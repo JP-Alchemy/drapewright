@@ -7,14 +7,21 @@ rust-version.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[features]
+# Random-piece generators for property tests in other crates.
+testing = ["dep:proptest"]
+
 [dependencies]
 kurbo.workspace = true
 i_overlay.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 ts-rs.workspace = true
+proptest = { workspace = true, optional = true }
 
 [dev-dependencies]
+# Enables the `testing` feature for this crate's own integration tests.
+soom-pattern-core = { path = ".", features = ["testing"] }
 proptest.workspace = true
 insta.workspace = true
 serde_json.workspace = true

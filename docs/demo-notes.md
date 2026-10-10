@@ -12,6 +12,34 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 2 — Geometry kernel (Phase 1, day 2)
+
+Nothing new in the browser yet; this step is the foundation the next ones
+draw with.
+
+**Try it:** `cargo test -p soom-pattern-core`. Seven property tests run
+256 random pieces each:
+
+* edge lengths add up to the outline length;
+* a point found by distance along an edge is found again by "nearest
+  point" (what tapping an edge will use);
+* splitting an edge and joining it back changes nothing, and notches stay
+  exactly where they were (to 0.000001 mm);
+* reversing an outline twice gives back the identical piece;
+* every piece survives a save/load round trip **bit for bit**. This test
+  caught that the JSON library rounds the last digit of some numbers by
+  default, which would have been a silent geometry change on every save. It
+  now uses exact round-tripping.
+
+**What's under the hood:** the piece model in
+`crates/pattern-core/src/model.rs` *is* the file format (serde types, with
+TypeScript types generated into `packages/engine/src/generated`), plus
+measuring (`geom.rs`), edge split/join/reverse that keep notches and corner
+styles in place (`ops.rs`), and the validation rules from the format spec
+(`validate.rs`).
+
+---
+
 ## Step 1 — Scaffold (Phase 1, day 1)
 
 **Try it:**

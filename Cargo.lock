@@ -570,6 +570,7 @@ dependencies = [
  "proptest",
  "serde",
  "serde_json",
+ "soom-pattern-core",
  "thiserror",
  "ts-rs",
 ]
