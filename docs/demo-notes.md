@@ -12,6 +12,46 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 3 — Seam allowance engine (Phase 1, day 3)
+
+**Try it:** open `crates/pattern-core/tests/gallery/index.html` in your
+browser (double-click it in Finder). It shows eleven hard cases, each
+with the stitching line dashed and the cutting line solid:
+
+* a half bodice with curved neckline and armhole, 15 mm seams, a 30 mm
+  waist hem folded back at the side seam, and centre front on the fold;
+* a flared skirt whose 40 mm hem angles back in at the side seam, so it
+  lies flat when turned up;
+* a trouser leg narrowing to the hem, where the hem allowance flares out
+  instead;
+* a 20° flare with a 50 mm hem, where the folded-back end is narrower than
+  the hem and the corner is trimmed;
+* a 10° point cut square at 40 mm, a squared corner, a circle, and an 8 mm
+  curve under a 15 mm allowance that the cutting line bridges cleanly;
+* a pattern with allowance *included*, with the stitching line derived
+  inside it.
+
+These are the pictures to show the seamstress for open questions 3 and 4
+(corner shapes).
+
+`cargo test -p soom-pattern-core` also runs the exact cases and four
+properties over hundreds of random pieces: the cut piece always contains
+the whole stitched piece and never crosses itself, away from corners the
+cutting line is exactly the allowance away (within 0.005 mm), and so on.
+
+**Speed:** under 1 ms per piece for everything in the gallery (release
+build). Curves tighter than the allowance first took 43 ms; they are now
+thinned where they cannot affect the result (0.4 ms, identical output).
+
+**How it works:** the allowance region is a union of simple pieces: a
+rectangle per flattened segment, pointed joins at kinks, and one polygon
+per corner shaped by its corner style. The union uses i_overlay. This
+avoids the classic failure of offsetting a curve and repairing its loops.
+The trade-off is a cutting line that is a polyline within 0.002 mm of the
+true curve.
+
+---
+
 ## Step 2 — Geometry kernel (Phase 1, day 2)
 
 Nothing new in the browser yet; this step is the foundation the next ones

@@ -187,11 +187,19 @@ Each corner joins the edge before it (*this* edge, which owns the
 |---|---|---|
 | `"auto"` | Automatic | `mirrorNext` if the next edge is a hem, `mirrorThis` if this edge is a hem, otherwise `mitre`. |
 | `"mitre"` | Pointed | Both cutting lines are extended until they meet. If the point would reach further than 4 × the larger allowance from the corner, it is cut square across at that distance. |
-| `"squareThis"`, `"squareNext"` | Squared | The allowance of the named edge ends with a cut at right angles to that edge, placed where the other edge's cutting line crosses the named edge's stitching line (extended). |
-| `"mirrorThis"`, `"mirrorNext"` | Folded back | The end of the named edge's allowance is the mirror image, reflected in that edge's stitching line, of the other edge's cutting line. When the allowance is folded back (a hem turned up, a seam pressed open) its end lies exactly on the other edge's cutting line. |
+| `"squareThis"`, `"squareNext"` | Squared | The allowance of the named edge ends with a cut at right angles to that edge, placed where the other edge's cutting line crosses the named edge's stitching line (extended). Applies where the corner is a right angle or sharper; at wider corners there is no point to cut off and the corner is pointed. |
+| `"mirrorThis"`, `"mirrorNext"` | Folded back | The end of the named edge's allowance is the mirror image, reflected in that edge's stitching line, of the other edge's cutting line. When the allowance is folded back (a hem turned up, a seam pressed open) its end lies exactly on the other edge's cutting line. Where that end is narrower than the allowance (a deep hem on a strongly flared skirt), the allowance is trimmed at the corner. |
 
 Corners next to a `fold` edge are constructed as `mitre` against the fold
-line, so the cutting line meets the fold exactly.
+line, so the cutting line meets the fold exactly. Shapes are built from
+the tangents at the corner. A shaped corner never reaches further than
+12 × the larger allowance, and never trims more than 4 × the larger
+allowance from the corner. Where it would, the corner is pointed and the app
+says so. Where an edge turns sharply between two of its own segments
+(a kink that is not a corner), the allowance is pointed there too.
+
+The reference implementation's gallery of corner cases is in
+`crates/pattern-core/tests/gallery/`.
 
 ### 4.5 Cut instructions
 

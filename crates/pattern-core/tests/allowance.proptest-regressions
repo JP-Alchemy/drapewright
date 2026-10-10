@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 4f20c017a30441097496600b9cad47a83707553737fc35f9fc52b925f3d665b5 # shrinks to mut piece = Piece { id: "p1", name: "Random piece", notes: "", outline: Outline { start: Pt { x: 134.78167988374219, y: 97.28983127880012 }, edges: [Edge { id: "e1", name: "", kind: Hem, segments: [Line(LineSeg { to: Pt { x: 66.63879013630236, y: 289.61460929903365 } }), Line(LineSeg { to: Pt { x: -50.34563128398698, y: 62.17167691655768 } })], allowance: None, end_corner: Auto }, Edge { id: "e2", name: "", kind: Hem, segments: [Line(LineSeg { to: Pt { x: -79.01506724761103, y: -12.514757203218425 } })], allowance: None, end_corner: Auto }, Edge { id: "e3", name: "", kind: Hem, segments: [Line(LineSeg { to: Pt { x: -28.66943596362399, y: -74.68643411977615 } }), Line(LineSeg { to: Pt { x: 176.6005776422385, y: -126.0904401715881 } }), Line(LineSeg { to: Pt { x: 134.78167988374219, y: 97.28983127880012 } })], allowance: None, end_corner: MirrorThis }] }, allowance: Allowance { mode: Add, seam: 0.0, hem: None }, cut: [CutInstruction { material: "main", quantity: 1, mirrored: None, on_fold: None }], grainline: None, notches: [], marks: [], lines: [], labels: [], placement: Placement { x: 0.0, y: 0.0, rotation: 0.0 }, source: None }, width = 1.0

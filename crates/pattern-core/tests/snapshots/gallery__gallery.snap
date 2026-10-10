@@ -1,0 +1,15 @@
+---
+source: crates/pattern-core/tests/gallery.rs
+expression: summary
+---
+rectangle: area 26400.0 mm², perimeter 680.00 mm, bounds (-10.00, -10.00)–(210.00, 110.00), notes []
+mixed-widths: area 26875.0 mm², perimeter 680.00 mm, bounds (-10.00, -25.00)–(205.00, 100.00), notes []
+bodice: area 97507.2 mm², perimeter 1341.15 mm, bounds (-0.13, -21.07)–(245.88, 460.03), notes []
+flared-skirt: area 177235.1 mm², perimeter 1857.92 mm, bounds (0.00, -15.02)–(320.00, 660.00), notes []
+wide-flare: area 143298.8 mm², perimeter 1543.70 mm, bounds (-15.00, -15.00)–(361.55, 450.00), notes []
+tapered-hem: area 132218.8 mm², perimeter 1607.07 mm, bounds (-16.25, -15.00)–(276.91, 540.00), notes []
+sharp-point: area 15209.7 mm², perimeter 787.58 mm, bounds (-40.00, -37.06)–(308.86, 37.06), notes []
+squared: area 17628.6 mm², perimeter 668.37 mm, bounds (-10.00, -10.00)–(237.32, 129.90), notes []
+circle: area 41556.9 mm², perimeter 722.65 mm, bounds (-115.00, -115.00)–(115.00, 115.00), notes []
+tight-curve: area 29900.0 mm², perimeter 720.00 mm, bounds (-15.00, -15.00)–(215.00, 115.00), notes []
+included: area 80564.4 mm², perimeter 1202.17 mm, bounds (0.00, 0.00)–(230.00, 430.00), notes []

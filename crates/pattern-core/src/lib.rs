@@ -4,6 +4,7 @@
 //! right, y down. Outlines run clockwise as seen on screen. See
 //! `docs/file-format.md` for the data model this crate implements.
 
+pub mod allowance;
 pub mod geom;
 pub mod model;
 pub mod ops;
