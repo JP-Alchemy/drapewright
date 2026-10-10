@@ -9,3 +9,5 @@ playwright-report
 docs/schema
 fixtures
 *.md
+crates/*/tests/gallery
+crates/*/tests/snapshots
