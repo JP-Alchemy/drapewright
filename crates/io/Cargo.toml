@@ -16,12 +16,16 @@ ts-rs.workspace = true
 sha2.workspace = true
 usvg.workspace = true
 roxmltree.workspace = true
+soom-project.workspace = true
+pdf-writer.workspace = true
+flate2.workspace = true
 
 [dev-dependencies]
 soom-pattern-core = { workspace = true, features = ["testing"] }
 insta.workspace = true
 serde_json.workspace = true
 proptest.workspace = true
+lopdf.workspace = true
 
 [lints]
 workspace = true

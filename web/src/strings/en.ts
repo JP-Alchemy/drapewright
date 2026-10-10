@@ -9,6 +9,7 @@ import type {
   ImportNote,
   NotchFrom,
   NotchKind,
+  PaperName,
   ScaleBasis,
   ScaleReason,
 } from '@soom/engine'
@@ -38,6 +39,7 @@ export const t = {
 
   actions: {
     open: 'Open pattern',
+    print: 'Print',
     undo: 'Undo',
     redo: 'Redo',
     undoThing: (label: string) => `Undo ${label}`,
@@ -299,6 +301,87 @@ export const t = {
           return `${pieceName(n.piece)}: the outline crosses itself. Check that piece after adding.`
       }
     },
+  },
+
+  print: {
+    heading: 'Print at true size',
+    paper: 'Paper',
+    papers: {
+      a4: 'A4',
+      letter: 'US Letter',
+      a3: 'A3',
+      tabloid: 'Tabloid (11 × 17 in)',
+      a0: 'A0 (copy shop)',
+    } satisfies Record<PaperName, string>,
+    custom: 'Custom size',
+    orientation: 'Orientation',
+    portrait: 'Portrait',
+    landscape: 'Landscape',
+    joining: 'Joining the pages',
+    trim: 'Trim and butt',
+    trimDetail: 'Cut off the margin on two sides and lay the pages edge to edge.',
+    overlap: 'Overlap',
+    overlapDetail: 'Lay each page over the next by a strip and match the circles.',
+    overlapWidth: 'Overlap strip',
+    margin: 'Margin',
+    marginHint: 'Most printers cannot print right up to the edge of the paper.',
+    notches: 'Notches',
+    slit: 'Slit into the allowance',
+    v: 'V outside the line',
+    stitchLine: 'Stitching line (dashed)',
+    testSquare: 'Test square',
+    pageMap: 'Page map on the first page',
+    skipEmpty: 'Leave out empty pages',
+    planning: 'Laying out the pages…',
+    summary: (pages: number) => plural(pages, '1 page', '# pages'),
+    grid: (columns: number, rows: number) => `${columns} across, ${rows} down`,
+    cover: 'including the page with the test square',
+    skipped: (n: number) => plural(n, '1 empty page left out', '# empty pages left out'),
+    preview: (pages: number) => `Layout of the ${plural(pages, 'page', '# pages')}`,
+    unprintable: (names: string[]) =>
+      `Some letters in ${namesList(names)} cannot be printed yet and will show as “?”.`,
+    save: 'Save PDF',
+    saving: 'Making the PDF…',
+    saved: (name: string) => `Saved ${name}. Print it at 100% and measure the test square.`,
+    failed: (message: string) => `The PDF could not be made. ${message}`,
+    hint: 'Print the PDF at 100% (“Actual size”), never “Fit to page”, then measure the test square before you cut.',
+    /** Words printed in the PDF. The PDF font has Western European letters only. */
+    pdf: {
+      subtitle: (pages: number, paper: string, joining: string) =>
+        `${plural(pages, '1 page', '# pages')} of ${paper} · ${joining.toLowerCase()}`,
+      scale:
+        'Print at 100% (“Actual size” or “Scale: 100”), never “Fit to page”, on one side of the paper.',
+      measure:
+        'Measure the test square before cutting: it must be exactly 10 cm (4 in). If it is not, check the print settings and print again.',
+      trim: 'Trim along the frame on the left and top of each page, except in column 1 and row A. Butt each page against its neighbours so the diamonds and page letters match, then tape them together.',
+      overlap:
+        'Trim the left and top margins of each page, except in column 1 and row A. Lay each page over its neighbour up to the dashed line so the circles match, then tape them together.',
+      skipped: 'Pages with nothing on them are left out; they are dashed on the map.',
+      squareMetric: '10 cm',
+      squareImperial: '4 in',
+      pageMap: 'Page map',
+      notPrinted: 'Dashed: not printed (nothing on it)',
+      placeOnFold: 'Place on fold',
+    },
+  },
+
+  screen: {
+    open: 'Measure the screen',
+    openUnmeasured: 'Measure the screen (not measured yet, so 100% is approximate)',
+    heading: 'Measure your screen',
+    intro:
+      'Hold a bank card, or any card that size, against the screen and slide until the outline matches the card’s edges. Then 100% shows pieces at their real size.',
+    card: 'Card outline, 85.6 × 54 mm',
+    size: 'Outline size',
+    smaller: 'A little smaller',
+    larger: 'A little larger',
+    ruler: 'Or measure this line with a ruler: it should be exactly 5 cm.',
+    rulerLabel: '5 cm line',
+    reset: 'Standard size',
+    cancel: 'Cancel',
+    save: 'Save',
+    saved: 'Screen measured: at 100% pieces show at their real size.',
+    standard: 'Back to the standard size: 100% is approximate.',
   },
 
   crash: {

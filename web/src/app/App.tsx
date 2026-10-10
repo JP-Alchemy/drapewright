@@ -5,6 +5,7 @@ import { Button } from 'react-aria-components'
 import { PatternCanvas } from '../canvas/PatternCanvas.tsx'
 import { actualSize, zoomAt } from '../canvas/viewport.ts'
 import { useEngineState } from '../state/hooks.ts'
+import { loadScreenScale } from '../platform/screen.ts'
 import { PATTERN_FILE_TYPES, Session } from '../state/session.ts'
 import { useStore } from '../state/store.ts'
 import { t } from '../strings/en.ts'
@@ -14,6 +15,8 @@ import { DeviceDialog } from './DeviceDialog.tsx'
 import { ImportDialog } from './ImportDialog.tsx'
 import { Inspector } from './Inspector.tsx'
 import { PieceList } from './PieceList.tsx'
+import { PrintDialog } from './PrintDialog.tsx'
+import { ScreenDialog } from './ScreenDialog.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { attachShortcuts } from './shortcuts.ts'
 
@@ -30,6 +33,7 @@ function TopBar({ session, onOpen }: { session: Session; onOpen: () => void }) {
         <FolderOpen size={18} aria-hidden="true" />
         {t.actions.open}
       </Button>
+      <PrintDialog session={session} />
       <div className="spacer" />
       <Button
         className="icon-button"
@@ -67,7 +71,10 @@ function ZoomControls({ session }: { session: Session }) {
       <Button
         className="zoom-label"
         aria-label={t.actions.actualSize}
-        onPress={() => session.setViewport(actualSize)}
+        onPress={() => {
+          session.setViewport(actualSize)
+          if (!session.ui.get().screenMeasured) session.toast(t.table.notCalibrated)
+        }}
       >
         {t.table.zoomLabel(viewport.zoom)}
       </Button>
@@ -85,6 +92,7 @@ function ZoomControls({ session }: { session: Session }) {
       >
         <Maximize2 size={18} aria-hidden="true" />
       </Button>
+      <ScreenDialog session={session} />
     </div>
   )
 }
@@ -175,7 +183,7 @@ export function App() {
     loadEngine()
       .then(() => {
         if (cancelled) return
-        const session = new Session(Engine.create(t.untitled), new IoClient())
+        const session = new Session(Engine.create(t.untitled), new IoClient(), loadScreenScale())
         // Opt-in handle for debugging and end-to-end tests: add ?debug to the URL.
         if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) {
           Object.assign(window, { soom: session })

@@ -13,8 +13,9 @@ import type {
 } from '@soom/engine'
 import { buildPaths } from '../canvas/paths.ts'
 import { type ScenePiece, sceneBounds } from '../canvas/renderer.ts'
-import { type ViewportState, fit, initialViewport } from '../canvas/viewport.ts'
+import { NOMINAL_PX_PER_MM, type ViewportState, fit, initialViewport } from '../canvas/viewport.ts'
 import { t } from '../strings/en.ts'
+import { saveScreenScale } from '../platform/screen.ts'
 import type { IoClient } from '../workers/io-client.ts'
 import { type Store, createStore } from './store.ts'
 
@@ -106,6 +107,8 @@ export interface UiState {
   tip: Tip | null
   /** Brief feedback, e.g. after a two-finger undo. */
   toast: string | null
+  /** Whether this screen's true size has been measured (see `setScreenScale`). */
+  screenMeasured: boolean
 }
 
 /** Space left between imported pieces and what is already on the table, mm. */
@@ -122,6 +125,7 @@ export class Session {
   constructor(
     readonly engine: Engine,
     readonly io: IoClient,
+    screenScale: number | null = null,
   ) {
     this.ui = createStore<UiState>({
       tool: 'select',
@@ -130,13 +134,14 @@ export class Session {
       hover: null,
       preview: null,
       grainPreview: null,
-      viewport: initialViewport,
+      viewport: { ...initialViewport, pxPerMm: screenScale ?? NOMINAL_PX_PER_MM },
       pendingImport: null,
       busy: null,
       notice: null,
       menu: null,
       tip: null,
       toast: null,
+      screenMeasured: screenScale !== null,
     })
     engine.subscribe((changes) => {
       // Print settings (notch style) change how every piece is drawn.
@@ -235,6 +240,19 @@ export class Session {
 
   openMenu(menu: MenuState | null): void {
     this.ui.set((s) => ({ ...s, menu }))
+  }
+
+  /**
+   * Sets how many CSS px make a millimetre on this screen (`null`: back to
+   * the nominal 96 to the inch). The zoom stays, so 100% is true size.
+   */
+  setScreenScale(pxPerMm: number | null): void {
+    saveScreenScale(pxPerMm)
+    this.ui.set((s) => ({
+      ...s,
+      viewport: { ...s.viewport, pxPerMm: pxPerMm ?? NOMINAL_PX_PER_MM },
+      screenMeasured: pxPerMm !== null,
+    }))
   }
 
   notify(notice: Notice | null): void {

@@ -91,8 +91,9 @@ matters.
     match*? *Provisional: trim and butt, with matching marks and A1/B2-style
     page labels.*
 13. ☐ **Paper and units**: A4 and centimetres, or US Letter and inches?
-    *Provisional: chosen from the device's language settings, changeable at
-    any time.*
+    *Provisional: new projects start on A4 in centimetres; Letter and
+    inches are one tap away and saved with the project. Choosing from the
+    device's language comes with project storage (day 10).*
 14. ☐ **Print the stitching line too** (dashed, inside the cutting line)?
     *Provisional: yes.*
 15. ☐ **Copy shop / projector**: does she ever print A0 at a copy shop or use

@@ -6,10 +6,12 @@
 import init, {
   EngineHandle,
   engineVersion,
+  exportPdf as exportPdfRaw,
   exportSvg as exportSvgRaw,
   finishImport as finishImportRaw,
   importDxf as importDxfRaw,
   importSvg as importSvgRaw,
+  planPrint as planPrintRaw,
   previewAllowance as previewAllowanceRaw,
 } from '../pkg/soom_wasm_core.js'
 import type {
@@ -24,8 +26,10 @@ import type {
   Hit,
   ImportResult,
   Issue,
+  PdfTexts,
   Piece,
   PieceView,
+  PrintPlan,
   ScaleOption,
   ViewState,
 } from './types'
@@ -180,6 +184,14 @@ export const jobs = {
   },
   exportSvg(pieces: Piece[]): string {
     return exportSvgRaw(pieces)
+  },
+  /** How the document would print. Throws if its print settings cannot print. */
+  planPrint(document: Document): PrintPlan {
+    return planPrintRaw(document) as PrintPlan
+  },
+  /** The document as a tiled PDF that prints at true size. */
+  exportPdf(document: Document, texts: PdfTexts): Uint8Array {
+    return exportPdfRaw(document, texts)
   },
 }
 

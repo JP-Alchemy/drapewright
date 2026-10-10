@@ -345,7 +345,7 @@ when building cutting lines.
 | `notchSpacing` | `6` | Gap between the marks of double and triple notches, mm. |
 | `testSquare`, `pageMap`, `skipEmptyPages` | `true` | |
 | `pieces` | `null` | `null` = all pieces, or a list of piece ids to print. |
-| `layout` | `null` | `null` = automatic, or `[{ "piece": "p1", "x": 0, "y": 0, "rotation": 90 }]` in mm on the printed sheet. |
+| `layout` | `null` | `null` = automatic, or `[{ "piece": "p1", "x": 0, "y": 0, "rotation": 90 }]`: each piece turned about its own origin by `rotation` degrees, then moved by `x`, `y` mm on the printed sheet (origin at the top-left of page A1's printed area, y down). Pieces not listed are laid out automatically below the listed ones. |
 
 ## 7. View state
 

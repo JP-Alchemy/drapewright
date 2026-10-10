@@ -1,0 +1,117 @@
+---
+source: crates/io/tests/pdf_export.rs
+expression: plan
+---
+{
+  "paperWidth": 210.0,
+  "paperHeight": 297.0,
+  "margin": 10.0,
+  "printableWidth": 190.0,
+  "printableHeight": 277.0,
+  "stepX": 190.0,
+  "stepY": 277.0,
+  "rows": 4,
+  "columns": 3,
+  "placements": [
+    {
+      "piece": "skirt",
+      "x": 5.000000299341593,
+      "y": 20.024469606215803,
+      "rotation": 0.0
+    },
+    {
+      "piece": "r0",
+      "x": 341.6881694793701,
+      "y": 20.0,
+      "rotation": 0.0
+    },
+    {
+      "piece": "r1",
+      "x": 20.0,
+      "y": 685.0244693756104,
+      "rotation": 0.0
+    },
+    {
+      "piece": "r2",
+      "x": 20.0,
+      "y": 805.0244693756104,
+      "rotation": 0.0
+    }
+  ],
+  "pages": [
+    {
+      "row": 0,
+      "column": 0,
+      "label": "A1",
+      "printed": true
+    },
+    {
+      "row": 0,
+      "column": 1,
+      "label": "A2",
+      "printed": true
+    },
+    {
+      "row": 0,
+      "column": 2,
+      "label": "A3",
+      "printed": true
+    },
+    {
+      "row": 1,
+      "column": 0,
+      "label": "B1",
+      "printed": true
+    },
+    {
+      "row": 1,
+      "column": 1,
+      "label": "B2",
+      "printed": true
+    },
+    {
+      "row": 1,
+      "column": 2,
+      "label": "B3",
+      "printed": false
+    },
+    {
+      "row": 2,
+      "column": 0,
+      "label": "C1",
+      "printed": true
+    },
+    {
+      "row": 2,
+      "column": 1,
+      "label": "C2",
+      "printed": true
+    },
+    {
+      "row": 2,
+      "column": 2,
+      "label": "C3",
+      "printed": true
+    },
+    {
+      "row": 3,
+      "column": 0,
+      "label": "D1",
+      "printed": true
+    },
+    {
+      "row": 3,
+      "column": 1,
+      "label": "D2",
+      "printed": false
+    },
+    {
+      "row": 3,
+      "column": 2,
+      "label": "D3",
+      "printed": false
+    }
+  ],
+  "cover": true,
+  "unprintable": []
+}

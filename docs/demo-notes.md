@@ -12,6 +12,66 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 9 — Printing at true size, and measuring the screen (Phase 1, day 9)
+
+**Try it:** open `fixtures/dxf/aama-skirt.dxf` and
+`fixtures/svg/flared-skirt.svg`, then press **Print** (top bar).
+
+1. **The print dialog** shows the pages as they will come out of the
+   printer, with the pieces laid out on them and the page letters (A1, A2…
+   B1…), plus the page count.
+   * Choose **A4, US Letter, A3, Tabloid or A0** (copy shop) and portrait
+     or landscape. The preview and count update as you go.
+   * Choose how pages join: **Trim and butt** (cut the margin off two sides
+     and lay pages edge to edge) or **Overlap** (lay pages over each other
+     by a strip, 1.5 cm by default).
+   * You can also set the margin, the notch style (slit or V), whether the
+     dashed stitching line prints, the test square, the page map, and
+     whether empty pages are left out.
+2. **Save PDF.** The file is made on your device and nothing is uploaded.
+   * Page 1 has the instructions and two test squares, **10 cm** and
+     **4 in**, plus a map of the pages.
+   * Every other page has a frame to trim along and its letter in the
+     margin, in faint large type and next to each neighbour's edge.
+   * Trimmed pages have half-diamonds that make a whole diamond when butted
+     together. Overlapping pages have a dashed line where the next page's
+     edge goes and circles to line up.
+   * Pieces have their cutting line (solid), stitching line (dashed),
+     notches, grainline, "Place on fold" brackets, drill holes and other
+     marks, plus their name and "Cut 1 · Main fabric".
+3. **Print it at 100%** ("Actual size"). The PDF asks readers not to
+   scale it and to print one-sided, but check the print dialog anyway.
+   **Measure the test square: it must be 10 cm.** Print settings are part
+   of the project and can be undone.
+4. **Measure your screen:** the ruler button (bottom left, with an orange
+   dot until it is done). Hold a bank card against the screen and slide
+   until the outline matches it, or check the 5 cm line with a ruler.
+   After that, **100%** shows pieces at their real size on this device. It
+   is remembered on this device only and is not part of any project.
+
+Drill holes and lines inside pieces now show on the table too, as they
+print.
+
+**How we know it is exact:** the tests read the PDF back and measure it:
+* Every page has the exact paper size, and print scaling is off.
+* The test squares measure 100.000 mm and 101.600 mm.
+* Known edges keep their lengths to 0.001 mm: 200 and 300 mm stitching
+  lines, and 230 and 330 mm cutting lines.
+* Every point of every cutting line falls on a printed page.
+* The same project always gives the same file.
+
+**Not yet:**
+* Pieces keep their table rotation and are laid out on shelves, without
+  rotating or nesting to save paper. Moving pieces on the print sheet by
+  hand comes later; the file format already holds such a layout.
+* A piece's name can be split across two pages.
+* The PDF uses the standard Helvetica font, which has Western European
+  letters only. The dialog lists any name that would print with "?".
+* New projects start on A4. Choosing Letter is one tap and is saved with
+  the project.
+
+---
+
 ## Step 8b — DXF import, and asking about seam allowance (Phase 1, day 8)
 
 **Try it:** *Open pattern* now takes `.dxf` as well as `.svg`.

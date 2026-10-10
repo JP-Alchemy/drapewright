@@ -17,7 +17,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "e2e": "pnpm --filter @soom/web e2e"
+    "e2e": "pnpm --filter @soom/web e2e",
+    "licences": "node scripts/check-licences.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

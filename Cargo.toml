@@ -30,6 +30,8 @@ sha2 = "0.11.0"
 # Formats
 usvg = { version = "0.48.1", default-features = false }
 roxmltree = "0.21.1"
+pdf-writer = "0.15.0"
+flate2 = "1.1.10"
 
 # WebAssembly facade (the CLI used by wasm-pack must match this version exactly)
 wasm-bindgen = "=0.2.129"
@@ -39,6 +41,7 @@ console_error_panic_hook = "0.1.7"
 # Tests
 proptest = "1.12.0"
 insta = { version = "1.49.0", features = ["json"] }
+lopdf = { version = "0.45.0", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

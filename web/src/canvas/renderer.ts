@@ -193,7 +193,14 @@ export function draw(
     ctx.strokeStyle = theme.stitch
     ctx.lineWidth = 1 / s
     ctx.stroke(paths.stitch)
+    ctx.strokeStyle = theme.ink
+    ctx.setLineDash([8 / s, 3 / s, 2 / s, 3 / s])
+    ctx.stroke(paths.dashedLines)
     ctx.setLineDash([])
+    ctx.stroke(paths.lines)
+    ctx.stroke(paths.marks)
+    ctx.fillStyle = theme.ink
+    ctx.fill(paths.dots)
     drawNotches(ctx, sp.view, s, theme)
     drawGrainline(ctx, piece, s, theme)
   }

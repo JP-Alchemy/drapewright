@@ -2,12 +2,13 @@
 //!
 //! Importers return plain pieces in millimetres together with what they
 //! learned about the file: how sure the scale is, and what was found,
-//! guessed or left out. Exporters take pieces and return bytes. Nothing in
-//! this crate touches a project or the browser.
+//! guessed or left out. Exporters take pieces, or for printing the whole
+//! document, and return bytes. Nothing in this crate touches the browser.
 
 mod assemble;
 pub mod dxf;
 pub mod import;
+pub mod pdf;
 pub mod svg;
 
 pub use import::{

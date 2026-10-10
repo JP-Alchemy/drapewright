@@ -8,11 +8,12 @@
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use soom_io::pdf::PdfTexts;
 use soom_io::svg::{SvgExportOptions, export_svg};
 use soom_io::{AllowanceAnswer, ImportResult, ScaleOption};
 use soom_pattern_core::{Issue, Piece, Pt};
 use soom_project::document::ViewState;
-use soom_project::{Command, CommandError, DispatchOptions, Engine};
+use soom_project::{Command, CommandError, DispatchOptions, Document, Engine};
 use wasm_bindgen::prelude::*;
 
 /// Called once by the host after the module is instantiated.
@@ -234,4 +235,21 @@ pub fn finish_import(
 pub fn export_svg_js(pieces: JsValue) -> Result<String, JsError> {
     let pieces: Vec<Piece> = from_js(pieces)?;
     Ok(export_svg(&pieces, &SvgExportOptions::default()))
+}
+
+/// How a document would print: the layout, the page grid and which pages
+/// print.
+#[wasm_bindgen(js_name = planPrint)]
+pub fn plan_print(document: JsValue) -> Result<JsValue, JsError> {
+    let doc: Document = from_js(document)?;
+    let plan = soom_io::pdf::plan_print(&doc).map_err(|e| JsError::new(&e.to_string()))?;
+    to_js(&plan)
+}
+
+/// A document as a PDF of tiled pages that print at true size.
+#[wasm_bindgen(js_name = exportPdf)]
+pub fn export_pdf(document: JsValue, texts: JsValue) -> Result<Vec<u8>, JsError> {
+    let doc: Document = from_js(document)?;
+    let texts: PdfTexts = from_js(texts)?;
+    soom_io::pdf::export_pdf(&doc, &texts).map_err(|e| JsError::new(&e.to_string()))
 }

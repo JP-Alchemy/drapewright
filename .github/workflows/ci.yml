@@ -51,6 +51,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm licences
       - run: pnpm wasm
       - name: WebAssembly size budget
         run: |
