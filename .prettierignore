@@ -1,0 +1,11 @@
+target
+pnpm-lock.yaml
+packages/engine/pkg
+packages/engine/src/generated
+**/dist
+**/dev-dist
+test-results
+playwright-report
+docs/schema
+fixtures
+*.md

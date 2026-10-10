@@ -1,0 +1,32 @@
+{
+  "name": "soom",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "wasm": "wasm-pack build crates/wasm-core --target web --out-dir ../../packages/engine/pkg --release",
+    "wasm:dev": "wasm-pack build crates/wasm-core --target web --out-dir ../../packages/engine/pkg --dev",
+    "dev": "pnpm --filter @soom/web dev",
+    "build": "pnpm wasm && pnpm --filter @soom/web build",
+    "preview": "pnpm --filter @soom/web preview",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "e2e": "pnpm --filter @soom/web e2e"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  }
+}

@@ -1,0 +1,213 @@
+/* Design tokens. The palette borrows from the sewing table: pattern paper,
+   ink, a green cutting mat, and a terracotta accent like tracing paper. */
+:root {
+  color-scheme: light;
+  --bg: #efe9df;
+  --surface: #fffdf9;
+  --surface-2: #f5f0e8;
+  --border: #d8cfc1;
+  --ink: #1f2a2e;
+  --ink-muted: #56666b;
+  --paper: #fbf7f0;
+  --mat: #2f5d50;
+  --mat-line: #3b6d5f;
+  --mat-line-major: #57907f;
+  --accent: #b4532a;
+  --accent-ink: #ffffff;
+  --select: #2563eb;
+  --ok: #2f7d4f;
+  --focus-ring: #2563eb;
+
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.08);
+  --font:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --tap: 44px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #161b1c;
+    --surface: #1f2627;
+    --surface-2: #273032;
+    --border: #364244;
+    --ink: #e8e4dc;
+    --ink-muted: #a3aeb0;
+    --paper: #e9e3d8;
+    --mat: #1d3a32;
+    --mat-line: #26493f;
+    --mat-line-major: #36695b;
+    --accent: #e07a4f;
+    --accent-ink: #1a1a1a;
+    --select: #6ea0ff;
+    --ok: #5cc28a;
+    --focus-ring: #6ea0ff;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #161b1c;
+  --surface: #1f2627;
+  --surface-2: #273032;
+  --border: #364244;
+  --ink: #e8e4dc;
+  --ink-muted: #a3aeb0;
+  --paper: #e9e3d8;
+  --mat: #1d3a32;
+  --mat-line: #26493f;
+  --mat-line-major: #36695b;
+  --accent: #e07a4f;
+  --accent-ink: #1a1a1a;
+  --select: #6ea0ff;
+  --ok: #5cc28a;
+  --focus-ring: #6ea0ff;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  /* No double-tap zoom on the app chrome; the canvas handles its own gestures. */
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 16px;
+  padding-top: env(safe-area-inset-top);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 650;
+  font-size: 18px;
+}
+
+.brand img {
+  border-radius: 7px;
+}
+
+/* The cutting table: a green mat with a 1 cm / 5 cm grid. The real grid is
+   drawn by the canvas at true scale; this CSS version is the empty state. */
+.table {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  overflow: auto;
+  background-color: var(--mat);
+  background-image:
+    linear-gradient(var(--mat-line-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mat-line-major) 1px, transparent 1px),
+    linear-gradient(var(--mat-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mat-line) 1px, transparent 1px);
+  background-size:
+    190px 190px,
+    190px 190px,
+    38px 38px,
+    38px 38px;
+}
+
+.card {
+  width: min(440px, 100%);
+  padding: 20px 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.card h1 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+
+.checks {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.checks li {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: start;
+}
+
+.checks li > span:last-child {
+  display: grid;
+}
+
+.check-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-muted);
+  background: var(--surface-2);
+}
+
+.checks li[data-ok='true'] .check-mark {
+  color: #fff;
+  background: var(--ok);
+}
+
+.muted {
+  color: var(--ink-muted);
+}
+
+.small {
+  margin: 0;
+  font-size: 13px;
+}
