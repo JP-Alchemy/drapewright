@@ -30,13 +30,3 @@ export function pdfTexts(doc: Document, plan: PrintPlan): PdfTexts {
     pieceLines: Object.fromEntries(doc.pieces.map((p) => [p.id, [cutSummary(p)].filter(Boolean)])),
   }
 }
-
-/** A file name from the project name, without characters file systems reject. */
-export function pdfFileName(name: string): string {
-  const safe = [...name]
-    .map((c) => (c < ' ' || '\\/:*?"<>|'.includes(c) ? '-' : c))
-    .join('')
-    .trim()
-    .slice(0, 80)
-  return `${safe || 'pattern'}.pdf`
-}

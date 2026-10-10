@@ -13,3 +13,13 @@ export function saveFile(bytes: Uint8Array, name: string, type: string): void {
   // Some browsers read the file after the click returns.
   setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
+
+/** A file name from a project name, without characters file systems reject. */
+export function fileName(name: string, extension: string): string {
+  const safe = [...name]
+    .map((c) => (c < ' ' || '\\/:*?"<>|'.includes(c) ? '-' : c))
+    .join('')
+    .trim()
+    .slice(0, 80)
+  return `${safe || 'pattern'}.${extension}`
+}

@@ -5,7 +5,7 @@ import { Button } from 'react-aria-components'
 import { PatternCanvas } from '../canvas/PatternCanvas.tsx'
 import { actualSize, zoomAt } from '../canvas/viewport.ts'
 import { useEngineState } from '../state/hooks.ts'
-import { saveFile } from '../platform/save-file.ts'
+import { fileName, saveFile } from '../platform/save-file.ts'
 import { loadScreenScale } from '../platform/screen.ts'
 import { PATTERN_FILE_TYPES, Session } from '../state/session.ts'
 import { useStore } from '../state/store.ts'
@@ -110,16 +110,6 @@ function TopBar({
       <DeviceDialog />
     </header>
   )
-}
-
-/** A file name from a project name, without characters file systems reject. */
-export function fileName(name: string, extension: string): string {
-  const safe = [...name]
-    .map((c) => (c < ' ' || '\\/:*?"<>|'.includes(c) ? '-' : c))
-    .join('')
-    .trim()
-    .slice(0, 80)
-  return `${safe || 'pattern'}.${extension}`
 }
 
 function ZoomControls({ session }: { session: Session }) {

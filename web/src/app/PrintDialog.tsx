@@ -25,12 +25,12 @@ import {
   SelectValue,
   Switch,
 } from 'react-aria-components'
-import { saveFile } from '../platform/save-file.ts'
+import { fileName, saveFile } from '../platform/save-file.ts'
 import { useEngineState } from '../state/hooks.ts'
 import type { Session } from '../state/session.ts'
 import { t } from '../strings/en.ts'
 import { LengthField } from './LengthField.tsx'
-import { paperLabel, pdfFileName, pdfTexts } from './print.ts'
+import { paperLabel, pdfTexts } from './print.ts'
 
 const PAPERS: PaperName[] = ['a4', 'letter', 'a3', 'tabloid', 'a0']
 
@@ -105,7 +105,7 @@ function PrintForm({ session, close }: { session: Session; close: () => void }) 
     setSaving(true)
     try {
       const bytes = await session.io.call('exportPdf', doc, pdfTexts(doc, ready))
-      const name = pdfFileName(doc.meta.name)
+      const name = fileName(doc.meta.name, 'pdf')
       saveFile(bytes, name, 'application/pdf')
       session.toast(t.print.saved(name))
       close()
