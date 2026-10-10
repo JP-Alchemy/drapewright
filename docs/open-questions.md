@@ -1,0 +1,101 @@
+# Open questions
+
+Questions I would rather ask than guess. Each one has a **provisional
+default** that the code uses until it is answered. Every default is a single
+setting, so changing it later is cheap.
+
+Status key: ☐ open · ☑ answered (answer recorded inline)
+
+---
+
+## For you (JP)
+
+### Licence
+☐ **Which licence?** I have not added one; the manifests say "licence to be
+decided".
+
+| Option | For | Against |
+|---|---|---|
+| **MIT OR Apache-2.0** (dual, the Rust convention) | Anyone can embed the geometry kernel or importers, including tools like FreeSewing (MIT) and commercial cutter vendors. Compatible with an App Store build later. All our dependencies already use these licences. | Someone could ship a closed fork of the app. |
+| **MPL-2.0** | Changes to our files must stay open, but the code can still be combined with other code. Firefox for iOS ships under it, so App Store distribution works. | Slightly more friction for embedders. |
+| **GPLv3** | Every fork must stay open. Lets us copy code from Seamly2D/Valentina. | GPLv3 conflicts with App Store terms, so no future native iPad app without a different licence. We do not need their code anyway: reading their file formats is fine under any licence. |
+
+My recommendation: **MIT OR Apache-2.0**, because interoperability is one of
+the product principles and nothing we need is GPL.
+
+### Other
+☐ **Acceptance garments** — the `[FILL IN]` in the brief. Which 3–4 garments,
+and can I have her pattern files (or the names of the patterns) as private
+test fixtures?
+☐ **Hosting** for the installable app, once she should try it on her iPad:
+Cloudflare Pages or Netlify (free, both support the isolation headers), or
+something you already use.
+☐ **Name**: is "Soom" staying for now? It only affects the app title and
+package names.
+
+---
+
+## For the seamstress
+
+Each question says what I do now (the provisional default) and why it
+matters.
+
+### Seam allowance
+1. ☐ **Default seam allowance for a pattern that has none.** 1.5 cm (5/8″,
+   the common commercial standard) or 1 cm (common in European patterns)?
+   *Provisional: 1.5 cm seams, 1.5 cm hems, set per piece and per edge.*
+2. ☐ **Default hem allowance**, if different from seams. *Provisional: same as
+   seams.*
+3. ☐ **Corners of the allowance.** I support four shapes (pictures in the
+   app): *pointed* (lines extended until they meet), *squared* (cut at a
+   right angle to one edge), *folded back* (shaped so that when a hem is
+   turned up, or a seam pressed open, the end lines up exactly), and
+   *automatic*. *Provisional: automatic = folded back where an edge meets a
+   hem, pointed elsewhere, with very sharp points cut square.* Is that what
+   she expects to see on a printed pattern?
+4. ☐ **"Squared" and "reverse for darts".** The brief lists these corner
+   styles. I read *squared* as "cut at a right angle to one of the two
+   seams", and *reverse for darts* as the shaped peak in the cutting line at
+   a dart so the allowance is straight when the dart is folded. Is that what
+   she means? (Darts come in Phase 4.)
+5. ☐ **Patterns that already include allowance.** When she imports a
+   pattern with allowance included, would she rather work on the cutting
+   line (as on paper, allowance implied) or have it converted to the
+   stitching line with the allowance added back? *Provisional: keep the
+   cutting line exactly as printed and show the stitching line dashed inside
+   it.* Nothing is converted unless she asks.
+
+### Notches and marks
+6. ☐ **How notches should look in print**: a short slit into the allowance,
+   or a small triangle outside the cutting line? *Provisional: slit.*
+7. ☐ **When an edge gets longer or shorter**, should a notch keep its
+   distance from the corner it was measured from, or slide proportionally?
+   *Provisional: keep its distance from the nearer corner at the time it was
+   placed.*
+8. ☐ **Double and triple notches**: is 6 mm (¼″) between the marks right?
+9. ☐ **Grainline**: double-headed arrow by default, single-headed for
+   napped or one-way fabrics. Correct?
+
+### Cutting instructions
+10. ☐ When a piece says **"Cut 2"**, does she assume a mirrored pair (fabric
+    folded) unless stated otherwise? *Provisional: yes.*
+11. ☐ **Place on fold**: the fold edge gets no allowance and is printed with
+    the usual bracket arrow. Correct?
+
+### Printing
+12. ☐ **Assembling tiled pages**: does she prefer *trim and butt* (cut off
+    the margin on two sides and butt pages edge to edge) or *overlap and
+    match*? *Provisional: trim and butt, with matching marks and A1/B2-style
+    page labels.*
+13. ☐ **Paper and units**: A4 and centimetres, or US Letter and inches?
+    *Provisional: chosen from the device's language settings, changeable at
+    any time.*
+14. ☐ **Print the stitching line too** (dashed, inside the cutting line)?
+    *Provisional: yes.*
+15. ☐ **Copy shop / projector**: does she ever print A0 at a copy shop or use
+    a projector? (Both are planned; this sets the priority.)
+
+### Her patterns
+16. ☐ **Where do her patterns come from?** Big 4 tissue, indie PDFs (which
+    companies?), magazines (Burda), or self-drafted? This decides which
+    importers and size systems get the most testing.
