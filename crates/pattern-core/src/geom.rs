@@ -210,6 +210,58 @@ impl Outline {
     }
 }
 
+/// Signed area of a closed polygon (positive: clockwise on screen).
+pub fn polygon_area(points: &[Point]) -> f64 {
+    let n = points.len();
+    (0..n)
+        .map(|i| points[i].to_vec2().cross(points[(i + 1) % n].to_vec2()))
+        .sum::<f64>()
+        * 0.5
+}
+
+/// Whether `p` lies inside a closed polygon (non-zero winding).
+pub fn point_in_polygon(p: Point, points: &[Point]) -> bool {
+    let n = points.len();
+    let mut winding = 0;
+    for i in 0..n {
+        let (a, b) = (points[i], points[(i + 1) % n]);
+        let side = (b - a).cross(p - a);
+        if a.y <= p.y {
+            if b.y > p.y && side > 0.0 {
+                winding += 1;
+            }
+        } else if b.y <= p.y && side < 0.0 {
+            winding -= 1;
+        }
+    }
+    winding != 0
+}
+
+/// Distance from `p` to a polyline; `closed` joins the last point to the first.
+pub fn distance_to_polyline(p: Point, points: &[Point], closed: bool) -> f64 {
+    let n = points.len();
+    if n == 0 {
+        return f64::INFINITY;
+    }
+    if n == 1 {
+        return p.distance(points[0]);
+    }
+    let count = if closed { n } else { n - 1 };
+    (0..count)
+        .map(|i| {
+            let (a, b) = (points[i], points[(i + 1) % n]);
+            let ab = b - a;
+            let len2 = ab.hypot2();
+            let t = if len2 > 0.0 {
+                ((p - a).dot(ab) / len2).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            p.distance(a + ab * t)
+        })
+        .fold(f64::INFINITY, f64::min)
+}
+
 /// The nearest point on an edge to some query point.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EdgeNearest {

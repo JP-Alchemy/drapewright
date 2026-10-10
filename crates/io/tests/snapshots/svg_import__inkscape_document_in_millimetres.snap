@@ -1,0 +1,281 @@
+---
+source: crates/io/tests/svg_import.rs
+expression: r
+---
+{
+  "pieces": [
+    {
+      "id": "p5",
+      "name": "Skirt front",
+      "notes": "",
+      "outline": {
+        "start": [
+          10.0,
+          20.0
+        ],
+        "edges": [
+          {
+            "id": "e1",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "c1": [
+                  80.0,
+                  24.0
+                ],
+                "c2": [
+                  150.0,
+                  28.0
+                ],
+                "to": [
+                  210.0,
+                  32.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e2",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  310.0,
+                  620.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e3",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "c1": [
+                  210.0,
+                  635.0
+                ],
+                "c2": [
+                  110.0,
+                  640.0
+                ],
+                "to": [
+                  10.0,
+                  640.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e4",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  10.0,
+                  20.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          }
+        ]
+      },
+      "allowance": {
+        "mode": "add",
+        "seam": 15.0,
+        "hem": null
+      },
+      "cut": [
+        {
+          "material": "main",
+          "quantity": 1,
+          "mirrored": null,
+          "onFold": null
+        }
+      ],
+      "grainline": {
+        "from": [
+          130.0,
+          170.0
+        ],
+        "to": [
+          130.0,
+          470.0
+        ],
+        "oneWay": false
+      },
+      "notches": [],
+      "marks": [
+        {
+          "id": "m11",
+          "kind": "dot",
+          "at": [
+            160.0,
+            320.0
+          ],
+          "size": 6.0,
+          "length": null,
+          "angle": 0.0,
+          "label": null
+        }
+      ],
+      "lines": [],
+      "labels": [],
+      "placement": {
+        "x": 0.0,
+        "y": 0.0,
+        "rotation": 0.0
+      },
+      "source": {
+        "format": "svg",
+        "file": "inkscape-mm.svg",
+        "sha256": "30e7197c5806055e00019ec424db26126b0cf48adbc8271b9f157f56233d2500",
+        "ref": "path101",
+        "scale": {
+          "mmPerUnit": 0.26458333333333334,
+          "basis": "declaredUnits",
+          "confirmed": true
+        }
+      }
+    },
+    {
+      "id": "p10",
+      "name": "Waistband",
+      "notes": "",
+      "outline": {
+        "start": [
+          360.0,
+          20.0
+        ],
+        "edges": [
+          {
+            "id": "e6",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  440.0,
+                  20.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e7",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  440.0,
+                  720.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e8",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  360.0,
+                  720.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e9",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  360.0,
+                  20.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          }
+        ]
+      },
+      "allowance": {
+        "mode": "add",
+        "seam": 15.0,
+        "hem": null
+      },
+      "cut": [
+        {
+          "material": "main",
+          "quantity": 1,
+          "mirrored": null,
+          "onFold": null
+        }
+      ],
+      "grainline": null,
+      "notches": [],
+      "marks": [],
+      "lines": [],
+      "labels": [],
+      "placement": {
+        "x": 0.0,
+        "y": 0.0,
+        "rotation": 0.0
+      },
+      "source": {
+        "format": "svg",
+        "file": "inkscape-mm.svg",
+        "sha256": "30e7197c5806055e00019ec424db26126b0cf48adbc8271b9f157f56233d2500",
+        "ref": "waistband",
+        "scale": {
+          "mmPerUnit": 0.26458333333333334,
+          "basis": "declaredUnits",
+          "confirmed": true
+        }
+      }
+    }
+  ],
+  "scale": {
+    "chosen": {
+      "mmPerUnit": 0.26458333333333334,
+      "basis": "declaredUnits"
+    },
+    "certain": true,
+    "reason": "declaredUnits",
+    "alternatives": []
+  },
+  "notes": [
+    {
+      "kind": "smallShapesIgnored",
+      "count": 1
+    },
+    {
+      "kind": "looseLinesIgnored",
+      "count": 1
+    }
+  ],
+  "sha256": "30e7197c5806055e00019ec424db26126b0cf48adbc8271b9f157f56233d2500"
+}

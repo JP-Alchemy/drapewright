@@ -13,6 +13,7 @@ publish = false
 [workspace.dependencies]
 # Our crates
 soom-pattern-core = { path = "crates/pattern-core" }
+soom-io = { path = "crates/io" }
 
 # Geometry
 kurbo = "0.13.1"
@@ -23,6 +24,11 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.152", features = ["float_roundtrip"] }
 thiserror = "2.0.21"
 ts-rs = "12.0.1"
+sha2 = "0.11.0"
+
+# Formats
+usvg = { version = "0.48.1", default-features = false }
+roxmltree = "0.21.1"
 
 # WebAssembly facade (the CLI used by wasm-pack must match this version exactly)
 wasm-bindgen = "=0.2.129"

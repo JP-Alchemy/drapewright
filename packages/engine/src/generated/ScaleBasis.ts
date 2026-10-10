@@ -3,4 +3,4 @@
 /**
  * How the import scale was established.
  */
-export type ScaleBasis = "declaredUnits" | "assumed96dpi" | "assumed72dpi" | "measured";
+export type ScaleBasis = "declaredUnits" | "assumed96dpi" | "assumed72dpi" | "assumed90dpi" | "measured";

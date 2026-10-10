@@ -1,0 +1,132 @@
+---
+source: crates/io/tests/svg_import.rs
+expression: r
+---
+{
+  "pieces": [
+    {
+      "id": "p5",
+      "name": "Facing",
+      "notes": "",
+      "outline": {
+        "start": [
+          20.0,
+          20.0
+        ],
+        "edges": [
+          {
+            "id": "e1",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  220.0,
+                  20.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e2",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  220.0,
+                  120.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e3",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  20.0,
+                  120.0
+                ]
+              }
+            ],
+            "allowance": 30.0,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e4",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  20.0,
+                  20.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          }
+        ]
+      },
+      "allowance": {
+        "mode": "add",
+        "seam": 15.0,
+        "hem": null
+      },
+      "cut": [
+        {
+          "material": "main",
+          "quantity": 1,
+          "mirrored": null,
+          "onFold": null
+        }
+      ],
+      "grainline": null,
+      "notches": [],
+      "marks": [],
+      "lines": [],
+      "labels": [],
+      "placement": {
+        "x": 0.0,
+        "y": 0.0,
+        "rotation": 0.0
+      },
+      "source": {
+        "format": "svg",
+        "file": "cut-and-seam.svg",
+        "sha256": "97a94f800c8d699e318e74b069c395c4809d79ca83fc7cb96bb08fce79cb8c4e",
+        "ref": "facing-cut",
+        "scale": {
+          "mmPerUnit": 0.26458333333333334,
+          "basis": "declaredUnits",
+          "confirmed": true
+        }
+      }
+    }
+  ],
+  "scale": {
+    "chosen": {
+      "mmPerUnit": 0.26458333333333334,
+      "basis": "declaredUnits"
+    },
+    "certain": true,
+    "reason": "declaredUnits",
+    "alternatives": []
+  },
+  "notes": [
+    {
+      "kind": "seamLineFound",
+      "piece": "p5",
+      "allowance": 15.0
+    }
+  ],
+  "sha256": "97a94f800c8d699e318e74b069c395c4809d79ca83fc7cb96bb08fce79cb8c4e"
+}

@@ -5,6 +5,7 @@
 //! `docs/file-format.md` for the data model this crate implements.
 
 pub mod allowance;
+pub mod build;
 pub mod geom;
 pub mod model;
 pub mod ops;

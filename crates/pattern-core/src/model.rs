@@ -401,6 +401,9 @@ pub enum ScaleBasis {
     /// No physical units; assumed points at 72 per inch (Illustrator).
     #[serde(rename = "assumed72dpi")]
     Assumed72Dpi,
+    /// No physical units; assumed 90 per inch (Inkscape before 0.92).
+    #[serde(rename = "assumed90dpi")]
+    Assumed90Dpi,
     /// The user measured a known length.
     Measured,
 }

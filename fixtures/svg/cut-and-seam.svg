@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="250mm" height="160mm" viewBox="0 0 250 160">
+  <g id="facing">
+    <path id="facing-cut" d="M 5 5 H 235 V 150 H 5 Z" fill="none" stroke="black"/>
+    <path id="facing-seam" d="M 20 20 H 220 V 120 H 20 Z" fill="none" stroke="black" stroke-dasharray="2 1"/>
+  </g>
+</svg>

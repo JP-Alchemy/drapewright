@@ -22,6 +22,7 @@ Project licence: **not yet chosen** (see
 | thiserror | MIT OR Apache-2.0 | Error types | all |
 | usvg | Apache-2.0 OR MIT | SVG parsing (CSS, transforms, units) | io |
 | roxmltree | MIT OR Apache-2.0 | Reading SVG root attributes and text | io |
+| sha2 | MIT OR Apache-2.0 | Hashing imported files for provenance | io |
 | pdf-writer | MIT OR Apache-2.0 | PDF generation | io |
 | zip | MIT | `.soom` container | project |
 | schemars | MIT | JSON Schema generation for the public format | project |

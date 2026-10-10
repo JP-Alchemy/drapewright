@@ -12,6 +12,40 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 4 — SVG import and export (Phase 1, day 4)
+
+Still nothing new in the browser: the importer gets its screen in step 5.
+
+**Try it:** `cargo test -p soom-io`. The fixtures in `fixtures/svg/` cover
+what real files throw at an importer:
+
+* **Inkscape, in millimetres** (`inkscape-mm.svg`): two pieces found and
+  named from their labels ("Skirt front", "Waistband"), a layer transform
+  undone, the grainline recognised from its id, a drill hole kept as a
+  mark. A notch drawn as a triangle, a title and a stray line are counted
+  and reported, never silently dropped.
+* **Illustrator** (`illustrator-pt.svg`): sizes in points written as
+  pixels. The importer reads it as points (Illustrator's habit) but marks
+  the scale **unconfirmed**; choosing another reading rescales everything.
+* **No units** (`unitless.svg`): the scale is a guess and must be
+  confirmed or measured. Imports never pretend to know.
+* **Cutting and stitching lines both present** (`cut-and-seam.svg`): paired
+  automatically. The stitching line becomes the outline and the allowance
+  is measured edge by edge (15 mm, with a 30 mm hem). The importer then
+  checks its own cutting line against the file's and would report any
+  difference.
+* **Transforms and `<use>`** (`transforms.svg`): rotated and scaled shapes
+  come out at the right size.
+* **Round trip**: pieces exported to SVG and imported again come back
+  within 0.001 mm, with the same allowances.
+
+**Scale rules:** a file is only trusted when its width and height state
+physical units. Otherwise the importer suggests 96, 72 or 90 per inch from
+clues (Illustrator's generator comment, old Inkscape versions, a drawing
+exactly the size of A4 or Letter) and the app will ask.
+
+---
+
 ## Step 3 — Seam allowance engine (Phase 1, day 3)
 
 **Try it:** open `crates/pattern-core/tests/gallery/index.html` in your
