@@ -14,16 +14,17 @@ publish = false
 # Our crates
 soom-pattern-core = { path = "crates/pattern-core" }
 soom-io = { path = "crates/io" }
+soom-project = { path = "crates/project" }
 
 # Geometry
 kurbo = "0.13.1"
 i_overlay = "9.0.1"
 
 # Data
-serde = { version = "1.0.229", features = ["derive"] }
+serde = { version = "1.0.229", features = ["derive", "rc"] }
 serde_json = { version = "1.0.152", features = ["float_roundtrip"] }
 thiserror = "2.0.21"
-ts-rs = "12.0.1"
+ts-rs = { version = "12.0.1", features = ["serde-json-impl"] }
 sha2 = "0.11.0"
 
 # Formats

@@ -35,7 +35,11 @@ type Contour = Vec<[f64; 2]>;
 
 /// Something about the allowance worth telling the user.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase", tag = "kind")]
+#[serde(
+    rename_all = "camelCase",
+    tag = "kind",
+    rename_all_fields = "camelCase"
+)]
 #[ts(export)]
 pub enum AllowanceNote {
     /// The requested corner shape is not possible at this corner (for

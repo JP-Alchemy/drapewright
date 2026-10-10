@@ -1,94 +1,186 @@
-import { engineVersion, loadEngine } from '@soom/engine'
-import { useEffect, useState } from 'react'
-import { type Capabilities, detectCapabilities } from '../platform/capabilities.ts'
+import { Engine, loadEngine } from '@soom/engine'
+import { FolderOpen, Maximize2, Minus, Plus, Redo2, Undo2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Button } from 'react-aria-components'
+import { PatternCanvas } from '../canvas/PatternCanvas.tsx'
+import { actualSize, zoomAt } from '../canvas/viewport.ts'
+import { useEngineState } from '../state/hooks.ts'
+import { Session } from '../state/session.ts'
+import { useStore } from '../state/store.ts'
+import { t } from '../strings/en.ts'
+import { IoClient } from '../workers/io-client.ts'
+import { DeviceDialog } from './DeviceDialog.tsx'
+import { ImportDialog } from './ImportDialog.tsx'
+import { PieceList } from './PieceList.tsx'
 
-interface CheckRow {
-  label: string
-  detail: string
-  ok: boolean
-  /** Shown instead of `detail` when the check fails. */
-  fallback: string
+const isApple = /Mac|iPhone|iPad/.test(navigator.platform) || navigator.userAgent.includes('Mac')
+
+function TopBar({ session, onOpen }: { session: Session; onOpen: () => void }) {
+  const state = useEngineState(session)
+  const name = session.engine.document().meta.name
+  return (
+    <header className="topbar">
+      <div className="brand">
+        <img src="/icon.svg" alt="" width={28} height={28} />
+        <span className="project-name">{name}</span>
+      </div>
+      <Button className="button" onPress={onOpen}>
+        <FolderOpen size={18} aria-hidden="true" />
+        {t.actions.open}
+      </Button>
+      <div className="spacer" />
+      <Button
+        className="icon-button"
+        aria-label={state.undoLabel ? t.actions.undoThing(state.undoLabel) : t.actions.undo}
+        isDisabled={!state.canUndo}
+        onPress={() => session.engine.undo()}
+      >
+        <Undo2 size={20} aria-hidden="true" />
+      </Button>
+      <Button
+        className="icon-button"
+        aria-label={state.redoLabel ? t.actions.redoThing(state.redoLabel) : t.actions.redo}
+        isDisabled={!state.canRedo}
+        onPress={() => session.engine.redo()}
+      >
+        <Redo2 size={20} aria-hidden="true" />
+      </Button>
+      <DeviceDialog />
+    </header>
+  )
 }
 
-function checkRows(caps: Capabilities): CheckRow[] {
-  return [
-    {
-      label: 'Saves on this device',
-      detail: 'Projects stay private, in this browser’s own storage.',
-      ok: caps.opfs,
-      fallback: 'This browser cannot store projects. Use Back up often.',
-    },
-    {
-      label: 'Works without internet',
-      detail: 'After this first visit the app opens offline.',
-      ok: caps.serviceWorker,
-      fallback: 'Offline use is not available in this browser.',
-    },
-    {
-      label: '3D draping',
-      detail: 'Your graphics chip can run the fabric simulation.',
-      ok: caps.webgpu,
-      fallback: '3D will show saved drapes only. Try the latest Chrome or Safari.',
-    },
-    {
-      label: 'Fast mode',
-      detail: 'Cross-origin isolated, for multi-core work.',
-      ok: caps.crossOriginIsolated,
-      fallback: 'The page is not served with isolation headers.',
-    },
-  ]
+function ZoomControls({ session }: { session: Session }) {
+  const { viewport } = useStore(session.ui)
+  const centre = { x: viewport.width / 2, y: viewport.height / 2 }
+  return (
+    <div className="zoom-controls" role="toolbar" aria-label="Zoom">
+      <Button
+        className="icon-button"
+        aria-label={t.actions.zoomOut}
+        onPress={() => session.setViewport((v) => zoomAt(v, centre, 1 / 1.5))}
+      >
+        <Minus size={18} aria-hidden="true" />
+      </Button>
+      <Button
+        className="zoom-label"
+        aria-label={t.actions.actualSize}
+        onPress={() => session.setViewport(actualSize)}
+      >
+        {t.table.zoomLabel(viewport.zoom)}
+      </Button>
+      <Button
+        className="icon-button"
+        aria-label={t.actions.zoomIn}
+        onPress={() => session.setViewport((v) => zoomAt(v, centre, 1.5))}
+      >
+        <Plus size={18} aria-hidden="true" />
+      </Button>
+      <Button
+        className="icon-button"
+        aria-label={t.actions.fitAll}
+        onPress={() => session.fitAll()}
+      >
+        <Maximize2 size={18} aria-hidden="true" />
+      </Button>
+    </div>
+  )
 }
 
-export function App() {
-  const [caps, setCaps] = useState<Capabilities | null>(null)
-  const [version, setVersion] = useState<string | null>(null)
-  const [engineError, setEngineError] = useState<string | null>(null)
+function Workspace({ session }: { session: Session }) {
+  const fileInput = useRef<HTMLInputElement>(null)
+  const { busy, notice } = useStore(session.ui)
+  useEngineState(session)
+  const empty = session.engine.document().pieces.length === 0
+  const open = () => fileInput.current?.click()
 
   useEffect(() => {
-    void detectCapabilities().then(setCaps)
-    loadEngine()
-      .then(() => setVersion(engineVersion()))
-      .catch((err: unknown) => setEngineError(String(err)))
-  }, [])
+    const onKey = (e: KeyboardEvent) => {
+      const mod = isApple ? e.metaKey : e.ctrlKey
+      if (!mod) return
+      const key = e.key.toLowerCase()
+      if (key === 'z' && !e.shiftKey) session.engine.undo()
+      else if ((key === 'z' && e.shiftKey) || key === 'y') session.engine.redo()
+      else if (key === 'o') open()
+      else return
+      e.preventDefault()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [session])
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <img src="/icon.svg" alt="" width={28} height={28} />
-          <span>Soom</span>
-        </div>
-      </header>
-
-      <main className="table" aria-label="Cutting table">
-        <section className="card" aria-labelledby="device-title">
-          <h1 id="device-title">This device</h1>
-          {caps === null ? (
-            <p className="muted">Checking…</p>
-          ) : (
-            <ul className="checks">
-              {checkRows(caps).map((row) => (
-                <li key={row.label} data-ok={row.ok}>
-                  <span className="check-mark" aria-hidden="true">
-                    {row.ok ? '✓' : '–'}
-                  </span>
-                  <span>
-                    <strong>{row.label}</strong>
-                    <span className="muted">{row.ok ? row.detail : row.fallback}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
+      <TopBar session={session} onOpen={open} />
+      <input
+        ref={fileInput}
+        type="file"
+        accept=".svg,image/svg+xml"
+        hidden
+        data-testid="pattern-file"
+        onChange={(e) => {
+          const file = e.currentTarget.files?.[0]
+          e.currentTarget.value = ''
+          if (file) void session.openPatternFile(file)
+        }}
+      />
+      <div className="workspace">
+        <main className="table" aria-label="Cutting table">
+          <PatternCanvas session={session} />
+          {empty && (
+            <div className="empty-state">
+              <p>{t.table.empty}</p>
+              <p className="muted small">{t.table.emptyHint}</p>
+              <Button className="button primary" onPress={open}>
+                <FolderOpen size={18} aria-hidden="true" />
+                {t.actions.open}
+              </Button>
+            </div>
           )}
-          <p className="muted small" data-testid="engine-status">
-            {engineError
-              ? `Pattern engine failed to load: ${engineError}`
-              : version
-                ? `Pattern engine ${version}`
-                : 'Loading pattern engine…'}
-          </p>
-        </section>
-      </main>
+          <ZoomControls session={session} />
+          {busy && (
+            <div className="status-bar" role="status">
+              {busy}
+            </div>
+          )}
+          {notice && (
+            <div
+              className={`status-bar ${notice.kind}`}
+              role={notice.kind === 'error' ? 'alert' : 'status'}
+            >
+              <span>{notice.text}</span>
+              <Button className="link-button" onPress={() => session.notify(null)}>
+                {t.actions.close}
+              </Button>
+            </div>
+          )}
+        </main>
+        <aside className="side-panel">
+          <PieceList session={session} />
+        </aside>
+      </div>
+      <ImportDialog session={session} />
     </div>
   )
+}
+
+export function App() {
+  const [session, setSession] = useState<Session | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    loadEngine()
+      .then(() => {
+        if (!cancelled) setSession(new Session(Engine.create(t.untitled), new IoClient()))
+      })
+      .catch((e: unknown) => setError(String(e)))
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (error) return <p className="boot-message">{t.device.engineFailed(error)}</p>
+  if (!session) return <p className="boot-message">{t.device.engineLoading}</p>
+  return <Workspace session={session} />
 }

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "soom-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@soom/web", "dev"],
+      "port": 5173
+    }
+  ]
+}

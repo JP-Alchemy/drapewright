@@ -714,13 +714,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "soom-project"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "kurbo",
+ "proptest",
+ "serde",
+ "serde_json",
+ "soom-pattern-core",
+ "thiserror",
+ "ts-rs",
+]
+
+[[package]]
 name = "soom-wasm-core"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "serde",
  "serde-wasm-bindgen",
+ "soom-io",
  "soom-pattern-core",
+ "soom-project",
  "wasm-bindgen",
 ]
 
@@ -854,6 +870,7 @@ version = "12.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "756050066659291d47a554a9f558125db17428b073c5ffce1daf5dcb0f7231d8"
 dependencies = [
+ "serde_json",
  "thiserror",
  "ts-rs-macros",
 ]

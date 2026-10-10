@@ -12,6 +12,45 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 5 — Open an SVG and see it on the table (Phase 1, day 5)
+
+**Try it:** `pnpm wasm && pnpm dev`, open http://localhost:5173.
+
+1. **Open pattern** and pick `fixtures/svg/inkscape-mm.svg`. Soom reads it in
+   the background and tells you what it found: two pieces, plus a small
+   shape and a stray line it left out. Choose **Add 2 pieces**.
+2. The pieces lie on a green cutting mat with a real 1 cm grid, bolder every
+   5 cm. Each piece is drawn as pattern paper: solid **cutting line**,
+   dashed **stitching line** 1.5 cm inside (the provisional default
+   allowance), the **grainline** arrow, and the name.
+3. Open `fixtures/svg/illustrator-pt.svg`. This file does not say how big it
+   is, so Soom **asks**, showing what each reading would mean ("Pocket would
+   be 10.0 cm × 5.0 cm"). Pick one; new pieces land beside the existing ones.
+4. `fixtures/svg/cut-and-seam.svg` has both lines; Soom measures the
+   allowance from the file (1.5 cm, with a 3 cm hem) instead of adding its
+   own.
+5. Navigate: two-finger scroll pans, pinch (or ⌘/Ctrl + scroll) zooms
+   around the pointer, drag the empty mat to pan. The zoom buttons are
+   bottom left; the percentage button jumps to **actual size**. It is
+   approximate until the screen is measured in step 9.
+6. Click a piece (on the table or in the list) to select it. **Undo/Redo**
+   (toolbar, ⌘Z / ⇧⌘Z) step back and forth through what you added.
+7. Switch your system between light and dark: the app and the table follow.
+
+**Not yet:** nothing is saved between reloads (step 10), pieces cannot be
+moved or edited yet (steps 6–8), and touch gestures on iPad come with the
+input layer (step 6).
+
+**Under the hood:** the `project` crate is the document engine. Every change
+is a command, the engine refuses any edit that would leave a piece broken,
+and unlimited undo shares unchanged pieces between versions. Random
+editing sessions (property test) never produce duplicate ids or broken
+pieces, and undoing everything restores the start exactly. Imports run in a
+worker on a second copy of the WebAssembly engine. Rust types generate the
+TypeScript types, so the two sides cannot drift.
+
+---
+
 ## Step 4 — SVG import and export (Phase 1, day 4)
 
 Still nothing new in the browser: the importer gets its screen in step 5.

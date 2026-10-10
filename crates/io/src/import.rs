@@ -65,7 +65,11 @@ pub struct ScaleInfo {
 /// Something the user should know about an import. The app turns these
 /// into plain-language messages.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase", tag = "kind")]
+#[serde(
+    rename_all = "camelCase",
+    tag = "kind",
+    rename_all_fields = "camelCase"
+)]
 #[ts(export)]
 pub enum ImportNote {
     /// The file has both the cutting line and the stitching line of a
