@@ -17,13 +17,18 @@ import { t } from '../strings/en.ts'
 import type { IoClient } from '../workers/io-client.ts'
 import { type Store, createStore } from './store.ts'
 
-export type ToolId = 'select' | 'notch' | 'grainline' | 'measure'
+export type ToolId = 'select' | 'notch' | 'grainline'
 
-/** A selected edge, or the corner at the end of an edge. */
-export interface PartRef {
-  kind: 'edge' | 'corner'
+/** A selected edge, the corner at the end of an edge, or a notch. */
+export type PartRef =
+  | { kind: 'edge' | 'corner'; piece: string; edge: string }
+  | { kind: 'notch'; piece: string; notch: string }
+
+/** A grainline being drawn, in the piece's own coordinates. */
+export interface GrainPreview {
   piece: string
-  edge: string
+  from: [number, number]
+  to: [number, number]
 }
 
 export interface PendingImport {
@@ -63,6 +68,7 @@ export interface UiState {
   part: PartRef | null
   hover: Hit | null
   preview: MovePreview | null
+  grainPreview: GrainPreview | null
   viewport: ViewportState
   pendingImport: PendingImport | null
   busy: string | null
@@ -94,6 +100,7 @@ export class Session {
       part: null,
       hover: null,
       preview: null,
+      grainPreview: null,
       viewport: initialViewport,
       pendingImport: null,
       busy: null,
@@ -103,6 +110,8 @@ export class Session {
       toast: null,
     })
     engine.subscribe((changes) => {
+      // Print settings (notch style) change how every piece is drawn.
+      if (changes.document) this.#scene.clear()
       for (const id of [...changes.changed, ...changes.removed]) this.#scene.delete(id)
       this.#dropStaleSelection()
     })
@@ -114,8 +123,14 @@ export class Session {
     const ui = this.ui.get()
     const alive = new Set(doc.pieces.map((p) => p.id))
     const selection = [...ui.selection].filter((id) => alive.has(id))
-    const partPiece = ui.part && doc.pieces.find((p) => p.id === ui.part?.piece)
-    const partAlive = !!partPiece && partPiece.outline.edges.some((e) => e.id === ui.part?.edge)
+    const part = ui.part
+    const partPiece = part && doc.pieces.find((p) => p.id === part.piece)
+    const partAlive =
+      !!partPiece &&
+      !!part &&
+      (part.kind === 'notch'
+        ? partPiece.notches.some((n) => n.id === part.notch)
+        : partPiece.outline.edges.some((e) => e.id === part.edge))
     if (selection.length !== ui.selection.size || (ui.part && !partAlive)) {
       this.ui.set((s) => ({
         ...s,
@@ -164,7 +179,11 @@ export class Session {
   }
 
   setTool(tool: ToolId): void {
-    this.ui.set((s) => ({ ...s, tool, preview: null, hover: null, tip: null }))
+    this.ui.set((s) => ({ ...s, tool, preview: null, grainPreview: null, hover: null, tip: null }))
+  }
+
+  setGrainPreview(grainPreview: GrainPreview | null): void {
+    this.ui.set((s) => ({ ...s, grainPreview }))
   }
 
   select(ids: Iterable<string>, part: PartRef | null = null): void {

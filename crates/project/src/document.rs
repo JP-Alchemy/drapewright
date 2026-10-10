@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+pub use soom_pattern_core::notches::NotchStyle;
 use soom_pattern_core::{Id, Piece, Pt};
 use ts_rs::TS;
 
@@ -109,17 +110,6 @@ pub enum Assembly {
     Trim,
     /// Lay pages over each other by the overlap and match the marks.
     Overlap,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
-pub enum NotchStyle {
-    /// A short cut into the allowance.
-    #[default]
-    Slit,
-    /// A small triangle outside the cutting line.
-    V,
 }
 
 /// Where a piece goes on the printed sheet, mm.

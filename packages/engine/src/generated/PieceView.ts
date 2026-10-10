@@ -2,6 +2,7 @@
 import type { AllowanceNote } from "./AllowanceNote";
 import type { EdgeView } from "./EdgeView";
 import type { Issue } from "./Issue";
+import type { NotchMark } from "./NotchMark";
 
 export type PieceView = { id: string, 
 /**
@@ -28,4 +29,8 @@ outlineBounds: [number, number, number, number],
 /**
  * Area inside the stitching line, mm².
  */
-area: number, allowanceNotes: Array<AllowanceNote>, issues: Array<Issue>, };
+area: number, allowanceNotes: Array<AllowanceNote>, issues: Array<Issue>, 
+/**
+ * Drawn marks for the notches, in the project's notch style.
+ */
+notches: Array<NotchMark>, };

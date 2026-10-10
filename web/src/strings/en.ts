@@ -7,6 +7,8 @@ import type {
   DisplayUnits,
   EdgeKind,
   ImportNote,
+  NotchFrom,
+  NotchKind,
   ScaleBasis,
   ScaleReason,
 } from '@soom/engine'
@@ -82,6 +84,61 @@ export const t = {
     foldNoAllowance: 'No allowance: this edge is cut on the fold.',
   },
 
+  toolbar: {
+    label: 'Tools',
+    select: 'Select and move (V)',
+    notch: 'Notches (N)',
+    grainline: 'Grainline (G)',
+    hints: {
+      select: 'Tap a piece, edge or corner. Drag to move a piece.',
+      notch: 'Tap an edge to add a notch. Drag a notch to slide it; tap it for double or triple.',
+      grainline: 'Drag inside a piece to draw its grainline. Hold Shift for any angle.',
+    },
+  },
+
+  notch: {
+    fromCorner: (d: string) => `${d} from the corner`,
+    heading: 'Notch',
+    kind: 'Notch',
+    kinds: { single: 'Single', double: 'Double', triple: 'Triple' } satisfies Record<
+      NotchKind,
+      string
+    >,
+    distance: 'Distance from the corner',
+    measuredFrom: 'Measured from the',
+    from: { start: 'Start of the edge', end: 'End of the edge' } satisfies Record<
+      NotchFrom,
+      string
+    >,
+    delete: 'Delete notch',
+  },
+
+  grain: {
+    heading: 'Grainline',
+    none: 'No grainline yet. Draw one with the grainline tool, or:',
+    add: 'Add a straight grainline',
+    remove: 'Remove grainline',
+    oneWay: 'One way (napped or one-way fabric)',
+  },
+
+  cut: {
+    heading: 'Cutting',
+    quantity: 'How many',
+    material: 'Fabric',
+    materials: {
+      main: 'Main fabric',
+      lining: 'Lining',
+      interfacing: 'Interfacing',
+      contrast: 'Contrast',
+    } as Record<string, string>,
+    mirrored: 'As mirrored pairs',
+    onFold: 'On the fold',
+    add: 'Also cut in another fabric',
+    remove: 'Remove this line',
+    summary: (quantity: number, material: string, onFold: boolean) =>
+      `Cut ${quantity}${onFold ? ' on the fold' : ''} · ${material}`,
+  },
+
   corner: {
     sectionHeading: 'Corner',
     heading: 'Shape of the allowance here',
@@ -123,6 +180,8 @@ export const t = {
     makeSeam: 'Make this edge a seam',
     makeHem: 'Make this edge a hem',
     makeFold: 'Place this edge on the fold',
+    addNotch: 'Add a notch here',
+    deleteNotch: 'Delete notch',
   },
 
   pieces: {

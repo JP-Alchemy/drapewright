@@ -7,6 +7,7 @@ import { useStore } from '../state/store.ts'
 import { formatLength, t } from '../strings/en.ts'
 import { CornerChooser } from './CornerChooser.tsx'
 import { LengthField } from './LengthField.tsx'
+import { CutSection, GrainSection, NotchSection } from './PieceDetails.tsx'
 
 /**
  * A text field that reports its value when editing ends, not per keystroke.
@@ -106,6 +107,8 @@ function PieceSection({
         units={units}
         onChange={(hem) => setAllowance({ ...piece.allowance, hem })}
       />
+      <GrainSection session={session} piece={piece} view={view} />
+      <CutSection session={session} piece={piece} />
       {view.allowanceNotes.length + view.issues.length > 0 && (
         <ul className="notes">
           {view.allowanceNotes.map((n, i) => (
@@ -258,6 +261,9 @@ export function Inspector({ session }: { session: Session }) {
       )}
       {own?.kind === 'edge' && (
         <EdgeSection session={session} piece={piece} view={view} edgeId={own.edge} />
+      )}
+      {own?.kind === 'notch' && (
+        <NotchSection session={session} piece={piece} view={view} notchId={own.notch} />
       )}
       <PieceSection session={session} piece={piece} view={view} />
     </>

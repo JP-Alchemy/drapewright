@@ -75,6 +75,12 @@ export function attachShortcuts(session: Session, onOpen: () => void): () => voi
       case 'tool.select':
         session.setTool('select')
         break
+      case 'tool.notch':
+        session.setTool('notch')
+        break
+      case 'tool.grainline':
+        session.setTool('grainline')
+        break
       default:
         // Tools that arrive in later steps.
         return

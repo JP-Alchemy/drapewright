@@ -16,6 +16,8 @@ type Action =
   | 'seam'
   | 'hem'
   | 'fold'
+  | 'addNotch'
+  | 'deleteNotch'
 
 const KIND_LABEL: Record<EdgeKind, string> = {
   seam: t.menu.makeSeam,
@@ -62,6 +64,25 @@ export function ContextMenu({ session, onOpen }: { session: Session; onOpen: () 
         if (hit.kind === 'corner') {
           session.dispatch({ type: 'joinEdges', piece: hit.piece, edge: hit.edge })
         }
+        break
+      case 'addNotch':
+        if (hit.kind === 'edge') {
+          const length =
+            session.scenePiece(hit.piece)?.view.edges.find((e) => e.id === hit.edge)?.length ?? 0
+          const fromEnd = hit.along > length / 2
+          session.dispatch({
+            type: 'addNotch',
+            piece: hit.piece,
+            edge: hit.edge,
+            at: fromEnd ? length - hit.along : hit.along,
+            from: fromEnd ? 'end' : 'start',
+            kind: 'single',
+          })
+        }
+        break
+      case 'deleteNotch':
+        if (hit.kind === 'notch')
+          session.dispatch({ type: 'deleteNotch', piece: hit.piece, notch: hit.notch })
         break
       case 'seam':
       case 'hem':
@@ -123,6 +144,9 @@ export function ContextMenu({ session, onOpen }: { session: Session; onOpen: () 
           )}
           {hit?.kind === 'edge' && edge && (
             <>
+              <MenuItem id="addNotch" className="menu-item">
+                {t.menu.addNotch}
+              </MenuItem>
               <MenuItem id="addCorner" className="menu-item">
                 {t.menu.addCorner}
               </MenuItem>
@@ -133,6 +157,14 @@ export function ContextMenu({ session, onOpen }: { session: Session; onOpen: () 
                     {KIND_LABEL[k]}
                   </MenuItem>
                 ))}
+              <Separator className="menu-separator" />
+            </>
+          )}
+          {hit?.kind === 'notch' && (
+            <>
+              <MenuItem id="deleteNotch" className="menu-item danger">
+                {t.menu.deleteNotch}
+              </MenuItem>
               <Separator className="menu-separator" />
             </>
           )}

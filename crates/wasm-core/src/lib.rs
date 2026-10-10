@@ -144,6 +144,15 @@ impl EngineHandle {
         to_js(&self.engine.hit_test(Pt::new(x, y), tolerance))
     }
 
+    /// Distance along an edge (mm from its start) of the point nearest to
+    /// `(x, y)` on the work table, or `null`.
+    #[wasm_bindgen(js_name = nearestOnEdge)]
+    pub fn nearest_on_edge(&self, piece: &str, edge: &str, x: f64, y: f64) -> Option<f64> {
+        self.engine
+            .nearest_on_edge(piece, edge, Pt::new(x, y))
+            .map(|n| n.along)
+    }
+
     #[wasm_bindgen(js_name = viewState)]
     pub fn view_state(&self) -> Result<JsValue, JsError> {
         to_js(self.engine.view_state())

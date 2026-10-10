@@ -104,3 +104,38 @@ export async function edgesOf(page: Page, pieceIndex: number) {
     pieceIndex,
   )
 }
+
+/** Page coordinates of a work-table point (mm). */
+export async function toPage(page: Page, x: number, y: number) {
+  return page.evaluate(
+    ({ x, y }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const v = (window as any).soom.ui.get().viewport
+      const scale = v.pxPerMm * v.zoom
+      const r = document.querySelector('canvas')!.getBoundingClientRect()
+      return {
+        x: r.left + (x - v.cx) * scale + v.width / 2,
+        y: r.top + (y - v.cy) * scale + v.height / 2,
+      }
+    },
+    { x, y },
+  )
+}
+
+/** The piece's notches as `[kind, at, from]`, and where the first mark meets the cutting line. */
+export async function notchesOf(page: Page, pieceIndex: number) {
+  return page.evaluate((i) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s = (window as any).soom
+    const piece = s.engine.document().pieces[i]
+    const marks = s.scene()[i].view.notches
+    return {
+      notches: piece.notches.map((n: { kind: string; at: number; from: string }) => [
+        n.kind,
+        n.at,
+        n.from,
+      ]),
+      firstCut: marks[0]?.onCut ?? null,
+    }
+  }, pieceIndex)
+}

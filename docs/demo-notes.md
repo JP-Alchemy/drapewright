@@ -12,6 +12,36 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 8a — Notches, grainline and cutting instructions (Phase 1, day 8)
+
+**Try it** with `fixtures/svg/flared-skirt.svg`:
+
+* **Toolbar** (top left): *Select* (V), *Notches* (N), *Grainline* (G), with
+  a one-line hint for the active tool.
+* **Notches:** with the notch tool, tap an edge. A notch appears exactly
+  there, drawn as a slit into the allowance with a faint line across it. It
+  is measured from the nearer corner, so it stays put if the far end
+  changes. **Tap the notch** (on the slit itself, out at the cutting line)
+  to cycle single → double → triple. **Drag it** to slide it along the
+  edge; the distance from the corner shows as you go, and the slide is one
+  undo step. The panel shows the type and the exact distance, which corner
+  it is measured from, and *Delete notch*. Right-click an edge for *Add a
+  notch here*.
+* **Grainline:** with the grainline tool, drag inside a piece. It snaps to
+  15° steps of the piece's own axes; hold Shift for any angle. Or use
+  *Add a straight grainline* in the panel, and switch on *One way* for
+  napped fabric (single arrowhead).
+* **Cutting:** *How many* and which fabric; *As mirrored pairs* appears from
+  2 up, *On the fold* when the piece has a fold edge; *Also cut in another
+  fabric* adds lining or interfacing. The first line shows on the piece
+  ("Cut 1 on the fold · Main fabric").
+
+**Found by testing:** you could only pick a notch at its point on the
+stitching line, 1.5 cm inside the slit you can see. Now the whole mark
+(slit and line) can be tapped.
+
+---
+
 ## Step 7 — Seam allowance, edge by edge and corner by corner (Phase 1, day 7)
 
 **Try it:** open `fixtures/svg/flared-skirt.svg` (new: a panel flaring 20°

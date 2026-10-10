@@ -55,6 +55,9 @@ export function selectTool(): Tool {
         // An edge or corner belongs to one piece: select just that piece.
         ids = [piece]
         session.select(ids, { kind: hit.kind, piece, edge: hit.edge })
+      } else if (hit.kind === 'notch') {
+        ids = [piece]
+        session.select(ids, { kind: 'notch', piece, notch: hit.notch })
       } else {
         // Keep a group selected so it can be dragged together.
         ids = ui.selection.has(piece) ? [...ui.selection] : [piece]

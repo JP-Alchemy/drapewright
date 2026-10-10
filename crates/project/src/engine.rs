@@ -6,11 +6,11 @@ use std::sync::Arc;
 use kurbo::Point;
 use serde::{Deserialize, Serialize};
 use soom_pattern_core::validate::validate_piece;
-use soom_pattern_core::{Id, Issue, IssueCode, Piece, Pt, Severity};
+use soom_pattern_core::{EdgeNearest, Id, Issue, IssueCode, Piece, Pt, Severity};
 use ts_rs::TS;
 
 use crate::command::{ChangeSet, Command, CommandError, all_ids, apply};
-use crate::document::{Document, FORMAT, Meta, ProjectFile, SCHEMA_VERSION, ViewState};
+use crate::document::{Document, FORMAT, Meta, NotchStyle, ProjectFile, SCHEMA_VERSION, ViewState};
 use crate::history::History;
 use crate::hit::{Hit, hit_test};
 use crate::ids::IdAllocator;
@@ -47,7 +47,15 @@ pub struct Engine {
     ids: IdAllocator,
     revision: u64,
     generator: String,
-    cache: HashMap<Id, (Arc<Piece>, Arc<PieceView>)>,
+    cache: HashMap<Id, CachedView>,
+}
+
+/// A piece's view, with the piece version and notch settings it was made for.
+#[derive(Debug)]
+struct CachedView {
+    piece: Arc<Piece>,
+    notches: (NotchStyle, u64),
+    view: Arc<PieceView>,
 }
 
 impl Engine {
@@ -186,14 +194,37 @@ impl Engine {
     /// piece has changed.
     pub fn piece_view(&mut self, id: &str) -> Option<Arc<PieceView>> {
         let piece = self.document().piece(id)?.clone();
-        if let Some((cached, view)) = self.cache.get(id)
-            && Arc::ptr_eq(cached, &piece)
+        let print = &self.document().print;
+        let notch_key = (print.notch_style, print.notch_spacing.to_bits());
+        if let Some(cached) = self.cache.get(id)
+            && Arc::ptr_eq(&cached.piece, &piece)
+            && cached.notches == notch_key
         {
-            return Some(view.clone());
+            return Some(cached.view.clone());
         }
-        let view = Arc::new(PieceView::of(&piece));
-        self.cache.insert(id.to_string(), (piece, view.clone()));
+        let view = Arc::new(PieceView::of(
+            &piece,
+            print.notch_style,
+            print.notch_spacing,
+        ));
+        self.cache.insert(
+            id.to_string(),
+            CachedView {
+                piece,
+                notches: notch_key,
+                view: view.clone(),
+            },
+        );
         Some(view)
+    }
+
+    /// The point of an edge nearest to `world` (work-table mm): its distance
+    /// along the edge from the start, and how far away it is.
+    pub fn nearest_on_edge(&self, piece: &str, edge: &str, world: Pt) -> Option<EdgeNearest> {
+        let piece = self.document().piece(piece)?;
+        let i = piece.outline.edge_index(edge)?;
+        let local = crate::hit::placement_affine(piece).inverse() * Point::from(world);
+        piece.outline.edge_geom(i).nearest(local)
     }
 
     /// What is under `world` (work-table mm), within `tolerance` mm.
@@ -409,6 +440,44 @@ mod tests {
             Some(Hit::Piece { .. })
         ));
         assert_eq!(e.hit_test(Pt::new(50.0, 50.0), 2.0), None);
+    }
+
+    #[test]
+    fn notches_can_be_picked_at_the_cutting_line() {
+        let mut e = engine();
+        e.dispatch(
+            Command::AddPieces {
+                pieces: vec![square("A")],
+            },
+            Default::default(),
+        )
+        .unwrap();
+        let piece = e.document().pieces[0].id.clone();
+        let edge = e.document().pieces[0].outline.edges[0].id.clone();
+        e.dispatch(
+            Command::AddNotch {
+                piece,
+                edge,
+                at: 40.0,
+                from: soom_pattern_core::NotchFrom::Start,
+                kind: soom_pattern_core::NotchKind::Single,
+            },
+            Default::default(),
+        )
+        .unwrap();
+        // The top edge runs along y = 0; its cutting line is at y = -15.
+        assert!(matches!(
+            e.hit_test(Pt::new(40.5, -14.0), 2.0),
+            Some(Hit::Notch { .. })
+        ));
+        assert!(matches!(
+            e.hit_test(Pt::new(40.0, -7.0), 2.0),
+            Some(Hit::Notch { .. })
+        ));
+        assert!(matches!(
+            e.hit_test(Pt::new(60.0, -14.0), 2.0),
+            Some(Hit::Piece { .. })
+        ));
     }
 
     #[test]

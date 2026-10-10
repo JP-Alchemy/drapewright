@@ -10,8 +10,7 @@ import {
   hitRadius,
 } from '@soom/input'
 import { isTyping } from '../app/shortcuts.ts'
-import type { Session } from '../state/session.ts'
-import type { ToolId } from '../state/session.ts'
+import type { PartRef, Session, ToolId } from '../state/session.ts'
 import type { Tool } from '../tools/tool.ts'
 import { toolContext } from '../tools/tool.ts'
 import { type Point, panBy, scaleOf, toWorld, zoomAt } from './viewport.ts'
@@ -31,10 +30,12 @@ export function openMenuAt(session: Session, x: number, y: number, kind: Pointer
   const w = toWorld(v, { x, y })
   const hit = session.engine.hitTest(w.x, w.y, hitRadius(kind) / scaleOf(v))
   if (hit) {
-    const part =
+    const part: PartRef | null =
       hit.kind === 'edge' || hit.kind === 'corner'
         ? { kind: hit.kind, piece: hit.piece, edge: hit.edge }
-        : null
+        : hit.kind === 'notch'
+          ? { kind: 'notch', piece: hit.piece, notch: hit.notch }
+          : null
     session.select([hit.piece], part)
   }
   session.openMenu({ x, y, hit })

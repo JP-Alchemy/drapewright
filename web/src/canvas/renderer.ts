@@ -3,7 +3,8 @@
 
 import type { Hit, Piece, PieceView } from '@soom/engine'
 import type { DisplayUnits } from '@soom/engine'
-import type { MovePreview, PartRef } from '../state/session.ts'
+import type { GrainPreview, MovePreview, PartRef } from '../state/session.ts'
+import { cutSummary } from '../app/PieceDetails.tsx'
 import { formatLength } from '../strings/en.ts'
 import { type PiecePaths, addSegment } from './paths.ts'
 import { type ViewportState, scaleOf, toScreen, visibleWorld } from './viewport.ts'
@@ -21,6 +22,7 @@ export interface Scene {
   units?: DisplayUnits
   hover?: Hit | null
   preview?: MovePreview | null
+  grainPreview?: GrainPreview | null
 }
 
 export interface Theme {
@@ -102,6 +104,30 @@ function cornerPoint(piece: Piece, edgeId: string): [number, number] | null {
   return edge?.segments.at(-1)?.to ?? null
 }
 
+/** Notch marks: the slit (or V) at the cutting line, and a faint line across the allowance. */
+function drawNotches(ctx: CanvasRenderingContext2D, view: PieceView, s: number, theme: Theme) {
+  if (view.notches.length === 0) return
+  ctx.beginPath()
+  for (const m of view.notches) {
+    for (const [x0, y0, x1, y1] of m.lines) {
+      ctx.moveTo(x0, y0)
+      ctx.lineTo(x1, y1)
+    }
+  }
+  ctx.strokeStyle = theme.ink
+  ctx.lineWidth = 1.5 / s
+  ctx.lineCap = 'round'
+  ctx.stroke()
+  ctx.beginPath()
+  for (const m of view.notches) {
+    ctx.moveTo(m.onOutline[0], m.onOutline[1])
+    ctx.lineTo(m.onCut[0], m.onCut[1])
+  }
+  ctx.strokeStyle = theme.stitch
+  ctx.lineWidth = 1 / s
+  ctx.stroke()
+}
+
 function drawGrainline(ctx: CanvasRenderingContext2D, piece: Piece, s: number, theme: Theme) {
   const g = piece.grainline
   if (!g) return
@@ -153,7 +179,8 @@ export function draw(
   ctx.setTransform(world)
   drawGrid(ctx, v, theme)
 
-  for (const { piece, paths } of scene.pieces) {
+  for (const sp of scene.pieces) {
+    const { piece, paths } = sp
     const selected = scene.selection.has(piece.id)
     ctx.setTransform(world.multiply(placement(piece, scene.preview)))
     ctx.fillStyle = theme.paper
@@ -167,7 +194,26 @@ export function draw(
     ctx.lineWidth = 1 / s
     ctx.stroke(paths.stitch)
     ctx.setLineDash([])
+    drawNotches(ctx, sp.view, s, theme)
     drawGrainline(ctx, piece, s, theme)
+  }
+
+  // A grainline being drawn.
+  const grain = scene.grainPreview
+  const grainPiece = grain && scene.pieces.find((p) => p.piece.id === grain.piece)
+  if (grain && grainPiece) {
+    ctx.setTransform(world.multiply(placement(grainPiece.piece, scene.preview)))
+    ctx.setLineDash([5 / s, 4 / s])
+    drawGrainline(
+      ctx,
+      { ...grainPiece.piece, grainline: { from: grain.from, to: grain.to, oneWay: false } },
+      s,
+      {
+        ...theme,
+        ink: theme.select,
+      },
+    )
+    ctx.setLineDash([])
   }
 
   // Hovered and selected edges and corners, over everything else.
@@ -177,7 +223,21 @@ export function draw(
     ctx.setTransform(world.multiply(placement(sp.piece, scene.preview)))
     ctx.strokeStyle = theme.select
     ctx.globalAlpha = strong ? 1 : 0.55
-    if (corner) {
+    if (edgeId.startsWith('notch:')) {
+      const id = edgeId.slice('notch:'.length)
+      ctx.lineWidth = (strong ? 4 : 3) / s
+      ctx.lineCap = 'round'
+      for (const m of sp.view.notches.filter((n) => n.notch === id)) {
+        ctx.beginPath()
+        for (const [x0, y0, x1, y1] of m.lines) {
+          ctx.moveTo(x0, y0)
+          ctx.lineTo(x1, y1)
+        }
+        ctx.moveTo(m.onOutline[0], m.onOutline[1])
+        ctx.lineTo(m.onCut[0], m.onCut[1])
+        ctx.stroke()
+      }
+    } else if (corner) {
       const c = cornerPoint(sp.piece, edgeId)
       if (c) {
         ctx.beginPath()
@@ -199,12 +259,15 @@ export function draw(
   if (hover && (hover.kind === 'edge' || hover.kind === 'corner')) {
     highlight(hover.piece, hover.edge, hover.kind === 'corner', false)
   }
-  if (scene.part) highlight(scene.part.piece, scene.part.edge, scene.part.kind === 'corner', true)
+  if (hover?.kind === 'notch') highlight(hover.piece, `notch:${hover.notch}`, false, false)
+  const part = scene.part
+  if (part?.kind === 'notch') highlight(part.piece, `notch:${part.notch}`, false, true)
+  else if (part) highlight(part.piece, part.edge, part.kind === 'corner', true)
 
   // Lengths of the hovered and selected edges, just outside the cutting line.
   const lengthLabels: { piece: string; edge: string }[] = []
   if (hover?.kind === 'edge') lengthLabels.push(hover)
-  if (scene.part?.kind === 'edge') lengthLabels.push(scene.part)
+  if (part?.kind === 'edge') lengthLabels.push(part)
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   for (const ref of lengthLabels) {
     const sp = scene.pieces.find((p) => p.piece.id === ref.piece)
@@ -233,11 +296,18 @@ export function draw(
     const p = toScreen(v, { x: m.x, y: m.y })
     const widthPx = (x1 - x0) * s
     if (widthPx < 40) continue
+    ctx.font = '600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     ctx.lineWidth = 4
     ctx.strokeStyle = theme.labelHalo
     ctx.strokeText(piece.name, p.x, p.y, widthPx - 8)
     ctx.fillStyle = theme.label
     ctx.fillText(piece.name, p.x, p.y, widthPx - 8)
+    const summary = cutSummary(piece)
+    if (summary && (y1 - y0) * s > 60) {
+      ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      ctx.strokeText(summary, p.x, p.y + 17, widthPx - 8)
+      ctx.fillText(summary, p.x, p.y + 17, widthPx - 8)
+    }
   }
 }
 

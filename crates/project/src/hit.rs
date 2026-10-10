@@ -2,7 +2,7 @@
 
 use kurbo::{Affine, Point};
 use serde::{Deserialize, Serialize};
-use soom_pattern_core::geom::point_in_polygon;
+use soom_pattern_core::geom::{distance_to_polyline, point_in_polygon};
 use soom_pattern_core::{Id, Piece};
 use ts_rs::TS;
 
@@ -49,20 +49,20 @@ pub fn hit_test<'a>(
         let local = placement_affine(piece).inverse() * world;
         let outline = &piece.outline;
 
-        let notch = piece.notches.iter().find(|n| {
-            outline.edge_index(&n.edge).is_some_and(|i| {
-                let geom = outline.edge_geom(i);
-                let along = match n.from {
-                    soom_pattern_core::NotchFrom::Start => n.at,
-                    soom_pattern_core::NotchFrom::End => geom.length() - n.at,
-                };
-                geom.point_at(along).distance(local) <= tolerance
-            })
+        // A notch can be picked anywhere along its mark: the slit at the
+        // cutting line and the line across the allowance to the outline.
+        let near = |[x0, y0, x1, y1]: [f64; 4]| {
+            distance_to_polyline(local, &[Point::new(x0, y0), Point::new(x1, y1)], false)
+                <= tolerance
+        };
+        let notch = view.notches.iter().find(|m| {
+            near([m.on_outline.x, m.on_outline.y, m.on_cut.x, m.on_cut.y])
+                || m.lines.iter().any(|&l| near(l))
         });
-        if let Some(n) = notch {
+        if let Some(m) = notch {
             return Some(Hit::Notch {
                 piece: piece.id.clone(),
-                notch: n.id.clone(),
+                notch: m.notch.clone(),
             });
         }
 

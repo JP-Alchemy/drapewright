@@ -8,6 +8,7 @@ pub mod allowance;
 pub mod build;
 pub mod geom;
 pub mod model;
+pub mod notches;
 pub mod ops;
 mod point;
 pub mod validate;

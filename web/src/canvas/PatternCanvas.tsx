@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { Session } from '../state/session.ts'
+import { grainlineTool } from '../tools/grainline.ts'
+import { notchTool } from '../tools/notch.ts'
 import { selectTool } from '../tools/select.ts'
 import { attachInput } from './input.ts'
 import { draw, readTheme } from './renderer.ts'
@@ -40,6 +42,7 @@ export function PatternCanvas({ session }: { session: Session }) {
           units: session.engine.document().settings.displayUnits,
           hover: ui.hover,
           preview: ui.preview,
+          grainPreview: ui.grainPreview,
         },
         theme,
       )
@@ -70,9 +73,8 @@ export function PatternCanvas({ session }: { session: Session }) {
 
     const input = attachInput(canvas, session, {
       select: selectTool(),
-      notch: selectTool(),
-      grainline: selectTool(),
-      measure: selectTool(),
+      notch: notchTool(),
+      grainline: grainlineTool(),
     })
     invalidate()
 

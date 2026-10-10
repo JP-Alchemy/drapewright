@@ -131,6 +131,11 @@ export class Engine {
     return this.#handle.hitTest(x, y, tolerance) as Hit | null
   }
 
+  /** Distance along an edge (mm from its start) nearest to a work-table point. */
+  nearestOnEdge(piece: string, edge: string, x: number, y: number): number | null {
+    return this.#handle.nearestOnEdge(piece, edge, x, y) ?? null
+  }
+
   viewState(): ViewState {
     return this.#handle.viewState() as ViewState
   }

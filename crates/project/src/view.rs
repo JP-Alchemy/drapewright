@@ -4,6 +4,7 @@
 use kurbo::Point;
 use serde::{Deserialize, Serialize};
 use soom_pattern_core::allowance::{AllowanceNote, allowance_lines};
+use soom_pattern_core::notches::{NotchMark, NotchStyle, notch_marks};
 use soom_pattern_core::{AllowanceMode, EdgeKind, Id, Issue, Piece, Pt, validate_piece};
 use ts_rs::TS;
 
@@ -46,6 +47,8 @@ pub struct PieceView {
     pub area: f64,
     pub allowance_notes: Vec<AllowanceNote>,
     pub issues: Vec<Issue>,
+    /// Drawn marks for the notches, in the project's notch style.
+    pub notches: Vec<NotchMark>,
 }
 
 fn flat(points: &[Point]) -> Vec<f64> {
@@ -53,7 +56,7 @@ fn flat(points: &[Point]) -> Vec<f64> {
 }
 
 impl PieceView {
-    pub fn of(piece: &Piece) -> Self {
+    pub fn of(piece: &Piece, notch_style: NotchStyle, notch_spacing: f64) -> Self {
         let lines = allowance_lines(piece);
         let outline = &piece.outline;
         let edges = (0..outline.edges.len())
@@ -92,6 +95,7 @@ impl PieceView {
             bounds,
             outline_bounds: [ob.x0, ob.y0, ob.x1, ob.y1],
             area,
+            notches: notch_marks(piece, &lines.cutting, notch_style, notch_spacing),
             allowance_notes: lines.notes,
             issues: validate_piece(piece),
         }

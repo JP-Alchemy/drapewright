@@ -14,6 +14,7 @@ import { DeviceDialog } from './DeviceDialog.tsx'
 import { ImportDialog } from './ImportDialog.tsx'
 import { Inspector } from './Inspector.tsx'
 import { PieceList } from './PieceList.tsx'
+import { Toolbar } from './Toolbar.tsx'
 import { attachShortcuts } from './shortcuts.ts'
 
 function TopBar({ session, onOpen }: { session: Session; onOpen: () => void }) {
@@ -125,6 +126,7 @@ function Workspace({ session }: { session: Session }) {
               </Button>
             </div>
           )}
+          <Toolbar session={session} />
           <ZoomControls session={session} />
           <ContextMenu session={session} onOpen={open} />
           {toast && (
