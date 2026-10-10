@@ -662,3 +662,162 @@ h2 {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
+
+/* Switch */
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap);
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.switch-track {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background 150ms;
+}
+
+.switch-track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+  transition: translate 150ms;
+}
+
+.switch[data-selected] .switch-track {
+  background: var(--select);
+}
+
+.switch[data-selected] .switch-track::after {
+  translate: 18px 0;
+}
+
+.switch[data-focus-visible] .switch-track {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Segmented choice (edge kind) */
+
+.segmented {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.segments {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.segment {
+  display: grid;
+  place-items: center;
+  min-height: 36px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segment[data-selected] {
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+}
+
+.segment[data-focus-visible] {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* Corner chooser */
+
+.corner-choice {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.corner-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.corner-card {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  cursor: pointer;
+}
+
+.corner-card[data-selected] {
+  border-color: var(--select);
+  box-shadow: 0 0 0 1px var(--select);
+}
+
+.corner-card[data-focus-visible] {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.corner-card[data-impossible] {
+  opacity: 0.55;
+}
+
+.corner-thumb {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  background: var(--mat);
+}
+
+.thumb-cut {
+  fill: var(--paper);
+  stroke: var(--ink-on-paper);
+  stroke-width: 1.5px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.thumb-stitch {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.25px;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.corner-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.menu-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}

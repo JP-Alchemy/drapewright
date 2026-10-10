@@ -19,7 +19,9 @@ import { type Store, createStore } from './store.ts'
 
 export type ToolId = 'select' | 'notch' | 'grainline' | 'measure'
 
-export interface EdgeRef {
+/** A selected edge, or the corner at the end of an edge. */
+export interface PartRef {
+  kind: 'edge' | 'corner'
   piece: string
   edge: string
 }
@@ -57,8 +59,8 @@ export interface MenuState {
 export interface UiState {
   tool: ToolId
   selection: ReadonlySet<string>
-  /** The selected edge, shown in the inspector. */
-  edge: EdgeRef | null
+  /** The selected edge or corner, shown in the inspector. */
+  part: PartRef | null
   hover: Hit | null
   preview: MovePreview | null
   viewport: ViewportState
@@ -89,7 +91,7 @@ export class Session {
     this.ui = createStore<UiState>({
       tool: 'select',
       selection: new Set(),
-      edge: null,
+      part: null,
       hover: null,
       preview: null,
       viewport: initialViewport,
@@ -112,13 +114,13 @@ export class Session {
     const ui = this.ui.get()
     const alive = new Set(doc.pieces.map((p) => p.id))
     const selection = [...ui.selection].filter((id) => alive.has(id))
-    const edgePiece = ui.edge && doc.pieces.find((p) => p.id === ui.edge?.piece)
-    const edgeAlive = !!edgePiece && edgePiece.outline.edges.some((e) => e.id === ui.edge?.edge)
-    if (selection.length !== ui.selection.size || (ui.edge && !edgeAlive)) {
+    const partPiece = ui.part && doc.pieces.find((p) => p.id === ui.part?.piece)
+    const partAlive = !!partPiece && partPiece.outline.edges.some((e) => e.id === ui.part?.edge)
+    if (selection.length !== ui.selection.size || (ui.part && !partAlive)) {
       this.ui.set((s) => ({
         ...s,
         selection: new Set(selection),
-        edge: edgeAlive ? s.edge : null,
+        part: partAlive ? s.part : null,
       }))
     }
   }
@@ -165,8 +167,8 @@ export class Session {
     this.ui.set((s) => ({ ...s, tool, preview: null, hover: null, tip: null }))
   }
 
-  select(ids: Iterable<string>, edge: EdgeRef | null = null): void {
-    this.ui.set((s) => ({ ...s, selection: new Set(ids), edge }))
+  select(ids: Iterable<string>, part: PartRef | null = null): void {
+    this.ui.set((s) => ({ ...s, selection: new Set(ids), part }))
   }
 
   setHover(hover: Hit | null): void {

@@ -7,9 +7,13 @@ import type { Session } from '../state/session.ts'
 /** Nudge distance, mm: one press, and with shift. */
 const NUDGE = { small: 1, big: 10 }
 
+/** Input types where keys type text (radios, checkboxes and switches do not). */
+const TEXT_INPUTS = new Set(['text', 'search', 'number', 'email', 'password', 'url', 'tel'])
+
 export function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
-  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+  if (target instanceof HTMLInputElement) return TEXT_INPUTS.has(target.type)
+  return target.isContentEditable || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT'
 }
 
 export function attachShortcuts(session: Session, onOpen: () => void): () => void {

@@ -36,7 +36,8 @@ export function PatternCanvas({ session }: { session: Session }) {
         {
           pieces: session.scene(),
           selection: ui.selection,
-          edge: ui.edge,
+          part: ui.part,
+          units: session.engine.document().settings.displayUnits,
           hover: ui.hover,
           preview: ui.preview,
         },

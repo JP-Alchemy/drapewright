@@ -8,9 +8,11 @@ import init, {
   engineVersion,
   exportSvg as exportSvgRaw,
   importSvg as importSvgRaw,
+  previewAllowance as previewAllowanceRaw,
   rescaleImport as rescaleImportRaw,
 } from '../pkg/soom_wasm_core.js'
 import type {
+  AllowanceNote,
   ChangeSet,
   Command,
   CommandError,
@@ -140,6 +142,17 @@ export class Engine {
   toJson(): string {
     return this.#handle.toJson(now())
   }
+}
+
+export interface AllowancePreview {
+  cutting: number[]
+  stitching: number[]
+  notes: AllowanceNote[]
+}
+
+/** The lines a piece would have, without touching any project. Fast enough for the main thread. */
+export function previewAllowance(piece: Piece): AllowancePreview {
+  return previewAllowanceRaw(piece) as AllowancePreview
 }
 
 /** Stateless jobs, usually run in the IO worker. */

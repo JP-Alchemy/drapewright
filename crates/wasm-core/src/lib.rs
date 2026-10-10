@@ -163,6 +163,27 @@ impl EngineHandle {
     }
 }
 
+/// The cutting and stitching lines a piece would have, without changing any
+/// project: used to preview choices such as corner shapes.
+#[wasm_bindgen(js_name = previewAllowance)]
+pub fn preview_allowance(piece: JsValue) -> Result<JsValue, JsError> {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Preview {
+        cutting: Vec<f64>,
+        stitching: Vec<f64>,
+        notes: Vec<soom_pattern_core::allowance::AllowanceNote>,
+    }
+    let piece: Piece = from_js(piece)?;
+    let lines = soom_pattern_core::allowance::allowance_lines(&piece);
+    let flat = |pts: &[kurbo::Point]| pts.iter().flat_map(|p| [p.x, p.y]).collect();
+    to_js(&Preview {
+        cutting: flat(&lines.cutting),
+        stitching: flat(&lines.stitching),
+        notes: lines.notes,
+    })
+}
+
 /// Reads pattern pieces from an SVG file.
 #[wasm_bindgen(js_name = importSvg)]
 pub fn import_svg(data: &[u8], file_name: Option<String>) -> Result<JsValue, JsError> {

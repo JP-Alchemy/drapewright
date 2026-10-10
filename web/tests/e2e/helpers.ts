@@ -65,3 +65,42 @@ export async function modKey(page: Page): Promise<'Meta' | 'Control'> {
   const apple = await page.evaluate(() => /Mac|iPhone|iPad/.test(navigator.userAgent))
   return apple ? 'Meta' : 'Control'
 }
+
+/** Page coordinates of the middle of an edge (on the stitching line). */
+export async function edgeMiddle(page: Page, pieceIndex: number, edgeId: string) {
+  return page.evaluate(
+    ({ i, edgeId }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const s = (window as any).soom
+      const v = s.ui.get().viewport
+      const sp = s.scene()[i]
+      const ev = sp.view.edges.find((e: { id: string }) => e.id === edgeId)
+      const scale = v.pxPerMm * v.zoom
+      const r = document.querySelector('canvas')!.getBoundingClientRect()
+      return {
+        x: r.left + (ev.middle[0] + sp.piece.placement.x - v.cx) * scale + v.width / 2,
+        y: r.top + (ev.middle[1] + sp.piece.placement.y - v.cy) * scale + v.height / 2,
+      }
+    },
+    { i: pieceIndex, edgeId },
+  )
+}
+
+/** The piece's edges as `[id, kind, endCorner, allowance]`. */
+export async function edgesOf(page: Page, pieceIndex: number) {
+  return page.evaluate(
+    (i) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).soom.engine
+        .document()
+        .pieces[i].outline.edges.map(
+          (e: { id: string; kind: string; endCorner: string; allowance: number | null }) => [
+            e.id,
+            e.kind,
+            e.endCorner,
+            e.allowance,
+          ],
+        ),
+    pieceIndex,
+  )
+}

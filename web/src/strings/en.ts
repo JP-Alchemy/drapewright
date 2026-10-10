@@ -1,7 +1,15 @@
 // Everything the app says, in plain sewing language. One place, so wording
 // stays consistent and can be translated later.
 
-import type { DisplayUnits, ImportNote, ScaleBasis, ScaleReason } from '@soom/engine'
+import type {
+  AllowanceNote,
+  CornerStyle,
+  DisplayUnits,
+  EdgeKind,
+  ImportNote,
+  ScaleBasis,
+  ScaleReason,
+} from '@soom/engine'
 
 /** A length in the user's units: "45.2 cm", "452 mm" or "17.8 in". */
 export function formatLength(mm: number, units: DisplayUnits): string {
@@ -46,12 +54,63 @@ export const t = {
 
   inspector: {
     heading: 'Piece',
-    nothing: 'Tap a piece to see its details. Tap an edge to measure it.',
+    nothing: 'Tap a piece to see its details. Tap an edge or a corner to adjust it.',
     many: (n: number) => `${n} pieces selected. Drag to move them together.`,
     name: 'Name',
+    included: 'Allowance is already included',
+    includedHint:
+      'The outline is the cutting line, as printed on the pattern. The dashed stitching line is worked out from the allowance below.',
+    addedHint: 'The outline is the stitching line. Allowance is added outside it for cutting.',
     seamAllowance: 'Seam allowance',
+    hemAllowance: 'Hem allowance',
     edge: 'Edge',
+    edgeName: 'Edge name',
+    edgeNamePlaceholder: 'For example: side seam',
+    edgeNumber: (n: number) => `edge ${n}`,
+    theHem: 'the hem',
+    theFold: 'the fold',
     edgeLength: (length: string) => `Length along the stitching line: ${length}`,
+    kind: 'This edge is a',
+    kinds: { seam: 'Seam', hem: 'Hem', fold: 'Fold' } satisfies Record<EdgeKind, string>,
+    kindHints: {
+      seam: 'Sewn to another piece.',
+      hem: 'Turned up and finished. The corners next to it fold back to match.',
+      fold: 'Placed on the fold of the fabric. It has no allowance and must be straight.',
+    } satisfies Record<EdgeKind, string>,
+    edgeAllowance: 'Allowance on this edge',
+    usePieceAllowance: 'Use the piece’s allowance',
+    foldNoAllowance: 'No allowance: this edge is cut on the fold.',
+  },
+
+  corner: {
+    sectionHeading: 'Corner',
+    heading: 'Shape of the allowance here',
+    between: (a: string, b: string) => `Where ${a} meets ${b}.`,
+    sides: (left: string, right: string) =>
+      `In the pictures: ${left} on the left, ${right} on the right.`,
+    style: (s: CornerStyle): string =>
+      ({
+        auto: 'Automatic',
+        mitre: 'Pointed',
+        squareThis: 'Squared on the left',
+        squareNext: 'Squared on the right',
+        mirrorThis: 'Folded back on the left',
+        mirrorNext: 'Folded back on the right',
+      })[s],
+    notHere: 'Not possible here',
+    likePointed: 'Same as pointed here',
+    remove: 'Remove this corner',
+  },
+
+  allowanceNote: (n: AllowanceNote, edgeName: (id: string) => string): string => {
+    switch (n.kind) {
+      case 'cornerFallback':
+        return `At the end of ${edgeName(n.edge)}, that corner shape is not possible, so it is pointed.`
+      case 'enclosedGap':
+        return 'Allowances from different edges meet and enclose a gap; it is cut as part of the piece.'
+      case 'nothingLeft':
+        return 'The allowance is wider than the piece, so no stitching line remains.'
+    }
   },
 
   menu: {
@@ -59,6 +118,11 @@ export const t = {
     turn: 'Turn 90° clockwise',
     turnBack: 'Turn 90° anticlockwise',
     deletePiece: 'Delete piece',
+    addCorner: 'Add a corner here',
+    removeCorner: 'Remove this corner',
+    makeSeam: 'Make this edge a seam',
+    makeHem: 'Make this edge a hem',
+    makeFold: 'Place this edge on the fold',
   },
 
   pieces: {

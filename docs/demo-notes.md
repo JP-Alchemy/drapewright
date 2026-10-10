@@ -12,6 +12,47 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 7 — Seam allowance, edge by edge and corner by corner (Phase 1, day 7)
+
+**Try it:** open `fixtures/svg/flared-skirt.svg` (new: a panel flaring 20°
+with a straight hem).
+
+1. **Tap the bottom edge.** The panel now has an *Edge* section: its length
+   along the stitching line (also shown on the table next to the edge), a
+   name, and **This edge is a Seam / Hem / Fold**. Choose **Hem**: the hem
+   gets the piece's hem allowance, and the corners next to it fold back.
+2. Under *Piece*, set **Hem allowance** to 4 cm. Watch the bottom-right
+   corner: the hem allowance angles back in, exactly as it must to lie flat
+   when turned up along a flared side seam.
+3. **Tap that corner** (the point where the side seam meets the hem). The
+   *Corner* section shows **six live pictures of this very corner**:
+   automatic, pointed, squared and folded back, on either side. Each one is
+   computed from the real piece, so what you see is what you will cut. Where
+   two shapes come out the same (common at right angles) it says so; where
+   one is impossible it says that too. **These pictures are what to show the
+   seamstress for open questions 3 and 4.**
+4. Tap the left edge and choose **Fold**: no allowance, and the cutting line
+   meets the fold squarely. Try **Fold** on a curved edge (the hem of
+   `inkscape-mm.svg`): Soom refuses and explains that a fold must be
+   straight.
+5. Any edge can have **its own allowance**; *Use the piece's allowance*
+   puts it back.
+6. Right-click (long-press) an edge for **Add a corner here**, a corner for
+   **Remove this corner**, and either for changing the edge type.
+7. **Allowance is already included**: for patterns printed with allowance,
+   the outline becomes the cutting line and the dashed stitching line is
+   worked out inside it.
+
+Undo (⌘Z, two-finger tap) covers all of it; stepping an allowance up and
+down is a single undo step.
+
+**Fixed along the way** (found by the new end-to-end tests): ⌘Z did nothing
+right after picking a corner shape, because focus on a radio button counted
+as typing; and tapping an edge of a piece that was part of a group selection
+kept the whole group selected, hiding the edge's settings.
+
+---
+
 ## Step 6 — Input layer: Pencil, fingers, mouse and keys (Phase 1, day 6)
 
 **Try it** (`pnpm dev`, open a fixture as in step 5):

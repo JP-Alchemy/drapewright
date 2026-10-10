@@ -9,7 +9,15 @@ import type { Tool, ToolContext } from './tool.ts'
 
 type State =
   | { kind: 'idle' }
-  | { kind: 'press'; start: Point; screen: Point; ids: string[]; pointer: ToolPointer['kind'] }
+  | {
+      kind: 'press'
+      start: Point
+      screen: Point
+      ids: string[]
+      pointer: ToolPointer['kind']
+      /** The pressed piece, when it was part of a larger selection. */
+      narrowTo: string | null
+    }
   | { kind: 'drag'; start: Point; ids: string[] }
 
 export function selectTool(): Tool {
@@ -43,10 +51,14 @@ export function selectTool(): Tool {
         else next.add(piece)
         ids = [...next]
         session.select(ids, null)
+      } else if (hit.kind === 'edge' || hit.kind === 'corner') {
+        // An edge or corner belongs to one piece: select just that piece.
+        ids = [piece]
+        session.select(ids, { kind: hit.kind, piece, edge: hit.edge })
       } else {
+        // Keep a group selected so it can be dragged together.
         ids = ui.selection.has(piece) ? [...ui.selection] : [piece]
-        const edge = hit.kind === 'edge' || hit.kind === 'corner' ? { piece, edge: hit.edge } : null
-        session.select(ids, edge)
+        session.select(ids, null)
       }
       state = {
         kind: 'press',
@@ -54,6 +66,7 @@ export function selectTool(): Tool {
         screen: { x: p.x, y: p.y },
         ids,
         pointer: p.kind,
+        narrowTo: ids.length > 1 && !p.modifiers.shift ? piece : null,
       }
     },
 
@@ -75,6 +88,8 @@ export function selectTool(): Tool {
 
     up(p, ctx) {
       if (state.kind === 'drag') finishDrag(ctx, ctx.world(p))
+      // A tap (no drag) on one piece of a group selects just that piece.
+      else if (state.kind === 'press' && state.narrowTo) ctx.session.select([state.narrowTo])
       state = { kind: 'idle' }
     },
 

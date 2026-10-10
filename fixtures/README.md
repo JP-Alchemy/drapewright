@@ -14,3 +14,4 @@ belong outside the repository (see `docs/open-questions.md`).
 | `svg/unitless.svg` | No units at all: the scale must be confirmed |
 | `svg/cut-and-seam.svg` | Both cutting and stitching lines for one piece, with a deeper hem |
 | `svg/transforms.svg` | Nested rotate/scale transforms, `<use>` and `<polygon>` |
+| `svg/flared-skirt.svg` | A panel flaring 20° with a straight hem, where the corner shapes differ visibly |

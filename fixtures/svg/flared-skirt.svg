@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     width="440mm" height="620mm" viewBox="-10 -10 440 620">
+  <!-- A skirt panel flaring 20° with a straight hem: corner shapes differ visibly here. -->
+  <path id="flared-skirt-front" inkscape:label="Flared skirt front"
+        d="M 0,0 L 200,0 L 418.38,600 L 0,600 Z"
+        style="fill:none;stroke:#000;stroke-width:0.5"/>
+</svg>

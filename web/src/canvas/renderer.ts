@@ -2,7 +2,9 @@
 // the pieces laid on it like pattern paper.
 
 import type { Hit, Piece, PieceView } from '@soom/engine'
-import type { EdgeRef, MovePreview } from '../state/session.ts'
+import type { DisplayUnits } from '@soom/engine'
+import type { MovePreview, PartRef } from '../state/session.ts'
+import { formatLength } from '../strings/en.ts'
 import { type PiecePaths, addSegment } from './paths.ts'
 import { type ViewportState, scaleOf, toScreen, visibleWorld } from './viewport.ts'
 
@@ -15,7 +17,8 @@ export interface ScenePiece {
 export interface Scene {
   pieces: ScenePiece[]
   selection: ReadonlySet<string>
-  edge?: EdgeRef | null
+  part?: PartRef | null
+  units?: DisplayUnits
   hover?: Hit | null
   preview?: MovePreview | null
 }
@@ -196,7 +199,26 @@ export function draw(
   if (hover && (hover.kind === 'edge' || hover.kind === 'corner')) {
     highlight(hover.piece, hover.edge, hover.kind === 'corner', false)
   }
-  if (scene.edge) highlight(scene.edge.piece, scene.edge.edge, false, true)
+  if (scene.part) highlight(scene.part.piece, scene.part.edge, scene.part.kind === 'corner', true)
+
+  // Lengths of the hovered and selected edges, just outside the cutting line.
+  const lengthLabels: { piece: string; edge: string }[] = []
+  if (hover?.kind === 'edge') lengthLabels.push(hover)
+  if (scene.part?.kind === 'edge') lengthLabels.push(scene.part)
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  for (const ref of lengthLabels) {
+    const sp = scene.pieces.find((p) => p.piece.id === ref.piece)
+    const ev = sp?.view.edges.find((e) => e.id === ref.edge)
+    if (!sp || !ev) continue
+    const out = ev.allowance + 14 / s
+    const local = new DOMPoint(
+      ev.middle[0] + ev.middleNormal[0] * out,
+      ev.middle[1] + ev.middleNormal[1] * out,
+    )
+    const m = placement(sp.piece, scene.preview).transformPoint(local)
+    const at = toScreen(v, { x: m.x, y: m.y })
+    drawPill(ctx, formatLength(ev.length, scene.units ?? 'cm'), at.x, at.y, theme)
+  }
 
   // Names in screen space, so they stay readable at any zoom.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -217,6 +239,20 @@ export function draw(
     ctx.fillStyle = theme.label
     ctx.fillText(piece.name, p.x, p.y, widthPx - 8)
   }
+}
+
+function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, theme: Theme) {
+  ctx.font = '600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  const w = ctx.measureText(text).width + 14
+  const h = 22
+  ctx.beginPath()
+  ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2)
+  ctx.fillStyle = theme.select
+  ctx.fill()
+  ctx.fillStyle = '#fff'
+  ctx.fillText(text, x, y + 0.5)
 }
 
 /** Bounds of all pieces on the work table, mm. */
