@@ -44,6 +44,23 @@ export const t = {
     notCalibrated: 'Screen not measured yet: 100% is approximate.',
   },
 
+  inspector: {
+    heading: 'Piece',
+    nothing: 'Tap a piece to see its details. Tap an edge to measure it.',
+    many: (n: number) => `${n} pieces selected. Drag to move them together.`,
+    name: 'Name',
+    seamAllowance: 'Seam allowance',
+    edge: 'Edge',
+    edgeLength: (length: string) => `Length along the stitching line: ${length}`,
+  },
+
+  menu: {
+    label: 'Actions',
+    turn: 'Turn 90° clockwise',
+    turnBack: 'Turn 90° anticlockwise',
+    deletePiece: 'Delete piece',
+  },
+
   pieces: {
     heading: 'Pieces',
     none: 'No pieces yet.',
@@ -106,6 +123,12 @@ export const t = {
           return `${pieceName(n.piece)}: the outline crosses itself. Check that piece after adding.`
       }
     },
+  },
+
+  crash: {
+    heading: 'Something went wrong',
+    body: 'Soom hit a problem showing this screen. Reloading usually fixes it.',
+    reload: 'Reload',
   },
 
   device: {

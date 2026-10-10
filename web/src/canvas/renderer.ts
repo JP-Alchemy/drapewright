@@ -1,8 +1,9 @@
 // Draws the work table: a cutting mat with a true-size centimetre grid and
 // the pieces laid on it like pattern paper.
 
-import type { Piece, PieceView } from '@soom/engine'
-import type { PiecePaths } from './paths.ts'
+import type { Hit, Piece, PieceView } from '@soom/engine'
+import type { EdgeRef, MovePreview } from '../state/session.ts'
+import { type PiecePaths, addSegment } from './paths.ts'
 import { type ViewportState, scaleOf, toScreen, visibleWorld } from './viewport.ts'
 
 export interface ScenePiece {
@@ -14,6 +15,9 @@ export interface ScenePiece {
 export interface Scene {
   pieces: ScenePiece[]
   selection: ReadonlySet<string>
+  edge?: EdgeRef | null
+  hover?: Hit | null
+  preview?: MovePreview | null
 }
 
 export interface Theme {
@@ -68,9 +72,31 @@ function drawGrid(ctx: CanvasRenderingContext2D, v: ViewportState, theme: Theme)
   else lines(500, theme.matLineMajor, 1.25)
 }
 
-function placement(piece: Piece): DOMMatrix {
+function placement(piece: Piece, preview?: MovePreview | null): DOMMatrix {
   const { x, y, rotation } = piece.placement
-  return new DOMMatrix().translateSelf(x, y).rotateSelf(rotation)
+  const moving = preview?.ids.has(piece.id)
+  return new DOMMatrix()
+    .translateSelf(x + (moving ? preview!.dx : 0), y + (moving ? preview!.dy : 0))
+    .rotateSelf(rotation)
+}
+
+/** One edge of a piece's outline, in piece coordinates. */
+function edgePath(piece: Piece, edgeId: string): Path2D | null {
+  const edges = piece.outline.edges
+  const i = edges.findIndex((e) => e.id === edgeId)
+  if (i < 0) return null
+  const prev = i === 0 ? null : edges[i - 1]?.segments.at(-1)
+  const [sx, sy] = prev ? prev.to : piece.outline.start
+  const path = new Path2D()
+  path.moveTo(sx, sy)
+  for (const seg of edges[i]!.segments) addSegment(path, seg)
+  return path
+}
+
+/** The corner where `edgeId` ends, in piece coordinates. */
+function cornerPoint(piece: Piece, edgeId: string): [number, number] | null {
+  const edge = piece.outline.edges.find((e) => e.id === edgeId)
+  return edge?.segments.at(-1)?.to ?? null
 }
 
 function drawGrainline(ctx: CanvasRenderingContext2D, piece: Piece, s: number, theme: Theme) {
@@ -126,7 +152,7 @@ export function draw(
 
   for (const { piece, paths } of scene.pieces) {
     const selected = scene.selection.has(piece.id)
-    ctx.setTransform(world.multiply(placement(piece)))
+    ctx.setTransform(world.multiply(placement(piece, scene.preview)))
     ctx.fillStyle = theme.paper
     ctx.fill(paths.cut)
     ctx.lineJoin = 'round'
@@ -141,6 +167,37 @@ export function draw(
     drawGrainline(ctx, piece, s, theme)
   }
 
+  // Hovered and selected edges and corners, over everything else.
+  const highlight = (pieceId: string, edgeId: string, corner: boolean, strong: boolean) => {
+    const sp = scene.pieces.find((p) => p.piece.id === pieceId)
+    if (!sp) return
+    ctx.setTransform(world.multiply(placement(sp.piece, scene.preview)))
+    ctx.strokeStyle = theme.select
+    ctx.globalAlpha = strong ? 1 : 0.55
+    if (corner) {
+      const c = cornerPoint(sp.piece, edgeId)
+      if (c) {
+        ctx.beginPath()
+        ctx.arc(c[0], c[1], (strong ? 6 : 5) / s, 0, Math.PI * 2)
+        ctx.lineWidth = 2 / s
+        ctx.stroke()
+      }
+    } else {
+      const path = edgePath(sp.piece, edgeId)
+      if (path) {
+        ctx.lineWidth = (strong ? 4 : 3) / s
+        ctx.lineCap = 'round'
+        ctx.stroke(path)
+      }
+    }
+    ctx.globalAlpha = 1
+  }
+  const hover = scene.hover
+  if (hover && (hover.kind === 'edge' || hover.kind === 'corner')) {
+    highlight(hover.piece, hover.edge, hover.kind === 'corner', false)
+  }
+  if (scene.edge) highlight(scene.edge.piece, scene.edge.edge, false, true)
+
   // Names in screen space, so they stay readable at any zoom.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.font = '600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -148,7 +205,9 @@ export function draw(
   ctx.textBaseline = 'middle'
   for (const { piece, view } of scene.pieces) {
     const [x0, y0, x1, y1] = view.bounds
-    const m = placement(piece).transformPoint(new DOMPoint((x0 + x1) / 2, (y0 + y1) / 2))
+    const m = placement(piece, scene.preview).transformPoint(
+      new DOMPoint((x0 + x1) / 2, (y0 + y1) / 2),
+    )
     const p = toScreen(v, { x: m.x, y: m.y })
     const widthPx = (x1 - x0) * s
     if (widthPx < 40) continue

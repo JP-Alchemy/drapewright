@@ -1,13 +1,28 @@
 // One open project and everything around it: the engine, the IO worker,
 // UI state, and the cache of drawable paths per piece.
 
-import type { Engine, ImportResult, Piece, ScaleOption } from '@soom/engine'
+import type {
+  Command,
+  DispatchOptions,
+  Engine,
+  Hit,
+  ImportResult,
+  Piece,
+  ScaleOption,
+} from '@soom/engine'
 import { buildPaths } from '../canvas/paths.ts'
 import { type ScenePiece, sceneBounds } from '../canvas/renderer.ts'
 import { type ViewportState, fit, initialViewport } from '../canvas/viewport.ts'
 import { t } from '../strings/en.ts'
 import type { IoClient } from '../workers/io-client.ts'
 import { type Store, createStore } from './store.ts'
+
+export type ToolId = 'select' | 'notch' | 'grainline' | 'measure'
+
+export interface EdgeRef {
+  piece: string
+  edge: string
+}
 
 export interface PendingImport {
   fileName: string
@@ -19,41 +34,93 @@ export interface Notice {
   text: string
 }
 
+/** Pieces being dragged, drawn offset until the drag ends. */
+export interface MovePreview {
+  ids: ReadonlySet<string>
+  dx: number
+  dy: number
+}
+
+/** A short measurement shown next to the pointer, screen px. */
+export interface Tip {
+  x: number
+  y: number
+  text: string
+}
+
+export interface MenuState {
+  x: number
+  y: number
+  hit: Hit | null
+}
+
 export interface UiState {
+  tool: ToolId
   selection: ReadonlySet<string>
+  /** The selected edge, shown in the inspector. */
+  edge: EdgeRef | null
+  hover: Hit | null
+  preview: MovePreview | null
   viewport: ViewportState
   pendingImport: PendingImport | null
   busy: string | null
   notice: Notice | null
+  menu: MenuState | null
+  tip: Tip | null
+  /** Brief feedback, e.g. after a two-finger undo. */
+  toast: string | null
 }
 
 /** Space left between imported pieces and what is already on the table, mm. */
 const IMPORT_GAP = 50
 
+const TOAST_MS = 1400
+
 export class Session {
   readonly ui: Store<UiState>
   readonly #scene = new Map<string, ScenePiece>()
+  #toastTimer: ReturnType<typeof setTimeout> | undefined
+  #fitPending = false
 
   constructor(
     readonly engine: Engine,
     readonly io: IoClient,
   ) {
     this.ui = createStore<UiState>({
+      tool: 'select',
       selection: new Set(),
+      edge: null,
+      hover: null,
+      preview: null,
       viewport: initialViewport,
       pendingImport: null,
       busy: null,
       notice: null,
+      menu: null,
+      tip: null,
+      toast: null,
     })
     engine.subscribe((changes) => {
       for (const id of [...changes.changed, ...changes.removed]) this.#scene.delete(id)
-      if (changes.removed.length > 0) {
-        this.ui.set((s) => ({
-          ...s,
-          selection: new Set([...s.selection].filter((id) => !changes.removed.includes(id))),
-        }))
-      }
+      this.#dropStaleSelection()
     })
+  }
+
+  /** Forgets selected pieces and edges that no longer exist. */
+  #dropStaleSelection() {
+    const doc = this.engine.document()
+    const ui = this.ui.get()
+    const alive = new Set(doc.pieces.map((p) => p.id))
+    const selection = [...ui.selection].filter((id) => alive.has(id))
+    const edgePiece = ui.edge && doc.pieces.find((p) => p.id === ui.edge?.piece)
+    const edgeAlive = !!edgePiece && edgePiece.outline.edges.some((e) => e.id === ui.edge?.edge)
+    if (selection.length !== ui.selection.size || (ui.edge && !edgeAlive)) {
+      this.ui.set((s) => ({
+        ...s,
+        selection: new Set(selection),
+        edge: edgeAlive ? s.edge : null,
+      }))
+    }
   }
 
   /** Every piece with its derived view and canvas paths, in drawing order. */
@@ -70,21 +137,96 @@ export class Session {
     })
   }
 
+  scenePiece(id: string): ScenePiece | undefined {
+    return this.scene().find((s) => s.piece.id === id)
+  }
+
   setViewport(update: (v: ViewportState) => ViewportState): void {
     this.ui.set((s) => ({ ...s, viewport: update(s.viewport) }))
+    const v = this.ui.get().viewport
+    if (this.#fitPending && v.width > 0 && v.height > 0) {
+      this.#fitPending = false
+      this.fitAll()
+    }
   }
 
+  /** Shows every piece. Waits for the table to have a size if it has none yet. */
   fitAll(): void {
+    const v = this.ui.get().viewport
+    if (v.width <= 0 || v.height <= 0) {
+      this.#fitPending = true
+      return
+    }
     const bounds = sceneBounds(this.scene())
-    if (bounds) this.setViewport((v) => fit(v, bounds))
+    if (bounds) this.setViewport((s) => fit(s, bounds))
   }
 
-  select(ids: Iterable<string>): void {
-    this.ui.set((s) => ({ ...s, selection: new Set(ids) }))
+  setTool(tool: ToolId): void {
+    this.ui.set((s) => ({ ...s, tool, preview: null, hover: null, tip: null }))
+  }
+
+  select(ids: Iterable<string>, edge: EdgeRef | null = null): void {
+    this.ui.set((s) => ({ ...s, selection: new Set(ids), edge }))
+  }
+
+  setHover(hover: Hit | null): void {
+    const current = this.ui.get().hover
+    if (JSON.stringify(current) === JSON.stringify(hover)) return
+    this.ui.set((s) => ({ ...s, hover }))
+  }
+
+  setPreview(preview: MovePreview | null): void {
+    this.ui.set((s) => ({ ...s, preview }))
+  }
+
+  showTip(tip: Tip | null): void {
+    this.ui.set((s) => ({ ...s, tip }))
+  }
+
+  openMenu(menu: MenuState | null): void {
+    this.ui.set((s) => ({ ...s, menu }))
   }
 
   notify(notice: Notice | null): void {
     this.ui.set((s) => ({ ...s, notice }))
+  }
+
+  toast(text: string): void {
+    clearTimeout(this.#toastTimer)
+    this.ui.set((s) => ({ ...s, toast: text }))
+    this.#toastTimer = setTimeout(() => this.ui.set((s) => ({ ...s, toast: null })), TOAST_MS)
+  }
+
+  /** Runs a command; shows its plain-language reason if it is refused. */
+  dispatch(command: Command, options?: DispatchOptions): boolean {
+    const result = this.engine.dispatch(command, options)
+    if (result.status === 'rejected') {
+      this.notify({ kind: 'error', text: result.error.message })
+      return false
+    }
+    return true
+  }
+
+  undo(feedback = false): void {
+    const label = this.engine.state.undoLabel
+    if (this.engine.undo() && feedback && label) this.toast(t.actions.undoThing(label))
+  }
+
+  redo(feedback = false): void {
+    const label = this.engine.state.redoLabel
+    if (this.engine.redo() && feedback && label) this.toast(t.actions.redoThing(label))
+  }
+
+  /** Moves the selected pieces; a run of nudges is one undo step. */
+  nudge(dx: number, dy: number): void {
+    const ids = [...this.ui.get().selection].sort()
+    if (ids.length === 0) return
+    this.dispatch({ type: 'movePieces', ids, dx, dy }, { coalesce: `nudge:${ids.join(',')}` })
+  }
+
+  deleteSelection(): void {
+    const ids = [...this.ui.get().selection]
+    if (ids.length > 0) this.dispatch({ type: 'deletePieces', ids })
   }
 
   async openPatternFile(file: File): Promise<void> {

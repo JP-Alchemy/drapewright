@@ -9,11 +9,12 @@ import { Session } from '../state/session.ts'
 import { useStore } from '../state/store.ts'
 import { t } from '../strings/en.ts'
 import { IoClient } from '../workers/io-client.ts'
+import { ContextMenu } from './ContextMenu.tsx'
 import { DeviceDialog } from './DeviceDialog.tsx'
 import { ImportDialog } from './ImportDialog.tsx'
+import { Inspector } from './Inspector.tsx'
 import { PieceList } from './PieceList.tsx'
-
-const isApple = /Mac|iPhone|iPad/.test(navigator.platform) || navigator.userAgent.includes('Mac')
+import { attachShortcuts } from './shortcuts.ts'
 
 function TopBar({ session, onOpen }: { session: Session; onOpen: () => void }) {
   const state = useEngineState(session)
@@ -33,7 +34,7 @@ function TopBar({ session, onOpen }: { session: Session; onOpen: () => void }) {
         className="icon-button"
         aria-label={state.undoLabel ? t.actions.undoThing(state.undoLabel) : t.actions.undo}
         isDisabled={!state.canUndo}
-        onPress={() => session.engine.undo()}
+        onPress={() => session.undo()}
       >
         <Undo2 size={20} aria-hidden="true" />
       </Button>
@@ -41,7 +42,7 @@ function TopBar({ session, onOpen }: { session: Session; onOpen: () => void }) {
         className="icon-button"
         aria-label={state.redoLabel ? t.actions.redoThing(state.redoLabel) : t.actions.redo}
         isDisabled={!state.canRedo}
-        onPress={() => session.engine.redo()}
+        onPress={() => session.redo()}
       >
         <Redo2 size={20} aria-hidden="true" />
       </Button>
@@ -89,25 +90,12 @@ function ZoomControls({ session }: { session: Session }) {
 
 function Workspace({ session }: { session: Session }) {
   const fileInput = useRef<HTMLInputElement>(null)
-  const { busy, notice } = useStore(session.ui)
+  const { busy, notice, toast, tip } = useStore(session.ui)
   useEngineState(session)
   const empty = session.engine.document().pieces.length === 0
   const open = () => fileInput.current?.click()
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const mod = isApple ? e.metaKey : e.ctrlKey
-      if (!mod) return
-      const key = e.key.toLowerCase()
-      if (key === 'z' && !e.shiftKey) session.engine.undo()
-      else if ((key === 'z' && e.shiftKey) || key === 'y') session.engine.redo()
-      else if (key === 'o') open()
-      else return
-      e.preventDefault()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [session])
+  useEffect(() => attachShortcuts(session, () => fileInput.current?.click()), [session])
 
   return (
     <div className="app">
@@ -138,6 +126,17 @@ function Workspace({ session }: { session: Session }) {
             </div>
           )}
           <ZoomControls session={session} />
+          <ContextMenu session={session} onOpen={open} />
+          {toast && (
+            <div className="toast" role="status">
+              {toast}
+            </div>
+          )}
+          {tip && (
+            <div className="tip" role="status" style={{ left: tip.x, top: tip.y }}>
+              {tip.text}
+            </div>
+          )}
           {busy && (
             <div className="status-bar" role="status">
               {busy}
@@ -157,6 +156,7 @@ function Workspace({ session }: { session: Session }) {
         </main>
         <aside className="side-panel">
           <PieceList session={session} />
+          <Inspector session={session} />
         </aside>
       </div>
       <ImportDialog session={session} />
@@ -172,7 +172,13 @@ export function App() {
     let cancelled = false
     loadEngine()
       .then(() => {
-        if (!cancelled) setSession(new Session(Engine.create(t.untitled), new IoClient()))
+        if (cancelled) return
+        const session = new Session(Engine.create(t.untitled), new IoClient())
+        // Opt-in handle for debugging and end-to-end tests: add ?debug to the URL.
+        if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) {
+          Object.assign(window, { soom: session })
+        }
+        setSession(session)
       })
       .catch((e: unknown) => setError(String(e)))
     return () => {

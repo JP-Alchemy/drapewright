@@ -12,6 +12,48 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 6 — Input layer: Pencil, fingers, mouse and keys (Phase 1, day 6)
+
+**Try it** (`pnpm dev`, open a fixture as in step 5):
+
+* **Move pieces:** drag a piece. While you drag it follows the pointer; on
+  release it is one undo step ("Undo move"). Arrow keys nudge the selection
+  by 1 mm, Shift+arrow by 1 cm; a run of nudges undoes in one go.
+* **Select:** tap or click a piece; Shift-click adds to the selection. Tap
+  an *edge* (on the dashed stitching line) and it lights up; the panel shows
+  its length along the stitching line.
+* **Inspector:** rename the piece, and step the seam allowance up and down.
+  The cutting line follows immediately. Stepping is one undo step.
+* **Menu:** right-click (or **long-press** on iPad) a piece for *Turn 90°*
+  and *Delete piece*; on the empty table for *Open pattern* and *Show all*.
+* **Undo/redo gestures on iPad:** two-finger tap undoes, three-finger tap
+  redoes, with a short "Undo move" confirmation at the top.
+* **Navigate:** two fingers pan and pinch; space + drag pans with a mouse.
+* **Keys:** ⌘Z / ⇧⌘Z (Ctrl+Z / Ctrl+Y), ⌫ delete, 0 show all, 1 actual
+  size, + and − zoom, Esc clear selection, ⌘A select all.
+* **Pencil:** once the Pencil has been used, fingers only navigate and
+  select (palm rejection), as in Procreate. Holding the Pencil still on an
+  edge shows its length.
+
+**Worth trying on a real iPad** (please report back): palm resting on the
+glass while drawing with the Pencil; two-finger tap undo; long-press menu.
+These are unit-tested with recorded event sequences, but real hardware is
+the real test.
+
+**Under the hood:** `@soom/input` is framework-free (it does not even see
+the DOM). It turns raw pen, touch and mouse events into pan/zoom, undo/redo,
+context menus and a single stream of tool events, with palm rejection and
+gesture recognition, all unit-tested by replaying event sequences against a
+fake clock. Tools are small state machines that only ever preview or
+dispatch commands, so a cancelled gesture can never leave half an edit.
+
+**Fixed along the way:** if the app starts while its window is hidden, the
+browser gives it no size, and "show all" used to zoom out to 2%. The canvas
+is now measured when it appears, and "show all" waits until the table has a
+size.
+
+---
+
 ## Step 5 — Open an SVG and see it on the table (Phase 1, day 5)
 
 **Try it:** `pnpm wasm && pnpm dev`, open http://localhost:5173.

@@ -35,11 +35,16 @@ importers:
 
   packages/engine: {}
 
+  packages/input: {}
+
   web:
     dependencies:
       '@soom/engine':
         specifier: workspace:*
         version: link:../packages/engine
+      '@soom/input':
+        specifier: workspace:^
+        version: link:../packages/input
       idb:
         specifier: ^8.0.4
         version: 8.0.4

@@ -528,3 +528,137 @@ h2 {
   color: #fff;
   background: var(--ok);
 }
+
+/* Fields */
+
+.field {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.field > label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.text-input,
+.number-input {
+  min-height: var(--tap);
+  min-width: 0;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: 16px var(--font);
+}
+
+.number-group {
+  display: grid;
+  grid-template-columns: var(--tap) 1fr var(--tap);
+  gap: 4px;
+}
+
+.number-input {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.step-button {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.inspector h3 {
+  margin: 16px 0 4px;
+  font-size: 16px;
+}
+
+.edge-details {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* Menus, toasts and tips over the table */
+
+.menu-anchor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.popover {
+  min-width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  outline: none;
+}
+
+.menu {
+  padding: 6px;
+  outline: none;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+}
+
+.menu-item[data-focused] {
+  background: var(--surface-2);
+}
+
+.menu-item.danger {
+  color: var(--danger);
+}
+
+.toast {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  translate: -50% 0;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgb(20 24 25 / 0.85);
+  color: #fff;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.tip {
+  position: absolute;
+  translate: -50% calc(-100% - 16px);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.card {
+  width: min(440px, calc(100% - 32px));
+  padding: 20px 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
