@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::Pt;
-use crate::geom::SAME_POINT;
+use crate::geom::{SAME_POINT, ray_hit};
 use crate::model::{AllowanceMode, Id, Notch, NotchFrom, Piece};
 
 /// How notches are drawn on the cutting line.
@@ -50,28 +50,6 @@ pub fn notch_along(notch: &Notch, edge_length: f64) -> f64 {
         NotchFrom::Start => notch.at,
         NotchFrom::End => edge_length - notch.at,
     }
-}
-
-/// Nearest crossing of the ray `origin + t·dir` (t ≥ 0) with a closed
-/// polyline.
-fn ray_hit(origin: Point, dir: Vec2, polyline: &[Point]) -> Option<Point> {
-    let n = polyline.len();
-    let mut best: Option<f64> = None;
-    for i in 0..n {
-        let (a, b) = (polyline[i], polyline[(i + 1) % n]);
-        let e = b - a;
-        let den = dir.cross(e);
-        if den.abs() < 1e-12 {
-            continue;
-        }
-        let w = a - origin;
-        let t = w.cross(e) / den;
-        let u = w.cross(dir) / den;
-        if t >= -SAME_POINT && (-1e-9..=1.0 + 1e-9).contains(&u) {
-            best = Some(best.map_or(t.max(0.0), |b: f64| b.min(t.max(0.0))));
-        }
-    }
-    best.map(|t| origin + dir * t)
 }
 
 /// The marks for every notch of a piece, given its cutting line.

@@ -1,14 +1,30 @@
 import { fileURLToPath } from 'node:url'
 import type { Page } from '@playwright/test'
 
+/** A file in `fixtures/svg` or `fixtures/dxf`, by its extension. */
 export const fixture = (name: string) =>
-  fileURLToPath(new URL(`../../../fixtures/svg/${name}`, import.meta.url))
+  fileURLToPath(new URL(`../../../fixtures/${name.split('.').pop()}/${name}`, import.meta.url))
 
-/** Opens the app with the debug handle and imports a fixture. */
-export async function openWithFixture(page: Page, name: string, add: string): Promise<void> {
+/**
+ * Opens the app with the debug handle and imports a fixture. When the
+ * import asks whether seam allowance is included, `allowance` answers.
+ */
+export async function openWithFixture(
+  page: Page,
+  name: string,
+  add: string,
+  allowance: 'Not included' | 'Already included' = 'Not included',
+): Promise<void> {
   await page.goto('/?debug')
   await page.getByTestId('pattern-file').setInputFiles(fixture(name))
-  await page.getByRole('dialog').getByRole('button', { name: add }).click()
+  const dialog = page.getByRole('dialog')
+  const addButton = dialog.getByRole('button', { name: add })
+  await addButton.waitFor()
+  const question = dialog.getByRole('radiogroup', { name: /seam allowance included/ })
+  if ((await question.count()) > 0) await question.getByText(allowance, { exact: true }).click()
+  await addButton.click()
+  // The dialog closes once the pieces are in the document.
+  await dialog.waitFor({ state: 'hidden' })
 }
 
 /** Page coordinates of the middle of a piece, by index. */

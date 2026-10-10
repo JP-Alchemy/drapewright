@@ -9,7 +9,7 @@
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use soom_io::svg::{SvgExportOptions, export_svg};
-use soom_io::{ImportResult, ScaleOption};
+use soom_io::{AllowanceAnswer, ImportResult, ScaleOption};
 use soom_pattern_core::{Issue, Piece, Pt};
 use soom_project::document::ViewState;
 use soom_project::{Command, CommandError, DispatchOptions, Engine};
@@ -201,16 +201,31 @@ pub fn import_svg(data: &[u8], file_name: Option<String>) -> Result<JsValue, JsE
     to_js(&result)
 }
 
-/// Re-reads an import at another scale.
-#[wasm_bindgen(js_name = rescaleImport)]
-pub fn rescale_import(
+/// Reads pattern pieces from an ASCII DXF file (CAD drawings and AAMA/ASTM
+/// garment pattern files).
+#[wasm_bindgen(js_name = importDxf)]
+pub fn import_dxf(data: &[u8], file_name: Option<String>) -> Result<JsValue, JsError> {
+    let result = soom_io::dxf::import_dxf(data, file_name.as_deref())
+        .map_err(|e| JsError::new(&e.to_string()))?;
+    to_js(&result)
+}
+
+/// Settles an import with the user's answers: the scale she confirmed and,
+/// when the file did not say, whether its outlines include seam allowance
+/// (`allowance` is null when nothing was asked).
+#[wasm_bindgen(js_name = finishImport)]
+pub fn finish_import(
     result: JsValue,
-    option: JsValue,
-    confirmed: bool,
+    scale: JsValue,
+    allowance: JsValue,
 ) -> Result<JsValue, JsError> {
     let mut result: ImportResult = from_js(result)?;
-    let option: ScaleOption = from_js(option)?;
-    result.rescale(&option, confirmed);
+    let scale: ScaleOption = from_js(scale)?;
+    let allowance: Option<AllowanceAnswer> = from_js(allowance)?;
+    result.rescale(&scale, true);
+    if let Some(answer) = allowance {
+        result.answer_allowance(answer);
+    }
     to_js(&result)
 }
 

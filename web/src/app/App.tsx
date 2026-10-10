@@ -5,7 +5,7 @@ import { Button } from 'react-aria-components'
 import { PatternCanvas } from '../canvas/PatternCanvas.tsx'
 import { actualSize, zoomAt } from '../canvas/viewport.ts'
 import { useEngineState } from '../state/hooks.ts'
-import { Session } from '../state/session.ts'
+import { PATTERN_FILE_TYPES, Session } from '../state/session.ts'
 import { useStore } from '../state/store.ts'
 import { t } from '../strings/en.ts'
 import { IoClient } from '../workers/io-client.ts'
@@ -104,7 +104,7 @@ function Workspace({ session }: { session: Session }) {
       <input
         ref={fileInput}
         type="file"
-        accept=".svg,image/svg+xml"
+        accept={PATTERN_FILE_TYPES}
         hidden
         data-testid="pattern-file"
         onChange={(e) => {

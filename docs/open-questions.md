@@ -63,7 +63,10 @@ matters.
    line (as on paper, allowance implied) or have it converted to the
    stitching line with the allowance added back? *Provisional: keep the
    cutting line exactly as printed and show the stitching line dashed inside
-   it.* Nothing is converted unless she asks.
+   it.* Nothing is converted unless she asks. When a file does not say
+   which line its outlines are, the import asks her (nothing pre-chosen),
+   with the allowance width; garment CAD files that mark their cutting
+   lines pre-choose *Already included*.
 
 ### Notches and marks
 6. ☐ **How notches should look in print**: a short slit into the allowance,
@@ -99,3 +102,8 @@ matters.
 16. ☐ **Where do her patterns come from?** Big 4 tissue, indie PDFs (which
     companies?), magazines (Burda), or self-drafted? This decides which
     importers and size systems get the most testing.
+17. ☐ **DXF files from pattern CAD systems** (Gerber, Lectra, Optitex,
+    Valentina/Seamly2D, CLO…): does she have any? The AAMA/ASTM reader is
+    tested only on files drawn for our tests; real exports vary between
+    vendors, so a few real files (kept private, outside the repository)
+    would show what needs adjusting.

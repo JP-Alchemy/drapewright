@@ -1,7 +1,7 @@
 //! Building pieces from raw paths (imports): finding the corners that
 //! split an outline into edges, and giving everything fresh ids.
 
-use kurbo::{ParamCurve, ParamCurveArclen, PathSeg};
+use kurbo::{ParamCurve, ParamCurveArclen, PathSeg, Point};
 
 use crate::Pt;
 use crate::geom::{ARCLEN_ACCURACY, unit_tangent};
@@ -23,24 +23,72 @@ pub fn outline_from_path(
     corner_angle: f64,
     next_id: &mut dyn FnMut(&str) -> Id,
 ) -> Option<Outline> {
-    let segs: Vec<PathSeg> = segs
-        .iter()
-        .copied()
-        .filter(|s| s.arclen(ARCLEN_ACCURACY) > MIN_SEGMENT_LENGTH)
-        .collect();
-    let n = segs.len();
-    if n == 0 {
+    let segs = usable(segs);
+    if segs.is_empty() {
         return None;
     }
+    let corners = corners_by_angle(&segs, corner_angle);
+    Some(group_edges(&segs, &corners, next_id))
+}
+
+/// Like [`outline_from_path`], but the edges break where the file says the
+/// corners are: at the joints within `tolerance` of the given points (CAD
+/// "turn points"). Falls back to finding corners by angle if none of the
+/// points lies on the path.
+pub fn outline_from_path_at(
+    segs: &[PathSeg],
+    corner_points: &[Point],
+    tolerance: f64,
+    corner_angle: f64,
+    next_id: &mut dyn FnMut(&str) -> Id,
+) -> Option<Outline> {
+    let segs = usable(segs);
+    if segs.is_empty() {
+        return None;
+    }
+    let mut corners: Vec<bool> = segs
+        .iter()
+        .map(|s| {
+            corner_points
+                .iter()
+                .any(|c| c.distance(s.start()) <= tolerance)
+        })
+        .collect();
+    if !corners.contains(&true) {
+        corners = corners_by_angle(&segs, corner_angle);
+    }
+    Some(group_edges(&segs, &corners, next_id))
+}
+
+fn usable(segs: &[PathSeg]) -> Vec<PathSeg> {
+    segs.iter()
+        .copied()
+        .filter(|s| s.arclen(ARCLEN_ACCURACY) > MIN_SEGMENT_LENGTH)
+        .collect()
+}
+
+/// For each segment, whether the joint before it turns by more than
+/// `corner_angle` degrees.
+fn corners_by_angle(segs: &[PathSeg], corner_angle: f64) -> Vec<bool> {
+    let n = segs.len();
     let threshold = corner_angle.to_radians().cos();
-    // Corner before segment k: between the end of k-1 and the start of k.
-    let is_corner: Vec<bool> = (0..n)
+    (0..n)
         .map(|k| {
             let a = unit_tangent(&segs[(k + n - 1) % n], 1.0);
             let b = unit_tangent(&segs[k], 0.0);
             a.dot(b) < threshold
         })
-        .collect();
+        .collect()
+}
+
+/// Groups segments into edges, starting a new edge before every segment
+/// marked as following a corner. The outline starts at the first corner.
+fn group_edges(
+    segs: &[PathSeg],
+    is_corner: &[bool],
+    next_id: &mut dyn FnMut(&str) -> Id,
+) -> Outline {
+    let n = segs.len();
     let first = is_corner.iter().position(|&c| c).unwrap_or(0);
     let start = Pt::from(segs[first].start());
     let mut edges: Vec<Edge> = Vec::new();
@@ -60,7 +108,7 @@ pub fn outline_from_path(
             Segment::Cubic(c) => c.to = start,
         }
     }
-    Some(Outline { start, edges })
+    Outline { start, edges }
 }
 
 /// Gives the piece and everything in it new ids from `next_id(prefix)`,
@@ -162,6 +210,39 @@ mod tests {
         let o = outline_from_path(&segs, DEFAULT_CORNER_ANGLE, &mut ids).unwrap();
         assert_eq!(o.edges.len(), 1);
         assert_eq!(o.start, Pt::new(50.0, 0.0));
+    }
+
+    #[test]
+    fn breaks_at_named_corners() {
+        // Points every 25 mm round a 100 × 50 rectangle; only two are named
+        // corners, so there are two edges.
+        let pts = [
+            (0.0, 0.0),
+            (50.0, 0.0),
+            (100.0, 0.0),
+            (100.0, 50.0),
+            (50.0, 50.0),
+            (0.0, 50.0),
+        ];
+        let segs: Vec<PathSeg> = (0..pts.len())
+            .map(|i| line(pts[i], pts[(i + 1) % pts.len()]))
+            .collect();
+        let mut ids = counter("");
+        let corners = [Point::new(100.0, 0.0), Point::new(0.0, 50.0)];
+        let o = outline_from_path_at(&segs, &corners, 0.5, DEFAULT_CORNER_ANGLE, &mut ids).unwrap();
+        assert_eq!(o.edges.len(), 2);
+        assert_eq!(o.start, Pt::new(100.0, 0.0));
+        // No named corner lies on the path: corners by angle instead.
+        let mut ids = counter("");
+        let o = outline_from_path_at(
+            &segs,
+            &[Point::new(500.0, 500.0)],
+            0.5,
+            DEFAULT_CORNER_ANGLE,
+            &mut ids,
+        )
+        .unwrap();
+        assert_eq!(o.edges.len(), 4);
     }
 
     #[test]

@@ -2,6 +2,7 @@
 // UI state, and the cache of drawable paths per piece.
 
 import type {
+  AllowanceAnswer,
   Command,
   DispatchOptions,
   Engine,
@@ -34,6 +35,34 @@ export interface GrainPreview {
 export interface PendingImport {
   fileName: string
   result: ImportResult
+}
+
+/** The pattern files Soom reads, by file extension and media type. */
+const PATTERN_FORMATS: {
+  importer: 'importSvg' | 'importDxf'
+  extensions: string[]
+  types: string[]
+}[] = [
+  { importer: 'importSvg', extensions: ['.svg'], types: ['image/svg+xml'] },
+  {
+    importer: 'importDxf',
+    extensions: ['.dxf'],
+    types: ['image/vnd.dxf', 'image/x-dxf', 'application/dxf'],
+  },
+]
+
+/** For a file input's `accept`. */
+export const PATTERN_FILE_TYPES = PATTERN_FORMATS.flatMap((f) => [
+  ...f.extensions,
+  ...f.types,
+]).join(',')
+
+function importerFor(file: File): 'importSvg' | 'importDxf' | null {
+  const name = file.name.toLowerCase()
+  const format = PATTERN_FORMATS.find(
+    (f) => f.extensions.some((e) => name.endsWith(e)) || f.types.includes(file.type),
+  )
+  return format?.importer ?? null
 }
 
 export interface Notice {
@@ -251,14 +280,15 @@ export class Session {
   }
 
   async openPatternFile(file: File): Promise<void> {
-    if (!file.name.toLowerCase().endsWith('.svg') && file.type !== 'image/svg+xml') {
+    const importer = importerFor(file)
+    if (!importer) {
       this.notify({ kind: 'error', text: t.importing.unsupported(file.name) })
       return
     }
     this.ui.set((s) => ({ ...s, busy: t.importing.reading(file.name), notice: null }))
     try {
       const bytes = new Uint8Array(await file.arrayBuffer())
-      const result = await this.io.call('importSvg', bytes, file.name)
+      const result = await this.io.call(importer, bytes, file.name)
       this.ui.set((s) => ({ ...s, pendingImport: { fileName: file.name, result } }))
     } catch (error) {
       this.notify({
@@ -274,13 +304,23 @@ export class Session {
     this.ui.set((s) => ({ ...s, pendingImport: null }))
   }
 
-  /** Adds the pending import's pieces at the chosen scale, beside what is already there. */
-  async confirmImport(scale: ScaleOption): Promise<void> {
+  /**
+   * Adds the pending import's pieces beside what is already there, at the
+   * scale she confirmed and, when she was asked, with her answer about seam
+   * allowance.
+   */
+  async confirmImport(scale: ScaleOption, allowance: AllowanceAnswer | null): Promise<void> {
     const pending = this.ui.get().pendingImport
     if (!pending) return
-    let { result } = pending
-    if (!result.scale.certain || scale.mmPerUnit !== result.scale.chosen.mmPerUnit) {
-      result = await this.io.call('rescaleImport', result, scale, true)
+    let result: ImportResult
+    try {
+      result = await this.io.call('finishImport', pending.result, scale, allowance)
+    } catch (error) {
+      this.notify({
+        kind: 'error',
+        text: t.importing.failed(error instanceof Error ? error.message : String(error)),
+      })
+      return
     }
     const pieces = this.#besideExisting(result.pieces)
     const outcome = this.engine.dispatch({ type: 'addPieces', pieces })

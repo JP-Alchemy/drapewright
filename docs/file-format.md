@@ -298,7 +298,7 @@ changes a piece's shape or its printed result.
 | `file`, `sha256` | Original file name and hash; the file itself is in `sources/`. |
 | `ref` | Element id, layer or block name inside the source. |
 | `scale.mmPerUnit` | Millimetres per source unit used at import. |
-| `scale.basis` | How the scale was established: `declaredUnits` (file states physical units), `assumed96dpi`, `assumed72dpi`, `assumed90dpi`, `measured` (the user measured a known length). |
+| `scale.basis` | How the scale was established: `declaredUnits` (file states physical units), `assumed96dpi`, `assumed72dpi`, `assumed90dpi` (drawings without units), `assumedMm`, `assumedCm`, `assumedInches` (CAD drawings without units), `measured` (the user measured a known length). |
 | `scale.confirmed` | Whether the user confirmed the scale. Imports never proceed with an unconfirmed guess. |
 
 ## 5. Derived geometry (not stored)

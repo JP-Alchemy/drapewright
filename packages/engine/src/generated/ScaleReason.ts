@@ -3,4 +3,4 @@
 /**
  * Why the importer chose the scale it did.
  */
-export type ScaleReason = "declaredUnits" | "illustratorFile" | "oldInkscapeFile" | "paperSize" | "noUnits";
+export type ScaleReason = "declaredUnits" | "illustratorFile" | "oldInkscapeFile" | "paperSize" | "noUnits" | "noDrawingUnits" | "aamaMetric";

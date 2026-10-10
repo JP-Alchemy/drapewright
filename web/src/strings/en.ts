@@ -28,6 +28,10 @@ export function formatLength(mm: number, units: DisplayUnits): string {
 const plural = (n: number, one: string, many: string) =>
   n === 1 ? one : many.replace('#', String(n))
 
+/** “Front”, “Back” and “Collar” */
+const namesList = (names: string[]) =>
+  new Intl.ListFormat('en', { type: 'conjunction' }).format(names.map((n) => `“${n}”`))
+
 export const t = {
   appName: 'Soom',
   untitled: 'Untitled pattern',
@@ -49,7 +53,7 @@ export const t = {
   table: {
     empty: 'Open a sewing pattern to lay it out here.',
     emptyHint:
-      'SVG files from Inkscape, Illustrator, FreeSewing and most pattern apps work. DXF comes next.',
+      'SVG files from Inkscape, Illustrator, FreeSewing and most pattern apps work, and DXF files from CAD and garment pattern systems. PDF comes next.',
     zoomLabel: (zoom: number) => `${Math.round(zoom * 100)}%`,
     notCalibrated: 'Screen not measured yet: 100% is approximate.',
   },
@@ -193,7 +197,7 @@ export const t = {
   importing: {
     reading: (name: string) => `Reading ${name}…`,
     unsupported: (name: string) =>
-      `Soom can open SVG files for now; “${name}” is not one. DXF and PDF are coming.`,
+      `Soom can open SVG and DXF files for now; “${name}” is neither. PDF is coming.`,
     failed: (message: string) => `This file could not be opened. ${message}`,
     found: (n: number) => plural(n, 'Found 1 piece', 'Found # pieces'),
     nothingFound: 'No pieces were found in this file.',
@@ -210,6 +214,10 @@ export const t = {
           'The drawing is exactly a paper size at this reading. Please check the size below.',
         noUnits:
           'The file does not say how big it is. Pick the reading where a piece has the size you expect.',
+        noDrawingUnits:
+          'The drawing does not say which unit it was drawn in. Pick the reading where a piece has the size you expect.',
+        aamaMetric:
+          'This garment CAD file says it is metric, which usually means millimetres. Please check the size below.',
       })[r],
     basis: (b: ScaleBasis): string =>
       ({
@@ -217,9 +225,42 @@ export const t = {
         assumed96dpi: '96 to the inch (most apps)',
         assumed72dpi: '72 to the inch (Adobe Illustrator)',
         assumed90dpi: '90 to the inch (Inkscape before 2017)',
+        assumedMm: 'Millimetres',
+        assumedCm: 'Centimetres',
+        assumedInches: 'Inches',
         measured: 'As measured',
       })[b],
     wouldBe: (name: string, size: string) => `${name} would be ${size}`,
+    /** `asked`: names of the pieces drawn with one line; `total`: pieces found. */
+    allowanceQuestion: (asked: string[], total: number) =>
+      asked.length === total
+        ? plural(
+            total,
+            'Is seam allowance included in this piece?',
+            'Is seam allowance included in these pieces?',
+          )
+        : asked.length <= 3
+          ? `Is seam allowance included in ${namesList(asked)}?`
+          : `Is seam allowance included in the ${asked.length} pieces drawn with one line?`,
+    allowanceWhy: (n: number) =>
+      plural(
+        n,
+        'It has a single outline, which could be the cutting line or the stitching line. The file does not say which.',
+        'Each has a single outline, which could be the cutting line or the stitching line. The file does not say which.',
+      ),
+    allowanceSuggested: (n: number) =>
+      plural(
+        n,
+        'The file marks this outline as the cutting line, so the allowance is already included. Check its width.',
+        'The file marks these outlines as cutting lines, so the allowance is already included. Check its width.',
+      ),
+    allowanceAdd: 'Not included',
+    allowanceAddDetail: 'The lines are stitching lines. Soom adds the allowance around them.',
+    allowanceIncluded: 'Already included',
+    allowanceIncludedDetail:
+      'The lines are cutting lines, kept exactly as drawn. The stitching line is shown inside.',
+    allowanceWidth: 'Seam allowance',
+    allowanceNeeded: 'Say whether seam allowance is included to add the pieces.',
     add: (n: number) => plural(n, 'Add the piece', 'Add # pieces'),
     cancel: 'Cancel',
     note: (n: ImportNote, pieceName: (id: string) => string, units: DisplayUnits): string => {
@@ -242,6 +283,18 @@ export const t = {
           )
         case 'noClosedShapes':
           return 'The file has lines but no closed shapes. Soom needs each piece’s outline drawn as one closed shape.'
+        case 'unsupportedEntities':
+          return plural(
+            n.count,
+            'Left out 1 part of the drawing Soom cannot read yet (such as a hatch or a 3D face).',
+            'Left out # parts of the drawing Soom cannot read yet (such as hatches or 3D faces).',
+          )
+        case 'curvesTraced':
+          return plural(
+            n.count,
+            '1 curve was stored only as the points it passes through, so Soom joined them with straight lines. Check its shape after adding.',
+            '# curves were stored only as the points they pass through, so Soom joined them with straight lines. Check their shape after adding.',
+          )
         case 'outlineCrossesItself':
           return `${pieceName(n.piece)}: the outline crosses itself. Check that piece after adding.`
       }

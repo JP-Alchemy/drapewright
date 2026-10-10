@@ -404,6 +404,12 @@ pub enum ScaleBasis {
     /// No physical units; assumed 90 per inch (Inkscape before 0.92).
     #[serde(rename = "assumed90dpi")]
     Assumed90Dpi,
+    /// A CAD drawing without units, read as millimetres.
+    AssumedMm,
+    /// A CAD drawing without units, read as centimetres.
+    AssumedCm,
+    /// A CAD drawing without units, read as inches.
+    AssumedInches,
     /// The user measured a known length.
     Measured,
 }

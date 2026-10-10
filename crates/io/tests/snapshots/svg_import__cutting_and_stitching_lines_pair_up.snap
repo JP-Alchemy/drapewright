@@ -121,6 +121,10 @@ expression: r
     "reason": "declaredUnits",
     "alternatives": []
   },
+  "allowance": {
+    "pieces": [],
+    "suggested": null
+  },
   "notes": [
     {
       "kind": "seamLineFound",

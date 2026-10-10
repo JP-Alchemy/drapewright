@@ -4,7 +4,7 @@ use kurbo::Affine;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use soom_pattern_core::ops::transform;
-use soom_pattern_core::{Id, Piece, ScaleBasis};
+use soom_pattern_core::{AllowanceMode, Id, Piece, ScaleBasis};
 use thiserror::Error;
 use ts_rs::TS;
 
@@ -46,6 +46,10 @@ pub enum ScaleReason {
     PaperSize,
     /// No units and no clues: the web standard of 96 per inch is a guess.
     NoUnits,
+    /// A CAD drawing that does not say which unit it measures in.
+    NoDrawingUnits,
+    /// A garment CAD (AAMA/ASTM) file marked METRIC, usually millimetres.
+    AamaMetric,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -85,8 +89,69 @@ pub enum ImportNote {
     LooseLinesIgnored { count: u32 },
     /// The file has lines but no closed shapes, so no pieces were found.
     NoClosedShapes,
+    /// Parts of the drawing Soom does not read yet (3D faces, hatches…).
+    UnsupportedEntities { count: u32 },
+    /// Curves stored only as points they pass through, joined by straight
+    /// lines: their shape may differ slightly from the original.
+    CurvesTraced { count: u32 },
     /// A piece outline crosses itself.
     OutlineCrossesItself { piece: Id },
+}
+
+/// Seam allowance the file does not settle. A piece drawn with one outline
+/// could have been drawn on either line, and the two differ by the
+/// allowance all round, so the user says which rather than Soom guessing.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AllowanceQuestion {
+    /// Pieces drawn with one outline. Empty when every piece's allowance
+    /// was measured from the file.
+    pub pieces: Vec<Id>,
+    /// Which line the file says those outlines are, when it says. Garment
+    /// CAD files mark their cutting lines as such.
+    pub suggested: Option<AllowanceMode>,
+}
+
+impl AllowanceQuestion {
+    /// The question for every piece whose allowance was not measured.
+    pub(crate) fn for_unmeasured(
+        pieces: &[Piece],
+        notes: &[ImportNote],
+        suggested: Option<AllowanceMode>,
+    ) -> Self {
+        let measured = measured(notes);
+        let pieces: Vec<Id> = pieces
+            .iter()
+            .filter(|p| !measured.contains(&p.id))
+            .map(|p| p.id.clone())
+            .collect();
+        let suggested = suggested.filter(|_| !pieces.is_empty());
+        Self { pieces, suggested }
+    }
+}
+
+/// The user's answer to an [`AllowanceQuestion`].
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AllowanceAnswer {
+    /// `add`: the outlines are stitching lines and allowance goes around
+    /// them. `included`: they are cutting lines with the allowance inside.
+    pub mode: AllowanceMode,
+    /// Width of the allowance, mm.
+    pub width: f64,
+}
+
+/// Pieces whose allowance was measured from a cutting and stitching line pair.
+fn measured(notes: &[ImportNote]) -> Vec<Id> {
+    notes
+        .iter()
+        .filter_map(|n| match n {
+            ImportNote::SeamLineFound { piece, .. } => Some(piece.clone()),
+            _ => None,
+        })
+        .collect()
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -95,26 +160,30 @@ pub enum ImportNote {
 pub struct ImportResult {
     pub pieces: Vec<Piece>,
     pub scale: ScaleInfo,
+    pub allowance: AllowanceQuestion,
     pub notes: Vec<ImportNote>,
     /// SHA-256 of the imported file, hex.
     pub sha256: String,
 }
 
 impl ImportResult {
+    /// Applies the user's answer to the pieces drawn with one outline, which
+    /// settles the question. Pieces whose allowance was measured keep it.
+    pub fn answer_allowance(&mut self, answer: AllowanceAnswer) {
+        let asked = std::mem::take(&mut self.allowance).pieces;
+        for piece in self.pieces.iter_mut().filter(|p| asked.contains(&p.id)) {
+            piece.allowance.mode = answer.mode;
+            piece.allowance.seam = answer.width;
+        }
+    }
+
     /// Re-reads the pieces at another scale: every length found in the
     /// file (geometry, detected allowances, notch positions) is multiplied
     /// by the ratio of the two scales.
     pub fn rescale(&mut self, option: &ScaleOption, confirmed: bool) {
         let factor = option.mm_per_unit / self.scale.chosen.mm_per_unit;
         let same = |a: f64, b: f64| (a - b).abs() <= 1e-12 * a.abs().max(b.abs());
-        let detected: Vec<Id> = self
-            .notes
-            .iter()
-            .filter_map(|n| match n {
-                ImportNote::SeamLineFound { piece, .. } => Some(piece.clone()),
-                _ => None,
-            })
-            .collect();
+        let detected = measured(&self.notes);
         for piece in &mut self.pieces {
             if !same(factor, 1.0) {
                 transform(piece, Affine::scale(factor));

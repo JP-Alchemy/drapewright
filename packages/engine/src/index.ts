@@ -7,11 +7,13 @@ import init, {
   EngineHandle,
   engineVersion,
   exportSvg as exportSvgRaw,
+  finishImport as finishImportRaw,
+  importDxf as importDxfRaw,
   importSvg as importSvgRaw,
   previewAllowance as previewAllowanceRaw,
-  rescaleImport as rescaleImportRaw,
 } from '../pkg/soom_wasm_core.js'
 import type {
+  AllowanceAnswer,
   AllowanceNote,
   ChangeSet,
   Command,
@@ -165,8 +167,16 @@ export const jobs = {
   importSvg(bytes: Uint8Array, fileName: string | null): ImportResult {
     return importSvgRaw(bytes, fileName ?? undefined) as ImportResult
   },
-  rescaleImport(result: ImportResult, option: ScaleOption, confirmed: boolean): ImportResult {
-    return rescaleImportRaw(result, option, confirmed) as ImportResult
+  importDxf(bytes: Uint8Array, fileName: string | null): ImportResult {
+    return importDxfRaw(bytes, fileName ?? undefined) as ImportResult
+  },
+  /** Applies the user's answers: the confirmed scale and, if asked, the seam allowance. */
+  finishImport(
+    result: ImportResult,
+    scale: ScaleOption,
+    allowance: AllowanceAnswer | null,
+  ): ImportResult {
+    return finishImportRaw(result, scale, allowance) as ImportResult
   },
   exportSvg(pieces: Piece[]): string {
     return exportSvgRaw(pieces)

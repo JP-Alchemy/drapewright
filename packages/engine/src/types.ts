@@ -2,8 +2,10 @@
 // re-exported in one place for the app.
 
 export type { Allowance } from './generated/Allowance'
+export type { AllowanceAnswer } from './generated/AllowanceAnswer'
 export type { AllowanceMode } from './generated/AllowanceMode'
 export type { AllowanceNote } from './generated/AllowanceNote'
+export type { AllowanceQuestion } from './generated/AllowanceQuestion'
 export type { ChangeSet } from './generated/ChangeSet'
 export type { Command } from './generated/Command'
 export type { CommandError } from './generated/CommandError'

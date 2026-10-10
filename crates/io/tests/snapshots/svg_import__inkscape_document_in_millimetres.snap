@@ -267,6 +267,13 @@ expression: r
     "reason": "declaredUnits",
     "alternatives": []
   },
+  "allowance": {
+    "pieces": [
+      "p5",
+      "p10"
+    ],
+    "suggested": null
+  },
   "notes": [
     {
       "kind": "smallShapesIgnored",

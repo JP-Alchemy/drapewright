@@ -83,6 +83,9 @@ fn inkscape_document_in_millimetres() {
         r.notes
             .contains(&ImportNote::LooseLinesIgnored { count: 1 })
     );
+    // One outline each, and an SVG cannot say which line it is: ask.
+    assert_eq!(r.allowance.pieces.len(), 2);
+    assert_eq!(r.allowance.suggested, None);
     insta::assert_json_snapshot!(r);
 }
 
@@ -157,6 +160,8 @@ fn cutting_and_stitching_lines_pair_up() {
         "{:?}",
         r.notes
     );
+    // Measured, so nothing to ask.
+    assert!(r.allowance.pieces.is_empty());
     insta::assert_json_snapshot!(r);
 }
 

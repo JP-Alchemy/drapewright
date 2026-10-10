@@ -12,6 +12,66 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 8b — DXF import, and asking about seam allowance (Phase 1, day 8)
+
+**Try it:** *Open pattern* now takes `.dxf` as well as `.svg`.
+
+1. Open `fixtures/dxf/aama-skirt.dxf`, a garment CAD (AAMA/ASTM) file.
+   * **Size:** the file says *metric*, which nearly always means
+     millimetres, but not always, so you confirm it. Each reading shows how
+     big the skirt front would be.
+   * **Skirt front:** the file has both its cutting line and its stitching
+     line, so Soom keeps the stitching line as the outline and measures the
+     allowance edge by edge: 1.5 cm seams, 4 cm hem, and nothing on the
+     centre front, which the file marks as a fold. The notch, grainline,
+     drill hole, "Quantity: 1" and "Size: 38" come across too.
+   * **Waistband:** only its cutting line is in the file. That is what
+     garment CAD files mean by their cutting lines, so *Already included*
+     is chosen for you. Set the width it should show (try 1 cm). The
+     cutting line is kept exactly as drawn, with the stitching line dashed
+     inside it.
+2. Open `fixtures/svg/inkscape-mm.svg` (or any SVG with one outline per
+   piece). The new question **"Is seam allowance included in these
+   pieces?"** has **nothing chosen**, and *Add* waits until you answer:
+   * *Not included*: the lines are stitching lines, and the allowance is
+     added around them (as before).
+   * *Already included*: the lines are cutting lines, kept as they are.
+
+   Getting this wrong makes a garment too big or too small by two
+   allowances at every seam, and the file cannot say which it is, so Soom
+   asks rather than guessing. Files with both lines (like
+   `fixtures/svg/cut-and-seam.svg`) are not asked about: their allowance is
+   measured.
+3. Open `fixtures/dxf/generic-mm.dxf`, an ordinary CAD drawing. The pocket's
+   rounded corners stay curved, within 0.001 mm of true arcs. The flap was drawn as four separate
+   lines and still becomes one piece, named by the text inside it. The
+   hatch Soom cannot read yet is reported, not silently dropped.
+
+**What it reads:**
+* ASCII DXF from any version: lines, polylines (with bulges), arcs,
+  circles, splines, points, text and blocks.
+* Units come from `$INSUNITS` when the drawing has them, and from the AAMA
+  units text otherwise. With neither, you are asked.
+* Curves stay curves. Splines of degree 3 or less become exact Béziers,
+  and arcs are within 0.001 mm. A spline saved only as the points it passes
+  through is joined with straight lines, and the import says so.
+* **Not yet:** binary DXF (you are asked to save it as ASCII), ellipses,
+  hatches and 3D entities (reported).
+
+**Research-grade, with a fallback:**
+* AAMA/ASTM files from real CAD systems vary between vendors. The reader
+  follows the published layer numbers and is tested only on files drawn for
+  these tests. The fallback is that anything it cannot place is reported,
+  and a file that is not recognised as AAMA is read as an ordinary drawing.
+  A few real exports would show what needs adjusting (open question 17).
+
+**Found by testing:** measuring the allowance at the nearest point of the
+cutting line gave a 4 cm hem as 1.5 cm. Near the fold corner, the fold's
+cutting line is closer than the hem's. The allowance is now measured
+straight out from the stitching line, as you would with a ruler.
+
+---
+
 ## Step 8a — Notches, grainline and cutting instructions (Phase 1, day 8)
 
 **Try it** with `fixtures/svg/flared-skirt.svg`:

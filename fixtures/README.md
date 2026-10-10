@@ -15,3 +15,10 @@ belong outside the repository (see `docs/open-questions.md`).
 | `svg/cut-and-seam.svg` | Both cutting and stitching lines for one piece, with a deeper hem |
 | `svg/transforms.svg` | Nested rotate/scale transforms, `<use>` and `<polygon>` |
 | `svg/flared-skirt.svg` | A panel flaring 20° with a straight hem, where the corner shapes differ visibly |
+| `dxf/aama-skirt.dxf` | AAMA/ASTM-style garment CAD file, `UNITS: METRIC`: a skirt front in a block with cutting line (layer 1), stitching line (14) with a 40 mm hem and 15 mm seams, turn points, a notch, grainline, fold (mirror) line, drill hole and piece texts; and a waistband with only its cutting line, so allowance is included |
+| `dxf/generic-mm.dxf` | Ordinary CAD drawing in millimetres (`$INSUNITS` 4): a pocket with rounded corners from polyline bulges, a flap drawn as four separate lines (one reversed) named by a text inside it, a grainline layer, a drill circle and an unsupported hatch |
+| `dxf/inches.dxf` | `$INSUNITS` 1 (inches): a 4″ × 2″ cuff |
+| `dxf/unitless.dxf` | No header at all: the scale must be confirmed |
+
+The DXF files are written by `dxf/make_fixtures.py` (run it from the
+repository root after changing it).

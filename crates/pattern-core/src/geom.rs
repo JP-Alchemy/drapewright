@@ -262,6 +262,28 @@ pub fn distance_to_polyline(p: Point, points: &[Point], closed: bool) -> f64 {
         .fold(f64::INFINITY, f64::min)
 }
 
+/// Nearest crossing of the ray `origin + t·dir` (t ≥ 0) with a closed
+/// polyline.
+pub fn ray_hit(origin: Point, dir: Vec2, polyline: &[Point]) -> Option<Point> {
+    let n = polyline.len();
+    let mut best: Option<f64> = None;
+    for i in 0..n {
+        let (a, b) = (polyline[i], polyline[(i + 1) % n]);
+        let e = b - a;
+        let den = dir.cross(e);
+        if den.abs() < 1e-12 {
+            continue;
+        }
+        let w = a - origin;
+        let t = w.cross(e) / den;
+        let u = w.cross(dir) / den;
+        if t >= -SAME_POINT && (-1e-9..=1.0 + 1e-9).contains(&u) {
+            best = Some(best.map_or(t.max(0.0), |b: f64| b.min(t.max(0.0))));
+        }
+    }
+    best.map(|t| origin + dir * t)
+}
+
 /// The nearest point on an edge to some query point.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EdgeNearest {
