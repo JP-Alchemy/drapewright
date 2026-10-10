@@ -1,18 +1,21 @@
-// The IO worker: imports and exports run here, on their own instance of the
-// engine's WebAssembly module, so a big file never freezes the screen.
+// The IO worker: imports, exports and project storage run here, on their
+// own instance of the engine's WebAssembly module, so a big file never
+// freezes the screen and OPFS can be written synchronously.
 
-import { jobs, loadEngine, type Jobs } from '@soom/engine'
-import type { IoRequest, IoResponse } from './io-protocol.ts'
+import { jobs, loadEngine } from '@soom/engine'
+import { storageJobs } from '../storage/worker-store.ts'
+import type { IoHandlers, IoRequest, IoResponse } from './io-protocol.ts'
 
 const ready = loadEngine()
+const handlers: IoHandlers = { ...jobs, ...storageJobs }
 
 self.onmessage = async (event: MessageEvent<IoRequest>) => {
   const { id, method, args } = event.data
   let response: IoResponse
   try {
     await ready
-    const job = jobs[method] as (...a: unknown[]) => ReturnType<Jobs[typeof method]>
-    response = { id, ok: true, result: job(...args) }
+    const handler = handlers[method] as (...a: unknown[]) => unknown
+    response = { id, ok: true, result: await handler(...args) }
   } catch (error) {
     response = { id, ok: false, message: error instanceof Error ? error.message : String(error) }
   }

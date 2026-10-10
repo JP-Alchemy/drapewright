@@ -5,6 +5,8 @@
 
 import init, {
   EngineHandle,
+  SoomReader,
+  SoomWriter,
   engineVersion,
   exportPdf as exportPdfRaw,
   exportSvg as exportSvgRaw,
@@ -193,6 +195,33 @@ export const jobs = {
   exportPdf(document: Document, texts: PdfTexts): Uint8Array {
     return exportPdfRaw(document, texts)
   },
+  /** Packs a project and the files it was imported from into a `.soom` file. */
+  packSoom(projectJson: string, sources: SourceFile[]): Uint8Array {
+    const writer = new SoomWriter(projectJson)
+    for (const source of sources) writer.addSource(source.path, source.data)
+    return writer.finish()
+  },
+  /** Reads a `.soom` file. Throws, with a plain reason, if it is not one. */
+  unpackSoom(bytes: Uint8Array): { projectJson: string; sources: SourceFile[] } {
+    const reader = SoomReader.open(bytes)
+    try {
+      const sources: SourceFile[] = []
+      for (let i = 0; i < reader.sourceCount; i++) {
+        const path = reader.sourcePath(i)
+        const data = reader.sourceData(i)
+        if (path !== undefined && data !== undefined) sources.push({ path, data })
+      }
+      return { projectJson: reader.projectJson, sources }
+    } finally {
+      reader.free()
+    }
+  },
 }
 
 export type Jobs = typeof jobs
+
+/** A file kept with a project: `sources/<sha256>-<file name>`. */
+export interface SourceFile {
+  path: string
+  data: Uint8Array
+}

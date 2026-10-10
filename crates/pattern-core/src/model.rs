@@ -1,6 +1,7 @@
 //! The piece model. These types are the file format: their serde form is
 //! what `docs/file-format.md` documents, field for field.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -14,7 +15,7 @@ pub type Id = String;
 pub const DEFAULT_SEAM_ALLOWANCE: f64 = 15.0;
 
 /// One run of an edge, continuing from where the previous segment ended.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(untagged)]
 #[ts(export)]
 pub enum Segment {
@@ -23,7 +24,7 @@ pub enum Segment {
 }
 
 /// Straight line to `to`.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[ts(export)]
 pub struct LineSeg {
@@ -31,7 +32,7 @@ pub struct LineSeg {
 }
 
 /// Cubic Bézier with control points `c1`, `c2`, ending at `to`.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[ts(export)]
 pub struct CubicSeg {
@@ -75,7 +76,7 @@ impl Segment {
 }
 
 /// What an edge is, in sewing terms.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum EdgeKind {
@@ -91,7 +92,7 @@ pub enum EdgeKind {
 
 /// How the cutting line is shaped where one edge ends and the next begins.
 /// See `docs/file-format.md` §4.4.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum CornerStyle {
@@ -105,7 +106,7 @@ pub enum CornerStyle {
 }
 
 /// A run of the outline from one corner to the next, e.g. "side seam".
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Edge {
@@ -142,7 +143,7 @@ impl Edge {
 }
 
 /// A closed path made of edges, running clockwise as seen on screen.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Outline {
@@ -151,7 +152,7 @@ pub struct Outline {
 }
 
 /// Whether the outline is the stitching line or the cutting line.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum AllowanceMode {
@@ -162,7 +163,7 @@ pub enum AllowanceMode {
     Included,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Allowance {
@@ -190,7 +191,7 @@ impl Default for Allowance {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct CutInstruction {
@@ -228,7 +229,7 @@ impl Default for CutInstruction {
 }
 
 /// The lengthwise grain, from `from` to `to`.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Grainline {
@@ -239,7 +240,7 @@ pub struct Grainline {
     pub one_way: bool,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum NotchFrom {
@@ -248,7 +249,7 @@ pub enum NotchFrom {
     End,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum NotchKind {
@@ -268,7 +269,7 @@ impl NotchKind {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Notch {
@@ -286,7 +287,7 @@ pub struct Notch {
     pub angle: f64,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum MarkKind {
@@ -298,7 +299,7 @@ pub enum MarkKind {
     Buttonhole,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Mark {
@@ -317,7 +318,7 @@ pub struct Mark {
     pub label: Option<String>,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum LineKind {
@@ -331,7 +332,7 @@ pub enum LineKind {
 }
 
 /// A line drawn inside a piece (fold line, placement line, lengthen/shorten…).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct InternalLine {
@@ -344,7 +345,7 @@ pub struct InternalLine {
     pub label: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Label {
@@ -364,7 +365,7 @@ fn default_label_size() -> f64 {
 
 /// Position of a piece on the work table: rotate about the piece origin,
 /// then translate. Never changes the piece's shape.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Placement {
@@ -377,7 +378,7 @@ pub struct Placement {
     pub rotation: f64,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum SourceFormat {
@@ -389,7 +390,7 @@ pub enum SourceFormat {
 }
 
 /// How the import scale was established.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum ScaleBasis {
@@ -414,7 +415,7 @@ pub enum ScaleBasis {
     Measured,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct SourceScale {
@@ -424,7 +425,7 @@ pub struct SourceScale {
 }
 
 /// Where a piece came from.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Source {
@@ -441,7 +442,7 @@ pub struct Source {
     pub scale: Option<SourceScale>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Piece {

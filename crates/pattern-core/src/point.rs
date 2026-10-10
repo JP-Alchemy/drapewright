@@ -23,6 +23,22 @@ impl Pt {
     }
 }
 
+impl schemars::JsonSchema for Pt {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Pt".into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "description": "A point `[x, y]` in millimetres; y points down.",
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 2,
+            "maxItems": 2
+        })
+    }
+}
+
 impl Serialize for Pt {
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         [self.x, self.y].serialize(s)

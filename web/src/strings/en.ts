@@ -365,6 +365,47 @@ export const t = {
     },
   },
 
+  projects: {
+    heading: 'Projects',
+    open: (name: string) => `Projects (open now: ${name})`,
+    name: 'Project name',
+    openNow: 'Open now',
+    new: 'New project',
+    restore: 'Restore a backup…',
+    backup: 'Back up',
+    backupHint: 'Save a .soom file of this project, with the files it came from.',
+    empty: 'No other projects on this device yet.',
+    loading: 'Looking for projects…',
+    summary: (pieces: number, modified: string) =>
+      `${plural(pieces, '1 piece', '# pieces')} · ${new Date(modified).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`,
+    delete: (name: string) => `Delete “${name}”`,
+    deleteQuestion: (name: string) => `Delete “${name}” from this device?`,
+    deleteWarning: 'This cannot be undone. Back it up first if you might need it again.',
+    deleteConfirm: 'Delete',
+    cancel: 'Cancel',
+    deleted: (name: string) => `Deleted “${name}”.`,
+    opened: (name: string) => `Opened “${name}”.`,
+    openFailed: (message: string) => `This project could not be opened. ${message}`,
+    restored: (name: string) => `Restored “${name}”.`,
+    restoredName: (name: string) => `${name} (restored)`,
+    restoreFailed: (message: string) => `This backup could not be restored. ${message}`,
+    backedUp: (file: string) =>
+      `Saved ${file}. Keep it somewhere safe, such as Files or a cloud drive.`,
+    backupFailed: (message: string) => `The backup could not be made. ${message}`,
+    needsChecking: (n: number) =>
+      plural(
+        n,
+        '1 thing in this project needs checking.',
+        '# things in this project need checking.',
+      ),
+    saving: 'Saving…',
+    saved: 'Saved',
+    savedLong: 'Saved on this device',
+    notSaved: 'Not saved',
+    notSavedLong: (message: string) =>
+      `Not saved on this device: ${message} Use Back up to keep a copy.`,
+  },
+
   screen: {
     open: 'Measure the screen',
     openUnmeasured: 'Measure the screen (not measured yet, so 100% is approximate)',
@@ -407,6 +448,11 @@ export const t = {
       '3D draping',
       'Your graphics chip can run the fabric simulation.',
       '3D will show saved drapes only. Try the latest Chrome or Safari.',
+    ],
+    kept: [
+      'Kept safe',
+      'The browser will not clear saved projects to free up space.',
+      'The browser may clear saved projects if space runs low. Back up the ones you care about.',
     ],
     isolation: [
       'Fast mode',

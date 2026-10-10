@@ -16,6 +16,7 @@ import { type ScenePiece, sceneBounds } from '../canvas/renderer.ts'
 import { NOMINAL_PX_PER_MM, type ViewportState, fit, initialViewport } from '../canvas/viewport.ts'
 import { t } from '../strings/en.ts'
 import { saveScreenScale } from '../platform/screen.ts'
+import type { Projects } from '../storage/projects.ts'
 import type { IoClient } from '../workers/io-client.ts'
 import { type Store, createStore } from './store.ts'
 
@@ -36,6 +37,8 @@ export interface GrainPreview {
 export interface PendingImport {
   fileName: string
   result: ImportResult
+  /** The file itself, kept with the project once the pieces are added. */
+  bytes: Uint8Array
 }
 
 /** The pattern files Soom reads, by file extension and media type. */
@@ -126,6 +129,7 @@ export class Session {
     readonly engine: Engine,
     readonly io: IoClient,
     screenScale: number | null = null,
+    readonly projects: Projects | null = null,
   ) {
     this.ui = createStore<UiState>({
       tool: 'select',
@@ -143,6 +147,18 @@ export class Session {
       toast: null,
       screenMeasured: screenScale !== null,
     })
+    // Back where the project was left; a project saved without a view
+    // (the engine's default) shows all its pieces instead.
+    const view = engine.viewState()
+    const unset = view.center[0] === 0 && view.center[1] === 0 && view.zoom === 0.5
+    if (!unset) {
+      this.ui.set((st) => ({
+        ...st,
+        viewport: { ...st.viewport, cx: view.center[0], cy: view.center[1], zoom: view.zoom },
+      }))
+    } else if (engine.document().pieces.length > 0) {
+      this.#fitPending = true
+    }
     engine.subscribe((changes) => {
       // Print settings (notch style) change how every piece is drawn.
       if (changes.document) this.#scene.clear()
@@ -199,6 +215,12 @@ export class Session {
       this.#fitPending = false
       this.fitAll()
     }
+  }
+
+  /** Puts the current view into the project, so it opens where it was left. */
+  syncView(): void {
+    const { viewport: v, selection } = this.ui.get()
+    this.engine.setViewState({ center: [v.cx, v.cy], zoom: v.zoom, selection: [...selection] })
   }
 
   /** Shows every piece. Waits for the table to have a size if it has none yet. */
@@ -307,7 +329,7 @@ export class Session {
     try {
       const bytes = new Uint8Array(await file.arrayBuffer())
       const result = await this.io.call(importer, bytes, file.name)
-      this.ui.set((s) => ({ ...s, pendingImport: { fileName: file.name, result } }))
+      this.ui.set((s) => ({ ...s, pendingImport: { fileName: file.name, result, bytes } }))
     } catch (error) {
       this.notify({
         kind: 'error',
@@ -347,6 +369,12 @@ export class Session {
       this.notify({ kind: 'error', text: outcome.error.message })
       return
     }
+    this.projects?.keepSource(
+      this.engine.document().meta.id,
+      result.sha256,
+      pending.fileName,
+      pending.bytes,
+    )
     this.select(outcome.changes.added)
     this.fitAll()
   }

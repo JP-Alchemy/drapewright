@@ -3,6 +3,7 @@
 //! cutting line.
 
 use kurbo::{Point, Vec2};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -11,7 +12,7 @@ use crate::geom::{SAME_POINT, ray_hit};
 use crate::model::{AllowanceMode, Id, Notch, NotchFrom, Piece};
 
 /// How notches are drawn on the cutting line.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum NotchStyle {

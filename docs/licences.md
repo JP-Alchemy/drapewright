@@ -28,10 +28,10 @@ Project licence: **not yet chosen** (see
 | sha2 | MIT OR Apache-2.0 | Hashing imported files for provenance | io |
 | pdf-writer | MIT OR Apache-2.0 | Tiled PDF export | io |
 | flate2 (with miniz_oxide: MIT OR Zlib OR Apache-2.0) | MIT OR Apache-2.0 | Compressing PDF page content | io |
-| zip | MIT | `.soom` container | project |
-| schemars | MIT | JSON Schema generation for the public format | project |
+| zip | MIT | `.soom` container (deflate only, through flate2) | project |
+| schemars | MIT | JSON Schema generation for the public format | pattern-core, project |
 | ts-rs | MIT | TypeScript types generated from Rust | project, wasm-core |
-| wasm-bindgen, js-sys | MIT OR Apache-2.0 | JS bindings (facade crates only) | wasm-core |
+| wasm-bindgen | MIT OR Apache-2.0 | JS bindings (facade crate only) | wasm-core |
 | serde-wasm-bindgen | MIT | Passing data across the boundary | wasm-core |
 | proptest *(dev)* | MIT OR Apache-2.0 | Property-based tests | tests |
 | insta *(dev)* | Apache-2.0 | Golden-file snapshot tests | tests |
@@ -44,12 +44,14 @@ Project licence: **not yet chosen** (see
 | react, react-dom | MIT | UI |
 | react-aria-components | Apache-2.0 | Accessible, touch- and pen-correct components |
 | lucide-react | ISC | Icons |
-| idb | ISC | IndexedDB helper |
+| idb | ISC | IndexedDB helper (project list; project files where OPFS is unavailable) |
 | vite, @vitejs/plugin-react | MIT | Build and dev server |
 | vite-plugin-pwa (Workbox) | MIT | Service worker and manifest |
 | typescript | Apache-2.0 | Type checking |
 | vitest | MIT | Unit tests |
 | @playwright/test | Apache-2.0 | End-to-end tests |
+| ajv *(dev)* | MIT | Checking saved projects against the published JSON Schema in tests |
+| binaryen *(dev)* | Apache-2.0 | `wasm-opt`, shrinking the WebAssembly build |
 | eslint, typescript-eslint, prettier | MIT | Linting and formatting |
 
 ## Assets

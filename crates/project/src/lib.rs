@@ -3,6 +3,7 @@
 //! See `docs/file-format.md`.
 
 pub mod command;
+pub mod container;
 pub mod document;
 pub mod engine;
 pub mod history;

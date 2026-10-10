@@ -20,7 +20,8 @@ test('saves a tiled PDF that prints at true size', async ({ page }) => {
   const download = page.waitForEvent('download')
   await dialog.getByRole('button', { name: 'Save PDF' }).click()
   const file = await download
-  expect(file.suggestedFilename()).toBe('Untitled pattern.pdf')
+  // WebKit on Linux saves spaces in file names as underscores.
+  expect(file.suggestedFilename()).toMatch(/^Untitled[ _]pattern\.pdf$/)
   const pdf = (await readFile(await file.path())).toString('latin1')
   expect(pdf.startsWith('%PDF-')).toBe(true)
   // Readers are told to print at 100 %, and every page is Letter size.

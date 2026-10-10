@@ -12,7 +12,8 @@ function Checks() {
   }, [])
   if (!caps) return <p className="muted">{t.device.checking}</p>
   const rows: [readonly [string, string, string], boolean][] = [
-    [t.device.storage, caps.opfs],
+    [t.device.storage, caps.storage],
+    [t.device.kept, caps.persisted],
     [t.device.offline, caps.serviceWorker],
     [t.device.gpu, caps.webgpu],
     [t.device.isolation, caps.crossOriginIsolated],

@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 pub use soom_pattern_core::notches::NotchStyle;
 use soom_pattern_core::{Id, Piece, Pt};
@@ -12,7 +13,7 @@ pub const FORMAT: &str = "soom-project";
 /// The schema version this build reads and writes.
 pub const SCHEMA_VERSION: u32 = 1;
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Meta {
@@ -25,7 +26,7 @@ pub struct Meta {
     pub notes: String,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum DisplayUnits {
@@ -35,7 +36,7 @@ pub enum DisplayUnits {
     In,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Settings {
@@ -43,7 +44,7 @@ pub struct Settings {
     pub display_units: DisplayUnits,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum PaperName {
@@ -68,7 +69,7 @@ impl PaperName {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(untagged)]
 #[ts(export)]
 pub enum Paper {
@@ -92,7 +93,7 @@ impl Paper {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum Orientation {
@@ -101,7 +102,7 @@ pub enum Orientation {
     Landscape,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum Assembly {
@@ -113,7 +114,7 @@ pub enum Assembly {
 }
 
 /// Where a piece goes on the printed sheet, mm.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct LayoutItem {
@@ -137,7 +138,7 @@ fn six() -> f64 {
     6.0
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct PrintSettings {
@@ -193,7 +194,7 @@ impl Default for PrintSettings {
 }
 
 /// Where the user was looking. Not part of undo history.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct ViewState {
@@ -215,7 +216,7 @@ impl Default for ViewState {
 }
 
 /// Everything that undo and redo step through.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Document {
@@ -242,7 +243,7 @@ impl Document {
 }
 
 /// The file as stored: `project.json`.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct ProjectFile {

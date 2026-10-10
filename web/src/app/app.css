@@ -1101,3 +1101,115 @@ h2 {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* Projects: the name in the top bar opens the list; a quiet save status
+   sits beside it. */
+.project-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: var(--tap);
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.project-button[data-hovered] {
+  background: var(--surface-2);
+}
+
+.project-button[data-focus-visible] {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.save-status {
+  flex: none;
+  color: var(--ink-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.save-status[data-state='failed'] {
+  color: var(--danger);
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.project-list {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--tap);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.project-row.current {
+  justify-content: space-between;
+  background: var(--surface-2);
+}
+
+.project-open {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-open[data-hovered] {
+  background: var(--surface-2);
+}
+
+.project-open[data-focus-visible] {
+  outline: 3px solid var(--focus-ring);
+}
+
+.project-title {
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.confirm {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+}
+
+.confirm p {
+  margin: 0 0 6px;
+}
+
+.button.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #ffffff;
+}

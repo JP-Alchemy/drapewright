@@ -14,6 +14,10 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 ts-rs.workspace = true
+schemars.workspace = true
+zip.workspace = true
+# Picks flate2's pure-Rust backend (miniz_oxide) for zip, as the PDF writer uses.
+flate2.workspace = true
 
 [dev-dependencies]
 soom-pattern-core = { workspace = true, features = ["testing"] }

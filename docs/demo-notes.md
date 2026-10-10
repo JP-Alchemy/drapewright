@@ -12,6 +12,58 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 10 — Projects that stay put: autosave, backup, offline (Phase 1, day 10)
+
+**Try it:**
+
+1. Open a pattern and change something. Next to the project name (top
+   left), **Saving…** turns into **Saved** a moment later. Close the tab or
+   reload: the same project opens, where you left it.
+2. **Tap the project name** to see **Projects**:
+   * Rename the project.
+   * Start a **New project**.
+   * Open another project from the list.
+   * **Delete** one. You are asked first, and the project that is open
+     cannot be deleted.
+3. **Back up** (top bar) saves a `.soom` file holding the project and the
+   original SVG/DXF its pieces came from. Keep it in Files or a cloud
+   drive.
+4. **Restore a backup…** (in Projects), or just *Open pattern* and pick a
+   `.soom`. If that project is already on the device, the backup opens as
+   a copy named "… (restored)". Nothing is overwritten.
+5. **Offline:** after one visit the app loads and works with no internet,
+   import and printing included. Nothing is ever uploaded.
+6. **This device** (ⓘ) now says whether the browser has promised to keep
+   saved projects ("Kept safe"). Safari on iPad does this for apps added
+   to the Home Screen; otherwise, back up the projects you care about.
+
+**Where it is kept:** each project is a folder in the browser's private
+file system (OPFS), with a list in IndexedDB. Where OPFS cannot be written,
+as in Safari's private browsing, the same files go into IndexedDB. Each
+save writes a complete copy before replacing the old one, so a crash
+mid-save never loses the project.
+
+**The format is published:** `docs/schema/project.schema.json` is generated
+from the same Rust types that read and write projects. A test checks real
+saved projects against it, and CI fails if it changes without being
+committed.
+
+**Checked on every push:**
+* A walk-through test: open a pattern, change the allowance, mark a hem, a
+  notch and a grainline, print the PDF, reload, and check everything is
+  still there.
+* An offline reload.
+* Edit speed: changing a piece's allowance and redrawing its lines takes a
+  median of 0.1 ms (worst under 1 ms) on Chromium and WebKit. The budget is
+  one frame, 16 ms.
+* The engine is now shrunk with `wasm-opt`: 1.8 MB (690 KB compressed),
+  down from 2.5 MB.
+
+**Not yet:** a thumbnail picture for each project in the list. Nudges to
+back up after many edits come later, with the Home Screen install prompt.
+
+---
+
 ## Step 9 — Printing at true size, and measuring the screen (Phase 1, day 9)
 
 **Try it:** open `fixtures/dxf/aama-skirt.dxf` and

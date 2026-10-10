@@ -1,7 +1,6 @@
-import type { Jobs } from '@soom/engine'
-import type { IoMethod, IoRequest, IoResponse } from './io-protocol.ts'
+import type { IoHandlers, IoMethod, IoRequest, IoResponse } from './io-protocol.ts'
 
-/** Calls jobs in the IO worker as promises. */
+/** Calls the IO worker's jobs as promises. */
 export class IoClient {
   readonly #worker = new Worker(new URL('./io.worker.ts', import.meta.url), { type: 'module' })
   readonly #pending = new Map<
@@ -21,7 +20,10 @@ export class IoClient {
     }
   }
 
-  call<M extends IoMethod>(method: M, ...args: Parameters<Jobs[M]>): Promise<ReturnType<Jobs[M]>> {
+  call<M extends IoMethod>(
+    method: M,
+    ...args: Parameters<IoHandlers[M]>
+  ): Promise<Awaited<ReturnType<IoHandlers[M]>>> {
     const id = this.#nextId++
     const request: IoRequest<M> = { id, method, args }
     return new Promise((resolve, reject) => {

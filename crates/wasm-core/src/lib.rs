@@ -12,6 +12,7 @@ use soom_io::pdf::PdfTexts;
 use soom_io::svg::{SvgExportOptions, export_svg};
 use soom_io::{AllowanceAnswer, ImportResult, ScaleOption};
 use soom_pattern_core::{Issue, Piece, Pt};
+use soom_project::container::{self, Sidecar, Unpacked};
 use soom_project::document::ViewState;
 use soom_project::{Command, CommandError, DispatchOptions, Document, Engine};
 use wasm_bindgen::prelude::*;
@@ -252,4 +253,77 @@ pub fn export_pdf(document: JsValue, texts: JsValue) -> Result<Vec<u8>, JsError>
     let doc: Document = from_js(document)?;
     let texts: PdfTexts = from_js(texts)?;
     soom_io::pdf::export_pdf(&doc, &texts).map_err(|e| JsError::new(&e.to_string()))
+}
+
+/// Builds a `.soom` file: the project, then the files it was imported from.
+#[wasm_bindgen]
+#[derive(Debug)]
+pub struct SoomWriter {
+    project_json: String,
+    sidecars: Vec<Sidecar>,
+}
+
+#[wasm_bindgen]
+impl SoomWriter {
+    #[wasm_bindgen(constructor)]
+    pub fn new(project_json: String) -> SoomWriter {
+        SoomWriter {
+            project_json,
+            sidecars: Vec::new(),
+        }
+    }
+
+    /// Adds a file under `sources/` (`path` includes the folder).
+    #[wasm_bindgen(js_name = addSource)]
+    pub fn add_source(&mut self, path: String, data: Vec<u8>) {
+        self.sidecars.push(Sidecar { path, data });
+    }
+
+    /// The `.soom` file's bytes.
+    pub fn finish(self) -> Result<Vec<u8>, JsError> {
+        container::pack(&self.project_json, &self.sidecars)
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+}
+
+/// What a `.soom` file holds: the project text and its source files.
+#[wasm_bindgen]
+#[derive(Debug)]
+pub struct SoomReader {
+    unpacked: Unpacked,
+}
+
+#[wasm_bindgen]
+impl SoomReader {
+    pub fn open(bytes: &[u8]) -> Result<SoomReader, JsError> {
+        container::unpack(bytes)
+            .map(|unpacked| SoomReader { unpacked })
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    #[wasm_bindgen(getter, js_name = projectJson)]
+    pub fn project_json(&self) -> String {
+        self.unpacked.project_json.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = sourceCount)]
+    pub fn source_count(&self) -> usize {
+        self.unpacked.sidecars.len()
+    }
+
+    #[wasm_bindgen(js_name = sourcePath)]
+    pub fn source_path(&self, index: usize) -> Option<String> {
+        self.unpacked.sidecars.get(index).map(|s| s.path.clone())
+    }
+
+    #[wasm_bindgen(js_name = sourceData)]
+    pub fn source_data(&self, index: usize) -> Option<Vec<u8>> {
+        self.unpacked.sidecars.get(index).map(|s| s.data.clone())
+    }
+}
+
+/// Whether a name is safe for one file under `sources/`.
+#[wasm_bindgen(js_name = safeSourceName)]
+pub fn safe_source_name(name: &str) -> bool {
+    container::safe_source_name(name)
 }

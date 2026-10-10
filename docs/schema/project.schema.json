@@ -1,0 +1,989 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Soom project (project.json)",
+  "description": "A Soom sewing pattern project, schema version 1. See docs/file-format.md.",
+  "type": "object",
+  "properties": {
+    "extensions": {
+      "description": "Data owned by other programs; preserved untouched.",
+      "type": "object",
+      "additionalProperties": true,
+      "default": {}
+    },
+    "format": {
+      "type": "string"
+    },
+    "generator": {
+      "type": "string"
+    },
+    "meta": {
+      "$ref": "#/$defs/Meta"
+    },
+    "pieces": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Piece"
+      }
+    },
+    "print": {
+      "$ref": "#/$defs/PrintSettings",
+      "default": {
+        "assembly": "trim",
+        "layout": null,
+        "margin": 10.0,
+        "notchSpacing": 6.0,
+        "notchStyle": "slit",
+        "orientation": "portrait",
+        "overlap": 15.0,
+        "pageMap": true,
+        "paper": "a4",
+        "pieces": null,
+        "skipEmptyPages": true,
+        "stitchLine": true,
+        "testSquare": true
+      }
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "settings": {
+      "$ref": "#/$defs/Settings",
+      "default": {
+        "displayUnits": "cm"
+      }
+    },
+    "view": {
+      "$ref": "#/$defs/ViewState",
+      "default": {
+        "center": [
+          0.0,
+          0.0
+        ],
+        "selection": [],
+        "zoom": 0.5
+      }
+    }
+  },
+  "required": [
+    "format",
+    "schemaVersion",
+    "generator",
+    "meta",
+    "pieces"
+  ],
+  "$defs": {
+    "Allowance": {
+      "type": "object",
+      "properties": {
+        "hem": {
+          "description": "Default for `hem` edges, mm. `None` means the same as `seam`.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "mode": {
+          "$ref": "#/$defs/AllowanceMode",
+          "default": "add"
+        },
+        "seam": {
+          "description": "Default for `seam` edges, mm.",
+          "type": "number",
+          "format": "double",
+          "default": 15.0
+        }
+      }
+    },
+    "AllowanceMode": {
+      "description": "Whether the outline is the stitching line or the cutting line.",
+      "oneOf": [
+        {
+          "description": "The outline is the stitching line; allowance is added outside it.",
+          "type": "string",
+          "const": "add"
+        },
+        {
+          "description": "The outline is the cutting line; the allowance lies inside it.",
+          "type": "string",
+          "const": "included"
+        }
+      ]
+    },
+    "Assembly": {
+      "oneOf": [
+        {
+          "description": "Cut away the border on two sides and butt pages together.",
+          "type": "string",
+          "const": "trim"
+        },
+        {
+          "description": "Lay pages over each other by the overlap and match the marks.",
+          "type": "string",
+          "const": "overlap"
+        }
+      ]
+    },
+    "CornerStyle": {
+      "description": "How the cutting line is shaped where one edge ends and the next begins.\nSee `docs/file-format.md` §4.4.",
+      "type": "string",
+      "enum": [
+        "auto",
+        "mitre",
+        "squareThis",
+        "squareNext",
+        "mirrorThis",
+        "mirrorNext"
+      ]
+    },
+    "CubicSeg": {
+      "description": "Cubic Bézier with control points `c1`, `c2`, ending at `to`.",
+      "type": "object",
+      "properties": {
+        "c1": {
+          "$ref": "#/$defs/Pt"
+        },
+        "c2": {
+          "$ref": "#/$defs/Pt"
+        },
+        "to": {
+          "$ref": "#/$defs/Pt"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "c1",
+        "c2",
+        "to"
+      ]
+    },
+    "CutInstruction": {
+      "type": "object",
+      "properties": {
+        "material": {
+          "description": "`main`, `lining`, `interfacing`, `contrast`, or free text.",
+          "type": "string",
+          "default": "main"
+        },
+        "mirrored": {
+          "description": "Cut as mirrored pairs. `None`: yes when `quantity` ≥ 2.",
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        },
+        "onFold": {
+          "description": "Place the fold edge on the fabric fold. `None`: yes when the piece\nhas a fold edge.",
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        },
+        "quantity": {
+          "type": "integer",
+          "format": "uint32",
+          "default": 1,
+          "minimum": 0
+        }
+      }
+    },
+    "DisplayUnits": {
+      "type": "string",
+      "enum": [
+        "mm",
+        "cm",
+        "in"
+      ]
+    },
+    "Edge": {
+      "description": "A run of the outline from one corner to the next, e.g. \"side seam\".",
+      "type": "object",
+      "properties": {
+        "allowance": {
+          "description": "Overrides the piece allowance for this edge, in mm.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "endCorner": {
+          "description": "Corner at the end of this edge, where the next edge begins.",
+          "$ref": "#/$defs/CornerStyle",
+          "default": "auto"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/EdgeKind",
+          "default": "seam"
+        },
+        "name": {
+          "type": "string",
+          "default": ""
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Segment"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "segments"
+      ]
+    },
+    "EdgeKind": {
+      "description": "What an edge is, in sewing terms.",
+      "oneOf": [
+        {
+          "description": "Sewn to another edge; gets the piece's seam allowance.",
+          "type": "string",
+          "const": "seam"
+        },
+        {
+          "description": "Turned up and finished; gets the hem allowance, and the corners next\nto it are shaped to fold back.",
+          "type": "string",
+          "const": "hem"
+        },
+        {
+          "description": "Placed on the fabric fold; no allowance. Must be straight.",
+          "type": "string",
+          "const": "fold"
+        }
+      ]
+    },
+    "Grainline": {
+      "description": "The lengthwise grain, from `from` to `to`.",
+      "type": "object",
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/Pt"
+        },
+        "oneWay": {
+          "description": "Napped or one-way fabric: top of the fabric towards `from`.",
+          "type": "boolean",
+          "default": false
+        },
+        "to": {
+          "$ref": "#/$defs/Pt"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ]
+    },
+    "InternalLine": {
+      "description": "A line drawn inside a piece (fold line, placement line, lengthen/shorten…).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/LineKind",
+          "default": "line"
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Segment"
+          }
+        },
+        "start": {
+          "$ref": "#/$defs/Pt"
+        }
+      },
+      "required": [
+        "id",
+        "start",
+        "segments"
+      ]
+    },
+    "Label": {
+      "type": "object",
+      "properties": {
+        "angle": {
+          "type": "number",
+          "format": "double",
+          "default": 0.0
+        },
+        "at": {
+          "$ref": "#/$defs/Pt"
+        },
+        "id": {
+          "type": "string"
+        },
+        "size": {
+          "description": "Letter height, mm.",
+          "type": "number",
+          "format": "double",
+          "default": 5.0
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "at"
+      ]
+    },
+    "LayoutItem": {
+      "description": "Where a piece goes on the printed sheet, mm.",
+      "type": "object",
+      "properties": {
+        "piece": {
+          "type": "string"
+        },
+        "rotation": {
+          "type": "number",
+          "format": "double",
+          "default": 0.0
+        },
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "piece",
+        "x",
+        "y"
+      ]
+    },
+    "LineKind": {
+      "type": "string",
+      "enum": [
+        "line",
+        "fold",
+        "placement",
+        "stitch",
+        "cut",
+        "lengthenShorten"
+      ]
+    },
+    "LineSeg": {
+      "description": "Straight line to `to`.",
+      "type": "object",
+      "properties": {
+        "to": {
+          "$ref": "#/$defs/Pt"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "to"
+      ]
+    },
+    "Mark": {
+      "type": "object",
+      "properties": {
+        "angle": {
+          "type": "number",
+          "format": "double",
+          "default": 0.0
+        },
+        "at": {
+          "$ref": "#/$defs/Pt"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/MarkKind"
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "length": {
+          "description": "Buttonhole length, mm.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "size": {
+          "description": "Diameter, mm.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "at"
+      ]
+    },
+    "MarkKind": {
+      "type": "string",
+      "enum": [
+        "drill",
+        "dot",
+        "circle",
+        "cross",
+        "button",
+        "buttonhole"
+      ]
+    },
+    "Meta": {
+      "type": "object",
+      "properties": {
+        "created": {
+          "description": "RFC 3339, UTC.",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "modified": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "created",
+        "modified"
+      ]
+    },
+    "Notch": {
+      "type": "object",
+      "properties": {
+        "angle": {
+          "description": "Degrees away from perpendicular to the edge.",
+          "type": "number",
+          "format": "double",
+          "default": 0.0
+        },
+        "at": {
+          "description": "Distance along the edge from `from`, mm.",
+          "type": "number",
+          "format": "double"
+        },
+        "edge": {
+          "description": "The edge the notch sits on.",
+          "type": "string"
+        },
+        "from": {
+          "$ref": "#/$defs/NotchFrom",
+          "default": "start"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/NotchKind",
+          "default": "single"
+        }
+      },
+      "required": [
+        "id",
+        "edge",
+        "at"
+      ]
+    },
+    "NotchFrom": {
+      "type": "string",
+      "enum": [
+        "start",
+        "end"
+      ]
+    },
+    "NotchKind": {
+      "type": "string",
+      "enum": [
+        "single",
+        "double",
+        "triple"
+      ]
+    },
+    "NotchStyle": {
+      "description": "How notches are drawn on the cutting line.",
+      "oneOf": [
+        {
+          "description": "A short cut into the allowance.",
+          "type": "string",
+          "const": "slit"
+        },
+        {
+          "description": "A small triangle outside the cutting line.",
+          "type": "string",
+          "const": "v"
+        }
+      ]
+    },
+    "Orientation": {
+      "type": "string",
+      "enum": [
+        "portrait",
+        "landscape"
+      ]
+    },
+    "Outline": {
+      "description": "A closed path made of edges, running clockwise as seen on screen.",
+      "type": "object",
+      "properties": {
+        "edges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Edge"
+          }
+        },
+        "start": {
+          "$ref": "#/$defs/Pt"
+        }
+      },
+      "required": [
+        "start",
+        "edges"
+      ]
+    },
+    "Paper": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PaperName"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "height": {
+              "type": "number",
+              "format": "double"
+            },
+            "width": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          "required": [
+            "width",
+            "height"
+          ]
+        }
+      ]
+    },
+    "PaperName": {
+      "type": "string",
+      "enum": [
+        "a4",
+        "letter",
+        "a3",
+        "tabloid",
+        "a0"
+      ]
+    },
+    "Piece": {
+      "type": "object",
+      "properties": {
+        "allowance": {
+          "$ref": "#/$defs/Allowance",
+          "default": {
+            "hem": null,
+            "mode": "add",
+            "seam": 15.0
+          }
+        },
+        "cut": {
+          "type": "array",
+          "default": [
+            {
+              "material": "main",
+              "mirrored": null,
+              "onFold": null,
+              "quantity": 1
+            }
+          ],
+          "items": {
+            "$ref": "#/$defs/CutInstruction"
+          }
+        },
+        "grainline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Grainline"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Label"
+          }
+        },
+        "lines": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/InternalLine"
+          }
+        },
+        "marks": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Mark"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "notches": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Notch"
+          }
+        },
+        "notes": {
+          "type": "string",
+          "default": ""
+        },
+        "outline": {
+          "$ref": "#/$defs/Outline"
+        },
+        "placement": {
+          "$ref": "#/$defs/Placement",
+          "default": {
+            "rotation": 0.0,
+            "x": 0.0,
+            "y": 0.0
+          }
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Source"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "outline"
+      ]
+    },
+    "Placement": {
+      "description": "Position of a piece on the work table: rotate about the piece origin,\nthen translate. Never changes the piece's shape.",
+      "type": "object",
+      "properties": {
+        "rotation": {
+          "description": "Degrees.",
+          "type": "number",
+          "format": "double",
+          "default": 0.0
+        },
+        "x": {
+          "type": "number",
+          "format": "double",
+          "default": 0.0
+        },
+        "y": {
+          "type": "number",
+          "format": "double",
+          "default": 0.0
+        }
+      }
+    },
+    "PrintSettings": {
+      "type": "object",
+      "properties": {
+        "assembly": {
+          "$ref": "#/$defs/Assembly",
+          "default": "trim"
+        },
+        "layout": {
+          "description": "Manual arrangement; `None` lays pieces out automatically.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "default": null,
+          "items": {
+            "$ref": "#/$defs/LayoutItem"
+          }
+        },
+        "margin": {
+          "description": "Unprinted border on each page, mm.",
+          "type": "number",
+          "format": "double",
+          "default": 10.0
+        },
+        "notchSpacing": {
+          "type": "number",
+          "format": "double",
+          "default": 6.0
+        },
+        "notchStyle": {
+          "$ref": "#/$defs/NotchStyle",
+          "default": "slit"
+        },
+        "orientation": {
+          "$ref": "#/$defs/Orientation",
+          "default": "portrait"
+        },
+        "overlap": {
+          "type": "number",
+          "format": "double",
+          "default": 15.0
+        },
+        "pageMap": {
+          "type": "boolean",
+          "default": true
+        },
+        "paper": {
+          "$ref": "#/$defs/Paper",
+          "default": "a4"
+        },
+        "pieces": {
+          "description": "Pieces to print; `None` prints all.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "default": null,
+          "items": {
+            "type": "string"
+          }
+        },
+        "skipEmptyPages": {
+          "type": "boolean",
+          "default": true
+        },
+        "stitchLine": {
+          "type": "boolean",
+          "default": true
+        },
+        "testSquare": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "Pt": {
+      "description": "A point `[x, y]` in millimetres; y points down.",
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2
+    },
+    "ScaleBasis": {
+      "description": "How the import scale was established.",
+      "oneOf": [
+        {
+          "description": "The file states physical units (mm, cm, in, pt…).",
+          "type": "string",
+          "const": "declaredUnits"
+        },
+        {
+          "description": "No physical units; assumed CSS pixels at 96 per inch.",
+          "type": "string",
+          "const": "assumed96dpi"
+        },
+        {
+          "description": "No physical units; assumed points at 72 per inch (Illustrator).",
+          "type": "string",
+          "const": "assumed72dpi"
+        },
+        {
+          "description": "No physical units; assumed 90 per inch (Inkscape before 0.92).",
+          "type": "string",
+          "const": "assumed90dpi"
+        },
+        {
+          "description": "A CAD drawing without units, read as millimetres.",
+          "type": "string",
+          "const": "assumedMm"
+        },
+        {
+          "description": "A CAD drawing without units, read as centimetres.",
+          "type": "string",
+          "const": "assumedCm"
+        },
+        {
+          "description": "A CAD drawing without units, read as inches.",
+          "type": "string",
+          "const": "assumedInches"
+        },
+        {
+          "description": "The user measured a known length.",
+          "type": "string",
+          "const": "measured"
+        }
+      ]
+    },
+    "Segment": {
+      "description": "One run of an edge, continuing from where the previous segment ended.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CubicSeg"
+        },
+        {
+          "$ref": "#/$defs/LineSeg"
+        }
+      ]
+    },
+    "Settings": {
+      "type": "object",
+      "properties": {
+        "displayUnits": {
+          "$ref": "#/$defs/DisplayUnits",
+          "default": "cm"
+        }
+      }
+    },
+    "Source": {
+      "description": "Where a piece came from.",
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "format": {
+          "$ref": "#/$defs/SourceFormat"
+        },
+        "ref": {
+          "description": "Element id, layer or block inside the source.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "scale": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceScale"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "format"
+      ]
+    },
+    "SourceFormat": {
+      "type": "string",
+      "enum": [
+        "svg",
+        "dxf",
+        "pdf",
+        "soom",
+        "drafted"
+      ]
+    },
+    "SourceScale": {
+      "type": "object",
+      "properties": {
+        "basis": {
+          "$ref": "#/$defs/ScaleBasis"
+        },
+        "confirmed": {
+          "type": "boolean"
+        },
+        "mmPerUnit": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "mmPerUnit",
+        "basis",
+        "confirmed"
+      ]
+    },
+    "ViewState": {
+      "description": "Where the user was looking. Not part of undo history.",
+      "type": "object",
+      "properties": {
+        "center": {
+          "$ref": "#/$defs/Pt"
+        },
+        "selection": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "zoom": {
+          "description": "Multiple of true size on a calibrated screen.",
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "center",
+        "zoom"
+      ]
+    }
+  }
+}

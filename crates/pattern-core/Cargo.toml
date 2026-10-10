@@ -17,6 +17,7 @@ i_overlay.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 ts-rs.workspace = true
+schemars.workspace = true
 proptest = { workspace = true, optional = true }
 
 [dev-dependencies]

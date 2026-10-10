@@ -24,5 +24,6 @@ console_error_panic_hook.workspace = true
 workspace = true
 
 [package.metadata.wasm-pack.profile.release]
-# wasm-opt is run separately when available; keep wasm-pack from downloading it.
+# `pnpm wasm` runs wasm-opt afterwards, from the binaryen npm package (pinned
+# in package.json), so wasm-pack need not download its own.
 wasm-opt = false

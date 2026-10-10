@@ -28,6 +28,7 @@
     "@types/react-dom": "^19.3.0",
     "@vite-pwa/assets-generator": "^2.0.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "ajv": "8.17.1",
     "vite": "^8.3.4",
     "vite-plugin-pwa": "^2.0.0"
   }

@@ -13,7 +13,7 @@ import { CutSection, GrainSection, NotchSection } from './PieceDetails.tsx'
  * A text field that reports its value when editing ends, not per keystroke.
  * Give it a `key` that changes with `value` so outside changes (undo) show.
  */
-function CommitTextField({
+export function CommitTextField({
   label,
   value,
   placeholder,

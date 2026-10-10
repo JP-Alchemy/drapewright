@@ -7,8 +7,10 @@ export interface Capabilities {
   crossOriginIsolated: boolean
   /** WebGPU adapter available: 3D draping can run. */
   webgpu: boolean
-  /** Origin private file system: projects can be saved on this device. */
-  opfs: boolean
+  /** Projects can be saved on this device (OPFS, or IndexedDB where it is not usable). */
+  storage: boolean
+  /** The browser has promised not to clear this site's storage on its own. */
+  persisted: boolean
   /** Service workers: the app can work offline after the first visit. */
   serviceWorker: boolean
 }
@@ -27,21 +29,30 @@ async function hasWebGpu(): Promise<boolean> {
   }
 }
 
-async function hasOpfs(): Promise<boolean> {
+async function hasStorage(): Promise<boolean> {
   try {
     await navigator.storage.getDirectory()
     return true
+  } catch {
+    return 'indexedDB' in globalThis
+  }
+}
+
+async function isPersisted(): Promise<boolean> {
+  try {
+    return (await navigator.storage?.persisted?.()) ?? false
   } catch {
     return false
   }
 }
 
 export async function detectCapabilities(): Promise<Capabilities> {
-  const [webgpu, opfs] = await Promise.all([hasWebGpu(), hasOpfs()])
+  const [webgpu, storage, persisted] = await Promise.all([hasWebGpu(), hasStorage(), isPersisted()])
   return {
     crossOriginIsolated: globalThis.crossOriginIsolated === true,
     webgpu,
-    opfs,
+    storage,
+    persisted,
     serviceWorker: 'serviceWorker' in navigator,
   }
 }
