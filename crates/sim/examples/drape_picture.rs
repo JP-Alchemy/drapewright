@@ -2,10 +2,11 @@
 //! pieces are placed, when they are sewn, and when they have settled.
 //!
 //!     cargo run --release -p drapewright-sim --example drape_picture -- \
-//!         assets/body/adult.dwbody out [fabric]
+//!         assets/body/adult.dwbody out [fabric] [skirt|blouse|long]
 //!
 //! writes out-placed.png, out-sewn.png and out-settled.png, draping a
-//! skirt cut for the standard figure.
+//! skirt, a blouse, or a blouse with long sleeves, cut for the standard
+//! figure.
 
 #[path = "../tests/common/mod.rs"]
 mod common;
@@ -118,7 +119,7 @@ fn picture(
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let [asset, out, rest @ ..] = args.as_slice() else {
-        eprintln!("usage: drape_picture <body file> <out> [fabric]");
+        eprintln!("usage: drape_picture <body file> <out> [fabric] [skirt|blouse|long]");
         std::process::exit(2);
     };
     let fabric = preset(rest.first().map_or("poplin", String::as_str)).expect("a fabric preset");
@@ -127,7 +128,11 @@ fn main() {
     let body = model.shape(&Shape::default());
     let figure = Figure::of(&model, &body);
     let triangles = model.skin();
-    let (pieces, seams) = common::skirt();
+    let (pieces, seams) = match rest.get(1).map_or("skirt", String::as_str) {
+        "blouse" => common::blouse(),
+        "long" => common::long_sleeved_blouse(),
+        _ => common::skirt(),
+    };
     let garment = assemble(&pieces, &seams, 20.0).expect("a garment");
     let starts = place(&garment, &figure);
     let mut drape = Drape::new(&garment, &starts, fabric, (&body.vertices, &triangles));
@@ -151,9 +156,10 @@ fn main() {
         frames += 1;
     }
     eprintln!(
-        "settled after {:.1} s; mean speed {:.4} m/s",
+        "settled after {:.1} s; mean speed {:.4} m/s; widest stitch {:.1} mm",
         drape.time,
-        drape.cloth.mean_speed()
+        drape.cloth.mean_speed(),
+        drape.cloth.widest_stitch() * 1000.0
     );
     let deepest = drape
         .cloth
@@ -178,6 +184,21 @@ fn main() {
         "nearest the body: points {:.1} mm, middles of triangles {:.1} mm",
         deepest * 1000.0,
         middles * 1000.0
+    );
+    // Hanging evenly: its middle, and its lowest point either side.
+    let x = &drape.cloth.x;
+    let middle = x.iter().map(|p| p[0]).sum::<f32>() / x.len() as f32 * 1000.0;
+    let lowest = |left: bool| {
+        x.iter()
+            .filter(|p| (p[0] > 0.0) == left)
+            .map(|p| p[1])
+            .fold(f32::MAX, f32::min)
+            * 1000.0
+    };
+    eprintln!(
+        "middle {middle:.1} mm across; lowest {:.0} mm on the left, {:.0} mm on the right",
+        lowest(true),
+        lowest(false)
     );
     draw("settled", &drape);
 }

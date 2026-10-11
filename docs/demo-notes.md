@@ -12,6 +12,47 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 21c — A blouse, its sleeves round the arms (Phase 3, part 8)
+
+The drape now takes a garment hung from the shoulders, with set-in sleeves.
+
+**Try it:**
+
+1. **Open pattern** and choose `fixtures/drapewright/blouse.drapewright`: a
+   loose blouse, front and back each cut on the fold, and a short sleeve
+   cut as a pair. Its seams are sewn: shoulders, sides, underarms, and each
+   sleeve's cap into its armhole, the back half to the back and the front
+   half to the front (the seams list shows the cap eased in, 6 mm at the
+   back and 10 mm at the front).
+2. Press **Avatar**, then **Drape**. It hangs from the shoulders, a sleeve
+   round each arm, in about a second on a computer.
+3. Turn the figure round to see the sleeves and the back.
+
+**How sleeves go on:** the garment's trunk goes on first. Then a ring of
+cloth sewn to it near a shoulder (a sleeve, closed by its underarm seam)
+goes round that arm. It is wrapped round a smooth line down the middle of
+the arm, from inside the shoulder through the elbow to the wrist, its cap
+over the top of the arm. It is turned and slid along the arm until its
+seams lie nearest the armhole they are sewn to.
+
+**Found by testing:** the first blouse hung crooked: its hem 11 mm lower
+on one side, and a fold at one side of the waist. Mirroring the body, or
+the order the cloth was solved in, did not move it. Mirroring the blouse
+itself did. A few of the triangles the cloth is made of had their
+diagonals the other way on one side of the fold, and that side gave
+differently. A piece cut on the fold is now meshed one half at a time,
+the other half its mirror image; the second of a pair is the first's
+mirror image. Garments cut alike on both sides now hang alike, to a
+tenth of a millimetre. Two more things were evened out on the way: the
+cloth's points sit evenly about each piece's middle, and the distance
+field round the body is centred on it. Triangles of no area, along
+straight edges, are left out of the mesh.
+
+**Not yet:** trousers (legs); long sleeves are placed but not yet tried;
+a fitted bodice with darts.
+
+---
+
 ## Step 21b — Draping in the app (Phase 3, part 7)
 
 Sew the pattern's pieces on the avatar in a chosen fabric, and watch it

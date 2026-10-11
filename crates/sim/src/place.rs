@@ -4,12 +4,14 @@
 //! on an oval a little larger than the body there, the centre front in
 //! front. A ring with shoulder seams (a bodice) hangs from above the
 //! shoulders; another from the waist, or from the ring it is sewn under.
+//! A ring sewn to cloth by a shoulder (a sleeve, its underarm seam closing
+//! it) goes round that arm, its top over the shoulder.
 
 use std::collections::HashMap;
 use std::f64::consts::TAU;
 
 use drapewright_body::measure::trunk_sections;
-use drapewright_body::{Body, BodyModel, measure};
+use drapewright_body::{Body, BodyModel, Region, measure};
 
 use crate::garment::{Copy, Garment, Half};
 
@@ -22,6 +24,8 @@ pub struct Figure {
     /// Round the trunk at a height: its middle (x, z) and half its width
     /// and depth, from the body's slices from the shoulders to the hip.
     pub sections: Vec<Section>,
+    /// The arms, left and right, for sleeves.
+    pub arms: Vec<Arm>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -43,10 +47,24 @@ impl Figure {
             .into_iter()
             .map(|(y, middle, half)| Section { y, middle, half })
             .collect();
+        let arms = [
+            (
+                ["l-shoulder", "l-elbow", "l-hand"],
+                [Region::ArmLeft, Region::ShoulderLeft],
+            ),
+            (
+                ["r-shoulder", "r-elbow", "r-hand"],
+                [Region::ArmRight, Region::ShoulderRight],
+            ),
+        ]
+        .into_iter()
+        .filter_map(|(joints, regions)| Arm::of(model, body, joints, regions))
+        .collect();
         Figure {
             waist: marks.levels["waist"],
             shoulders,
             sections,
+            arms,
         }
     }
 
@@ -82,6 +100,168 @@ impl Figure {
                 middle: [0.0, 0.0],
                 half: [170.0, 120.0],
             })
+    }
+}
+
+type V3 = [f64; 3];
+
+fn sub3(a: V3, b: V3) -> V3 {
+    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
+
+fn add3(a: V3, b: V3) -> V3 {
+    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+}
+
+fn scale3(a: V3, k: f64) -> V3 {
+    [a[0] * k, a[1] * k, a[2] * k]
+}
+
+fn dot3(a: V3, b: V3) -> f64 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+fn cross3(a: V3, b: V3) -> V3 {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+fn unit3(a: V3) -> V3 {
+    scale3(a, 1.0 / dot3(a, a).sqrt().max(1e-12))
+}
+
+fn lerp3(a: V3, b: V3, t: f64) -> V3 {
+    add3(a, scale3(sub3(b, a), t))
+}
+
+/// Points down an arm are this far apart, mm.
+const ARM_STEP: f64 = 10.0;
+/// The line down an arm starts this far inside its shoulder joint, mm: a
+/// sleeve's cap reaches over the shoulder.
+const ARM_BEFORE: f64 = 100.0;
+
+/// An arm, for a sleeve to go round: a smooth line down its middle, from
+/// inside the shoulder through the elbow to the wrist, a point every
+/// `ARM_STEP` mm; at each, the way to the top of the arm and to its side
+/// (turning as little as they can down the arm), and how far the arm
+/// reaches from the line.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Arm {
+    pub line: Vec<V3>,
+    pub up: Vec<V3>,
+    pub side: Vec<V3>,
+    pub radius: Vec<f64>,
+}
+
+impl Arm {
+    /// The arm through joints `[shoulder, elbow, wrist]`, its surface the
+    /// body's in `regions`.
+    fn of(model: &BodyModel, body: &Body, joints: [&str; 3], regions: [Region; 2]) -> Option<Arm> {
+        let [s, e, w] = [
+            model.joint(body, joints[0])?,
+            model.joint(body, joints[1])?,
+            model.joint(body, joints[2])?,
+        ];
+        // Through the joints smoothly (Catmull-Rom), finely, and on a
+        // little past each end.
+        let hermite = |a: V3, b: V3, ma: V3, mb: V3, t: f64| {
+            let (t2, t3) = (t * t, t * t * t);
+            let mut p = scale3(a, 2.0 * t3 - 3.0 * t2 + 1.0);
+            p = add3(p, scale3(ma, t3 - 2.0 * t2 + t));
+            p = add3(p, scale3(b, -2.0 * t3 + 3.0 * t2));
+            add3(p, scale3(mb, t3 - t2))
+        };
+        let middle = scale3(sub3(w, s), 0.5);
+        let mut fine = Vec::new();
+        for (a, b, ma, mb) in [(s, e, sub3(e, s), middle), (e, w, middle, sub3(w, e))] {
+            for k in 0..200 {
+                fine.push(hermite(a, b, ma, mb, f64::from(k) / 200.0));
+            }
+        }
+        fine.push(w);
+        let first = unit3(sub3(fine[1], fine[0]));
+        let last = unit3(sub3(fine[fine.len() - 1], fine[fine.len() - 2]));
+        fine.insert(0, add3(s, scale3(first, -ARM_BEFORE)));
+        fine.push(add3(w, scale3(last, 50.0)));
+        // A point every ARM_STEP mm along it.
+        let mut line = vec![fine[0]];
+        let mut walked = 0.0;
+        for pair in fine.windows(2) {
+            let length = dot3(sub3(pair[1], pair[0]), sub3(pair[1], pair[0])).sqrt();
+            while walked + length >= ARM_STEP * line.len() as f64 && length > 0.0 {
+                let t = (ARM_STEP * line.len() as f64 - walked) / length;
+                line.push(lerp3(pair[0], pair[1], t));
+            }
+            walked += length;
+        }
+        if line.len() < 3 {
+            return None;
+        }
+        let n = line.len();
+        let tangent = |k: usize| unit3(sub3(line[(k + 1).min(n - 1)], line[k.saturating_sub(1)]));
+        let mut up = Vec::with_capacity(n);
+        let mut side = Vec::with_capacity(n);
+        let mut last_up = [0.0, 1.0, 0.0];
+        for k in 0..n {
+            let t = tangent(k);
+            last_up = unit3(sub3(last_up, scale3(t, dot3(last_up, t))));
+            up.push(last_up);
+            side.push(cross3(t, last_up));
+        }
+        // How far the arm's surface reaches from the line, near each point.
+        let mut radius = vec![0.0f64; n];
+        for (i, p) in body.vertices[..model.asset.shown as usize]
+            .iter()
+            .enumerate()
+        {
+            if !model.region(i).is_some_and(|r| regions.contains(&r)) {
+                continue;
+            }
+            let k = (0..n)
+                .min_by(|&a, &b| {
+                    let (da, db) = (sub3(*p, line[a]), sub3(*p, line[b]));
+                    dot3(da, da).total_cmp(&dot3(db, db))
+                })
+                .expect("a line");
+            let d = sub3(*p, line[k]);
+            let across = sub3(d, scale3(tangent(k), dot3(d, tangent(k))));
+            radius[k] = radius[k].max(dot3(across, across).sqrt());
+        }
+        // Where no surface was nearest, as near the line's nearest that was.
+        for k in 1..n {
+            if radius[k] == 0.0 {
+                radius[k] = radius[k - 1];
+            }
+        }
+        for k in (0..n - 1).rev() {
+            if radius[k] == 0.0 {
+                radius[k] = radius[k + 1];
+            }
+        }
+        Some(Arm {
+            line,
+            up,
+            side,
+            radius,
+        })
+    }
+
+    /// `along` mm down the line: the point, the ways to the top of the arm
+    /// and its side, and the arm's radius.
+    fn at(&self, along: f64) -> (V3, V3, V3, f64) {
+        let last = self.line.len() - 1;
+        let f = (along / ARM_STEP).clamp(0.0, last as f64);
+        let k = (f.floor() as usize).min(last - 1);
+        let t = f - k as f64;
+        (
+            lerp3(self.line[k], self.line[k + 1], t),
+            unit3(lerp3(self.up[k], self.up[k + 1], t)),
+            unit3(lerp3(self.side[k], self.side[k + 1], t)),
+            self.radius[k] + (self.radius[k + 1] - self.radius[k]) * t,
+        )
     }
 }
 
@@ -224,9 +404,11 @@ fn span(outline: &[[f64; 2]], v: f64) -> Option<(f64, f64)> {
     (low < high).then_some((low, high))
 }
 
-/// A ring at one height: each panel's span across there (or none), and
-/// the oval they go round.
-type Row = (Vec<Option<(f64, f64)>>, Oval);
+/// Each panel of a ring's span across, at one height (or none).
+type Spans = Vec<Option<(f64, f64)>>;
+
+/// A ring at one height: its panels' spans, and the oval they go round.
+type Row = (Spans, Oval);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Side {
@@ -249,8 +431,8 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
             .iter()
             .position(|e| e.edge == id && e.half == half)
     };
-    let mut shoulders = vec![false; n];
-    let mut under: Vec<Option<usize>> = vec![None; n];
+    // Level links: (panel, its edge's mean height there) for each side.
+    let mut level: Vec<(usize, f64, usize, f64)> = Vec::new();
     for link in &g.links {
         let (pa, ea, ha) = (&link.a.0, &link.a.1, link.a.2);
         let (pb, eb, hb) = (&link.b.0, &link.b.1, link.b.2);
@@ -274,20 +456,7 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
                 beside[*pb].push((side(*pb, sb.0), *pa, side(*pa, sa.0), ib));
             }
         } else {
-            // Near the top of both: over the shoulders. One's top to the
-            // other's bottom: hung under it.
-            let near_top =
-                |p: usize, v: f64| v > boxes[p].1[1] - 0.25 * (boxes[p].1[1] - boxes[p].0[1]);
-            let near_bottom =
-                |p: usize, v: f64| v < boxes[p].0[1] + 0.25 * (boxes[p].1[1] - boxes[p].0[1]);
-            if near_top(*pa, sa.1) && near_top(*pb, sb.1) {
-                shoulders[*pa] = true;
-                shoulders[*pb] = true;
-            } else if near_top(*pa, sa.1) && near_bottom(*pb, sb.1) {
-                under[*pa] = Some(*pb);
-            } else if near_top(*pb, sb.1) && near_bottom(*pa, sa.1) {
-                under[*pb] = Some(*pa);
-            }
+            level.push((*pa, sa.1, *pb, sb.1));
         }
     }
     // Rings: panels joined side by side, in order round the body, each
@@ -347,6 +516,25 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
         }
         rings.push(ring);
     }
+    // Near the top of two panels of a ring: over the shoulders (two rings
+    // sewn at their tops are a sleeve in an armhole). One's top to the
+    // other's bottom: hung under it.
+    let near_top = |p: usize, v: f64| v > boxes[p].1[1] - 0.25 * (boxes[p].1[1] - boxes[p].0[1]);
+    let near_bottom = |p: usize, v: f64| v < boxes[p].0[1] + 0.25 * (boxes[p].1[1] - boxes[p].0[1]);
+    let mut shoulders = vec![false; n];
+    let mut under: Vec<Option<usize>> = vec![None; n];
+    for &(pa, va, pb, vb) in &level {
+        if near_top(pa, va) && near_top(pb, vb) {
+            if ring_of[pa] == ring_of[pb] {
+                shoulders[pa] = true;
+                shoulders[pb] = true;
+            }
+        } else if near_top(pa, va) && near_bottom(pb, vb) {
+            under[pa] = Some(pb);
+        } else if near_top(pb, vb) && near_bottom(pa, va) {
+            under[pb] = Some(pa);
+        }
+    }
     // Each ring's height: from above the shoulders, under another ring, or
     // from the waist.
     let tall = |r: &[(usize, bool)]| {
@@ -391,9 +579,8 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
         let right = seam(Side::Right).or(outline_span.map(|s| s.1))?;
         (left < right).then_some((left, right))
     };
-    let mut out: Vec<Vec<[f64; 3]>> = vec![Vec::new(); n];
-    for (r, ring) in rings.iter().enumerate() {
-        let top = tops[r].unwrap_or(figure.waist + 20.0);
+    // A ring round the trunk, hanging from `top`: each panel's points.
+    let wrap_trunk = |ring: &[(usize, bool)], top: f64| -> Vec<Vec<[f64; 3]>> {
         // The front's middle in front, a back's behind; otherwise the
         // first panel's middle in front.
         let front = ring
@@ -409,7 +596,7 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
             for q in &g.panels[p].mesh.points {
                 let y = top - (boxes[p].1[1] - q[1]);
                 rows.entry(key(y)).or_insert_with(|| {
-                    let spans: Vec<Option<(f64, f64)>> = ring
+                    let spans: Spans = ring
                         .iter()
                         .map(|&(o, _)| between_seams(o, boxes[o].1[1] - (top - y)))
                         .collect();
@@ -418,6 +605,7 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
                 });
             }
         }
+        let mut placed = Vec::new();
         for (k, &(p, turned)) in ring.iter().enumerate() {
             let (_, high) = boxes[p];
             let mut points = Vec::new();
@@ -440,6 +628,160 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
                 let middle = figure.smoothed(y).middle;
                 points.push([x + middle[0], y, z + middle[1]]);
             }
+            placed.push(points);
+        }
+        placed
+    };
+    // A ring round an arm (a sleeve), sewn to points already placed
+    // (`partners`: its panel, point, and where what it is sewn to is):
+    // each panel's points.
+    let wrap_arm = |ring: &[(usize, bool)],
+                    arm: &Arm,
+                    partners: &[(usize, u32, [f64; 3])]|
+     -> Vec<Vec<[f64; 3]>> {
+        // Down the ring from its top: each panel's span between its seams
+        // at that depth, and the width round, every 5 mm.
+        let depth = |p: usize, q: [f64; 2]| boxes[p].1[1] - q[1];
+        let key = |d: f64| (d / 5.0).round() as i64;
+        let mut rows: HashMap<i64, (Spans, f64)> = HashMap::new();
+        for &(p, _) in ring {
+            for q in &g.panels[p].mesh.points {
+                let d = depth(p, *q);
+                rows.entry(key(d)).or_insert_with(|| {
+                    let spans: Spans = ring
+                        .iter()
+                        .map(|&(o, _)| between_seams(o, boxes[o].1[1] - d))
+                        .collect();
+                    let around = spans.iter().flatten().map(|(a, b)| b - a).sum();
+                    (spans, around)
+                });
+            }
+        }
+        // A point's way round the ring from its first seam, its depth, and
+        // the width round there.
+        let round = |k: usize, turned: bool, q: [f64; 2]| -> (f64, f64, f64) {
+            let p = ring[k].0;
+            let d = depth(p, q);
+            let (spans, around) = &rows[&key(d)];
+            let width = |j: usize| spans[j].map_or(0.0, |(a, b)| b - a);
+            let offset: f64 = (0..k).map(width).sum();
+            let (left, right) = spans[k].unwrap_or((q[0], q[0]));
+            let u = if turned { right - q[0] } else { q[0] - left };
+            (offset + u, d, *around)
+        };
+        // The ring's top goes over the top of the arm.
+        let (top, _) = ring
+            .iter()
+            .enumerate()
+            .flat_map(|(k, &(p, turned))| {
+                g.panels[p]
+                    .mesh
+                    .points
+                    .iter()
+                    .map(move |&q| (round(k, turned, q), depth(p, q)))
+            })
+            .map(|((s, _, _), d)| (s, d))
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .expect("a ring of points");
+        // Round the arm `along` mm down it, `sign` the way round.
+        let at = |(s, d, around): (f64, f64, f64), sign: f64, along: f64| {
+            let (middle, up, side, radius) = arm.at(along + d);
+            let r = (around / TAU).max(radius * CLEAR);
+            let angle = sign * TAU * (s - top) / around.max(1.0);
+            add3(
+                middle,
+                add3(scale3(up, r * angle.cos()), scale3(side, r * angle.sin())),
+            )
+        };
+        // Turned and slid down the arm to bring its seams nearest what
+        // they are sewn to.
+        let index: HashMap<usize, (usize, bool)> = ring
+            .iter()
+            .enumerate()
+            .map(|(k, &(p, turned))| (p, (k, turned)))
+            .collect();
+        let mut best = (f64::MAX, 1.0, ARM_BEFORE);
+        for sign in [1.0, -1.0] {
+            for step in 0..=16 {
+                let along = ARM_BEFORE - 100.0 + 10.0 * f64::from(step);
+                let cost: f64 = partners
+                    .iter()
+                    .map(|&(p, i, partner)| {
+                        let (k, turned) = index[&p];
+                        let q = g.panels[p].mesh.points[i as usize];
+                        let d = sub3(at(round(k, turned, q), sign, along), partner);
+                        dot3(d, d)
+                    })
+                    .sum();
+                if cost < best.0 {
+                    best = (cost, sign, along);
+                }
+            }
+        }
+        let (_, sign, along) = best;
+        ring.iter()
+            .enumerate()
+            .map(|(k, &(p, turned))| {
+                g.panels[p]
+                    .mesh
+                    .points
+                    .iter()
+                    .map(|&q| at(round(k, turned, q), sign, along))
+                    .collect()
+            })
+            .collect()
+    };
+    let mut out: Vec<Vec<[f64; 3]>> = vec![Vec::new(); n];
+    // The trunk's rings first: those hanging from the shoulders, or under
+    // another.
+    for (r, ring) in rings.iter().enumerate() {
+        if let Some(top) = tops[r] {
+            for (&(p, _), points) in ring.iter().zip(wrap_trunk(ring, top)) {
+                out[p] = points;
+            }
+        }
+    }
+    // Then the rest: a ring sewn to cloth placed by a shoulder goes round
+    // that arm; another from the waist.
+    for (r, ring) in rings.iter().enumerate() {
+        if tops[r].is_some() {
+            continue;
+        }
+        let partners: Vec<(usize, u32, [f64; 3])> = g
+            .stitches
+            .iter()
+            .flat_map(|&[a, b]| [(a, b), (b, a)])
+            .filter(|&((p, _), (q, j))| {
+                ring_of[p] == r
+                    && ring_of[q] != r
+                    && !out[q].is_empty()
+                    && (j as usize) < out[q].len()
+            })
+            .map(|((p, i), (q, j))| (p, i, out[q][j as usize]))
+            .collect();
+        let arm = (!partners.is_empty())
+            .then(|| {
+                let count = partners.len() as f64;
+                let middle = partners
+                    .iter()
+                    .fold([0.0; 3], |m, &(_, _, x)| add3(m, scale3(x, 1.0 / count)));
+                figure
+                    .arms
+                    .iter()
+                    .map(|arm| {
+                        let d = sub3(arm.at(ARM_BEFORE).0, middle);
+                        (dot3(d, d).sqrt(), arm)
+                    })
+                    .min_by(|a, b| a.0.total_cmp(&b.0))
+                    .filter(|(distance, _)| *distance < 200.0)
+                    .map(|(_, arm)| arm)
+            })
+            .flatten();
+        let placed = match arm {
+            Some(arm) => wrap_arm(ring, arm, &partners),
+            None => wrap_trunk(ring, figure.waist + 20.0),
+        };
+        for (&(p, _), points) in ring.iter().zip(placed) {
             out[p] = points;
         }
     }

@@ -144,6 +144,8 @@ struct Layout {
     /// Round the panel: (edge, run backwards).
     order: Vec<(usize, bool)>,
     grain: P2,
+    /// Unfolded: the fold, from its start to its end.
+    fold: Option<(P2, P2)>,
 }
 
 fn reflect(p: P2, a: P2, b: P2) -> P2 {
@@ -247,6 +249,7 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                 edges,
                 order,
                 grain,
+                fold: Some((a, b)),
             });
             continue;
         }
@@ -272,10 +275,168 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                 edges,
                 order,
                 grain: [flip * grain[0], grain[1]],
+                fold: None,
             });
         }
     }
     out
+}
+
+/// Whether runs of points `x` and `y` are each other's mirror image in the
+/// line from `a` to `b`.
+fn mirrors(x: &[P2], y: &[P2], a: P2, b: P2) -> bool {
+    x.len() == y.len()
+        && x.iter().zip(y).all(|(&p, &q)| {
+            let r = reflect(q, a, b);
+            (p[0] - r[0]).hypot(p[1] - r[1]) < 1e-6
+        })
+}
+
+/// Meshes chains running round either way, giving the chains' points in
+/// the way they were given.
+fn mesh_either_way(chains: &[Vec<P2>], spacing: f64) -> Result<PanelMesh, MeshError> {
+    let round: Vec<P2> = chains
+        .iter()
+        .flat_map(|c| c[..c.len() - 1].iter().copied())
+        .collect();
+    if twice_area(&round) > 0.0 {
+        return mesh(chains, spacing);
+    }
+    let backwards: Vec<Vec<P2>> = chains
+        .iter()
+        .rev()
+        .map(|c| c.iter().rev().copied().collect())
+        .collect();
+    let mut m = mesh(&backwards, spacing)?;
+    m.chains = m
+        .chains
+        .into_iter()
+        .rev()
+        .map(|c| c.into_iter().rev().collect())
+        .collect();
+    Ok(m)
+}
+
+/// Mesh `m` reflected in the line from `a` to `b`, its triangles wound
+/// counter-clockwise still; the points in `keep` (on the line) not copied.
+/// Also gives each of `m`'s points' index in the reflection.
+fn reflected(m: &PanelMesh, a: P2, b: P2, keep: &[u32]) -> (Vec<P2>, Vec<[u32; 3]>, Vec<u32>) {
+    let mut points = Vec::new();
+    let mut index = vec![0u32; m.points.len()];
+    for (i, &p) in m.points.iter().enumerate() {
+        if keep.contains(&(i as u32)) {
+            index[i] = i as u32;
+        } else {
+            index[i] = (m.points.len() + points.len()) as u32;
+            points.push(reflect(p, a, b));
+        }
+    }
+    let triangles = m
+        .triangles
+        .iter()
+        .map(|t| {
+            [
+                index[t[0] as usize],
+                index[t[2] as usize],
+                index[t[1] as usize],
+            ]
+        })
+        .collect();
+    (points, triangles, index)
+}
+
+/// A panel meshed as the mirror image of what it mirrors, so that its two
+/// sides (a piece unfolded, or a pair) are meshed alike: alike
+/// triangulations meet a body alike on either side, and a garment cut
+/// alike on both sides hangs alike. `None` where its sides are sewn
+/// differently, and it is meshed whole.
+fn mirrored_mesh(
+    p: usize,
+    layouts: &[Layout],
+    sampled: &[Vec<Vec<P2>>],
+    panels: &[Panel],
+    spacing: f64,
+) -> Result<Option<PanelMesh>, MeshError> {
+    let layout = &layouts[p];
+    let in_order = |edge_points: &dyn Fn(usize) -> Vec<u32>| -> Vec<Vec<u32>> {
+        layout
+            .order
+            .iter()
+            .map(|&(e, back)| {
+                let mut c = edge_points(e);
+                if back {
+                    c.reverse();
+                }
+                c
+            })
+            .collect()
+    };
+    match (layout.copy, layout.fold) {
+        (Copy::Unfolded, Some((a, b))) => {
+            // Half B's edges mirror half A's: edge `half + j` is edge
+            // `half - 1 - j` reflected in the fold.
+            let half = layout.edges.len() / 2;
+            if !(0..half).all(|j| mirrors(&sampled[p][half + j], &sampled[p][half - 1 - j], a, b)) {
+                return Ok(None);
+            }
+            // Half A, from the fold's end round to its start, then along
+            // the fold.
+            let along = (a[0] - b[0]).hypot(a[1] - b[1]);
+            let mut chains: Vec<Vec<P2>> = (0..half).map(|e| sampled[p][e].clone()).collect();
+            chains.push(steps(
+                &[a, b],
+                0.0,
+                along,
+                (along / spacing).round().max(1.0) as usize,
+            ));
+            let m = mesh_either_way(&chains, spacing)?;
+            let fold = m.chains[half].clone();
+            let (more, triangles, index) = reflected(&m, a, b, &fold);
+            let edge_points = |e: usize| -> Vec<u32> {
+                if e < half {
+                    m.chains[e].clone()
+                } else {
+                    m.chains[2 * half - 1 - e]
+                        .iter()
+                        .map(|&i| index[i as usize])
+                        .collect()
+                }
+            };
+            let chains = in_order(&edge_points);
+            let mut points = m.points.clone();
+            points.extend(more);
+            let mut all = m.triangles.clone();
+            all.extend(triangles);
+            Ok(Some(PanelMesh {
+                points,
+                triangles: all,
+                chains,
+            }))
+        }
+        (Copy::Mirror, _) if p > 0 => {
+            let original = p - 1;
+            let (a, b) = ([0.0, 0.0], [0.0, 1.0]);
+            if layouts[original].copy != Copy::Original
+                || layouts[original].piece != layout.piece
+                || !(0..layout.edges.len())
+                    .all(|e| mirrors(&sampled[p][e], &sampled[original][e], a, b))
+            {
+                return Ok(None);
+            }
+            // The same points along each edge, from its start to its end.
+            let m = &panels[original].mesh;
+            let (points, triangles, _) = reflected(m, a, b, &[]);
+            let base = m.points.len() as u32;
+            let triangles = triangles.into_iter().map(|t| t.map(|i| i - base)).collect();
+            let chains = in_order(&|e: usize| panels[original].edges[e].points.clone());
+            Ok(Some(PanelMesh {
+                points,
+                triangles,
+                chains,
+            }))
+        }
+        _ => Ok(None),
+    }
 }
 
 /// A stretch of an edge to sew: from and to (mm along it), in how many
@@ -407,10 +568,14 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
                 c
             })
             .collect();
-        let m = mesh(&chains, spacing).map_err(|error| GarmentError::Mesh {
+        let failed = |error| GarmentError::Mesh {
             piece: pieces[layout.piece].name.clone(),
             error,
-        })?;
+        };
+        let m = match mirrored_mesh(p, &layouts, &sampled, &panels, spacing).map_err(failed)? {
+            Some(m) => m,
+            None => mesh(&chains, spacing).map_err(failed)?,
+        };
         let mut edges: Vec<PanelEdge> = Vec::new();
         for (chain, &(e, back)) in m.chains.iter().zip(&layout.order) {
             let mut points = chain.clone();

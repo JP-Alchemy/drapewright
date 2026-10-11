@@ -92,8 +92,12 @@ impl BodyField {
                 }
             }
         }
-        let low = low.map(|v| v - margin);
-        let size = [0, 1, 2].map(|k| ((high[k] + margin - low[k]) / cell).ceil() as usize + 1);
+        // Cells laid evenly about the body's middle, so that a body alike on
+        // both sides is felt alike on both.
+        let half = [0, 1, 2].map(|k| ((high[k] - low[k]) / 2.0 + margin) / cell);
+        let half = half.map(|h| h.ceil() as usize);
+        let low = [0, 1, 2].map(|k| (low[k] + high[k]) / 2.0 - half[k] as f32 * cell);
+        let size = half.map(|h| 2 * h + 1);
         let index = |i: usize, j: usize, k: usize| i + size[0] * (j + size[1] * k);
         let at = |i: usize, j: usize, k: usize| {
             [

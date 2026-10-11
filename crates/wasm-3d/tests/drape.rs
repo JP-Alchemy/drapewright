@@ -14,11 +14,12 @@ fn model() -> BodyModel {
     BodyModel::from_bytes(&std::fs::read(path).expect("the body file")).expect("a body file")
 }
 
-/// The test skirt's project, as the app sends its pieces and seams.
-fn skirt() -> DrapeRequest {
-    let path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../fixtures/drapewright/skirt.drapewright"
+/// A test garment's project (`fixtures/drapewright/{name}.drapewright`),
+/// as the app sends its pieces and seams.
+fn garment(name: &str) -> DrapeRequest {
+    let path = format!(
+        "{}/../../fixtures/drapewright/{name}.drapewright",
+        env!("CARGO_MANIFEST_DIR")
     );
     let unpacked = container::unpack(&std::fs::read(path).unwrap()).unwrap();
     let (engine, _) = Engine::open(&unpacked.project_json, "test").unwrap();
@@ -31,9 +32,9 @@ fn skirt() -> DrapeRequest {
     }
 }
 
-#[test]
-fn the_skirt_drapes_until_it_has_settled() {
-    let mut draping = Draping::start(&model(), &skirt()).unwrap();
+/// Drapes `request` until it is done, checking as it goes; its draping.
+fn drape_until_done(request: &DrapeRequest) -> Draping {
+    let mut draping = Draping::start(&model(), request).unwrap();
     assert!(draping.left_out.is_empty());
     let mut progress = draping.progress();
     assert_eq!(progress.stage, DrapeStage::Sewing);
@@ -45,6 +46,25 @@ fn the_skirt_drapes_until_it_has_settled() {
     }
     assert_eq!(progress.stage, DrapeStage::Settled, "{progress:?}");
     assert!(progress.widest_gap < 5.0, "{progress:?}");
+    draping
+}
+
+#[test]
+fn a_blouse_drapes_with_its_sleeves() {
+    let draping = drape_until_done(&garment("blouse"));
+    // Out along the arms, both sides.
+    let reach = draping
+        .points()
+        .iter()
+        .map(|p| p[0].abs())
+        .fold(0.0, f32::max);
+    assert!(reach > 250.0, "reaches {reach} mm out");
+}
+
+#[test]
+fn the_skirt_drapes_until_it_has_settled() {
+    let mut draping = drape_until_done(&garment("skirt"));
+    let progress = draping.progress();
     // Done: stepping on changes nothing.
     let points = draping.points();
     assert_eq!(draping.step(), progress);
@@ -63,7 +83,7 @@ fn the_skirt_drapes_until_it_has_settled() {
 
 #[test]
 fn pieces_sewn_to_nothing_are_left_out() {
-    let mut request = skirt();
+    let mut request = garment("skirt");
     let mut pocket = request.pieces[0].clone();
     pocket.id = "pocket".into();
     request.pieces.push(pocket);
@@ -73,7 +93,7 @@ fn pieces_sewn_to_nothing_are_left_out() {
 
 #[test]
 fn nothing_is_draped_until_something_is_sewn() {
-    let mut request = skirt();
+    let mut request = garment("skirt");
     // Seams suggested but not confirmed are not sewn.
     for seam in &mut request.seams {
         seam.confirmed = false;

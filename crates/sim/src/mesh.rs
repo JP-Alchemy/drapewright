@@ -143,7 +143,9 @@ pub fn mesh(chains: &[Vec<[f64; 2]>], spacing: f64) -> Result<PanelMesh, MeshErr
         }
     }
 
-    // Inside: rows of points, each row half a step along from the last.
+    // Inside: rows of points, each row half a step along from the last,
+    // each even about the panel's middle (so a piece cut on the fold is
+    // meshed alike either side of it).
     let (mut low, mut high) = ([f64::MAX; 2], [f64::MIN; 2]);
     for p in &boundary {
         for k in 0..2 {
@@ -153,10 +155,12 @@ pub fn mesh(chains: &[Vec<[f64; 2]>], spacing: f64) -> Result<PanelMesh, MeshErr
     }
     let row = spacing * 3f64.sqrt() / 2.0;
     let keep = 0.45 * spacing;
+    let middle = (low[0] + high[0]) / 2.0;
     let mut v = low[1] + row / 2.0;
     let mut odd = false;
     while v < high[1] {
-        let mut u = low[0] + if odd { spacing } else { spacing / 2.0 };
+        let half = if odd { 0.0 } else { spacing / 2.0 };
+        let mut u = middle + half - spacing * ((middle + half - low[0]) / spacing).floor();
         while u < high[0] {
             let p = [u, v];
             let clear = (0..boundary.len())
@@ -186,6 +190,8 @@ pub fn mesh(chains: &[Vec<[f64; 2]>], spacing: f64) -> Result<PanelMesh, MeshErr
         points.push([p.x, p.y]);
     }
 
+    // Inside the boundary, and not flat: three points along a straight edge
+    // can make a triangle of no area lying on it.
     let triangles: Vec<[u32; 3]> = cdt
         .inner_faces()
         .filter(|f| {
@@ -193,6 +199,10 @@ pub fn mesh(chains: &[Vec<[f64; 2]>], spacing: f64) -> Result<PanelMesh, MeshErr
             inside(&boundary, [c.x, c.y])
         })
         .map(|f| f.vertices().map(|v| ours[v.fix().index()]))
+        .filter(|t| {
+            let [a, b, c] = t.map(|i| points[i as usize]);
+            (b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1]) > 1e-6 * spacing * spacing
+        })
         .collect();
     Ok(PanelMesh {
         points,

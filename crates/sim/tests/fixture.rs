@@ -1,24 +1,32 @@
-//! The skirt the drape tests use, as a project file for the app's tests
-//! (`fixtures/drapewright/skirt.drapewright`), written from it so the two
-//! cannot drift. CI fails if the written file differs from the committed
-//! one.
+//! The garments the drape tests use, as project files for the app's tests
+//! and for trying in the app (`fixtures/drapewright/`), written from them
+//! so the two cannot drift. CI fails if a written file differs from the
+//! committed one.
 
 mod common;
 
 use std::path::Path;
 
+use drapewright_pattern_core::Piece;
 use drapewright_project::{Command, Engine, container};
 use drapewright_seams::{Seam, SeamSide};
 
-/// When the project was made: fixed, so the file is the same every time.
+/// When the projects were made: fixed, so the files are the same every time.
 const MADE: &str = "2026-10-11T00:00:00Z";
 
-#[test]
-fn the_skirt_project_is_up_to_date() {
-    let (mut pieces, seams) = common::skirt();
-    // Side by side on the table.
-    pieces[1].placement.x = 400.0;
-    let mut engine = Engine::new("skirt", "Test skirt", MADE, "drapewright tests");
+/// `pieces`, side by side on the table at `across` (mm), sewn by `seams`,
+/// as project `id`. Also gives each seam's difference in length between
+/// its sides (ease), mm.
+fn project(
+    (id, name): (&str, &str),
+    mut pieces: Vec<Piece>,
+    seams: Vec<Seam>,
+    across: &[f64],
+) -> (String, Vec<f64>) {
+    for (piece, &x) in pieces.iter_mut().zip(across) {
+        piece.placement.x = x;
+    }
+    let mut engine = Engine::new(id, name, MADE, "drapewright tests");
     engine
         .dispatch(
             Command::AddPieces {
@@ -40,6 +48,7 @@ fn the_skirt_project_is_up_to_date() {
             ..side.clone()
         }
     };
+    let count = seams.len();
     let seams: Vec<Seam> = seams
         .iter()
         .map(|s| Seam {
@@ -51,21 +60,54 @@ fn the_skirt_project_is_up_to_date() {
     engine
         .dispatch(Command::AddSeams { seams }, Default::default())
         .unwrap();
-    // Sewn as the drape tests sew it, the sides the same length.
-    assert_eq!(engine.document().seams.len(), 2);
-    for report in engine.seam_reports() {
+    assert_eq!(engine.document().seams.len(), count);
+    let reports = engine.seam_reports();
+    for report in &reports {
         assert!(report.problem.is_none(), "{report:?}");
-        assert!(report.difference.abs() < 1.0, "{report:?}");
     }
-    let json = engine.to_json(MADE);
-    let path =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/drapewright/skirt.drapewright");
+    (
+        engine.to_json(MADE),
+        reports.iter().map(|r| r.difference).collect(),
+    )
+}
+
+/// Writes `json` as `fixtures/drapewright/{file}` unless it is there already.
+fn write(file: &str, json: &str) {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/drapewright")
+        .join(file);
     // Compared as project.json: the archive's compression may change.
     let written = std::fs::read(&path)
         .ok()
         .and_then(|bytes| container::unpack(&bytes).ok())
         .map(|u| u.project_json);
-    if written.as_deref() != Some(json.as_str()) {
-        std::fs::write(&path, container::pack(&json, &[]).unwrap()).unwrap();
+    if written.as_deref() != Some(json) {
+        std::fs::write(&path, container::pack(json, &[]).unwrap()).unwrap();
     }
+}
+
+#[test]
+fn the_skirt_project_is_up_to_date() {
+    let (pieces, seams) = common::skirt();
+    let (json, differences) = project(("skirt", "Test skirt"), pieces, seams, &[0.0, 400.0]);
+    // Sewn as the drape tests sew it, the sides the same length.
+    assert!(differences.iter().all(|d| d.abs() < 1.0), "{differences:?}");
+    write("skirt.drapewright", &json);
+}
+
+#[test]
+fn the_blouse_project_is_up_to_date() {
+    let (pieces, seams) = common::blouse();
+    let (json, differences) = project(
+        ("blouse", "Test blouse"),
+        pieces,
+        seams,
+        &[0.0, 350.0, 850.0],
+    );
+    // The sleeve's cap a little longer than the armhole, eased in.
+    assert!(
+        differences.iter().all(|d| d.abs() < 30.0),
+        "{differences:?}"
+    );
+    write("blouse.drapewright", &json);
 }

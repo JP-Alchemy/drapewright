@@ -2,8 +2,11 @@
 
 mod common;
 
-use common::skirt;
+use std::collections::{HashMap, HashSet};
+
+use common::{blouse, skirt};
 use drapewright_sim::garment::{Copy, Half, assemble};
+use drapewright_sim::mesh::PanelMesh;
 
 fn along(points: &[[f64; 2]], indices: &[u32], upto: usize) -> f64 {
     indices[..=upto]
@@ -82,4 +85,125 @@ fn a_skirt_is_unfolded_paired_and_sewn() {
             .sum()
     };
     assert!((area(&g.panels[0]) / area(&g.panels[1]) - 2.0).abs() < 0.05);
+}
+
+/// Points as whole hundredths of a millimetre, to find them again.
+fn key(p: [f64; 2]) -> (i64, i64) {
+    ((p[0] * 100.0).round() as i64, (p[1] * 100.0).round() as i64)
+}
+
+/// The triangles of `b` that are not `a`'s reflected in x = 0.
+fn not_reflected(a: &PanelMesh, b: &PanelMesh) -> usize {
+    let at: HashMap<(i64, i64), u32> = b
+        .points
+        .iter()
+        .enumerate()
+        .map(|(i, &p)| (key(p), i as u32))
+        .collect();
+    let triangles: HashSet<[u32; 3]> = b
+        .triangles
+        .iter()
+        .map(|t| {
+            let mut t = *t;
+            t.sort_unstable();
+            t
+        })
+        .collect();
+    a.triangles
+        .iter()
+        .filter(|t| {
+            let reflected: Option<Vec<u32>> = t
+                .iter()
+                .map(|&i| {
+                    let p = a.points[i as usize];
+                    at.get(&key([-p[0], p[1]])).copied()
+                })
+                .collect();
+            reflected.is_none_or(|mut r| {
+                r.sort_unstable();
+                !triangles.contains(&[r[0], r[1], r[2]])
+            })
+        })
+        .count()
+}
+
+#[test]
+fn both_sides_of_a_garment_are_meshed_alike() {
+    // Cut alike on both sides, a garment must hang alike: a triangle's
+    // diagonal one way on one side and the other way on the other makes
+    // the two sides give differently, and it leans.
+    for (pieces, seams) in [skirt(), blouse()] {
+        let g = assemble(&pieces, &seams, 20.0).unwrap();
+        for (k, panel) in g.panels.iter().enumerate() {
+            match panel.copy {
+                // About the fold (x = 0 here): each side the other's mirror.
+                Copy::Unfolded => {
+                    assert_eq!(not_reflected(&panel.mesh, &panel.mesh), 0, "{}", panel.name);
+                }
+                // Each of a pair the other's mirror.
+                Copy::Mirror => {
+                    let original = &g.panels[k - 1];
+                    assert_eq!(original.copy, Copy::Original);
+                    assert_eq!(
+                        not_reflected(&original.mesh, &panel.mesh),
+                        0,
+                        "{}",
+                        panel.name
+                    );
+                    assert_eq!(original.mesh.points.len(), panel.mesh.points.len());
+                }
+                Copy::Original => {}
+            }
+            // Counter-clockwise still, and every edge's points where they were sampled.
+            for t in &panel.mesh.triangles {
+                let [a, b, c] = t.map(|i| panel.mesh.points[i as usize]);
+                let twice = (b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1]);
+                assert!(
+                    twice > 0.0,
+                    "{}: a triangle wound the wrong way",
+                    panel.name
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn a_blouse_is_sewn_into_its_armholes() {
+    let (pieces, seams) = blouse();
+    let g = assemble(&pieces, &seams, 20.0).unwrap();
+    let copies: Vec<(&str, Copy)> = g
+        .panels
+        .iter()
+        .map(|p| (p.piece.as_str(), p.copy))
+        .collect();
+    assert_eq!(
+        copies,
+        [
+            ("front", Copy::Unfolded),
+            ("back", Copy::Unfolded),
+            ("sleeve", Copy::Original),
+            ("sleeve", Copy::Mirror)
+        ]
+    );
+    // Shoulders, sides, underarms and both halves of each armhole, on
+    // both sides of the body.
+    assert_eq!(g.links.len(), 10);
+    // Each sleeve's cap is sewn all along, half to the front and half to
+    // the back: none of its points left unsewn but its ends' neighbours.
+    for sleeve in [2, 3] {
+        let cap = g.panels[sleeve]
+            .edges
+            .iter()
+            .find(|e| e.edge == "sc")
+            .unwrap();
+        let sewn: HashSet<u32> = g
+            .stitches
+            .iter()
+            .flat_map(|&[a, b]| [a, b])
+            .filter(|&(p, _)| p == sleeve)
+            .map(|(_, i)| i)
+            .collect();
+        assert!(cap.points.iter().all(|i| sewn.contains(i)));
+    }
 }
