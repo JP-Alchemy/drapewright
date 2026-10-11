@@ -653,10 +653,14 @@ fn a_dart_is_pivoted_only_if_it_is_there_and_to_somewhere_else() {
 }
 
 #[test]
-fn darts_steps_make_are_renamed_with_them() {
+fn darts_steps_make_and_the_edges_they_true_are_renamed_with_them() {
     let mut p = bodice();
     let drawn = Drawn::of(&p);
-    let (_, _, steps) = pivoted(0.5);
+    let (_, _, mut steps) = pivoted(0.5);
+    steps.push(step(Change::TrueUp {
+        edge: "waist".into(),
+        straight: false,
+    }));
     p.alterations = steps;
     alter(&drawn, &p.alterations).unwrap().put(&mut p);
     p.drawn = Some(Box::new(drawn));
@@ -872,4 +876,115 @@ fn the_hip_is_let_out_at_the_side_and_on_down_to_the_hem() {
         refused(hip, Pt::new(200.5, 205.0)),
         Err(AlterError::NotOneSeam)
     );
+}
+
+/// A piece 200 across the top and 260 across the bottom, 400 tall, its
+/// right side slanting out, notched 300 mm down it; lengthened 20 mm
+/// across its middle, its right side jogs there.
+fn jogged() -> (Drawn, Drawn) {
+    let mut p = Piece::new(
+        "p",
+        "Panel",
+        Outline {
+            start: Pt::new(0.0, 0.0),
+            edges: vec![
+                Edge::new("top", vec![Segment::line([200.0, 0.0])]),
+                Edge::new("right", vec![Segment::line([260.0, 400.0])]),
+                Edge::new("bottom", vec![Segment::line([0.0, 400.0])]),
+                Edge::new("left", vec![Segment::line([0.0, 0.0])]),
+            ],
+        },
+    );
+    p.notches.push(Notch {
+        id: "n".into(),
+        edge: "right".into(),
+        at: 300.0,
+        from: NotchFrom::Start,
+        kind: NotchKind::default(),
+        angle: 0.0,
+    });
+    let drawn = Drawn::of(&p);
+    let longer = alter(&drawn, &[across(200.0, 20.0)]).unwrap();
+    (drawn, longer)
+}
+
+fn trued(shape: &Drawn, edge: &str, straight: bool) -> Result<Drawn, AlterError> {
+    alter(
+        shape,
+        &[step(Change::TrueUp {
+            edge: edge.into(),
+            straight,
+        })],
+    )
+}
+
+#[test]
+fn an_edge_jogged_by_lengthening_is_trued_straight() {
+    let (_, longer) = jogged();
+    assert!(longer.outline.edges[1].segments.len() > 1, "jogged");
+    let straight = trued(&longer, "right", true).unwrap();
+    assert!(straight.outline.closure_gap() < 1e-9);
+    let side = straight.outline.edge_geom(1);
+    assert_eq!(side.segs().len(), 1);
+    assert!(side.start().distance(kurbo::Point::new(200.0, 0.0)) < 1e-9);
+    assert!(side.end().distance(kurbo::Point::new(260.0, 420.0)) < 1e-9);
+    // The notch where it was, nearly: on the new line by it.
+    let was = longer.outline.edge_geom(1).point_at(longer.notches[0].at);
+    let now = side.point_at(straight.notches[0].at);
+    assert!(was.distance(now) < 2.0, "{was:?} {now:?}");
+    assert_eq!(
+        trued(&longer, "gone", true),
+        Err(AlterError::NoEdge {
+            edge: "gone".into()
+        })
+    );
+}
+
+#[test]
+fn an_edge_jogged_by_lengthening_is_trued_smooth() {
+    let (_, longer) = jogged();
+    let smooth = trued(&longer, "right", false).unwrap();
+    assert!(smooth.outline.closure_gap() < 1e-9);
+    // No corners along it any more, its ends where they were, and close
+    // to where it ran.
+    let side = smooth.outline.edge_geom(1);
+    let segs = side.segs();
+    for w in segs.windows(2) {
+        let (a, b) = (
+            drapewright_pattern_core::geom::unit_tangent(&w[0], 1.0),
+            drapewright_pattern_core::geom::unit_tangent(&w[1], 0.0),
+        );
+        assert!(a.cross(b).atan2(a.dot(b)).abs() < 1e-6, "{segs:?}");
+    }
+    let before = longer.outline.edge_geom(1);
+    assert!(side.start().distance(before.start()) < 1e-9);
+    assert!(side.end().distance(before.end()) < 1e-9);
+    for k in 0..=40 {
+        let p = side.point_at(side.length() * f64::from(k) / 40.0);
+        assert!(before.nearest(p).unwrap().distance < 6.0, "{p:?}");
+    }
+}
+
+#[test]
+fn a_side_seam_with_a_dart_is_trued_around_it() {
+    let (drawn, bust) = bust(25.0);
+    let fuller = alter(&drawn, std::slice::from_ref(&bust)).unwrap();
+    let steps = [
+        bust,
+        step(Change::TrueUp {
+            edge: "side".into(),
+            straight: true,
+        }),
+    ];
+    let straight = alter(&drawn, &steps).unwrap();
+    assert!(straight.outline.closure_gap() < 1e-9);
+    // Its dart as it was; a straight line either side of it.
+    assert_eq!(straight.darts.len(), 1);
+    let ((angle, tip), (was, was_tip)) = (
+        dart_shape(&straight, &straight.darts[0]),
+        dart_shape(&fuller, &fuller.darts[0]),
+    );
+    assert!((angle - was).abs() < 1e-6 && tip.distance(was_tip) < 0.1);
+    let side = straight.outline.edge_geom(3);
+    assert_eq!(side.segs().len(), 4, "{:?}", side.segs());
 }

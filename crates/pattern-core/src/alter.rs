@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::Pt;
-use crate::geom::{EdgeGeom, SAME_POINT, flatten_segs, point_in_polygon, polygon_area, segs_of};
+use crate::geom::{
+    EdgeGeom, SAME_POINT, flatten_segs, point_in_polygon, polygon_area, segs_of, unit_tangent,
+};
 use crate::model::{
     CubicSeg, Dart, EdgeKind, Grainline, Id, InternalLine, Label, LineSeg, Mark, Notch, NotchFrom,
     Outline, Piece, Segment,
@@ -145,6 +147,11 @@ pub enum Change {
     /// out by `by` mm at `at` (at the hip) and beyond (down to the hem),
     /// tapering to nothing at `to` (at the waist).
     Hip { at: Pt, to: Pt, by: f64 },
+    /// An edge trued, after other steps left jogs or corners in it: each
+    /// part of it between its darts redrawn as a straight line where
+    /// `straight`; otherwise each jog and corner along it (not at its ends
+    /// or its darts) blended into a curve, the rest of it kept.
+    TrueUp { edge: Id, straight: bool },
 }
 
 impl Change {
@@ -195,6 +202,7 @@ impl Change {
                 *at = f(*at);
                 *to = f(*to);
             }
+            Change::TrueUp { .. } => {}
         }
     }
 
@@ -205,6 +213,14 @@ impl Change {
                 line: AlterLine::Own { line },
                 ..
             } => Some(line),
+            _ => None,
+        }
+    }
+
+    /// The piece's edge it trues, if one.
+    pub fn own_edge(&mut self) -> Option<&mut Id> {
+        match self {
+            Change::TrueUp { edge, .. } => Some(edge),
             _ => None,
         }
     }
@@ -275,6 +291,8 @@ pub enum AlterError {
     OnFold,
     #[error("Both points must be on the same seam, apart.")]
     NotOneSeam,
+    #[error("The edge to true is no longer on the piece.")]
+    NoEdge { edge: Id },
 }
 
 /// The shape `drawn` with `alterations` applied in order (those switched
@@ -334,6 +352,7 @@ pub fn alter(drawn: &Drawn, alterations: &[Alteration]) -> Result<Drawn, AlterEr
             Change::Waist { at, to, by } | Change::Hip { at, to, by } => {
                 widen(&shape, (*at).into(), (*to).into(), *by)?
             }
+            Change::TrueUp { edge, straight } => true_up(&shape, edge, *straight)?,
         };
     }
     Ok(shape)
@@ -1686,4 +1705,135 @@ fn shifted_start(seg: &Segment, by: Vec2) -> Segment {
             ..c
         }),
     }
+}
+
+// ── Truing ───────────────────────────────────────────────────────────────
+
+/// Where one curve of an edge meets the next turning more than this, it
+/// is a corner to true, radians.
+const CORNER: f64 = 0.0175;
+/// How far either side of a jog or corner a smooth truing blends, mm.
+const BLEND: f64 = 25.0;
+
+/// The curves of `segs` (measured by `geom`) between `from` and `to` mm
+/// along them.
+fn stretch(geom: &EdgeGeom, segs: &[PathSeg], from: f64, to: f64) -> Vec<PathSeg> {
+    if to - from <= SAME_POINT {
+        return Vec::new();
+    }
+    let ((k0, t0), (k1, t1)) = (geom.locate(from), geom.locate(to));
+    let parts: Vec<PathSeg> = if k0 == k1 {
+        vec![segs[k0].subsegment(t0..t1)]
+    } else {
+        std::iter::once(segs[k0].subsegment(t0..1.0))
+            .chain(segs[k0 + 1..k1].iter().copied())
+            .chain(std::iter::once(segs[k1].subsegment(0.0..t1)))
+            .collect()
+    };
+    parts.into_iter().filter(|s| !seg_len_zero(s)).collect()
+}
+
+/// The curves of `segs` between `from` and `to` mm along them, each jog
+/// and corner inside them blended into a curve.
+fn smoothed(geom: &EdgeGeom, segs: &[PathSeg], from: f64, to: f64) -> Vec<PathSeg> {
+    let corners = (0..segs.len().saturating_sub(1)).filter_map(|k| {
+        let s = geom.along_at(k, 1.0);
+        let (a, b) = (unit_tangent(&segs[k], 1.0), unit_tangent(&segs[k + 1], 0.0));
+        (s > from + SAME_POINT && s < to - SAME_POINT && a.cross(b).atan2(a.dot(b)).abs() > CORNER)
+            .then_some(s)
+    });
+    // Corners near each other are blended as one.
+    let mut runs: Vec<(f64, f64)> = Vec::new();
+    for s in corners {
+        match runs.last_mut() {
+            Some(run) if s - run.1 < 2.0 * BLEND => run.1 = s,
+            _ => runs.push((s, s)),
+        }
+    }
+    let mut out = Vec::new();
+    let mut at = from;
+    for (n, &(a, b)) in runs.iter().enumerate() {
+        // Blended either side, short of the next ones and of the ends.
+        let before = if n == 0 {
+            from
+        } else {
+            (runs[n - 1].1 + a) / 2.0
+        };
+        let after = runs.get(n + 1).map_or(to, |r| (b + r.0) / 2.0);
+        let (s0, s1) = ((a - BLEND).max(before), (b + BLEND).min(after));
+        out.extend(stretch(geom, segs, at, s0));
+        let (p0, p3) = (geom.point_at(s0), geom.point_at(s1));
+        // Leaving and arriving as the edge does there.
+        let (t0, t1) = (
+            geom.tangent_at((s0 + 1e-6).min(s1)),
+            geom.tangent_at((s1 - 1e-6).max(s0)),
+        );
+        let reach = p0.distance(p3) / 3.0;
+        out.push(cubic([p0, p0 + t0 * reach, p3 - t1 * reach, p3]));
+        at = s1;
+    }
+    out.extend(stretch(geom, segs, at, to));
+    out
+}
+
+/// The shape with edge `edge` trued: straight, or smoothly.
+fn true_up(shape: &Drawn, edge: &str, straight: bool) -> Result<Drawn, AlterError> {
+    let outline = &shape.outline;
+    let i = outline.edge_index(edge).ok_or_else(|| AlterError::NoEdge {
+        edge: edge.to_owned(),
+    })?;
+    let segs = segs_of(outline.edge_start(i), &outline.edges[i].segments);
+    let geom = EdgeGeom::new(segs.clone());
+    // Its darts as they are; the parts between them trued.
+    let mut darts: Vec<(f64, f64)> = shape
+        .darts
+        .iter()
+        .filter(|d| d.edge == edge)
+        .map(|d| (d.from, d.to))
+        .collect();
+    darts.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut trued: Vec<PathSeg> = Vec::new();
+    let mut at = 0.0;
+    for (from, to) in darts
+        .iter()
+        .copied()
+        .chain([(geom.length(), geom.length())])
+    {
+        if from - at > SAME_POINT {
+            if straight {
+                trued.push(PathSeg::Line(Line::new(
+                    geom.point_at(at),
+                    geom.point_at(from),
+                )));
+            } else {
+                trued.extend(smoothed(&geom, &segs, at, from));
+            }
+        }
+        trued.extend(stretch(&geom, &segs, from, to));
+        at = to;
+    }
+    // Each curve starting where the one before ends.
+    for k in 1..trued.len() {
+        let end = trued[k - 1].end();
+        trued[k] = with_start(trued[k], end);
+    }
+    let mut altered = shape.clone();
+    altered.outline.edges[i].segments = to_segments(&trued);
+    // Its notches and darts where they were on it.
+    let after = altered.outline.edge_geom(i);
+    let along = |s: f64| after.nearest(geom.point_at(s)).map_or(s, |n| n.along);
+    let (before, length) = (geom.length(), after.length());
+    for notch in altered.notches.iter_mut().filter(|n| n.edge == edge) {
+        notch.at = match notch.from {
+            NotchFrom::Start => along(notch.at),
+            NotchFrom::End => length - along(before - notch.at),
+        }
+        .max(0.0);
+    }
+    for dart in altered.darts.iter_mut().filter(|d| d.edge == edge) {
+        let (from, to) = (along(dart.from), along(dart.to));
+        dart.from = from.min(to);
+        dart.to = from.max(to);
+    }
+    Ok(altered)
 }

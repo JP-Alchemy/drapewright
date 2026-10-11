@@ -4,10 +4,10 @@
 // point, then where the armhole hinges and where the side seam is slashed
 // (both on the edge); a pivot takes the dart to move (unless the piece has
 // only one), then where on the edge it goes; a swayback, shoulder, waist or
-// hip adjustment takes two points on the edge. Points on the edge snap to
-// it.
+// hip adjustment takes two points on the edge; truing up takes the edge
+// tapped. Points on the edge snap to it.
 
-import type { Alteration } from '@drapewright/engine'
+import type { Alteration, Piece } from '@drapewright/engine'
 import type { ToolPointer } from '@drapewright/input'
 import type { PickFor, Picking } from '../state/session.ts'
 import { type Tool, type ToolContext, toPiece } from './tool.ts'
@@ -21,6 +21,22 @@ export const ON_EDGE: Record<PickFor, boolean[]> = {
   shoulder: [true, true],
   waist: [true, true],
   hip: [true, true],
+  trueUp: [],
+}
+
+/** Whether an edge runs within 6 mm of the line between its ends: one to true straight. */
+export function nearlyStraight(piece: Piece, edgeId: string): boolean {
+  const edges = piece.outline.edges
+  const i = edges.findIndex((e) => e.id === edgeId)
+  const edge = edges[i]
+  if (!edge) return false
+  const start = i === 0 ? piece.outline.start : edges[i - 1]!.segments.at(-1)!.to
+  const end = edge.segments.at(-1)!.to
+  const [dx, dy] = [end[0] - start[0], end[1] - start[1]]
+  const length = Math.hypot(dx, dy) || 1
+  // A curve keeps within its control points.
+  const points = edge.segments.flatMap((s) => ('c1' in s ? [s.c1, s.c2, s.to] : [s.to]))
+  return points.every(([x, y]) => Math.abs((x - start[0]) * dy - (y - start[1]) * dx) / length < 6)
 }
 
 /** A step making `change`. */
@@ -88,6 +104,24 @@ export function pickTool(): Tool {
       pressed = null
       const picking = ctx.session.ui.get().picking
       if (!start || !picking || Math.hypot(p.x - start.x, p.y - start.y) > TAP_SLOP) return
+      if (picking.for === 'trueUp') {
+        // The edge tapped: trued straight if it nearly is, else smooth.
+        const hit = ctx.hit(p)
+        const piece = ctx.session.engine.document().pieces.find((q) => q.id === picking.piece)
+        if (!piece || hit?.piece !== piece.id || (hit.kind !== 'edge' && hit.kind !== 'corner'))
+          return
+        ctx.session.setPicking(null)
+        ctx.session.dispatch({
+          type: 'addAlteration',
+          piece: piece.id,
+          alteration: step({
+            type: 'trueUp',
+            edge: hit.edge,
+            straight: nearlyStraight(piece, hit.edge),
+          }),
+        })
+        return
+      }
       if (picking.for === 'pivot' && !picking.dart) {
         // Which dart: the one tapped.
         const hit = ctx.hit(p)

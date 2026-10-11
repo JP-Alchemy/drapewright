@@ -183,6 +183,7 @@ export const t = {
         'Tap the side seam at the waist, where it tapers to nothing.',
         '',
       ],
+      trueUp: ['Tap the edge to true.', ''],
     },
     whichDart: 'Tap the dart to move.',
     cancel: 'Cancel',
@@ -200,6 +201,7 @@ export const t = {
       waist: ['Waist', 'At a side seam, tapering to the hip'],
       hip: ['Hip', 'At a side seam, from the hip down'],
       pivot: ['Move a dart', 'Closed where it is, opened elsewhere'],
+      trueUp: ['True up an edge', 'Its jogs and corners smoothed, or made straight'],
     } as Record<string, [string, string]>,
     none: 'None yet. Each change is kept as a step that can be switched off: the piece as drawn is kept too.',
     lengthen: 'Lengthen or shorten',
@@ -238,6 +240,13 @@ export const t = {
     sideWay: 'Let out or take in',
     sideHint:
       'At this side seam. A front and a back, each cut on the fold, change the whole garment by four times as much.',
+    trueStep: (edge: string, straight: boolean) =>
+      `${edge.charAt(0).toUpperCase()}${edge.slice(1)} trued ${straight ? 'straight' : 'smooth'}`,
+    trueWay: 'Straight or smooth',
+    straight: 'Straight',
+    smooth: 'Smooth',
+    trueHint:
+      'Straight: a straight line between its ends (and its darts). Smooth: each jog and corner along it blended into a curve.',
     pivot: 'Move a dart',
     pivotStep: (share: number) =>
       share >= 1

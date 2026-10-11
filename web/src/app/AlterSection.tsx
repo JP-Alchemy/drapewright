@@ -27,6 +27,7 @@ import {
 } from 'react-aria-components'
 import type { PickFor, Session } from '../state/session.ts'
 import { formatLength, t } from '../strings/en.ts'
+import { edgeLabel } from './labels.ts'
 import { LengthField } from './LengthField.tsx'
 
 /** The choice of a line straight across the piece, among its own lines. */
@@ -118,12 +119,20 @@ const KINDS = [
   'shoulder',
   'swayback',
   'waist',
+
+  'lengthen',
+  'spread',
+  'bust',
+  'shoulder',
+  'swayback',
+  'waist',
   'hip',
   'pivot',
+  'trueUp',
 ] as const
 
 /** What a step that changes by an amount says it does, and the two ways it can go (more, or less). */
-function wording(change: Exclude<Change, { type: 'pivot' }>, by: string) {
+function wording(change: Exclude<Change, { type: 'pivot' | 'trueUp' }>, by: string) {
   const more = change.by >= 0
   switch (change.type) {
     case 'swayback':
@@ -196,7 +205,9 @@ function AlterStep({
   const said =
     change.type === 'pivot'
       ? t.alter.pivotStep(change.share)
-      : wording(change, formatLength(Math.abs(change.by), units)).said
+      : change.type === 'trueUp'
+        ? t.alter.trueStep(edgeLabel(piece, change.edge), change.straight)
+        : wording(change, formatLength(Math.abs(change.by), units)).said
   return (
     <div className="alter-step">
       <div className="alter-step-head">
@@ -240,6 +251,24 @@ function AlterStep({
           </div>
           <p className="muted small">{t.alter.pivotHint}</p>
         </RadioGroup>
+      ) : change.type === 'trueUp' ? (
+        <RadioGroup
+          className="segmented"
+          orientation="horizontal"
+          aria-label={t.alter.trueWay}
+          value={change.straight ? 'straight' : 'smooth'}
+          onChange={(w) => withChange({ ...change, straight: w === 'straight' })}
+        >
+          <div className="segments">
+            <Radio value="straight" className="segment">
+              {t.alter.straight}
+            </Radio>
+            <Radio value="smooth" className="segment">
+              {t.alter.smooth}
+            </Radio>
+          </div>
+          <p className="muted small">{t.alter.trueHint}</p>
+        </RadioGroup>
       ) : (
         <Amount change={change} units={units} withChange={withChange} id={alteration.id} />
       )}
@@ -267,7 +296,7 @@ function Amount({
   withChange,
   id,
 }: {
-  change: Exclude<Change, { type: 'pivot' }>
+  change: Exclude<Change, { type: 'pivot' | 'trueUp' }>
   units: DisplayUnits
   withChange: (next: Change, coalesce?: string) => void
   id: string

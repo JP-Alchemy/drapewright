@@ -24,7 +24,8 @@ import { type Store, createStore } from './store.ts'
 export type ToolId = 'select' | 'notch' | 'grainline' | 'pick'
 
 /** What points are tapped on a piece for: an alteration placed by them. */
-export type PickFor = 'spread' | 'bust' | 'pivot' | 'swayback' | 'shoulder' | 'waist' | 'hip'
+export type PickFor =
+  'spread' | 'bust' | 'pivot' | 'swayback' | 'shoulder' | 'waist' | 'hip' | 'trueUp'
 
 /** Points being tapped on a piece (its own coordinates), and what for. */
 export interface Picking {

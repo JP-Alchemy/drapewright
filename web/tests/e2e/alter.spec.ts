@@ -211,6 +211,22 @@ test('shoulders are made broader by tapping the shoulder seam and the armhole', 
   })
   const along = ((end[0] - 174) * 104 + (end[1] - 42) * 42) / Math.hypot(104, 42)
   expect(along).toBeCloseTo(10, 0)
+
+  // The shoulder seam, jogged where it was slashed, trued straight.
+  const shoulder = () =>
+    page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const s = (window as any).drapewright
+      return s.engine.document().pieces[0].outline.edges[1].segments.length as number
+    })
+  expect(await shoulder()).toBeGreaterThan(1)
+  await addStep(page, 'True up an edge')
+  await expect(page.getByText('Tap the edge to true.')).toBeVisible()
+  await tapOn(page, 0, [70 + 0.3 * 104, 0.3 * 42])
+  await expect(page.getByRole('switch', { name: /^Edge 2 trued (straight|smooth)$/ })).toBeChecked()
+  await page.getByText('Straight', { exact: true }).click()
+  await expect(page.getByRole('switch', { name: 'Edge 2 trued straight' })).toBeChecked()
+  expect(await shoulder()).toBe(1)
 })
 
 test('a swayback and a waist are adjusted on a skirt', async ({ page }) => {

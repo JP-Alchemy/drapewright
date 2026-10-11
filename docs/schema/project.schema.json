@@ -421,6 +421,27 @@
             "to",
             "by"
           ]
+        },
+        {
+          "description": "An edge trued, after other steps left jogs or corners in it: each\npart of it between its darts redrawn as a straight line where\n`straight`; otherwise each jog and corner along it (not at its ends\nor its darts) blended into a curve, the rest of it kept.",
+          "type": "object",
+          "properties": {
+            "edge": {
+              "type": "string"
+            },
+            "straight": {
+              "type": "boolean"
+            },
+            "type": {
+              "type": "string",
+              "const": "trueUp"
+            }
+          },
+          "required": [
+            "type",
+            "edge",
+            "straight"
+          ]
         }
       ]
     },

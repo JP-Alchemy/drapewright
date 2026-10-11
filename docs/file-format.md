@@ -416,6 +416,16 @@ at the waist and `to` at the hip; for the hip, `at` is at the hip (the
 seam moves out from there down to the hem) and `to` at the waist. The two
 kinds differ only in what they are called.
 
+**Change** `trueUp` — `{ "type": "trueUp", "edge": id, "straight":
+boolean }`: an edge trued, after other steps left jogs or corners in it.
+Straight, each part of it between its darts is redrawn as a straight line
+between that part's ends. Otherwise each jog or corner along it (where
+one curve meets the next at more than 1°, but not at its ends or its
+darts) is blended into a curve running 25 mm either side of it (less
+where jogs are close together), leaving and arriving as the edge does
+there, and the rest of the edge is kept. Its ends and its darts stay as
+they are; its notches stay where they were on it.
+
 **AlterLine** — `{ "type": "own", "line": id }`: one of the piece's
 internal lines (normally its lengthen or shorten line), straight from its
 start to its end; or `{ "type": "through", "from": [x, y], "to": [x, y] }`:
@@ -627,9 +637,8 @@ How to take each one is shown in the app beside its box.
 
 ### 10.3 More alterations (Phase 4)
 
-Alterations are kept on each piece (§4.13). Still to come: truing the
-seams an alteration leaves with a jog or a corner in them, as a new
-`change` type with the same rules.
+Alterations are kept on each piece (§4.13). More kinds may follow, each
+a new `change` type with the same rules.
 
 ### 10.4 Seams (version 3)
 

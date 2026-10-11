@@ -12,6 +12,36 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 27 — Truing up (Phase 4, part 6)
+
+Alterations leave jogs and corners in the edges they cut across.
+Truing them up is now a step of its own.
+
+**Try it** (on the test blouse's front):
+
+1. Make the shoulders 1 cm broader (step 26). The shoulder seam jogs
+   where it was slashed.
+2. **Add a step → True up an edge**, then tap the shoulder seam. It is
+   nearly straight, so it is trued **Straight**: one line from the neck to
+   the shoulder's new end.
+3. On an edge that curves, such as a hem after **Slash and spread**,
+   truing is **Smooth**: each jog and corner is blended into a curve
+   running 2.5 cm either side of it, leaving and arriving as the edge does
+   there, and the rest of the edge is kept. Either choice can be switched
+   in the step.
+4. An edge's ends and darts stay as they are. Truing a side seam with a
+   bust dart straightens it above and below the dart.
+
+**Walking seams** is in the seams list as before: each seam's two sides
+are measured as sewn, darts closed, with how far apart their notches
+meet.
+
+**Not yet:** a seam is trued on its own piece, not with the edge it is
+sewn to (a hem across a side seam, say). A corner where two edges meet
+isn't blended, since it's usually meant.
+
+---
+
 ## Step 26 — Swayback, shoulders, waist and hip (Phase 4, part 5)
 
 Four more alterations, each placed by tapping two points. The inspector's

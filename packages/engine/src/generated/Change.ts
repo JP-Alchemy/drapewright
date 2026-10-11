@@ -6,4 +6,4 @@ import type { Turns } from "./Turns";
 /**
  * What an alteration does.
  */
-export type Change = { "type": "lengthen", line: AlterLine, by: number, } | { "type": "spread", from: Pt, hinge: Pt, by: number, turns: Turns, } | { "type": "fullBust", apex: Pt, armhole: Pt, side: Pt, by: number, } | { "type": "pivot", dart: string, to: Pt, share: number, } | { "type": "swayback", centre: Pt, side: Pt, by: number, } | { "type": "shoulder", shoulder: Pt, armhole: Pt, by: number, } | { "type": "waist", at: Pt, to: Pt, by: number, } | { "type": "hip", at: Pt, to: Pt, by: number, };
+export type Change = { "type": "lengthen", line: AlterLine, by: number, } | { "type": "spread", from: Pt, hinge: Pt, by: number, turns: Turns, } | { "type": "fullBust", apex: Pt, armhole: Pt, side: Pt, by: number, } | { "type": "pivot", dart: string, to: Pt, share: number, } | { "type": "swayback", centre: Pt, side: Pt, by: number, } | { "type": "shoulder", shoulder: Pt, armhole: Pt, by: number, } | { "type": "waist", at: Pt, to: Pt, by: number, } | { "type": "hip", at: Pt, to: Pt, by: number, } | { "type": "trueUp", edge: string, straight: boolean, };

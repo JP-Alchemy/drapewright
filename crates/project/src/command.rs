@@ -399,6 +399,7 @@ fn checked_alteration(alteration: &Alteration) -> Result<(), CommandError> {
                 });
             }
         }
+        Change::TrueUp { .. } => {}
     }
     Ok(())
 }

@@ -176,6 +176,9 @@ pub fn reassign_ids(piece: &mut Piece, next_id: &mut dyn FnMut(&str) -> Id) {
         if let Some(dart) = a.change.own_dart() {
             rename("d", dart);
         }
+        if let Some(edge) = a.change.own_edge() {
+            rename("e", edge);
+        }
     }
     current.put(piece);
     piece.drawn = drawn;
