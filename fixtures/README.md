@@ -5,7 +5,12 @@ file here was drawn for Drapewright's tests and is dedicated to the public domai
 under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
 
 Never add a commercial pattern here. Real patterns used for private testing
-belong outside the repository (see `docs/open-questions.md`).
+belong outside the repository (see `docs/open-questions.md`). To see how a
+folder of them imports (pieces, scale, notes, timing) without opening the app:
+
+```bash
+cargo run --release -p drapewright-io --example import_report -- ~/Source/drapewright-test-patterns
+```
 
 | File | What it exercises |
 |---|---|
