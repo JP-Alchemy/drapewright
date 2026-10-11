@@ -27,9 +27,8 @@ the product principles and nothing we need is GPL.
 ☐ **Acceptance garments** — the `[FILL IN]` in the brief. Which 3–4 garments,
 and can I have her pattern files (or the names of the patterns) as private
 test fixtures?
-☐ **Hosting** for the installable app, once she should try it on her iPad:
-Cloudflare Pages or Netlify (free, both support the isolation headers), or
-something you already use.
+☑ **Hosting**: our own server (Hetzner, nginx) at https://drapewright.com,
+deployed from the `production` branch (README → Hosting).
 ☑ **Name**: Drapewright.
 
 ---

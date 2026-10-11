@@ -1,13 +1,19 @@
+# Checks every push and pull request. Pushes to the `production` branch then
+# deploy to drapewright.com, but only after every check has passed (the
+# deploy job at the end). Release: git push origin main:production.
+# One-time setup: ./deploy/add-ci-key.sh (README → Hosting).
 name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, production]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push replaces a running check, but never a production deploy.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/production' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -70,3 +76,66 @@ jobs:
           name: playwright-report
           path: web/playwright-report
           retention-days: 7
+      - name: Build the site for the deploy
+        if: github.ref == 'refs/heads/production'
+        run: pnpm --filter @drapewright/web build
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/production'
+        with:
+          name: site
+          path: web/dist
+          retention-days: 7
+
+  deploy:
+    name: Deploy to drapewright.com
+    needs: [rust, licences, web]
+    if: github.ref == 'refs/heads/production' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # One deploy at a time; a newer one waits for the running one to finish.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: dist
+
+      - name: Check the deploy secrets are set
+        id: secrets
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if [ -n "$SSH_KEY" ] && [ -n "$KNOWN_HOSTS" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Not deploying: the DEPLOY_SSH_KEY / DEPLOY_KNOWN_HOSTS secrets aren't set yet. Run ./deploy/add-ci-key.sh once (README → Hosting)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ship the release to the server
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ vars.DEPLOY_HOST || '91.98.193.172' }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          rm -f dist/_headers
+          tar -czf release.tgz dist
+          # The key can only run drapewright-receive, which checks the release,
+          # switches the site to it and switches back if it isn't served.
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "root@$HOST" "release $GITHUB_SHA" < release.tgz
+
+      - name: Check it's live
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          live=$(curl -fsS --retry 5 --retry-delay 3 https://drapewright.com/version.txt)
+          echo "drapewright.com is on $live"
+          test "$live" = "$GITHUB_SHA"
