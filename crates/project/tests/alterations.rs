@@ -326,3 +326,124 @@ fn slashed_and_spread_or_closed_by_command() {
     .expect_err("no endless spread");
     assert!(width(&e) > 225.0);
 }
+
+/// A half bodice front: its neck, shoulder, armhole, side, waist and centre
+/// front, the side seam from the underarm at (250, 215) to (240, 450).
+fn bodice() -> Piece {
+    let mut p = Piece::new(
+        "tmp",
+        "Bodice front",
+        Outline {
+            start: Pt::new(0.0, 80.0),
+            edges: vec![
+                Edge::new(
+                    "neck",
+                    vec![Segment::cubic([40.0, 80.0], [68.0, 40.0], [70.0, 0.0])],
+                ),
+                Edge::new("shoulder", vec![Segment::line([174.0, 42.0])]),
+                Edge::new(
+                    "armhole",
+                    vec![Segment::cubic(
+                        [168.0, 100.0],
+                        [185.0, 215.0],
+                        [250.0, 215.0],
+                    )],
+                ),
+                Edge::new("side", vec![Segment::line([240.0, 450.0])]),
+                Edge::new("waist", vec![Segment::line([0.0, 460.0])]),
+                Edge::new("centre", vec![Segment::line([0.0, 80.0])]),
+            ],
+        },
+    );
+    p.grainline = Some(drapewright_pattern_core::Grainline {
+        from: Pt::new(60.0, 120.0),
+        to: Pt::new(60.0, 400.0),
+        one_way: false,
+    });
+    p
+}
+
+#[test]
+fn a_bust_dart_is_found_where_tapped_and_pivoted_to_the_waist() {
+    let mut e = Engine::new("prj", "Test", "2026-10-12T00:00:00Z", "test");
+    e.dispatch(
+        Command::AddPieces {
+            pieces: vec![bodice()],
+        },
+        Default::default(),
+    )
+    .unwrap();
+    let p = e.document().pieces[0].clone();
+    let (piece, side, waist) = (
+        p.id.clone(),
+        p.outline.edges[3].id.clone(),
+        p.outline.edges[4].id.clone(),
+    );
+    let armhole = p.outline.edge_geom(2);
+    let hinge = armhole.point_at(armhole.length() * 0.7);
+    let add = |e: &mut Engine, change: Change| {
+        e.dispatch(
+            Command::AddAlteration {
+                piece: piece.clone(),
+                alteration: Alteration {
+                    id: String::new(),
+                    on: true,
+                    change,
+                },
+            },
+            Default::default(),
+        )
+        .unwrap();
+    };
+    add(
+        &mut e,
+        Change::FullBust {
+            apex: Pt::new(95.0, 260.0),
+            armhole: Pt::new(hinge.x, hinge.y),
+            side: Pt::new(250.0 - 85.0 / 235.0 * 10.0, 300.0),
+            by: 25.0,
+        },
+    );
+    // The dart it opens, named after the step, found where its legs are.
+    let p = e.document().pieces[0].clone();
+    let dart = p.darts[0].clone();
+    assert_eq!(dart.id, format!("{}.dart", p.alterations[0].id));
+    let leg = p.outline.edge_geom(3).point_at(dart.from + 20.0);
+    let world = |q: kurbo::Point| Pt::new(q.x + p.placement.x, q.y + p.placement.y);
+    assert_eq!(e.dart_at(&piece, &side, world(leg)), Some(dart.id.clone()));
+    assert_eq!(
+        e.dart_at(&piece, &side, world(p.outline.edge_geom(3).point_at(1.0))),
+        None
+    );
+
+    // Pivoted to the waist: the same dart, there now.
+    let to = p.outline.edge_geom(4).point_at(100.0);
+    add(
+        &mut e,
+        Change::Pivot {
+            dart: dart.id.clone(),
+            to: Pt::new(to.x, to.y),
+            share: 1.0,
+        },
+    );
+    let darts = &e.document().pieces[0].darts;
+    assert_eq!(darts.len(), 1);
+    assert_eq!((&darts[0].id, &darts[0].edge), (&dart.id, &waist));
+    // A share of it only: two darts. Undone, one again.
+    let mut step = e.document().pieces[0].alterations[1].clone();
+    let Change::Pivot { share, .. } = &mut step.change else {
+        unreachable!()
+    };
+    *share = 0.5;
+    e.dispatch(
+        Command::SetAlteration {
+            piece: piece.clone(),
+            alteration: step,
+        },
+        Default::default(),
+    )
+    .unwrap();
+    assert_eq!(e.document().pieces[0].darts.len(), 2);
+    e.undo().unwrap();
+    assert_eq!(e.document().pieces[0].darts.len(), 1);
+}

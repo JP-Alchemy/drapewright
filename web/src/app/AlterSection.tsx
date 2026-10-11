@@ -1,7 +1,14 @@
 // A piece's alterations in the inspector: changes kept as steps on the
 // piece as drawn, each switched on or off, changed or taken away.
 
-import type { AlterLine, Alteration, Change, Piece, PieceView } from '@drapewright/engine'
+import type {
+  AlterLine,
+  Alteration,
+  Change,
+  DisplayUnits,
+  Piece,
+  PieceView,
+} from '@drapewright/engine'
 import { ChevronDown, Plus, Trash2 } from 'lucide-react'
 import {
   Button,
@@ -82,13 +89,19 @@ export function AlterSection({
           <Plus size={18} aria-hidden="true" />
           {t.alter.bust}
         </Button>
+        {piece.darts.length > 0 && (
+          <Button className="button" onPress={() => session.startPicking(piece.id, 'pivot')}>
+            <Plus size={18} aria-hidden="true" />
+            {t.alter.pivot}
+          </Button>
+        )}
       </div>
     </div>
   )
 }
 
-/** What a step says it does, and the two ways it can go (more, or less). */
-function wording(change: Change, by: string) {
+/** What a step that changes by an amount says it does, and the two ways it can go (more, or less). */
+function wording(change: Exclude<Change, { type: 'pivot' }>, by: string) {
   const more = change.by >= 0
   switch (change.type) {
     case 'lengthen':
@@ -125,8 +138,6 @@ function AlterStep({
 }) {
   const units = session.engine.document().settings.displayUnits
   const { change } = alteration
-  const more = change.by >= 0
-  const amount = Math.abs(change.by)
   const set = (next: Alteration, coalesce?: string) =>
     session.dispatch(
       { type: 'setAlteration', piece: piece.id, alteration: next },
@@ -135,7 +146,10 @@ function AlterStep({
     )
   const withChange = (next: Change, coalesce?: string) =>
     set({ ...alteration, change: next }, coalesce)
-  const { said, way, ways } = wording(change, formatLength(amount, units))
+  const said =
+    change.type === 'pivot'
+      ? t.alter.pivotStep(change.share)
+      : wording(change, formatLength(Math.abs(change.by), units)).said
   return (
     <div className="alter-step">
       <div className="alter-step-head">
@@ -161,6 +175,61 @@ function AlterStep({
           <Trash2 size={18} aria-hidden="true" />
         </Button>
       </div>
+      {change.type === 'pivot' ? (
+        <RadioGroup
+          className="segmented"
+          orientation="horizontal"
+          aria-label={t.alter.share}
+          value={change.share >= 1 ? 'all' : 'half'}
+          onChange={(w) => withChange({ ...change, share: w === 'all' ? 1 : 0.5 })}
+        >
+          <div className="segments">
+            <Radio value="all" className="segment">
+              {t.alter.all}
+            </Radio>
+            <Radio value="half" className="segment">
+              {t.alter.half}
+            </Radio>
+          </div>
+          <p className="muted small">{t.alter.pivotHint}</p>
+        </RadioGroup>
+      ) : (
+        <Amount change={change} units={units} withChange={withChange} id={alteration.id} />
+      )}
+      {change.type === 'lengthen' && (
+        <LineChoice session={session} piece={piece} view={view} alteration={alteration} />
+      )}
+      {change.type === 'spread' && (
+        <Button
+          className="link-button"
+          onPress={() =>
+            withChange({ ...change, turns: change.turns === 'right' ? 'left' : 'right' })
+          }
+        >
+          {t.alter.otherSide}
+        </Button>
+      )}
+    </div>
+  )
+}
+
+/** How much a step changes the piece, and which way. */
+function Amount({
+  change,
+  units,
+  withChange,
+  id,
+}: {
+  change: Exclude<Change, { type: 'pivot' }>
+  units: DisplayUnits
+  withChange: (next: Change, coalesce?: string) => void
+  id: string
+}) {
+  const more = change.by >= 0
+  const amount = Math.abs(change.by)
+  const { way, ways } = wording(change, formatLength(amount, units))
+  return (
+    <>
       <RadioGroup
         className="segmented"
         orientation="horizontal"
@@ -182,24 +251,9 @@ function AlterStep({
         value={amount}
         units={units}
         description={change.type === 'fullBust' ? t.alter.bustHint : undefined}
-        onChange={(mm) =>
-          withChange({ ...change, by: (more ? 1 : -1) * mm }, `alter:${alteration.id}`)
-        }
+        onChange={(mm) => withChange({ ...change, by: (more ? 1 : -1) * mm }, `alter:${id}`)}
       />
-      {change.type === 'lengthen' && (
-        <LineChoice session={session} piece={piece} view={view} alteration={alteration} />
-      )}
-      {change.type === 'spread' && (
-        <Button
-          className="link-button"
-          onPress={() =>
-            withChange({ ...change, turns: change.turns === 'right' ? 'left' : 'right' })
-          }
-        >
-          {t.alter.otherSide}
-        </Button>
-      )}
-    </div>
+    </>
   )
 }
 

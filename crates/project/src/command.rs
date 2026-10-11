@@ -378,12 +378,21 @@ fn realter(piece: &mut Piece, drawn: Drawn) -> Result<(), CommandError> {
 const MOST_ALTERED: f64 = 1000.0;
 
 fn checked_alteration(alteration: &Alteration) -> Result<(), CommandError> {
-    let (Change::Lengthen { by, .. } | Change::Spread { by, .. } | Change::FullBust { by, .. }) =
-        alteration.change;
-    if !by.is_finite() || by.abs() > MOST_ALTERED {
-        return Err(CommandError::Rejected {
-            message: "A piece can be lengthened or shortened by up to a metre.".into(),
-        });
+    match &alteration.change {
+        Change::Lengthen { by, .. } | Change::Spread { by, .. } | Change::FullBust { by, .. } => {
+            if !by.is_finite() || by.abs() > MOST_ALTERED {
+                return Err(CommandError::Rejected {
+                    message: "A piece can be lengthened or shortened by up to a metre.".into(),
+                });
+            }
+        }
+        Change::Pivot { share, .. } => {
+            if !(0.0..=1.0).contains(share) {
+                return Err(CommandError::Rejected {
+                    message: "A dart is moved whole, or a share of it.".into(),
+                });
+            }
+        }
     }
     Ok(())
 }

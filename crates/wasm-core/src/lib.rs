@@ -187,6 +187,12 @@ impl EngineHandle {
             .map(|n| vec![n.point.x, n.point.y])
     }
 
+    /// The dart in a piece's edge at a work-table point, if there is one.
+    #[wasm_bindgen(js_name = dartAt)]
+    pub fn dart_at(&self, piece: &str, edge: &str, x: f64, y: f64) -> Option<String> {
+        self.engine.dart_at(piece, edge, Pt::new(x, y))
+    }
+
     #[wasm_bindgen(js_name = viewState)]
     pub fn view_state(&self) -> Result<JsValue, JsError> {
         to_js(self.engine.view_state())

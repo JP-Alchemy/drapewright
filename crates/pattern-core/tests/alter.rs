@@ -5,8 +5,8 @@ use drapewright_pattern_core::alter::Turns;
 use drapewright_pattern_core::build::reassign_ids;
 use drapewright_pattern_core::ops::transform;
 use drapewright_pattern_core::{
-    AlterError, AlterLine, Alteration, Change, Drawn, Edge, Grainline, InternalLine, LineKind,
-    Mark, MarkKind, Notch, NotchFrom, NotchKind, Outline, Piece, Pt, Segment, alter,
+    AlterError, AlterLine, Alteration, Change, Dart, Drawn, Edge, Grainline, InternalLine,
+    LineKind, Mark, MarkKind, Notch, NotchFrom, NotchKind, Outline, Piece, Pt, Segment, alter,
 };
 use kurbo::Affine;
 
@@ -531,4 +531,141 @@ fn a_bust_point_outside_the_piece_is_refused() {
     };
     *apex = Pt::new(400.0, 260.0);
     assert_eq!(alter(&drawn, &[step]), Err(AlterError::BustPoint));
+}
+
+/// How a dart of `shape` is shaped: the angle between its legs (radians),
+/// and its tip, the point between its legs' ends furthest from its mouth.
+fn dart_shape(shape: &Drawn, dart: &Dart) -> (f64, kurbo::Point) {
+    let edge = shape
+        .outline
+        .edge_geom(shape.outline.edge_index(&dart.edge).unwrap());
+    let (a, b) = (edge.point_at(dart.from), edge.point_at(dart.to));
+    let off = |p: kurbo::Point| (p - a).cross(b - a).abs();
+    let tip = (0..=4000)
+        .map(|k| edge.point_at(dart.from + (dart.to - dart.from) * f64::from(k) / 4000.0))
+        .reduce(|best, p| if off(p) > off(best) { p } else { best })
+        .unwrap();
+    let (u, v) = (a - tip, b - tip);
+    (u.cross(v).atan2(u.dot(v)).abs(), tip)
+}
+
+/// The bodice with a full bust adjustment, and its dart then pivoted to
+/// the waist, 60% of the way from the side to the centre front: `share`
+/// of it. The piece with the dart in its side, and pivoted.
+fn pivoted(share: f64) -> (Drawn, Drawn, Vec<Alteration>) {
+    let (drawn, bust) = bust(25.0);
+    let fuller = alter(&drawn, std::slice::from_ref(&bust)).unwrap();
+    let waist = fuller.outline.edge_geom(4);
+    let to = waist.point_at(waist.length() * 0.6);
+    let steps = vec![
+        bust,
+        Alteration {
+            id: "p".into(),
+            on: true,
+            change: Change::Pivot {
+                dart: "b.dart".into(),
+                to: Pt::new(to.x, to.y),
+                share,
+            },
+        },
+    ];
+    let pivoted = alter(&drawn, &steps).unwrap();
+    (fuller, pivoted, steps)
+}
+
+#[test]
+fn a_dart_pivoted_to_the_waist_closes_in_the_side_and_opens_there() {
+    let (fuller, pivoted, _) = pivoted(1.0);
+    assert!(pivoted.outline.closure_gap() < 1e-9);
+    // The same dart, in the waist now: as wide, its tip where it was.
+    assert_eq!(pivoted.darts.len(), 1);
+    let (dart, before) = (&pivoted.darts[0], &fuller.darts[0]);
+    assert_eq!((dart.id.as_str(), dart.edge.as_str()), ("b.dart", "waist"));
+    let ((angle, tip), (angle_before, tip_before)) =
+        (dart_shape(&pivoted, dart), dart_shape(&fuller, before));
+    assert!(
+        (angle - angle_before).abs() < 1e-3,
+        "{angle} {angle_before}"
+    );
+    assert!(tip.distance(tip_before) < 0.1, "{tip:?} {tip_before:?}");
+    // The side seam without it: shorter by its legs, but for the little
+    // its mouth now jogs.
+    let length = |s: &Drawn, i: usize| s.outline.edge_geom(i).length();
+    let legs = before.to - before.from;
+    let shorter = length(&fuller, 3) - length(&pivoted, 3);
+    assert!(
+        shorter > legs - 2.0 && shorter <= legs + 1e-9,
+        "{shorter} {legs}"
+    );
+    // The waist longer by the dart's legs.
+    let longer = length(&pivoted, 4) - length(&fuller, 4);
+    assert!((longer - (dart.to - dart.from)).abs() < 1e-6, "{longer}");
+    // Above the bust and at the centre front, nothing moved.
+    for i in [0, 1, 2, 5] {
+        assert_eq!(pivoted.outline.edges[i], fuller.outline.edges[i]);
+    }
+}
+
+#[test]
+fn half_a_dart_pivoted_leaves_half_where_it_was() {
+    let (fuller, pivoted, _) = pivoted(0.5);
+    assert!(pivoted.outline.closure_gap() < 1e-9);
+    assert_eq!(pivoted.darts.len(), 2);
+    let (whole, _) = dart_shape(&fuller, &fuller.darts[0]);
+    for (id, edge) in [("b.dart", "side"), ("p.dart", "waist")] {
+        let dart = pivoted.darts.iter().find(|d| d.id == id).unwrap();
+        assert_eq!(dart.edge, edge);
+        let (angle, _) = dart_shape(&pivoted, dart);
+        assert!(
+            (angle - whole / 2.0).abs() < 1e-3,
+            "{id}: {angle} of {whole}"
+        );
+    }
+}
+
+#[test]
+fn a_dart_is_pivoted_only_if_it_is_there_and_to_somewhere_else() {
+    let (fuller, _, steps) = pivoted(1.0);
+    let (drawn, _) = bust(25.0);
+    let moving = |dart: &str, to: kurbo::Point| {
+        let mut steps = steps.clone();
+        steps[1].change = Change::Pivot {
+            dart: dart.into(),
+            to: Pt::new(to.x, to.y),
+            share: 1.0,
+        };
+        alter(&drawn, &steps)
+    };
+    let waist = fuller.outline.edge_geom(4).point_at(100.0);
+    assert_eq!(
+        moving("gone", waist),
+        Err(AlterError::NoDart {
+            dart: "gone".into()
+        })
+    );
+    // Onto the dart itself.
+    let d = &fuller.darts[0];
+    let on_it = fuller.outline.edge_geom(3).point_at(d.from + 10.0);
+    assert_eq!(moving("b.dart", on_it), Err(AlterError::OntoDart));
+    assert!(moving("b.dart", waist).is_ok());
+}
+
+#[test]
+fn darts_steps_make_are_renamed_with_them() {
+    let mut p = bodice();
+    let drawn = Drawn::of(&p);
+    let (_, _, steps) = pivoted(0.5);
+    p.alterations = steps;
+    alter(&drawn, &p.alterations).unwrap().put(&mut p);
+    p.drawn = Some(Box::new(drawn));
+    let mut n = 0;
+    reassign_ids(&mut p, &mut |prefix| {
+        n += 1;
+        format!("{prefix}{n}")
+    });
+    // Named after the steps that made them, as altering again names them.
+    let drawn = p.drawn.as_ref().unwrap();
+    assert_eq!(alter(drawn, &p.alterations).unwrap(), Drawn::of(&p));
+    let ids: Vec<&str> = p.darts.iter().map(|d| d.id.as_str()).collect();
+    assert!(ids.iter().all(|id| id.ends_with(".dart")), "{ids:?}");
 }

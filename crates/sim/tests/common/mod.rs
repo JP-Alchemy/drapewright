@@ -259,6 +259,32 @@ pub fn full_bust_blouse() -> (Vec<Piece>, Vec<Seam>) {
     (pieces, seams)
 }
 
+/// The blouse with a full bust adjustment, its dart then pivoted into the
+/// armhole: a dart in the seam sewn to the sleeve.
+#[allow(dead_code)] // Not every test drapes it.
+pub fn armhole_dart_blouse() -> (Vec<Piece>, Vec<Seam>) {
+    let (mut pieces, seams) = full_bust_blouse();
+    let front = pieces.iter_mut().find(|p| p.id == "front").unwrap();
+    let armhole = front.outline.edge_geom(2);
+    let to = armhole.point_at(armhole.along_at(0, 0.5));
+    let mut steps = front.alterations.clone();
+    steps.push(Alteration {
+        id: "pivot".into(),
+        on: true,
+        change: Change::Pivot {
+            dart: "bust.dart".into(),
+            to: Pt::new(to.x, to.y),
+            share: 1.0,
+        },
+    });
+    let drawn = Drawn::of(&blouse().0[0]);
+    let moved = alter(&drawn, &steps).unwrap();
+    assert_eq!(moved.darts[0].edge, "fa", "a dart in the armhole");
+    moved.put(front);
+    front.alterations = steps;
+    (pieces, seams)
+}
+
 /// The blouse with sleeves to the wrist, 22 cm round there.
 #[allow(dead_code)] // Not every test drapes it.
 pub fn long_sleeved_blouse() -> (Vec<Piece>, Vec<Seam>) {

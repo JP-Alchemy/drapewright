@@ -2,7 +2,8 @@
 // and spread takes where its slash starts and where it hinges (both on the
 // edge) and then the part that turns; a bust adjustment takes the bust
 // point, then where the armhole hinges and where the side seam is slashed
-// (both on the edge). Points on the edge snap to it.
+// (both on the edge); a pivot takes the dart to move (unless the piece has
+// only one), then where on the edge it goes. Points on the edge snap to it.
 
 import type { Alteration } from '@drapewright/engine'
 import type { ToolPointer } from '@drapewright/input'
@@ -13,6 +14,7 @@ import { type Tool, type ToolContext, toPiece } from './tool.ts'
 export const ON_EDGE: Record<PickFor, boolean[]> = {
   spread: [true, true, false],
   bust: [false, true, true],
+  pivot: [true],
 }
 
 /** A press moving less than this, CSS pixels, is a tap. */
@@ -23,6 +25,10 @@ export function placed(picking: Picking): Alteration | null {
   const points = picking.points
   if (points.length < ON_EDGE[picking.for].length) return null
   const [a, b, c] = points as [[number, number], [number, number], [number, number]]
+  if (picking.for === 'pivot') {
+    if (!picking.dart) return null
+    return { id: '', on: true, change: { type: 'pivot', dart: picking.dart, to: a, share: 1 } }
+  }
   if (picking.for === 'spread') {
     const along = [b[0] - a[0], b[1] - a[1]] as const
     // Right of the slash, going along it from where it starts (y down).
@@ -63,6 +69,15 @@ export function pickTool(): Tool {
       pressed = null
       const picking = ctx.session.ui.get().picking
       if (!start || !picking || Math.hypot(p.x - start.x, p.y - start.y) > TAP_SLOP) return
+      if (picking.for === 'pivot' && !picking.dart) {
+        // Which dart: the one tapped.
+        const hit = ctx.hit(p)
+        if (hit?.piece !== picking.piece || (hit.kind !== 'edge' && hit.kind !== 'corner')) return
+        const at = ctx.world(p)
+        const dart = ctx.session.engine.dartAt(picking.piece, hit.edge, at.x, at.y)
+        if (dart) ctx.session.setPicking({ ...picking, dart })
+        return
+      }
       const point = tapped(p, ctx, picking)
       if (!point) return
       const next = { ...picking, points: [...picking.points, point] }

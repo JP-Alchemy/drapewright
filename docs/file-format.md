@@ -378,6 +378,19 @@ its id the step's with `.dart` after it); the centre front below the bust
 drops to meet the side at the waist. Closing (a small bust) overlaps
 instead, with no dart.
 
+**Change** `pivot` — `{ "type": "pivot", "dart": id, "to": [x, y],
+"share": 0 to 1 }`: one of the piece's darts (§4.14) pivoted to `to`, on
+its edge. The piece is slashed straight from `to` to the dart's tip (the
+point between its legs furthest from its mouth), and the smaller of the
+two parts the slash makes turns about the tip until the dart is closed by
+`share` (1 all of it, 0.5 half). The slash opens as much, a new dart with
+its tip at the same place. Moved whole, the dart keeps its id, its legs
+are taken out of the edge it was in (joined straight where they were not
+quite as long as each other), and notches and darts beyond it on that
+edge come back as far; in part, the dart stays where it was, narrower, and
+the new one is the step's id with `.dart` after it. The slash must run
+inside the piece, and `to` must be away from the dart.
+
 **AlterLine** — `{ "type": "own", "line": id }`: one of the piece's
 internal lines (normally its lengthen or shorten line), straight from its
 start to its end; or `{ "type": "through", "from": [x, y], "to": [x, y] }`:

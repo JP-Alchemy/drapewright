@@ -58,7 +58,11 @@ export function Toolbar({ session }: { session: Session }) {
       </ToggleButtonGroup>
       {tool === 'pick' && picking ? (
         <div className="tool-hint pick-hint">
-          <p role="status">{t.pick.prompts[picking.for][picking.points.length]}</p>
+          <p role="status">
+            {picking.for === 'pivot' && !picking.dart
+              ? t.pick.whichDart
+              : t.pick.prompts[picking.for][picking.points.length]}
+          </p>
           <Button className="button" onPress={() => session.setPicking(null)}>
             {t.pick.cancel}
           </Button>

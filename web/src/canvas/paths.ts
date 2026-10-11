@@ -60,6 +60,9 @@ function alteredPaths(piece: Piece): { drawn: Path2D | null; alterLines: Path2D 
         line(change.apex, change.armhole)
         line(change.apex, change.side)
         break
+      // A pivoted dart shows where it went.
+      case 'pivot':
+        break
     }
   }
   return { drawn: outlinePath(piece.drawn.outline), alterLines }

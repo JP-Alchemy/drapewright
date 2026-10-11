@@ -12,6 +12,37 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 25c — Pivoting a dart (Phase 4, part 4)
+
+Move a dart to another place on the piece: all of it, or half.
+
+**Try it** (on the test blouse, `fixtures/drapewright/blouse.drapewright`):
+
+1. Give **Blouse front** a full bust adjustment, as in 25a: it now has a
+   dart in its side seam.
+2. Under **Alterations**, press **Move a dart**. The front has only one
+   dart, so the bar at the top left asks just where it goes: tap the hem,
+   a little in from the side. The side seam closes up straight and the
+   dart opens in the hem instead, as wide, its tip where it was. On a piece
+   with more than one dart, it first asks which: tap it.
+3. **Half** moves half of it: half stays in the side seam, narrower, and
+   half opens in the hem.
+4. Like any step, it can be switched off or removed. Draped, both darts
+   are sewn closed.
+
+**How it works:** the piece is slashed straight from where you tapped to
+the dart's tip, and the smaller part turns about the tip until the dart
+closes. The slash opens by as much, and that is the new dart. Moved whole,
+the dart keeps its name, so a later step can find it and move it again.
+
+**Not yet:** a dart turns about its own tip, not the bust point. A side
+dart moved to the waist therefore points where the side dart did (2.5 cm
+from the bust point, towards the side). A dart's tip can't be moved or
+its length changed yet. After a pivot, the edge the turned part was on
+has a corner in it, for truing (step 27).
+
+---
+
 ## Step 25b — Darts known as darts: measured and sewn closed (Phase 4, part 3)
 
 The dart a full bust adjustment opens is now known as a dart: seams are

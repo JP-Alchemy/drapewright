@@ -177,6 +177,11 @@ export class Engine {
     return p ? [p[0]!, p[1]!] : null
   }
 
+  /** The dart in a piece's edge at a work-table point, if there is one. */
+  dartAt(piece: string, edge: string, x: number, y: number): string | null {
+    return this.#handle.dartAt(piece, edge, x, y) ?? null
+  }
+
   viewState(): ViewState {
     return this.#handle.viewState() as ViewState
   }

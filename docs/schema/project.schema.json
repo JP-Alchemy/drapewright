@@ -291,6 +291,32 @@
             "side",
             "by"
           ]
+        },
+        {
+          "description": "A dart pivoted to `to`, on the edge: the piece slashed from there to\nthe dart's tip, and the smaller part turned about the tip until the\ndart is closed by `share` (1 all of it, 0.5 half) and the slash is\nopen as much, a dart there. Moved whole, the dart keeps its id; in\npart, the new one is the step's id with `.dart` after it.",
+          "type": "object",
+          "properties": {
+            "dart": {
+              "type": "string"
+            },
+            "share": {
+              "type": "number",
+              "format": "double"
+            },
+            "to": {
+              "$ref": "#/$defs/Pt"
+            },
+            "type": {
+              "type": "string",
+              "const": "pivot"
+            }
+          },
+          "required": [
+            "type",
+            "dart",
+            "to",
+            "share"
+          ]
         }
       ]
     },

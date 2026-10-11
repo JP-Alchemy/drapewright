@@ -273,6 +273,23 @@ impl Engine {
         piece.outline.edge_geom(i).nearest(local)
     }
 
+    /// The dart in a piece's edge at `world` (work-table mm): one whose legs
+    /// the point nearest it on the edge is on, or within 10 mm along it.
+    pub fn dart_at(&self, piece: &str, edge: &str, world: Pt) -> Option<Id> {
+        const NEAR: f64 = 10.0;
+        let near = self.nearest_on_edge(piece, edge, world)?;
+        let off = |d: &drapewright_pattern_core::Dart| {
+            (d.from - near.along).max(near.along - d.to).max(0.0)
+        };
+        self.document()
+            .piece(piece)?
+            .darts
+            .iter()
+            .filter(|d| d.edge == edge && off(d) < NEAR)
+            .min_by(|a, b| off(a).total_cmp(&off(b)))
+            .map(|d| d.id.clone())
+    }
+
     /// What is under `world` (work-table mm), within `tolerance` mm.
     pub fn hit_test(&mut self, world: Pt, tolerance: f64) -> Option<Hit> {
         let pieces: Vec<Arc<Piece>> = self.document().pieces.clone();

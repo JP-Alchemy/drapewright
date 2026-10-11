@@ -162,7 +162,9 @@ export const t = {
         'Tap the side seam where the dart goes.',
         '',
       ],
+      pivot: ['Tap the edge where the dart goes.', ''],
     },
+    whichDart: 'Tap the dart to move.',
     cancel: 'Cancel',
   },
 
@@ -186,6 +188,17 @@ export const t = {
     small: 'Small bust',
     bustWay: 'Full or small bust',
     bustHint: 'Measured across the bust on this half: the whole front changes by twice as much.',
+    pivot: 'Move a dart',
+    pivotStep: (share: number) =>
+      share >= 1
+        ? 'Dart moved'
+        : share === 0.5
+          ? 'Half a dart moved'
+          : `${Math.round(share * 100)}% of a dart moved`,
+    pivotHint: 'Turned about its tip: the dart closes where it was and opens where it goes.',
+    share: 'How much of it',
+    all: 'All of it',
+    half: 'Half',
     by: 'By how much',
     where: 'Where',
     across: 'Straight across the piece',

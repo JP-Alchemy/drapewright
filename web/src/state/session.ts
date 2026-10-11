@@ -24,13 +24,15 @@ import { type Store, createStore } from './store.ts'
 export type ToolId = 'select' | 'notch' | 'grainline' | 'pick'
 
 /** What points are tapped on a piece for: an alteration placed by them. */
-export type PickFor = 'spread' | 'bust'
+export type PickFor = 'spread' | 'bust' | 'pivot'
 
 /** Points being tapped on a piece (its own coordinates), and what for. */
 export interface Picking {
   piece: string
   for: PickFor
   points: [number, number][]
+  /** A pivot's dart, once known. */
+  dart?: string
 }
 
 /** A selected edge, the corner at the end of an edge, or a notch. */
@@ -288,7 +290,10 @@ export class Session {
   /** Starts tapping points on a piece to place an alteration. */
   startPicking(piece: string, kind: PickFor): void {
     this.select([piece])
-    this.ui.set((s) => ({ ...s, tool: 'pick', picking: { piece, for: kind, points: [] } }))
+    // A piece with one dart: that is the dart to move.
+    const darts = this.engine.document().pieces.find((p) => p.id === piece)?.darts ?? []
+    const dart = kind === 'pivot' && darts.length === 1 ? darts[0]!.id : undefined
+    this.ui.set((s) => ({ ...s, tool: 'pick', picking: { piece, for: kind, points: [], dart } }))
   }
 
   /** The points tapped so far, as they change. */

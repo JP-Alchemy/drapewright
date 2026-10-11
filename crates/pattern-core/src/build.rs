@@ -121,12 +121,25 @@ pub fn reassign_ids(piece: &mut Piece, next_id: &mut dyn FnMut(&str) -> Id) {
     // Old id to new, by kind of thing.
     let mut renamed: HashMap<(&str, Id), Id> = HashMap::new();
     let mut rename = |kind: &'static str, id: &mut Id| {
+        // A dart a step made is named after it ("a1.dart"), and is renamed
+        // with it.
+        if kind == "d"
+            && let Some(step) = id.strip_suffix(".dart")
+            && let Some(new) = renamed.get(&("a", step.to_owned()))
+        {
+            *id = format!("{new}.dart");
+            return;
+        }
         let new = renamed
             .entry((kind, id.clone()))
             .or_insert_with(|| next_id(kind))
             .clone();
         *id = new;
     };
+    // The steps first, for the darts they made.
+    for a in &mut piece.alterations {
+        rename("a", &mut a.id);
+    }
     let mut shapes: Vec<&mut crate::alter::Drawn> = Vec::new();
     let mut current = crate::alter::Drawn::of(piece);
     let mut drawn = piece.drawn.take();
@@ -157,9 +170,11 @@ pub fn reassign_ids(piece: &mut Piece, next_id: &mut dyn FnMut(&str) -> Id) {
         }
     }
     for a in &mut piece.alterations {
-        rename("a", &mut a.id);
         if let Some(line) = a.change.own_line() {
             rename("l", line);
+        }
+        if let Some(dart) = a.change.own_dart() {
+            rename("d", dart);
         }
     }
     current.put(piece);

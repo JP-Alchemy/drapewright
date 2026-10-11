@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::Pt;
-use crate::geom::{EdgeGeom, SAME_POINT, flatten_segs, point_in_polygon, segs_of};
+use crate::geom::{EdgeGeom, SAME_POINT, flatten_segs, point_in_polygon, polygon_area, segs_of};
 use crate::model::{
     Dart, Grainline, Id, InternalLine, Label, Mark, Notch, NotchFrom, Outline, Piece, Segment,
 };
@@ -119,6 +119,12 @@ pub enum Change {
         side: Pt,
         by: f64,
     },
+    /// A dart pivoted to `to`, on the edge: the piece slashed from there to
+    /// the dart's tip, and the smaller part turned about the tip until the
+    /// dart is closed by `share` (1 all of it, 0.5 half) and the slash is
+    /// open as much, a dart there. Moved whole, the dart keeps its id; in
+    /// part, the new one is the step's id with `.dart` after it.
+    Pivot { dart: Id, to: Pt, share: f64 },
 }
 
 impl Change {
@@ -154,6 +160,7 @@ impl Change {
                 *armhole = f(*armhole);
                 *side = f(*side);
             }
+            Change::Pivot { to, .. } => *to = f(*to),
         }
     }
 
@@ -164,6 +171,14 @@ impl Change {
                 line: AlterLine::Own { line },
                 ..
             } => Some(line),
+            _ => None,
+        }
+    }
+
+    /// The piece's dart it moves, if one.
+    pub fn own_dart(&mut self) -> Option<&mut Id> {
+        match self {
+            Change::Pivot { dart, .. } => Some(dart),
             _ => None,
         }
     }
@@ -216,6 +231,10 @@ pub enum AlterError {
         "The bust point must be inside the piece, with its edge straight below it and across from it."
     )]
     BustPoint,
+    #[error("The dart to move is no longer on the piece.")]
+    NoDart { dart: Id },
+    #[error("A dart must move to another place on the edge, away from where it is.")]
+    OntoDart,
 }
 
 /// The shape `drawn` with `alterations` applied in order (those switched
@@ -242,6 +261,7 @@ pub fn alter(drawn: &Drawn, alterations: &[Alteration]) -> Result<Drawn, AlterEr
                 [(*apex).into(), (*armhole).into(), (*side).into()],
                 *by,
             )?,
+            Change::Pivot { dart, to, share } => pivot(&shape, &a.id, dart, (*to).into(), *share)?,
         };
     }
     Ok(shape)
@@ -1061,4 +1081,269 @@ fn edge_of(outline: &Outline, p: Point) -> Option<usize> {
         .filter_map(|i| outline.edge_geom(i).nearest(p).map(|n| (i, n.distance)))
         .min_by(|a, b| a.1.total_cmp(&b.1))
         .map(|(i, _)| i)
+}
+
+// ── Pivoting a dart ──────────────────────────────────────────────────────
+
+/// A dart pivoted: the slash to its tip opens into a new dart as the part
+/// beyond it turns.
+struct Pivoting {
+    slash: Slash,
+    /// The new dart's mouth: where the slash starts, on the part that stays
+    /// and on the part that turns.
+    mouth: (Point, Point),
+}
+
+impl Cut for Pivoting {
+    fn crossings(&self, seg: &PathSeg) -> Vec<f64> {
+        self.slash.crossings(seg)
+    }
+
+    fn part(&self, at: Point) -> Affine {
+        self.slash.part(at)
+    }
+
+    fn join(&self, end: Point, start: Point) -> Option<Vec<PathSeg>> {
+        let near = |p: Point, q: Point| p.distance(q) < 1e-3;
+        let (p, q) = self.mouth;
+        let tip = self.slash.hinge;
+        (near(end, p) && near(start, q) || near(end, q) && near(start, p)).then(|| {
+            vec![
+                PathSeg::Line(Line::new(end, tip)),
+                PathSeg::Line(Line::new(tip, start)),
+            ]
+        })
+    }
+}
+
+/// A dart's tip on its edge (`geom`), between where its legs meet the edge
+/// (`from` and `to`, mm along it): the point furthest from its mouth (a
+/// corner, or where its legs curve, a point along them), and how far along
+/// the edge it is.
+fn dart_tip(geom: &EdgeGeom, from: f64, to: f64) -> (Point, f64) {
+    let (a, b) = (geom.point_at(from), geom.point_at(to));
+    let mouth = b - a;
+    let off = |p: Point| (p - a).cross(mouth).abs();
+    let corners = (0..geom.segs().len())
+        .map(|k| geom.along_at(k, 1.0))
+        .filter(|s| *s > from && *s < to);
+    let along = (0..=200).map(|k| from + (to - from) * f64::from(k) / 200.0);
+    corners
+        .chain(along)
+        .map(|s| (geom.point_at(s), s))
+        .reduce(|best, x| if off(x.0) > off(best.0) { x } else { best })
+        .unwrap_or((a.midpoint(b), (from + to) / 2.0))
+}
+
+/// Curves `segs` with the stretch between `from` and `to` (mm along them)
+/// taken out, the ends either side joined straight where they do not meet:
+/// the curves, and how long the join is.
+fn without(segs: &[PathSeg], from: f64, to: f64) -> (Vec<PathSeg>, f64) {
+    let geom = EdgeGeom::new(segs.to_vec());
+    let ((k0, t0), (k1, t1)) = (geom.locate(from), geom.locate(to));
+    let (a, b) = (geom.point_at(from), geom.point_at(to));
+    let gap = if a.distance(b) > SAME_POINT {
+        a.distance(b)
+    } else {
+        0.0
+    };
+    let mut out: Vec<PathSeg> = segs[..k0].to_vec();
+    let head = segs[k0].subsegment(0.0..t0);
+    if !seg_len_zero(&head) {
+        out.push(head);
+    }
+    if gap > 0.0 {
+        out.push(PathSeg::Line(Line::new(a, b)));
+    }
+    let tail = segs[k1].subsegment(t1..1.0);
+    let rest = (!seg_len_zero(&tail))
+        .then_some(tail)
+        .into_iter()
+        .chain(segs[k1 + 1..].iter().copied());
+    for (n, seg) in rest.enumerate() {
+        // Going on from where the curves before end.
+        let seg = if n == 0 {
+            with_start(seg, out.last().map_or(a, ParamCurve::end))
+        } else {
+            seg
+        };
+        out.push(seg);
+    }
+    (out, gap)
+}
+
+/// The shape with its dart `dart_id` pivoted to `to`, on its edge, by
+/// alteration `id`: `share` of it (0 to 1) moved there.
+fn pivot(
+    shape: &Drawn,
+    id: &str,
+    dart_id: &str,
+    to: Point,
+    share: f64,
+) -> Result<Drawn, AlterError> {
+    const ON_EDGE: f64 = 2.0;
+    let outline = &shape.outline;
+    let no_dart = || AlterError::NoDart {
+        dart: dart_id.to_owned(),
+    };
+    let dart = shape
+        .darts
+        .iter()
+        .find(|d| d.id == dart_id)
+        .ok_or_else(no_dart)?;
+    let i = outline.edge_index(&dart.edge).ok_or_else(no_dart)?;
+    let geom = outline.edge_geom(i);
+    let (a, b) = (geom.point_at(dart.from), geom.point_at(dart.to));
+    let (tip, tip_along) = dart_tip(&geom, dart.from, dart.to);
+    let Some((p, s_p, d_p)) = on_outline(outline, to) else {
+        return Err(AlterError::NotOnEdge);
+    };
+    if d_p > ON_EDGE {
+        return Err(AlterError::NotOnEdge);
+    }
+    // Along the outline from its start: the dart's ends and its tip.
+    let before: f64 = (0..i).map(|k| outline.edge_geom(k).length()).sum();
+    let (s_a, s_t, s_b) = (before + dart.from, before + tip_along, before + dart.to);
+    if s_p > s_a - ON_EDGE && s_p < s_b + ON_EDGE {
+        return Err(AlterError::OntoDart);
+    }
+    let share = share.clamp(0.0, 1.0);
+    if share == 0.0 {
+        return Ok(shape.clone());
+    }
+    // The slash runs inside the piece, meeting its edge only at its ends.
+    let polygon = outline_points(outline);
+    let slash = Line::new(p, tip);
+    let inside = [0.25, 0.5, 0.75].iter().all(|&t| {
+        let q = slash.eval(t);
+        point_in_polygon(q, &polygon) && on_outline(outline, q).is_some_and(|o| o.2 > 0.5)
+    });
+    let crosses = outline.path_segs().iter().any(|seg| {
+        seg.intersect_line(slash).into_iter().any(|x| {
+            let q = slash.eval(x.line_t);
+            (0.0..=1.0).contains(&x.line_t) && q.distance(p) > ON_EDGE && q.distance(tip) > ON_EDGE
+        })
+    });
+    if !inside || crosses {
+        return Err(AlterError::SlashOutside);
+    }
+    // The piece in two along the slash, each part closed by it into a
+    // polygon: the smaller part turns.
+    let flat = outline_flat_with_along(outline);
+    let (lo, hi) = (s_p.min(s_t), s_p.max(s_t));
+    let (first, last) = if s_p <= s_t { (p, tip) } else { (tip, p) };
+    let mut inner = vec![first];
+    inner.extend(
+        flat.iter()
+            .filter(|(_, s)| *s > lo && *s < hi)
+            .map(|(q, _)| *q),
+    );
+    inner.push(last);
+    let mut outer = vec![last];
+    outer.extend(
+        flat.iter()
+            .filter(|(_, s)| *s > hi)
+            .chain(flat.iter().filter(|(_, s)| *s < lo))
+            .map(|(q, _)| *q),
+    );
+    outer.push(first);
+    let between = polygon_area(&inner).abs() <= polygon_area(&outer).abs();
+    let turning = if between { inner } else { outer };
+    // The dart's leg on the turning part turns towards the other, closing
+    // the dart by `share`.
+    let b_turns = (s_b > lo && s_b < hi) == between;
+    let (moving, staying) = if b_turns { (b, a) } else { (a, b) };
+    let (u, v) = (moving - tip, staying - tip);
+    let angle = share * u.cross(v).atan2(u.dot(v));
+    let turn = Affine::translate(tip.to_vec2())
+        * Affine::rotate(angle)
+        * Affine::translate(-tip.to_vec2());
+    let opened = turn * p;
+    let mut altered = cut_shape(
+        &Pivoting {
+            slash: Slash {
+                from: p,
+                hinge: tip,
+                outline: outline.clone(),
+                lo,
+                hi,
+                between,
+                turning,
+                turn,
+            },
+            mouth: (p, opened),
+        },
+        shape,
+    );
+    // The edge the new dart opens in: where both sides of the slash meet it.
+    let off_edge = |o: &Outline, k: usize| {
+        let g = o.edge_geom(k);
+        [p, opened]
+            .iter()
+            .map(|q| g.nearest(*q).map_or(f64::MAX, |n| n.distance))
+            .sum::<f64>()
+    };
+    let j = (0..altered.outline.edges.len())
+        .min_by(|&x, &y| off_edge(&altered.outline, x).total_cmp(&off_edge(&altered.outline, y)))
+        .unwrap_or(i);
+    // Where the dart was on its edge: as before, unless the new one opened
+    // in that edge before it.
+    let opens_at = |o: &Outline| {
+        let g = o.edge_geom(j);
+        let (x, y) = (g.nearest(p), g.nearest(opened));
+        x.zip(y)
+            .map(|(x, y)| (x.along.min(y.along), x.along.max(y.along)))
+    };
+    let legs = p.distance(tip) + opened.distance(tip);
+    let shift = match opens_at(&altered.outline) {
+        Some((from, _)) if j == i && from < dart.from => legs,
+        _ => 0.0,
+    };
+    let (from, to) = (dart.from + shift, dart.to + shift);
+    let moved_whole = share >= 1.0 - 1e-9;
+    if moved_whole {
+        // Closed: its legs lie along each other, and are taken out of the
+        // edge. Notches and darts beyond it come back as far.
+        let edge = &altered.outline.edges[i];
+        let length = altered.outline.edge_geom(i).length();
+        let (kept, gap) = without(
+            &segs_of(altered.outline.edge_start(i), &edge.segments),
+            from,
+            to,
+        );
+        let removed = to - from - gap;
+        let back = |s: f64| {
+            if s >= to { s - removed } else { s.min(from) }
+        };
+        let edge_id = edge.id.clone();
+        altered.outline.edges[i].segments = to_segments(&kept);
+        for notch in altered.notches.iter_mut().filter(|n| n.edge == edge_id) {
+            notch.at = match notch.from {
+                NotchFrom::Start => back(notch.at),
+                NotchFrom::End => length - removed - back(length - notch.at),
+            };
+        }
+        for other in altered.darts.iter_mut().filter(|d| d.edge == edge_id) {
+            other.from = back(other.from);
+            other.to = back(other.to);
+        }
+        altered.darts.retain(|d| d.id != dart_id);
+    } else if let Some(old) = altered.darts.iter_mut().find(|d| d.id == dart_id) {
+        old.from = from;
+        old.to = to;
+    }
+    // The new dart, where the slash opened.
+    if let Some((from, to)) = opens_at(&altered.outline) {
+        altered.darts.push(Dart {
+            id: if moved_whole {
+                dart_id.to_owned()
+            } else {
+                format!("{id}.dart")
+            },
+            edge: altered.outline.edges[j].id.clone(),
+            from,
+            to,
+        });
+    }
+    Ok(altered)
 }

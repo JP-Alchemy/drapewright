@@ -109,6 +109,11 @@ fn a_blouse_with_a_full_bust_adjustment_drapes_with_its_darts_closed() {
     blouse_hangs(common::full_bust_blouse());
 }
 
+#[test]
+fn a_blouse_with_a_dart_in_its_armhole_drapes_with_it_closed() {
+    blouse_hangs(common::armhole_dart_blouse());
+}
+
 fn blouse_hangs(
     (pieces, seams): (
         Vec<drapewright_pattern_core::Piece>,

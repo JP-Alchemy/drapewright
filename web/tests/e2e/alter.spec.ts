@@ -94,6 +94,39 @@ test('a bust adjustment is placed by tapping the bust point, armhole and side se
   await expect(front).toContainText(/2[6-9]\.\d cm × 6[1-3]\.\d cm/)
   // The side seam measured with the new dart closed: as long as the back's.
   await expect(page.getByText(/^Same length, 38\.\d cm/)).toBeVisible()
+  // Its dart pivoted to the armhole: the piece's only dart, so only where
+  // it goes is tapped (halfway up the armhole's part above the hinge).
+  const document = () =>
+    page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const s = (window as any).drapewright
+      return s.engine.document().pieces[0]
+    })
+  const { armhole, side, armholeAt } = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s = (window as any).drapewright
+    const edges = s.engine.document().pieces[0].outline.edges
+    const [p0, { c1, c2, to: p3 }] = [edges[1].segments.at(-1).to, edges[2].segments[0]]
+    const mid = (k: number) => (p0[k] + 3 * c1[k] + 3 * c2[k] + p3[k]) / 8
+    return {
+      armhole: edges[2].id as string,
+      side: edges[3].id as string,
+      armholeAt: [mid(0), mid(1)] as [number, number],
+    }
+  })
+  await page.getByRole('button', { name: 'Move a dart' }).click()
+  await expect(page.getByText('Tap the edge where the dart goes.')).toBeVisible()
+  await tap(...armholeAt)
+  await expect(page.getByRole('switch', { name: 'Dart moved' })).toBeChecked()
+  let darts = (await document()).darts
+  expect(darts.map((d: { edge: string }) => d.edge)).toEqual([armhole])
+  // Half of it: half stays in the side seam.
+  await page.getByText('Half', { exact: true }).click()
+  await expect(page.getByRole('switch', { name: 'Half a dart moved' })).toBeChecked()
+  darts = (await document()).darts
+  expect(darts.map((d: { edge: string }) => d.edge).sort()).toEqual([armhole, side].sort())
+  await page.getByRole('button', { name: 'Remove the step “Half a dart moved”' }).click()
+
   // A small bust adjustment instead.
   await page.getByText('Small bust', { exact: true }).click()
   await expect(page.getByRole('switch', { name: 'Small bust adjustment, 2.0 cm' })).toBeChecked()
