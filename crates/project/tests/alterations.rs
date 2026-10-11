@@ -288,3 +288,41 @@ fn seams_are_measured_on_the_altered_piece() {
     let report = &e.seam_reports()[0];
     assert!((report.difference + 30.0).abs() < 1e-6, "{report:?}");
 }
+
+#[test]
+fn slashed_and_spread_or_closed_by_command() {
+    let (mut e, piece, _) = project();
+    let spread = |by: f64| Alteration {
+        id: String::new(),
+        on: true,
+        change: Change::Spread {
+            from: Pt::new(100.0, 500.0),
+            hinge: Pt::new(100.0, 0.0),
+            by,
+            turns: drapewright_pattern_core::alter::Turns::Right,
+        },
+    };
+    let width = |e: &Engine| e.document().pieces[0].outline.bounds().width();
+    e.dispatch(
+        Command::AddAlteration {
+            piece: piece.clone(),
+            alteration: spread(30.0),
+        },
+        Default::default(),
+    )
+    .unwrap();
+    assert!(width(&e) > 225.0, "{}", width(&e));
+    let step = e.document().pieces[0].alterations[0].clone();
+    e.dispatch(
+        Command::SetAlteration {
+            piece,
+            alteration: Alteration {
+                id: step.id,
+                ..spread(f64::INFINITY)
+            },
+        },
+        Default::default(),
+    )
+    .expect_err("no endless spread");
+    assert!(width(&e) > 225.0);
+}

@@ -148,6 +148,24 @@ export const t = {
     oneWay: 'One way (napped or one-way fabric)',
   },
 
+  pick: {
+    prompts: {
+      spread: [
+        'Tap the edge where the slash starts.',
+        'Tap the edge across the piece where it hinges.',
+        'Tap the part that turns.',
+        '',
+      ],
+      bust: [
+        'Tap the bust point.',
+        'Tap the armhole where it hinges, about a third of the way up from the underarm.',
+        'Tap the side seam where the dart goes.',
+        '',
+      ],
+    },
+    cancel: 'Cancel',
+  },
+
   alter: {
     heading: 'Alterations',
     none: 'None yet. Each change is kept as a step that can be switched off: the piece as drawn is kept too.',
@@ -156,6 +174,18 @@ export const t = {
     longer: 'Lengthen',
     shorter: 'Shorten',
     way: 'Lengthen or shorten',
+    spread: 'Slash and spread',
+    spreadStep: (open: boolean, by: string) => `Slashed and ${open ? 'spread' : 'closed'} ${by}`,
+    open: 'Spread',
+    close: 'Close',
+    spreadWay: 'Spread or close',
+    otherSide: 'Turn the other side instead',
+    bust: 'Bust adjustment',
+    bustStep: (full: boolean, by: string) => `${full ? 'Full' : 'Small'} bust adjustment, ${by}`,
+    full: 'Full bust',
+    small: 'Small bust',
+    bustWay: 'Full or small bust',
+    bustHint: 'Measured across the bust on this half: the whole front changes by twice as much.',
     by: 'By how much',
     where: 'Where',
     across: 'Straight across the piece',

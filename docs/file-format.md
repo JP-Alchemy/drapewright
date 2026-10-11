@@ -354,6 +354,26 @@ edge), and what lay beyond it moves back. Notches stay where they were
 on their edges' cloth; marks, labels, internal lines and the grainline
 move with the part they are on.
 
+**Change** `spread` — `{ "type": "spread", "from": [x, y], "hinge": [x,
+y], "by": mm, "turns": "right" | "left" }`: slash and spread. The piece is
+slashed straight from `from` to `hinge`, both on its edge, and the part on
+the `turns` side of the slash (going from `from` to `hinge`, as the
+pattern is seen) turns about the hinge until the slash is `by` mm open at
+`from`; less than 0 closes it, the parts overlapping and meeting where
+they cross. The slash must run inside the piece.
+
+**Change** `fullBust` — `{ "type": "fullBust", "apex": [x, y], "armhole":
+[x, y], "side": [x, y], "by": mm }`: a full bust adjustment by the Y
+method (a small one where `by` is less than 0) on a bodice front. Slashes
+run from the bust point `apex` straight down the grain to the waist, from
+it to `armhole` (on the armhole, where it hinges), from it to `side` (on
+the side seam), and from it straight across to the centre front. The side
+turns about the hinge until the bust point has moved `by` mm out; the part
+below the side seam slash moves with it, opening a dart in the side seam
+whose tip is 25 mm short of the bust point; the centre front below the
+bust drops to meet the side at the waist. Closing (a small bust) overlaps
+instead, with no dart.
+
 **AlterLine** — `{ "type": "own", "line": id }`: one of the piece's
 internal lines (normally its lengthen or shorten line), straight from its
 start to its end; or `{ "type": "through", "from": [x, y], "to": [x, y] }`:
@@ -545,9 +565,8 @@ How to take each one is shown in the app beside its box.
 ### 10.3 More alterations (Phase 4)
 
 Alterations are kept on each piece (§4.13). The kinds still to come are
-full and small bust adjustments, slash and spread, pivot, swayback,
-broad and narrow shoulders, waist and hip, and truing seams: each a new
-`change` type, with the same rules.
+swayback, broad and narrow shoulders, waist and hip, and truing seams:
+each a new `change` type, with the same rules.
 
 ### 10.4 Seams (version 3)
 

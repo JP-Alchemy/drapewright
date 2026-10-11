@@ -206,11 +206,7 @@ pub fn transform(piece: &mut Piece, affine: Affine) {
     // The piece as drawn, and the lines its alterations work along, alike.
     also_drawn(piece, |p| transform(p, affine));
     for a in &mut piece.alterations {
-        let crate::alter::Change::Lengthen { line, .. } = &mut a.change;
-        if let crate::alter::AlterLine::Through { from, to } = line {
-            *from = f(*from);
-            *to = f(*to);
-        }
+        a.change.map_points(f, affine.determinant() < 0.0);
     }
     let outline = &mut piece.outline;
     outline.start = f(outline.start);

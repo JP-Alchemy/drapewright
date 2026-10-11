@@ -1026,6 +1026,22 @@ h2 {
   border-radius: var(--radius-sm);
 }
 
+.alter-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pick-hint {
+  display: grid;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.pick-hint p {
+  margin: 0;
+}
+
 .alter-step-head {
   display: flex;
   align-items: center;
@@ -1167,7 +1183,8 @@ h2 {
 }
 
 @media (max-width: 820px) {
-  .tool-hint {
+  /* A tapping prompt stays: it says what to tap, and can be cancelled. */
+  .tool-hint:not(.pick-hint) {
     display: none;
   }
 }

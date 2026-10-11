@@ -171,6 +171,12 @@ export class Engine {
     return this.#handle.nearestOnEdge(piece, edge, x, y) ?? null
   }
 
+  /** The point of an edge nearest to a work-table point, in the piece's own coordinates. */
+  snapToEdge(piece: string, edge: string, x: number, y: number): [number, number] | null {
+    const p = this.#handle.snapToEdge(piece, edge, x, y)
+    return p ? [p[0]!, p[1]!] : null
+  }
+
   viewState(): ViewState {
     return this.#handle.viewState() as ViewState
   }

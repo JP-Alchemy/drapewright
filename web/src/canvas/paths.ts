@@ -43,11 +43,23 @@ function alteredPaths(piece: Piece): { drawn: Path2D | null; alterLines: Path2D 
   const on = piece.alterations.filter((a) => a.on)
   if (!piece.drawn || on.length === 0) return { drawn: null, alterLines: null }
   const alterLines = new Path2D()
-  for (const a of on) {
-    const { line } = a.change
-    if (line.type === 'through') {
-      alterLines.moveTo(line.from[0], line.from[1])
-      alterLines.lineTo(line.to[0], line.to[1])
+  const line = (a: [number, number], b: [number, number]) => {
+    alterLines.moveTo(a[0], a[1])
+    alterLines.lineTo(b[0], b[1])
+  }
+  for (const { change } of on) {
+    switch (change.type) {
+      // A lengthen line of the piece's own is drawn already.
+      case 'lengthen':
+        if (change.line.type === 'through') line(change.line.from, change.line.to)
+        break
+      case 'spread':
+        line(change.from, change.hinge)
+        break
+      case 'fullBust':
+        line(change.apex, change.armhole)
+        line(change.apex, change.side)
+        break
     }
   }
   return { drawn: outlinePath(piece.drawn.outline), alterLines }

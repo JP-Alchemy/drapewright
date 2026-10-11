@@ -1,7 +1,7 @@
 // A piece's alterations in the inspector: changes kept as steps on the
 // piece as drawn, each switched on or off, changed or taken away.
 
-import type { AlterLine, Alteration, Piece, PieceView } from '@drapewright/engine'
+import type { AlterLine, Alteration, Change, Piece, PieceView } from '@drapewright/engine'
 import { ChevronDown, Plus, Trash2 } from 'lucide-react'
 import {
   Button,
@@ -48,7 +48,7 @@ export function AlterSection({
   view: PieceView
 }) {
   const own = piece.lines.filter((l) => l.kind === 'lengthenShorten')
-  const add = () => {
+  const lengthen = () => {
     const line: AlterLine = own[0] ? { type: 'own', line: own[0].id } : across(view, middle(view))
     session.dispatch({
       type: 'addAlteration',
@@ -69,12 +69,47 @@ export function AlterSection({
           <p className="muted small">{t.alter.asDrawn}</p>
         </>
       )}
-      <Button className="button" onPress={add}>
-        <Plus size={18} aria-hidden="true" />
-        {t.alter.lengthen}
-      </Button>
+      <div className="alter-add">
+        <Button className="button" onPress={lengthen}>
+          <Plus size={18} aria-hidden="true" />
+          {t.alter.lengthen}
+        </Button>
+        <Button className="button" onPress={() => session.startPicking(piece.id, 'spread')}>
+          <Plus size={18} aria-hidden="true" />
+          {t.alter.spread}
+        </Button>
+        <Button className="button" onPress={() => session.startPicking(piece.id, 'bust')}>
+          <Plus size={18} aria-hidden="true" />
+          {t.alter.bust}
+        </Button>
+      </div>
     </div>
   )
+}
+
+/** What a step says it does, and the two ways it can go (more, or less). */
+function wording(change: Change, by: string) {
+  const more = change.by >= 0
+  switch (change.type) {
+    case 'lengthen':
+      return {
+        said: t.alter.step(more, by),
+        way: t.alter.way,
+        ways: [t.alter.longer, t.alter.shorter],
+      }
+    case 'spread':
+      return {
+        said: t.alter.spreadStep(more, by),
+        way: t.alter.spreadWay,
+        ways: [t.alter.open, t.alter.close],
+      }
+    case 'fullBust':
+      return {
+        said: t.alter.bustStep(more, by),
+        way: t.alter.bustWay,
+        ways: [t.alter.full, t.alter.small],
+      }
+  }
 }
 
 function AlterStep({
@@ -90,7 +125,7 @@ function AlterStep({
 }) {
   const units = session.engine.document().settings.displayUnits
   const { change } = alteration
-  const longer = change.by >= 0
+  const more = change.by >= 0
   const amount = Math.abs(change.by)
   const set = (next: Alteration, coalesce?: string) =>
     session.dispatch(
@@ -98,10 +133,9 @@ function AlterStep({
       // Stepping an amount up and down is one undo step.
       coalesce ? { coalesce } : undefined,
     )
-  const own = piece.lines.filter((l) => l.kind === 'lengthenShorten')
-  const where = change.line.type === 'own' ? change.line.line : ACROSS
-  const said = t.alter.step(longer, formatLength(amount, units))
-  const down = change.line.type === 'through' ? change.line.from[1] - view.outlineBounds[1] : 0
+  const withChange = (next: Change, coalesce?: string) =>
+    set({ ...alteration, change: next }, coalesce)
+  const { said, way, ways } = wording(change, formatLength(amount, units))
   return (
     <div className="alter-step">
       <div className="alter-step-head">
@@ -130,18 +164,16 @@ function AlterStep({
       <RadioGroup
         className="segmented"
         orientation="horizontal"
-        aria-label={t.alter.way}
-        value={longer ? 'longer' : 'shorter'}
-        onChange={(way) =>
-          set({ ...alteration, change: { ...change, by: (way === 'longer' ? 1 : -1) * amount } })
-        }
+        aria-label={way}
+        value={more ? 'more' : 'less'}
+        onChange={(w) => withChange({ ...change, by: (w === 'more' ? 1 : -1) * amount })}
       >
         <div className="segments">
-          <Radio value="longer" className="segment">
-            {t.alter.longer}
+          <Radio value="more" className="segment">
+            {ways[0]}
           </Radio>
-          <Radio value="shorter" className="segment">
-            {t.alter.shorter}
+          <Radio value="less" className="segment">
+            {ways[1]}
           </Radio>
         </div>
       </RadioGroup>
@@ -149,26 +181,65 @@ function AlterStep({
         label={t.alter.by}
         value={amount}
         units={units}
+        description={change.type === 'fullBust' ? t.alter.bustHint : undefined}
         onChange={(mm) =>
-          set(
-            { ...alteration, change: { ...change, by: (longer ? 1 : -1) * mm } },
-            `alter:${alteration.id}`,
-          )
+          withChange({ ...change, by: (more ? 1 : -1) * mm }, `alter:${alteration.id}`)
         }
       />
+      {change.type === 'lengthen' && (
+        <LineChoice session={session} piece={piece} view={view} alteration={alteration} />
+      )}
+      {change.type === 'spread' && (
+        <Button
+          className="link-button"
+          onPress={() =>
+            withChange({ ...change, turns: change.turns === 'right' ? 'left' : 'right' })
+          }
+        >
+          {t.alter.otherSide}
+        </Button>
+      )}
+    </div>
+  )
+}
+
+/** Where a lengthening is: one of the piece's own lines, or straight across it. */
+function LineChoice({
+  session,
+  piece,
+  view,
+  alteration,
+}: {
+  session: Session
+  piece: Piece
+  view: PieceView
+  alteration: Alteration
+}) {
+  const { change } = alteration
+  if (change.type !== 'lengthen') return null
+  const units = session.engine.document().settings.displayUnits
+  const own = piece.lines.filter((l) => l.kind === 'lengthenShorten')
+  const where = change.line.type === 'own' ? change.line.line : ACROSS
+  const down = change.line.type === 'through' ? change.line.from[1] - view.outlineBounds[1] : 0
+  const setLine = (line: AlterLine, coalesce?: string) =>
+    session.dispatch(
+      {
+        type: 'setAlteration',
+        piece: piece.id,
+        alteration: { ...alteration, change: { ...change, line } },
+      },
+      coalesce ? { coalesce } : undefined,
+    )
+  return (
+    <>
       {own.length > 0 && (
         <Select
           className="field"
           selectedKey={where}
           onSelectionChange={(key) =>
-            set({
-              ...alteration,
-              change: {
-                ...change,
-                line:
-                  key === ACROSS ? across(view, middle(view)) : { type: 'own', line: String(key) },
-              },
-            })
+            setLine(
+              key === ACROSS ? across(view, middle(view)) : { type: 'own', line: String(key) },
+            )
           }
         >
           <Label>{t.alter.where}</Label>
@@ -195,14 +266,9 @@ function AlterStep({
           label={t.alter.fromTop}
           value={down}
           units={units}
-          onChange={(mm) =>
-            set(
-              { ...alteration, change: { ...change, line: across(view, mm) } },
-              `at:${alteration.id}`,
-            )
-          }
+          onChange={(mm) => setLine(across(view, mm), `at:${alteration.id}`)}
         />
       )}
-    </div>
+    </>
   )
 }

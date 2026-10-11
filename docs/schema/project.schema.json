@@ -231,6 +231,66 @@
             "line",
             "by"
           ]
+        },
+        {
+          "description": "Slash and spread: the piece slashed straight from `from`, on its\nedge, to `hinge`, on its edge too, and the part on the `turns`\nside of the slash turned about the hinge until the slash is `by` mm\nopen at `from` (overlapping where less than 0). The edge it opens\nin is bridged straight across, or meets where the parts overlap,\nto be trued up.",
+          "type": "object",
+          "properties": {
+            "by": {
+              "type": "number",
+              "format": "double"
+            },
+            "from": {
+              "$ref": "#/$defs/Pt"
+            },
+            "hinge": {
+              "$ref": "#/$defs/Pt"
+            },
+            "turns": {
+              "$ref": "#/$defs/Turns"
+            },
+            "type": {
+              "type": "string",
+              "const": "spread"
+            }
+          },
+          "required": [
+            "type",
+            "from",
+            "hinge",
+            "by",
+            "turns"
+          ]
+        },
+        {
+          "description": "Full bust adjustment by the Y method on a bodice front, or a small\none where `by` is less than 0. The front is slashed from the waist\nstraight up (along the grain) to the bust point `apex` and on to\n`armhole`, on the armhole, where it hinges; from `side`, on the\nside seam, to the bust point; and from the bust point straight\nacross to the centre front. The side turns out about the hinge\nuntil the bust point has moved `by` mm, a dart opens at the side\nseam (its tip 25 mm from the bust point), and the centre front below\nthe bust drops to meet the side at the waist.",
+          "type": "object",
+          "properties": {
+            "apex": {
+              "$ref": "#/$defs/Pt"
+            },
+            "armhole": {
+              "$ref": "#/$defs/Pt"
+            },
+            "by": {
+              "type": "number",
+              "format": "double"
+            },
+            "side": {
+              "$ref": "#/$defs/Pt"
+            },
+            "type": {
+              "type": "string",
+              "const": "fullBust"
+            }
+          },
+          "required": [
+            "type",
+            "apex",
+            "armhole",
+            "side",
+            "by"
+          ]
         }
       ]
     },
@@ -1332,6 +1392,14 @@
         "mmPerUnit",
         "basis",
         "confirmed"
+      ]
+    },
+    "Turns": {
+      "description": "Which side of a slash turns: on the right or the left, going along it\nfrom where it starts to the hinge, as the pattern is seen.",
+      "type": "string",
+      "enum": [
+        "right",
+        "left"
       ]
     },
     "ViewState": {

@@ -178,6 +178,15 @@ impl EngineHandle {
             .map(|n| n.along)
     }
 
+    /// The point of an edge nearest to a work-table point, in the piece's
+    /// own coordinates: `[x, y]`.
+    #[wasm_bindgen(js_name = snapToEdge)]
+    pub fn snap_to_edge(&self, piece: &str, edge: &str, x: f64, y: f64) -> Option<Vec<f64>> {
+        self.engine
+            .nearest_on_edge(piece, edge, Pt::new(x, y))
+            .map(|n| vec![n.point.x, n.point.y])
+    }
+
     #[wasm_bindgen(js_name = viewState)]
     pub fn view_state(&self) -> Result<JsValue, JsError> {
         to_js(self.engine.view_state())

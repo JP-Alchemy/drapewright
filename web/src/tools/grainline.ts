@@ -1,26 +1,14 @@
 // The grainline tool: drag inside a piece to draw its grainline. It snaps
 // to 15° steps of the piece's own axes; hold Shift for any angle.
 
-import type { Piece } from '@drapewright/engine'
 import type { ToolPointer } from '@drapewright/input'
-import type { Tool, ToolContext } from './tool.ts'
+import { type Tool, type ToolContext, toPiece } from './tool.ts'
 
 /** Shortest grainline worth keeping, mm. */
 const MIN_LENGTH = 10
 const SNAP = (15 * Math.PI) / 180
 
 type State = { kind: 'idle' } | { kind: 'drawing'; piece: string; from: [number, number] }
-
-/** A work-table point in a piece's own coordinates. */
-function toPiece(piece: Piece, world: { x: number; y: number }): [number, number] {
-  const { x, y, rotation } = piece.placement
-  const p = new DOMMatrix()
-    .translateSelf(x, y)
-    .rotateSelf(rotation)
-    .inverse()
-    .transformPoint(new DOMPoint(world.x, world.y))
-  return [p.x, p.y]
-}
 
 export function grainlineTool(): Tool {
   let state: State = { kind: 'idle' }

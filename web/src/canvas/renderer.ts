@@ -3,7 +3,7 @@
 
 import type { Hit, Piece, PieceView, Seam } from '@drapewright/engine'
 import type { DisplayUnits } from '@drapewright/engine'
-import type { GrainPreview, MovePreview, PartRef } from '../state/session.ts'
+import type { GrainPreview, MovePreview, PartRef, Picking } from '../state/session.ts'
 import { cutSummary } from '../app/PieceDetails.tsx'
 import { formatLength } from '../strings/en.ts'
 import { type PiecePaths, addSegment } from './paths.ts'
@@ -23,6 +23,8 @@ export interface Scene {
   hover?: Hit | null
   preview?: MovePreview | null
   grainPreview?: GrainPreview | null
+  /** Points tapped so far to place an alteration. */
+  picking?: Picking | null
   seams?: SeamMark[]
 }
 
@@ -255,6 +257,34 @@ export function draw(
       ctx.stroke(paths.alterLines)
     }
     ctx.setLineDash([])
+  }
+
+  // Points tapped to place an alteration, and the slashes between them.
+  const picking = scene.picking
+  const pickPiece = picking && scene.pieces.find((p) => p.piece.id === picking.piece)
+  if (picking && pickPiece && picking.points.length > 0) {
+    ctx.setTransform(world.multiply(placement(pickPiece.piece, scene.preview)))
+    const [first, ...rest] = picking.points
+    ctx.strokeStyle = theme.accent
+    ctx.fillStyle = theme.accent
+    ctx.lineWidth = 1.5 / s
+    ctx.setLineDash([10 / s, 4 / s])
+    // A slash runs from its start to its hinge; a bust adjustment's from
+    // the bust point to each of the others.
+    const lines =
+      picking.for === 'spread' ? (rest[0] ? [[first!, rest[0]]] : []) : rest.map((p) => [first!, p])
+    for (const [a, b] of lines) {
+      ctx.beginPath()
+      ctx.moveTo(a![0], a![1])
+      ctx.lineTo(b![0], b![1])
+      ctx.stroke()
+    }
+    ctx.setLineDash([])
+    for (const [x, y] of picking.points) {
+      ctx.beginPath()
+      ctx.arc(x, y, 4 / s, 0, Math.PI * 2)
+      ctx.fill()
+    }
   }
 
   // A grainline being drawn.

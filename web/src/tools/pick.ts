@@ -1,0 +1,81 @@
+// The pick tool: points tapped on a piece to place an alteration. A slash
+// and spread takes where its slash starts and where it hinges (both on the
+// edge) and then the part that turns; a bust adjustment takes the bust
+// point, then where the armhole hinges and where the side seam is slashed
+// (both on the edge). Points on the edge snap to it.
+
+import type { Alteration } from '@drapewright/engine'
+import type { ToolPointer } from '@drapewright/input'
+import type { PickFor, Picking } from '../state/session.ts'
+import { type Tool, type ToolContext, toPiece } from './tool.ts'
+
+/** For each kind, which of its points are on the edge (the rest inside the piece). */
+export const ON_EDGE: Record<PickFor, boolean[]> = {
+  spread: [true, true, false],
+  bust: [false, true, true],
+}
+
+/** A press moving less than this, CSS pixels, is a tap. */
+const TAP_SLOP = 8
+
+/** The alteration the points place, once all are tapped: 2 cm to start. */
+export function placed(picking: Picking): Alteration | null {
+  const points = picking.points
+  if (points.length < ON_EDGE[picking.for].length) return null
+  const [a, b, c] = points as [[number, number], [number, number], [number, number]]
+  if (picking.for === 'spread') {
+    const along = [b[0] - a[0], b[1] - a[1]] as const
+    // Right of the slash, going along it from where it starts (y down).
+    const right = (c[0] - a[0]) * -along[1] + (c[1] - a[1]) * along[0]
+    return {
+      id: '',
+      on: true,
+      change: { type: 'spread', from: a, hinge: b, by: 20, turns: right > 0 ? 'right' : 'left' },
+    }
+  }
+  return {
+    id: '',
+    on: true,
+    change: { type: 'fullBust', apex: a, armhole: b, side: c, by: 20 },
+  }
+}
+
+/** The point a tap gives on the piece being picked on, if it gives one. */
+function tapped(p: ToolPointer, ctx: ToolContext, picking: Picking): [number, number] | null {
+  const piece = ctx.session.engine.document().pieces.find((q) => q.id === picking.piece)
+  const hit = ctx.hit(p)
+  if (!piece || !hit || hit.piece !== piece.id) return null
+  const at = ctx.world(p)
+  if (!ON_EDGE[picking.for][picking.points.length]) return toPiece(piece, at)
+  if (hit.kind !== 'edge' && hit.kind !== 'corner') return null
+  return ctx.session.engine.snapToEdge(piece.id, hit.edge, at.x, at.y)
+}
+
+export function pickTool(): Tool {
+  let pressed: ToolPointer | null = null
+  return {
+    down(p) {
+      pressed = p
+    },
+    move() {},
+    up(p, ctx) {
+      const start = pressed
+      pressed = null
+      const picking = ctx.session.ui.get().picking
+      if (!start || !picking || Math.hypot(p.x - start.x, p.y - start.y) > TAP_SLOP) return
+      const point = tapped(p, ctx, picking)
+      if (!point) return
+      const next = { ...picking, points: [...picking.points, point] }
+      const alteration = placed(next)
+      if (alteration) {
+        ctx.session.setPicking(null)
+        ctx.session.dispatch({ type: 'addAlteration', piece: picking.piece, alteration })
+      } else {
+        ctx.session.setPicking(next)
+      }
+    },
+    cancel() {
+      pressed = null
+    },
+  }
+}

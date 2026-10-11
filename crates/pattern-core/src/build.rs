@@ -154,8 +154,7 @@ pub fn reassign_ids(piece: &mut Piece, next_id: &mut dyn FnMut(&str) -> Id) {
     }
     for a in &mut piece.alterations {
         rename("a", &mut a.id);
-        let crate::alter::Change::Lengthen { line, .. } = &mut a.change;
-        if let crate::alter::AlterLine::Own { line } = line {
+        if let Some(line) = a.change.own_line() {
             rename("l", line);
         }
     }

@@ -21,7 +21,17 @@ import type { Projects } from '../storage/projects.ts'
 import type { IoClient } from '../workers/io-client.ts'
 import { type Store, createStore } from './store.ts'
 
-export type ToolId = 'select' | 'notch' | 'grainline'
+export type ToolId = 'select' | 'notch' | 'grainline' | 'pick'
+
+/** What points are tapped on a piece for: an alteration placed by them. */
+export type PickFor = 'spread' | 'bust'
+
+/** Points being tapped on a piece (its own coordinates), and what for. */
+export interface Picking {
+  piece: string
+  for: PickFor
+  points: [number, number][]
+}
 
 /** A selected edge, the corner at the end of an edge, or a notch. */
 export type PartRef =
@@ -106,6 +116,8 @@ export interface UiState {
   hover: Hit | null
   preview: MovePreview | null
   grainPreview: GrainPreview | null
+  /** Points being tapped for an alteration, with the pick tool. */
+  picking: Picking | null
   viewport: ViewportState
   pendingImport: PendingImport | null
   busy: string | null
@@ -152,6 +164,7 @@ export class Session {
       hover: null,
       preview: null,
       grainPreview: null,
+      picking: null,
       viewport: { ...initialViewport, pxPerMm: screenScale ?? NOMINAL_PX_PER_MM },
       pendingImport: null,
       busy: null,
@@ -261,7 +274,26 @@ export class Session {
   }
 
   setTool(tool: ToolId): void {
-    this.ui.set((s) => ({ ...s, tool, preview: null, grainPreview: null, hover: null, tip: null }))
+    this.ui.set((s) => ({
+      ...s,
+      tool,
+      preview: null,
+      grainPreview: null,
+      hover: null,
+      tip: null,
+      picking: tool === 'pick' ? s.picking : null,
+    }))
+  }
+
+  /** Starts tapping points on a piece to place an alteration. */
+  startPicking(piece: string, kind: PickFor): void {
+    this.select([piece])
+    this.ui.set((s) => ({ ...s, tool: 'pick', picking: { piece, for: kind, points: [] } }))
+  }
+
+  /** The points tapped so far, as they change. */
+  setPicking(picking: Picking | null): void {
+    this.ui.set((s) => ({ ...s, picking, tool: picking ? 'pick' : 'select' }))
   }
 
   setGrainPreview(grainPreview: GrainPreview | null): void {

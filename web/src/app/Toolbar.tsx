@@ -1,5 +1,5 @@
 import { MousePointer2, MoveVertical } from 'lucide-react'
-import { ToggleButton, ToggleButtonGroup } from 'react-aria-components'
+import { Button, ToggleButton, ToggleButtonGroup } from 'react-aria-components'
 import type { Session, ToolId } from '../state/session.ts'
 import { useStore } from '../state/store.ts'
 import { t } from '../strings/en.ts'
@@ -35,7 +35,7 @@ const TOOLS: { id: ToolId; label: string; icon: React.ReactNode }[] = [
 
 /** The tools, down the left of the table, with a hint for the active one. */
 export function Toolbar({ session }: { session: Session }) {
-  const { tool } = useStore(session.ui)
+  const { tool, picking } = useStore(session.ui)
   return (
     <div className="toolbar-wrap">
       <ToggleButtonGroup
@@ -56,9 +56,18 @@ export function Toolbar({ session }: { session: Session }) {
           </ToggleButton>
         ))}
       </ToggleButtonGroup>
-      <p className="tool-hint" role="status">
-        {t.toolbar.hints[tool]}
-      </p>
+      {tool === 'pick' && picking ? (
+        <div className="tool-hint pick-hint">
+          <p role="status">{t.pick.prompts[picking.for][picking.points.length]}</p>
+          <Button className="button" onPress={() => session.setPicking(null)}>
+            {t.pick.cancel}
+          </Button>
+        </div>
+      ) : (
+        <p className="tool-hint" role="status">
+          {tool === 'pick' ? '' : t.toolbar.hints[tool]}
+        </p>
+      )}
     </div>
   )
 }

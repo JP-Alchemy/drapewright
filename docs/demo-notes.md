@@ -12,6 +12,46 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 25a — Slash and spread; full and small bust adjustments (Phase 4, part 2)
+
+Two more kinds of alteration, each placed by tapping points on the piece.
+
+**Try it** (on the test blouse, `fixtures/drapewright/blouse.drapewright`):
+
+1. **Full bust adjustment:** tap **Blouse front**, then under
+   **Alterations** press **Bust adjustment**. The bar at the top left of
+   the table says what to tap: the bust point; the armhole where it
+   hinges, about a third of the way up from the underarm; the side seam
+   where the dart goes. Points on the edge snap to it, and the slashes
+   show as you go. The front gains 2 cm across the bust on this half: the
+   side turns out about the armhole, a dart opens in the side seam with
+   its tip 2.5 cm from the bust point, and the centre front below the bust
+   drops to meet the side at the waist. **Small bust** takes room away
+   instead (no dart: the parts overlap).
+2. **Slash and spread:** on the back, press **Slash and spread** and tap
+   the hem where the slash starts, the edge across the piece where it
+   hinges (say the shoulder seam), then the part that turns. The hem opens
+   2 cm, the side swinging out about the hinge: a flare. **Close** overlaps
+   it instead; **Turn the other side instead** swings the other part.
+3. As with lengthening, each step can be switched off, changed or removed,
+   and **Cancel** stops placing one.
+
+**How it works:** every alteration now shares one way of working. It cuts
+the piece's curves where they cross its slashes, moves each part (turned,
+moved or folded), and joins the parts where they no longer meet: straight
+across a gap; where they cross if they overlap; or with a dart where the
+change says so. The bust adjustment works out from the bust point which
+part each point of the piece is in.
+
+**Not yet:** the new dart is part of the side seam's edge, so the seams
+list counts its legs in the seam's length (showing the front's side seam
+much longer than the back's), and the drape would sew its legs to the back
+instead of closing it. Darts known as darts, measured and sewn closed,
+come next (25b). The bust point and slashes are placed by tapping; they
+cannot yet be dragged.
+
+---
+
 ## Step 24 — Alterations, kept as steps: lengthen and shorten (Phase 4, part 1)
 
 Change a piece's length without losing it as drawn: each change is a
