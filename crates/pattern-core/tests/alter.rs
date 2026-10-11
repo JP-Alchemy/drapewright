@@ -1,12 +1,14 @@
-//! Alterations: lengthening and shortening a piece across a line, kept as
-//! steps that can be switched off.
+//! Alterations: changes to a piece's shape (lengthening and shortening,
+//! slashing and spreading, bust, shoulder, swayback, waist and hip
+//! adjustments, darts pivoted), kept as steps that can be switched off.
 
 use drapewright_pattern_core::alter::Turns;
 use drapewright_pattern_core::build::reassign_ids;
 use drapewright_pattern_core::ops::transform;
 use drapewright_pattern_core::{
-    AlterError, AlterLine, Alteration, Change, Dart, Drawn, Edge, Grainline, InternalLine,
-    LineKind, Mark, MarkKind, Notch, NotchFrom, NotchKind, Outline, Piece, Pt, Segment, alter,
+    AlterError, AlterLine, Alteration, Change, Dart, Drawn, Edge, EdgeKind, Grainline,
+    InternalLine, LineKind, Mark, MarkKind, Notch, NotchFrom, NotchKind, Outline, Piece, Pt,
+    Segment, alter,
 };
 use kurbo::Affine;
 
@@ -668,4 +670,206 @@ fn darts_steps_make_are_renamed_with_them() {
     assert_eq!(alter(drawn, &p.alterations).unwrap(), Drawn::of(&p));
     let ids: Vec<&str> = p.darts.iter().map(|d| d.id.as_str()).collect();
     assert!(ids.iter().all(|id| id.ends_with(".dart")), "{ids:?}");
+}
+
+/// A back 200 wide and 450 long, its centre back a seam on the left and
+/// its side seam on the right, the waist at the bottom.
+fn back(centre: EdgeKind) -> Drawn {
+    let mut p = Piece::new(
+        "back",
+        "Bodice back",
+        Outline {
+            start: Pt::new(0.0, 0.0),
+            edges: vec![
+                Edge::new("top", vec![Segment::line([200.0, 0.0])]),
+                Edge::new("side", vec![Segment::line([200.0, 450.0])]),
+                Edge::new("waist", vec![Segment::line([0.0, 450.0])]),
+                Edge {
+                    kind: centre,
+                    ..Edge::new("centre", vec![Segment::line([0.0, 0.0])])
+                },
+            ],
+        },
+    );
+    p.grainline = Some(Grainline {
+        from: Pt::new(100.0, 50.0),
+        to: Pt::new(100.0, 400.0),
+        one_way: false,
+    });
+    Drawn::of(&p)
+}
+
+fn step(change: Change) -> Alteration {
+    Alteration {
+        id: "s".into(),
+        on: true,
+        change,
+    }
+}
+
+#[test]
+fn a_swayback_folds_a_wedge_out_of_the_centre_back() {
+    let swayback = |by| {
+        step(Change::Swayback {
+            centre: Pt::new(0.0, 380.0),
+            side: Pt::new(200.0, 380.0),
+            by,
+        })
+    };
+    let drawn = back(EdgeKind::Seam);
+    let altered = alter(&drawn, &[swayback(15.0)]).unwrap();
+    assert!(altered.outline.closure_gap() < 1e-9);
+    let length = |s: &Drawn, i: usize| s.outline.edge_geom(i).length();
+    // The centre back 15 mm shorter; the side seam as long as ever (the
+    // waist turned up about it).
+    let shorter = length(&drawn, 3) - length(&altered, 3);
+    assert!((shorter - 15.0).abs() < 0.5, "{shorter}");
+    assert!((length(&altered, 1) - length(&drawn, 1)).abs() < 1e-6);
+    // The waist up 15 mm at the centre back, as low as ever at the side
+    // (its end turned in a little there, for truing).
+    let waist = altered.outline.edge_geom(2);
+    assert!((waist.start().y - 450.0).abs() < 0.5, "{:?}", waist.start());
+    assert!((waist.end().y - 435.0).abs() < 0.5, "{:?}", waist.end());
+    // A back cut on the fold has no centre back seam to take it in.
+    assert_eq!(
+        alter(&back(EdgeKind::Fold), &[swayback(15.0)]),
+        Err(AlterError::OnFold)
+    );
+}
+
+#[test]
+fn shoulders_are_made_broader_or_narrower() {
+    let drawn = Drawn::of(&bodice());
+    let shoulder = drawn.outline.edge_geom(1);
+    let armhole = drawn.outline.edge_geom(2);
+    let (at, hinge) = (
+        shoulder.point_at(shoulder.length() / 2.0),
+        armhole.point_at(armhole.length() * 0.5),
+    );
+    let broader = |by| {
+        alter(
+            &drawn,
+            &[step(Change::Shoulder {
+                shoulder: Pt::new(at.x, at.y),
+                armhole: Pt::new(hinge.x, hinge.y),
+                by,
+            })],
+        )
+        .unwrap()
+    };
+    // The shoulder's end out (or in) along the shoulder seam by as much,
+    // the seam jogging where it was slashed, to be trued; the neckline as
+    // it was.
+    let (neck, end) = (shoulder.start(), shoulder.end());
+    let along = (end - neck) / (end - neck).hypot();
+    for by in [10.0, -10.0] {
+        let altered = broader(by);
+        assert!(altered.outline.closure_gap() < 1e-9);
+        let moved = (altered.outline.edge_geom(1).end() - end).dot(along);
+        assert!((moved - by).abs() < 0.5, "{by}: {moved}");
+        assert_eq!(altered.outline.edges[0], drawn.outline.edges[0]);
+    }
+}
+
+/// A skirt front cut on the fold: its waist 180 mm across, its side seam
+/// out to the hip 200 mm down and on down to the hem, 600 long.
+fn skirt() -> Drawn {
+    let mut p = Piece::new(
+        "skirt",
+        "Skirt front",
+        Outline {
+            start: Pt::new(0.0, 0.0),
+            edges: vec![
+                Edge::new("waist", vec![Segment::line([180.0, 5.0])]),
+                Edge::new(
+                    "side",
+                    vec![Segment::line([200.0, 200.0]), Segment::line([210.0, 600.0])],
+                ),
+                Edge::new("hem", vec![Segment::line([0.0, 600.0])]),
+                Edge {
+                    kind: EdgeKind::Fold,
+                    ..Edge::new("centre", vec![Segment::line([0.0, 0.0])])
+                },
+            ],
+        },
+    );
+    p.grainline = Some(Grainline {
+        from: Pt::new(80.0, 100.0),
+        to: Pt::new(80.0, 500.0),
+        one_way: false,
+    });
+    Drawn::of(&p)
+}
+
+#[test]
+fn the_waist_is_let_out_at_the_side_tapering_to_the_hip() {
+    let drawn = skirt();
+    let waist = Pt::new(180.0 + 20.0 / 195.0 * 15.0, 20.0);
+    let hip = Pt::new(200.0, 200.0);
+    let altered = alter(
+        &drawn,
+        &[step(Change::Waist {
+            at: waist,
+            to: hip,
+            by: 10.0,
+        })],
+    )
+    .unwrap();
+    assert!(altered.outline.closure_gap() < 1e-9);
+    // The side seam's top 10 mm further out; the hip and below as they were.
+    let side = altered.outline.edge_geom(1);
+    assert!((side.start().x - 190.0).abs() < 1e-6, "{:?}", side.start());
+    assert!((side.start().y - 5.0).abs() < 1e-6);
+    assert!(
+        side.nearest(kurbo::Point::new(200.0, 200.0))
+            .unwrap()
+            .distance
+            < 1e-6
+    );
+    assert!((side.end().x - 210.0).abs() < 1e-6);
+    // The waist wider by as much; the hem and centre front as they were.
+    let length = |s: &Drawn, i: usize| s.outline.edge_geom(i).length();
+    assert!((length(&altered, 0) - length(&drawn, 0) - 10.0).abs() < 0.1);
+    assert_eq!(altered.outline.edges[2], drawn.outline.edges[2]);
+    assert_eq!(altered.outline.edges[3], drawn.outline.edges[3]);
+}
+
+#[test]
+fn the_hip_is_let_out_at_the_side_and_on_down_to_the_hem() {
+    let drawn = skirt();
+    let waist = Pt::new(180.0 + 20.0 / 195.0 * 15.0, 20.0);
+    let hip = Pt::new(200.0, 200.0);
+    let altered = alter(
+        &drawn,
+        &[step(Change::Hip {
+            at: hip,
+            to: waist,
+            by: -8.0,
+        })],
+    )
+    .unwrap();
+    assert!(altered.outline.closure_gap() < 1e-9);
+    // Taken in 8 mm at the hip and below, nothing at the waist.
+    let side = altered.outline.edge_geom(1);
+    assert!((side.start().x - 180.0).abs() < 1e-6, "{:?}", side.start());
+    assert!(
+        side.nearest(kurbo::Point::new(192.0, 200.0))
+            .unwrap()
+            .distance
+            < 1e-6
+    );
+    assert!((side.end().x - 202.0).abs() < 1e-6, "{:?}", side.end());
+    let length = |s: &Drawn, i: usize| s.outline.edge_geom(i).length();
+    assert!((length(&drawn, 2) - length(&altered, 2) - 8.0).abs() < 1e-6);
+    assert_eq!(altered.outline.edges[0], drawn.outline.edges[0]);
+    // Both points on the side seam, and apart.
+    let refused = |at: Pt, to: Pt| alter(&drawn, &[step(Change::Hip { at, to, by: 8.0 })]);
+    assert_eq!(
+        refused(hip, Pt::new(100.0, 600.0)),
+        Err(AlterError::NotOneSeam)
+    );
+    assert_eq!(
+        refused(hip, Pt::new(200.5, 205.0)),
+        Err(AlterError::NotOneSeam)
+    );
 }

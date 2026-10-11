@@ -3,7 +3,9 @@
 // edge) and then the part that turns; a bust adjustment takes the bust
 // point, then where the armhole hinges and where the side seam is slashed
 // (both on the edge); a pivot takes the dart to move (unless the piece has
-// only one), then where on the edge it goes. Points on the edge snap to it.
+// only one), then where on the edge it goes; a swayback, shoulder, waist or
+// hip adjustment takes two points on the edge. Points on the edge snap to
+// it.
 
 import type { Alteration } from '@drapewright/engine'
 import type { ToolPointer } from '@drapewright/input'
@@ -15,7 +17,14 @@ export const ON_EDGE: Record<PickFor, boolean[]> = {
   spread: [true, true, false],
   bust: [false, true, true],
   pivot: [true],
+  swayback: [true, true],
+  shoulder: [true, true],
+  waist: [true, true],
+  hip: [true, true],
 }
+
+/** A step making `change`. */
+const step = (change: Alteration['change']): Alteration => ({ id: '', on: true, change })
 
 /** A press moving less than this, CSS pixels, is a tap. */
 const TAP_SLOP = 8
@@ -28,6 +37,16 @@ export function placed(picking: Picking): Alteration | null {
   if (picking.for === 'pivot') {
     if (!picking.dart) return null
     return { id: '', on: true, change: { type: 'pivot', dart: picking.dart, to: a, share: 1 } }
+  }
+  switch (picking.for) {
+    case 'swayback':
+      return step({ type: 'swayback', centre: a, side: b, by: 15 })
+    case 'shoulder':
+      return step({ type: 'shoulder', shoulder: a, armhole: b, by: 10 })
+    case 'waist':
+      return step({ type: 'waist', at: a, to: b, by: 10 })
+    case 'hip':
+      return step({ type: 'hip', at: a, to: b, by: 10 })
   }
   if (picking.for === 'spread') {
     const along = [b[0] - a[0], b[1] - a[1]] as const

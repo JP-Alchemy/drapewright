@@ -15,6 +15,9 @@ import {
   Label,
   ListBox,
   ListBoxItem,
+  Menu,
+  MenuItem,
+  MenuTrigger,
   Popover,
   Radio,
   RadioGroup,
@@ -22,7 +25,7 @@ import {
   SelectValue,
   Switch,
 } from 'react-aria-components'
-import type { Session } from '../state/session.ts'
+import type { PickFor, Session } from '../state/session.ts'
 import { formatLength, t } from '../strings/en.ts'
 import { LengthField } from './LengthField.tsx'
 
@@ -76,51 +79,95 @@ export function AlterSection({
           <p className="muted small">{t.alter.asDrawn}</p>
         </>
       )}
-      <div className="alter-add">
-        <Button className="button" onPress={lengthen}>
+      <MenuTrigger>
+        <Button className="button">
           <Plus size={18} aria-hidden="true" />
-          {t.alter.lengthen}
+          {t.alter.add}
         </Button>
-        <Button className="button" onPress={() => session.startPicking(piece.id, 'spread')}>
-          <Plus size={18} aria-hidden="true" />
-          {t.alter.spread}
-        </Button>
-        <Button className="button" onPress={() => session.startPicking(piece.id, 'bust')}>
-          <Plus size={18} aria-hidden="true" />
-          {t.alter.bust}
-        </Button>
-        {piece.darts.length > 0 && (
-          <Button className="button" onPress={() => session.startPicking(piece.id, 'pivot')}>
-            <Plus size={18} aria-hidden="true" />
-            {t.alter.pivot}
-          </Button>
-        )}
-      </div>
+        <Popover className="popover">
+          <Menu
+            className="menu"
+            onAction={(key) => {
+              if (key === 'lengthen') lengthen()
+              else session.startPicking(piece.id, key as PickFor)
+            }}
+          >
+            {KINDS.filter((k) => k !== 'pivot' || piece.darts.length > 0).map((k) => (
+              <MenuItem
+                key={k}
+                id={k}
+                className="menu-item described"
+                textValue={t.alter.kinds[k]![0]}
+              >
+                <span>{t.alter.kinds[k]![0]}</span>
+                <span className="muted small">{t.alter.kinds[k]![1]}</span>
+              </MenuItem>
+            ))}
+          </Menu>
+        </Popover>
+      </MenuTrigger>
     </div>
   )
 }
+
+/** The kinds of step, in the order offered. */
+const KINDS = [
+  'lengthen',
+  'spread',
+  'bust',
+  'shoulder',
+  'swayback',
+  'waist',
+  'hip',
+  'pivot',
+] as const
 
 /** What a step that changes by an amount says it does, and the two ways it can go (more, or less). */
 function wording(change: Exclude<Change, { type: 'pivot' }>, by: string) {
   const more = change.by >= 0
   switch (change.type) {
+    case 'swayback':
+      return {
+        said: t.alter.swaybackStep(more, by),
+        way: t.alter.swaybackWay,
+        ways: [t.alter.takeOut, t.alter.letOut],
+        hint: t.alter.swaybackHint,
+      }
+    case 'shoulder':
+      return {
+        said: t.alter.shoulderStep(more, by),
+        way: t.alter.shoulderWay,
+        ways: [t.alter.broader, t.alter.narrower],
+        hint: t.alter.shoulderHint,
+      }
+    case 'waist':
+    case 'hip':
+      return {
+        said: (change.type === 'waist' ? t.alter.waistStep : t.alter.hipStep)(more, by),
+        way: t.alter.sideWay,
+        ways: [t.alter.letOut, t.alter.takeOut],
+        hint: t.alter.sideHint,
+      }
     case 'lengthen':
       return {
         said: t.alter.step(more, by),
         way: t.alter.way,
         ways: [t.alter.longer, t.alter.shorter],
+        hint: undefined,
       }
     case 'spread':
       return {
         said: t.alter.spreadStep(more, by),
         way: t.alter.spreadWay,
         ways: [t.alter.open, t.alter.close],
+        hint: undefined,
       }
     case 'fullBust':
       return {
         said: t.alter.bustStep(more, by),
         way: t.alter.bustWay,
         ways: [t.alter.full, t.alter.small],
+        hint: t.alter.bustHint,
       }
   }
 }
@@ -227,7 +274,7 @@ function Amount({
 }) {
   const more = change.by >= 0
   const amount = Math.abs(change.by)
-  const { way, ways } = wording(change, formatLength(amount, units))
+  const { way, ways, hint } = wording(change, formatLength(amount, units))
   return (
     <>
       <RadioGroup
@@ -250,7 +297,7 @@ function Amount({
         label={t.alter.by}
         value={amount}
         units={units}
-        description={change.type === 'fullBust' ? t.alter.bustHint : undefined}
+        description={hint}
         onChange={(mm) => withChange({ ...change, by: (more ? 1 : -1) * mm }, `alter:${id}`)}
       />
     </>

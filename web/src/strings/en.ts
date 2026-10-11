@@ -163,6 +163,26 @@ export const t = {
         '',
       ],
       pivot: ['Tap the edge where the dart goes.', ''],
+      swayback: [
+        'Tap the centre back where the wedge is taken out.',
+        'Tap the side seam where it tapers to nothing.',
+        '',
+      ],
+      shoulder: [
+        'Tap the shoulder seam about halfway along.',
+        'Tap the armhole where it hinges, about level with its notch.',
+        '',
+      ],
+      waist: [
+        'Tap the side seam at the waist.',
+        'Tap the side seam at the hip, where it tapers to nothing.',
+        '',
+      ],
+      hip: [
+        'Tap the side seam at the hip.',
+        'Tap the side seam at the waist, where it tapers to nothing.',
+        '',
+      ],
     },
     whichDart: 'Tap the dart to move.',
     cancel: 'Cancel',
@@ -170,6 +190,17 @@ export const t = {
 
   alter: {
     heading: 'Alterations',
+    add: 'Add a step',
+    kinds: {
+      lengthen: ['Lengthen or shorten', 'Across a line'],
+      spread: ['Slash and spread', 'Open or close a slash'],
+      bust: ['Bust adjustment', 'Full or small bust, on a front'],
+      shoulder: ['Shoulders', 'Broader or narrower'],
+      swayback: ['Swayback', 'A wedge out of the centre back'],
+      waist: ['Waist', 'At a side seam, tapering to the hip'],
+      hip: ['Hip', 'At a side seam, from the hip down'],
+      pivot: ['Move a dart', 'Closed where it is, opened elsewhere'],
+    } as Record<string, [string, string]>,
     none: 'None yet. Each change is kept as a step that can be switched off: the piece as drawn is kept too.',
     lengthen: 'Lengthen or shorten',
     step: (longer: boolean, by: string) => `${longer ? 'Lengthened' : 'Shortened'} by ${by}`,
@@ -188,6 +219,25 @@ export const t = {
     small: 'Small bust',
     bustWay: 'Full or small bust',
     bustHint: 'Measured across the bust on this half: the whole front changes by twice as much.',
+    swaybackStep: (out: boolean, by: string) =>
+      out ? `Swayback, ${by} taken out` : `${by} let out at the centre back`,
+    swaybackWay: 'Take out or let out',
+    takeOut: 'Take out',
+    letOut: 'Let out',
+    swaybackHint: 'At the centre back, tapering to nothing at the side seam.',
+    shoulderStep: (broader: boolean, by: string) =>
+      `Shoulders ${by} ${broader ? 'broader' : 'narrower'}`,
+    shoulderWay: 'Broader or narrower',
+    broader: 'Broader',
+    narrower: 'Narrower',
+    shoulderHint: 'How far the end of the shoulder seam moves along it.',
+    waistStep: (larger: boolean, by: string) =>
+      `Waist ${larger ? 'let out' : 'taken in'} ${by} at the side`,
+    hipStep: (larger: boolean, by: string) =>
+      `Hip ${larger ? 'let out' : 'taken in'} ${by} at the side`,
+    sideWay: 'Let out or take in',
+    sideHint:
+      'At this side seam. A front and a back, each cut on the fold, change the whole garment by four times as much.',
     pivot: 'Move a dart',
     pivotStep: (share: number) =>
       share >= 1

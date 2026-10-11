@@ -12,7 +12,8 @@ use ts_rs::TS;
 use crate::Pt;
 use crate::geom::{EdgeGeom, SAME_POINT, flatten_segs, point_in_polygon, polygon_area, segs_of};
 use crate::model::{
-    Dart, Grainline, Id, InternalLine, Label, Mark, Notch, NotchFrom, Outline, Piece, Segment,
+    CubicSeg, Dart, EdgeKind, Grainline, Id, InternalLine, Label, LineSeg, Mark, Notch, NotchFrom,
+    Outline, Piece, Segment,
 };
 
 /// The piece's shape: what alterations change.
@@ -125,6 +126,25 @@ pub enum Change {
     /// open as much, a dart there. Moved whole, the dart keeps its id; in
     /// part, the new one is the step's id with `.dart` after it.
     Pivot { dart: Id, to: Pt, share: f64 },
+    /// A swayback adjustment on a back: a wedge `by` mm deep at the centre
+    /// back (at `centre`, on it) folded out, tapering to nothing at the
+    /// side seam (at `side`, on it); let out where less than 0. The smaller
+    /// part turns about the side.
+    Swayback { centre: Pt, side: Pt, by: f64 },
+    /// Broad shoulders, or narrow where `by` is less than 0: slashed from
+    /// `shoulder`, on the shoulder seam, to `armhole`, on the armhole, where
+    /// it hinges, and the shoulder's end turned out until the slash is `by`
+    /// mm open at the shoulder seam (overlapping where less than 0).
+    Shoulder { shoulder: Pt, armhole: Pt, by: f64 },
+    /// More room at the waist, or less where `by` is less than 0: a side
+    /// seam moved out square to the grain by `by` mm at `at` (on it, at the
+    /// waist) and beyond, tapering to nothing at `to` (on it too, at the
+    /// hip). The edges meeting it stretch to meet it.
+    Waist { at: Pt, to: Pt, by: f64 },
+    /// More room at the hip, or less: as for the waist, the side seam moved
+    /// out by `by` mm at `at` (at the hip) and beyond (down to the hem),
+    /// tapering to nothing at `to` (at the waist).
+    Hip { at: Pt, to: Pt, by: f64 },
 }
 
 impl Change {
@@ -161,6 +181,20 @@ impl Change {
                 *side = f(*side);
             }
             Change::Pivot { to, .. } => *to = f(*to),
+            Change::Swayback { centre, side, .. } => {
+                *centre = f(*centre);
+                *side = f(*side);
+            }
+            Change::Shoulder {
+                shoulder, armhole, ..
+            } => {
+                *shoulder = f(*shoulder);
+                *armhole = f(*armhole);
+            }
+            Change::Waist { at, to, .. } | Change::Hip { at, to, .. } => {
+                *at = f(*at);
+                *to = f(*to);
+            }
         }
     }
 
@@ -235,6 +269,12 @@ pub enum AlterError {
     NoDart { dart: Id },
     #[error("A dart must move to another place on the edge, away from where it is.")]
     OntoDart,
+    #[error(
+        "A swayback adjustment needs a centre back seam: this piece is cut on the fold there. Make the fold a seam first."
+    )]
+    OnFold,
+    #[error("Both points must be on the same seam, apart.")]
+    NotOneSeam,
 }
 
 /// The shape `drawn` with `alterations` applied in order (those switched
@@ -249,7 +289,14 @@ pub fn alter(drawn: &Drawn, alterations: &[Alteration]) -> Result<Drawn, AlterEr
                 hinge,
                 by,
                 turns,
-            } => spread(&shape, (*from).into(), (*hinge).into(), *by, *turns)?,
+            } => spread(
+                &shape,
+                (*from).into(),
+                &[],
+                (*hinge).into(),
+                *by,
+                Some(*turns),
+            )?,
             Change::FullBust {
                 apex,
                 armhole,
@@ -262,6 +309,31 @@ pub fn alter(drawn: &Drawn, alterations: &[Alteration]) -> Result<Drawn, AlterEr
                 *by,
             )?,
             Change::Pivot { dart, to, share } => pivot(&shape, &a.id, dart, (*to).into(), *share)?,
+            Change::Swayback { centre, side, by } => {
+                let centre: Point = (*centre).into();
+                if edge_of(&shape.outline, centre)
+                    .is_some_and(|i| shape.outline.edges[i].kind == EdgeKind::Fold)
+                {
+                    return Err(AlterError::OnFold);
+                }
+                spread(&shape, centre, &[], (*side).into(), -*by, None)?
+            }
+            Change::Shoulder {
+                shoulder,
+                armhole,
+                by,
+            } => {
+                // Slashed down the grain from the shoulder seam, then across
+                // to the armhole.
+                let (shoulder, armhole): (Point, Point) = ((*shoulder).into(), (*armhole).into());
+                let down = down_the_grain(&shape);
+                let bend = shoulder + down * (armhole - shoulder).dot(down);
+                let opening = shoulder_opening(&shape.outline, shoulder, armhole, *by)?;
+                spread(&shape, shoulder, &[bend], armhole, opening, None)?
+            }
+            Change::Waist { at, to, by } | Change::Hip { at, to, by } => {
+                widen(&shape, (*at).into(), (*to).into(), *by)?
+            }
         };
     }
     Ok(shape)
@@ -682,11 +754,12 @@ fn lengthen(shape: &Drawn, line: &AlterLine, by: f64) -> Result<Drawn, AlterErro
 
 // ── Slash and spread ─────────────────────────────────────────────────────
 
-/// A slash from one point of the edge to another, the part on one side of
-/// it turning about the hinge at its end.
+/// A slash from one point of the edge to another, straight or bending at
+/// points inside the piece, the part on one side of it turning about the
+/// hinge at its end.
 struct Slash {
-    from: Point,
-    hinge: Point,
+    /// From its start, on the edge, through its bends, to the hinge.
+    path: Vec<Point>,
     outline: Outline,
     /// Where the turning part's edge is along the outline: between `lo`
     /// and `hi` mm from its start, or outside them.
@@ -702,21 +775,38 @@ struct Slash {
 /// at its very ends, mm.
 const REACH: f64 = 10.0;
 
+impl Slash {
+    fn hinge(&self) -> Point {
+        self.path[self.path.len() - 1]
+    }
+}
+
 impl Cut for Slash {
     fn crossings(&self, seg: &PathSeg) -> Vec<f64> {
-        let length = self.from.distance(self.hinge);
-        let way = (self.hinge - self.from) / length;
-        let longer = Line::new(self.from - way * REACH, self.hinge + way * REACH);
-        let mut ts: Vec<f64> = seg
-            .intersect_line(longer)
-            .into_iter()
-            .filter(|i| {
-                let along = i.line_t * (length + 2.0 * REACH) - REACH;
-                (-SAME_POINT..=length + SAME_POINT).contains(&along)
-            })
-            .map(|i| i.segment_t)
-            .filter(|t| *t > 1e-9 && *t < 1.0 - 1e-9)
-            .collect();
+        let legs = self.path.len() - 1;
+        let mut ts = Vec::new();
+        for (k, w) in self.path.windows(2).enumerate() {
+            let length = w[0].distance(w[1]);
+            if length < 1e-9 {
+                continue;
+            }
+            let way = (w[1] - w[0]) / length;
+            // Its ends on the edge made longer, to find curves meeting it
+            // there.
+            let before = if k == 0 { REACH } else { 0.0 };
+            let after = if k == legs - 1 { REACH } else { 0.0 };
+            let longer = Line::new(w[0] - way * before, w[1] + way * after);
+            ts.extend(
+                seg.intersect_line(longer)
+                    .into_iter()
+                    .filter(|i| {
+                        let along = i.line_t * (length + before + after) - before;
+                        (-SAME_POINT..=length + SAME_POINT).contains(&along)
+                    })
+                    .map(|i| i.segment_t),
+            );
+        }
+        ts.retain(|t| *t > 1e-9 && *t < 1.0 - 1e-9);
         ts.sort_by(f64::total_cmp);
         ts.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
         ts
@@ -752,14 +842,16 @@ fn on_outline(outline: &Outline, p: Point) -> Option<(Point, f64, f64)> {
     best
 }
 
-/// The shape slashed from `from` to `hinge` and spread (or closed) by `by`
-/// at `from`, the part on the `turns` side turning.
+/// The shape slashed from `from` (through `bends`, inside it) to `hinge`,
+/// and spread (or closed) by `by` at `from`, the part on the `turns` side
+/// turning (or the smaller part).
 fn spread(
     shape: &Drawn,
     from: Point,
+    bends: &[Point],
     hinge: Point,
     by: f64,
-    turns: Turns,
+    turns: Option<Turns>,
 ) -> Result<Drawn, AlterError> {
     const ON_EDGE: f64 = 2.0;
     let outline = &shape.outline;
@@ -776,25 +868,28 @@ fn spread(
         return Err(AlterError::NoDirection);
     }
     // The slash runs inside the piece, crossing its edge only at its ends.
+    let mut path = vec![from];
+    path.extend(bends);
+    path.push(hinge);
     let polygon = outline_points(outline);
-    let slash = Line::new(from, hinge);
-    let inside = [0.25, 0.5, 0.75].iter().all(|&t| {
-        let p = slash.eval(t);
-        point_in_polygon(p, &polygon) && on_outline(outline, p).is_some_and(|o| o.2 > 0.5)
-    });
-    if !inside {
-        return Err(AlterError::SlashOutside);
-    }
-    let crosses = outline.path_segs().iter().any(|seg| {
-        seg.intersect_line(slash).into_iter().any(|i| {
-            let p = slash.eval(i.line_t);
-            (0.0..=1.0).contains(&i.line_t)
-                && p.distance(from) > ON_EDGE
-                && p.distance(hinge) > ON_EDGE
-        })
-    });
-    if crosses {
-        return Err(AlterError::SlashOutside);
+    let segs = outline.path_segs();
+    for w in path.windows(2) {
+        let leg = Line::new(w[0], w[1]);
+        let inside = [0.25, 0.5, 0.75].iter().all(|&t| {
+            let p = leg.eval(t);
+            point_in_polygon(p, &polygon) && on_outline(outline, p).is_some_and(|o| o.2 > 0.5)
+        });
+        let crosses = segs.iter().any(|seg| {
+            seg.intersect_line(leg).into_iter().any(|i| {
+                let p = leg.eval(i.line_t);
+                (0.0..=1.0).contains(&i.line_t)
+                    && p.distance(from) > ON_EDGE
+                    && p.distance(hinge) > ON_EDGE
+            })
+        });
+        if !inside || crosses {
+            return Err(AlterError::SlashOutside);
+        }
     }
     let most = 2.0 * length * 0.5f64.sin();
     if by.abs() > most {
@@ -806,7 +901,14 @@ fn spread(
     let flat = outline_flat_with_along(outline);
     let (lo, hi) = (a.min(b), a.max(b));
     let (first, last) = if a <= b { (from, hinge) } else { (hinge, from) };
-    // Between the ends, going along the outline.
+    // The bends from the hinge back to the start, and the other way.
+    let back: Vec<Point> = bends.iter().rev().copied().collect();
+    let (to_first, to_last): (&[Point], &[Point]) = if a <= b {
+        (&back, bends)
+    } else {
+        (bends, &back)
+    };
+    // Between the ends, going along the outline, and back by the slash.
     let mut inner = vec![first];
     inner.extend(
         flat.iter()
@@ -814,6 +916,7 @@ fn spread(
             .map(|(p, _)| *p),
     );
     inner.push(last);
+    inner.extend(to_first.iter());
     // The rest, on round past the outline's start.
     let mut outer = vec![last];
     outer.extend(
@@ -823,17 +926,29 @@ fn spread(
             .map(|(p, _)| *p),
     );
     outer.push(first);
+    outer.extend(to_last.iter());
     let along = (hinge - from) / length;
     // Right of the slash, going along it as the pattern is seen (y down).
     let right = Vec2::new(-along.y, along.x);
-    let want = match turns {
-        Turns::Right => 1.0,
-        Turns::Left => -1.0,
-    };
     let side = |points: &[Point]| {
         points.iter().map(|p| (*p - from).dot(right)).sum::<f64>() / points.len() as f64
     };
-    let between = side(&inner) * want > side(&outer) * want;
+    let (between, want) = match turns {
+        Some(turns) => {
+            let want = match turns {
+                Turns::Right => 1.0,
+                Turns::Left => -1.0,
+            };
+            (side(&inner) * want > side(&outer) * want, want)
+        }
+        None => {
+            let between = polygon_area(&inner).abs() <= polygon_area(&outer).abs();
+            (
+                between,
+                side(if between { &inner } else { &outer }).signum(),
+            )
+        }
+    };
     let turning = if between { inner } else { outer };
     // Turned away from the rest to open the slash by `by` at its start.
     let r = from - hinge;
@@ -844,8 +959,7 @@ fn spread(
         * Affine::translate(-hinge.to_vec2());
     Ok(cut_shape(
         &Slash {
-            from,
-            hinge,
+            path,
             outline: outline.clone(),
             lo,
             hi,
@@ -981,16 +1095,9 @@ fn full_bust(shape: &Drawn, id: &str, points: [Point; 3], by: f64) -> Result<Dra
     if d_armhole > ON_EDGE || d_side > ON_EDGE {
         return Err(AlterError::NotOnEdge);
     }
-    // Down the grain to the waist (y down without a grainline), and across
-    // to the side and to the centre front.
-    let down = shape
-        .grainline
-        .map(|g| {
-            let d = Point::from(g.to) - Point::from(g.from);
-            let d = d / d.hypot().max(1e-9);
-            if d.y < 0.0 { -d } else { d }
-        })
-        .unwrap_or(Vec2::new(0.0, 1.0));
+    // Down the grain to the waist, and across to the side and to the
+    // centre front.
+    let down = down_the_grain(shape);
     let mut out = Vec2::new(-down.y, down.x);
     if (side - apex).dot(out) < 0.0 {
         out = -out;
@@ -1075,6 +1182,54 @@ fn full_bust(shape: &Drawn, id: &str, points: [Point; 3], by: f64) -> Result<Dra
     Ok(altered)
 }
 
+/// How far a shoulder's slash, from `shoulder` (on the shoulder seam) to
+/// the hinge at `armhole`, opens for the shoulder's end to move `by` mm
+/// along the shoulder seam.
+fn shoulder_opening(
+    outline: &Outline,
+    shoulder: Point,
+    armhole: Point,
+    by: f64,
+) -> Result<f64, AlterError> {
+    let n = outline.edges.len();
+    let (Some(k), Some(m)) = (edge_of(outline, shoulder), edge_of(outline, armhole)) else {
+        return Err(AlterError::NotOnEdge);
+    };
+    // The shoulder's end, by the armhole, and the way along it there.
+    let (start, end) = (
+        Point::from(outline.edge_start(k)),
+        Point::from(outline.edge_end(k)),
+    );
+    let (neck, end) = if m == (k + n - 1) % n
+        || (m != (k + 1) % n && start.distance(armhole) < end.distance(armhole))
+    {
+        (end, start)
+    } else {
+        (start, end)
+    };
+    let along = (end - neck) / (end - neck).hypot().max(1e-9);
+    // Turned about the hinge, the end moves square to its line from it.
+    let r = end - armhole;
+    let moves = Vec2::new(-r.y, r.x) / r.hypot().max(1e-9);
+    let share = moves.dot(along).abs();
+    if share < 0.1 {
+        return Err(AlterError::SlashOutside);
+    }
+    Ok(by * shoulder.distance(armhole) / (r.hypot() * share))
+}
+
+/// Down the shape's grainline, as the pattern is seen (y down without one).
+fn down_the_grain(shape: &Drawn) -> Vec2 {
+    shape
+        .grainline
+        .map(|g| {
+            let d = Point::from(g.to) - Point::from(g.from);
+            let d = d / d.hypot().max(1e-9);
+            if d.y < 0.0 { -d } else { d }
+        })
+        .unwrap_or(Vec2::new(0.0, 1.0))
+}
+
 /// The edge nearest to `p` (by index).
 fn edge_of(outline: &Outline, p: Point) -> Option<usize> {
     (0..outline.edges.len())
@@ -1106,7 +1261,7 @@ impl Cut for Pivoting {
     fn join(&self, end: Point, start: Point) -> Option<Vec<PathSeg>> {
         let near = |p: Point, q: Point| p.distance(q) < 1e-3;
         let (p, q) = self.mouth;
-        let tip = self.slash.hinge;
+        let tip = self.slash.hinge();
         (near(end, p) && near(start, q) || near(end, q) && near(start, p)).then(|| {
             vec![
                 PathSeg::Line(Line::new(end, tip)),
@@ -1262,8 +1417,7 @@ fn pivot(
     let mut altered = cut_shape(
         &Pivoting {
             slash: Slash {
-                from: p,
-                hinge: tip,
+                path: vec![p, tip],
                 outline: outline.clone(),
                 lo,
                 hi,
@@ -1346,4 +1500,190 @@ fn pivot(
         });
     }
     Ok(altered)
+}
+
+// ── Waist and hip ────────────────────────────────────────────────────────
+
+/// `segs` cut where they are `alongs` mm along them (each place inside them).
+fn split_along(segs: &[PathSeg], alongs: &[f64]) -> Vec<PathSeg> {
+    let geom = EdgeGeom::new(segs.to_vec());
+    let mut cuts: Vec<(usize, f64)> = alongs
+        .iter()
+        .map(|&s| geom.locate(s))
+        .filter(|&(_, t)| t > 1e-9 && t < 1.0 - 1e-9)
+        .collect();
+    cuts.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
+    let mut out = Vec::new();
+    for (k, seg) in segs.iter().enumerate() {
+        let mut from = 0.0;
+        for &(_, t) in cuts.iter().filter(|c| c.0 == k) {
+            out.push(seg.subsegment(from..t));
+            from = t;
+        }
+        out.push(seg.subsegment(from..1.0));
+    }
+    out
+}
+
+/// Each point of `seg` moved by `moved`.
+fn warped(seg: PathSeg, moved: impl Fn(Point) -> Point) -> PathSeg {
+    match seg {
+        PathSeg::Line(l) => PathSeg::Line(Line::new(moved(l.p0), moved(l.p1))),
+        PathSeg::Quad(q) => {
+            let c = q.raise();
+            cubic([c.p0, c.p1, c.p2, c.p3].map(moved))
+        }
+        PathSeg::Cubic(c) => cubic([c.p0, c.p1, c.p2, c.p3].map(moved)),
+    }
+}
+
+/// The shape with a side seam moved out square to the grain: by `by` mm
+/// at `at` and beyond it, tapering to nothing at `to` (both on the seam),
+/// the edges either side stretched to meet it.
+fn widen(shape: &Drawn, at: Point, to: Point, by: f64) -> Result<Drawn, AlterError> {
+    const ON_EDGE: f64 = 2.0;
+    /// The two points are at least this far apart along the grain, mm.
+    const APART: f64 = 10.0;
+    let outline = &shape.outline;
+    let on = |p: Point, k: usize| {
+        outline
+            .edge_geom(k)
+            .nearest(p)
+            .filter(|n| n.distance <= ON_EDGE)
+    };
+    let edges = 0..outline.edges.len();
+    if !edges.clone().any(|k| on(at, k).is_some()) || !edges.clone().any(|k| on(to, k).is_some()) {
+        return Err(AlterError::NotOnEdge);
+    }
+    // The seam both are on (either may be at one of its ends).
+    let Some((i, near_at, near_to)) = edges
+        .filter_map(|k| Some((k, on(at, k)?, on(to, k)?)))
+        .min_by(|x, y| (x.1.distance + x.2.distance).total_cmp(&(y.1.distance + y.2.distance)))
+    else {
+        return Err(AlterError::NotOneSeam);
+    };
+    let geom = outline.edge_geom(i);
+    // Out of the piece, square to the grain.
+    let down = down_the_grain(shape);
+    let mut out = Vec2::new(-down.y, down.x);
+    if geom.normal_at(near_at.along).dot(out) < 0.0 {
+        out = -out;
+    }
+    let (y_at, y_to) = (
+        near_at.point.to_vec2().dot(down),
+        near_to.point.to_vec2().dot(down),
+    );
+    if (y_at - y_to).abs() < APART {
+        return Err(AlterError::NotOneSeam);
+    }
+    let shift =
+        |p: Point| out * (by * ((p.to_vec2().dot(down) - y_to) / (y_at - y_to)).clamp(0.0, 1.0));
+    let moved = |p: Point| p + shift(p);
+    // The seam, cut where its taper starts and stops so that it bends
+    // there, every point moved.
+    let n = outline.edges.len();
+    let segs = split_along(
+        &segs_of(outline.edge_start(i), &outline.edges[i].segments),
+        &[near_at.along, near_to.along],
+    );
+    let seam: Vec<PathSeg> = segs.into_iter().map(|s| warped(s, moved)).collect();
+    let (start, end) = (
+        Point::from(outline.edge_start(i)),
+        Point::from(outline.edge_end(i)),
+    );
+    let (d_start, d_end) = (shift(start), shift(end));
+    let mut altered = shape.clone();
+    let edges = &mut altered.outline.edges;
+    edges[i].segments = to_segments(&seam);
+    // The edge before ends where the seam now starts, its last curve
+    // leaving at the same angle; the edge after starts where it now ends.
+    let before = (i + n - 1) % n;
+    if let Some(last) = edges[before].segments.last_mut() {
+        *last = shifted_end(last, d_start);
+    }
+    let after = (i + 1) % n;
+    if let Some(first) = edges[after].segments.first_mut() {
+        *first = shifted_start(first, d_end);
+    }
+    if i == 0 {
+        altered.outline.start = (Point::from(altered.outline.start) + d_start).into();
+    }
+    if after == 0 {
+        altered.outline.start = (Point::from(altered.outline.start) + d_end).into();
+    }
+    // Notches and darts where they were on the cloth of their edges.
+    let mapped = |edge: &Id, along: f64| -> f64 {
+        let Some(k) = outline.edge_index(edge) else {
+            return along;
+        };
+        let p = outline.edge_geom(k).point_at(along);
+        let p = if k == i { moved(p) } else { p };
+        altered
+            .outline
+            .edge_geom(k)
+            .nearest(p)
+            .map_or(along, |n| n.along)
+    };
+    let notches = altered
+        .notches
+        .iter()
+        .map(|notch| {
+            let Some(k) = outline.edge_index(&notch.edge) else {
+                return notch.clone();
+            };
+            let (length, after) = (
+                outline.edge_geom(k).length(),
+                altered.outline.edge_geom(k).length(),
+            );
+            let at = match notch.from {
+                NotchFrom::Start => mapped(&notch.edge, notch.at),
+                NotchFrom::End => after - mapped(&notch.edge, length - notch.at),
+            };
+            Notch {
+                at: at.max(0.0),
+                ..notch.clone()
+            }
+        })
+        .collect();
+    let darts = altered
+        .darts
+        .iter()
+        .map(|d| {
+            let (from, to) = (mapped(&d.edge, d.from), mapped(&d.edge, d.to));
+            Dart {
+                from: from.min(to),
+                to: from.max(to),
+                ..d.clone()
+            }
+        })
+        .collect();
+    altered.notches = notches;
+    altered.darts = darts;
+    Ok(altered)
+}
+
+/// A curve of the model ending `by` further on, a cubic's last control
+/// point moved with its end so that it arrives at the same angle.
+fn shifted_end(seg: &Segment, by: Vec2) -> Segment {
+    let shift = |p: Pt| -> Pt { (Point::from(p) + by).into() };
+    match *seg {
+        Segment::Line(l) => Segment::Line(LineSeg { to: shift(l.to) }),
+        Segment::Cubic(c) => Segment::Cubic(CubicSeg {
+            c2: shift(c.c2),
+            to: shift(c.to),
+            ..c
+        }),
+    }
+}
+
+/// A curve of the model starting `by` further on (where the curve before
+/// now ends), a cubic's first control point moved with it.
+fn shifted_start(seg: &Segment, by: Vec2) -> Segment {
+    match *seg {
+        Segment::Line(l) => Segment::Line(l),
+        Segment::Cubic(c) => Segment::Cubic(CubicSeg {
+            c1: (Point::from(c.c1) + by).into(),
+            ..c
+        }),
+    }
 }

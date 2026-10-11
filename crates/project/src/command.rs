@@ -379,7 +379,13 @@ const MOST_ALTERED: f64 = 1000.0;
 
 fn checked_alteration(alteration: &Alteration) -> Result<(), CommandError> {
     match &alteration.change {
-        Change::Lengthen { by, .. } | Change::Spread { by, .. } | Change::FullBust { by, .. } => {
+        Change::Lengthen { by, .. }
+        | Change::Spread { by, .. }
+        | Change::FullBust { by, .. }
+        | Change::Swayback { by, .. }
+        | Change::Shoulder { by, .. }
+        | Change::Waist { by, .. }
+        | Change::Hip { by, .. } => {
             if !by.is_finite() || by.abs() > MOST_ALTERED {
                 return Err(CommandError::Rejected {
                     message: "A piece can be lengthened or shortened by up to a metre.".into(),

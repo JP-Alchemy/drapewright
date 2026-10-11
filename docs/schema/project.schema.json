@@ -317,6 +317,110 @@
             "to",
             "share"
           ]
+        },
+        {
+          "description": "A swayback adjustment on a back: a wedge `by` mm deep at the centre\nback (at `centre`, on it) folded out, tapering to nothing at the\nside seam (at `side`, on it); let out where less than 0. The smaller\npart turns about the side.",
+          "type": "object",
+          "properties": {
+            "by": {
+              "type": "number",
+              "format": "double"
+            },
+            "centre": {
+              "$ref": "#/$defs/Pt"
+            },
+            "side": {
+              "$ref": "#/$defs/Pt"
+            },
+            "type": {
+              "type": "string",
+              "const": "swayback"
+            }
+          },
+          "required": [
+            "type",
+            "centre",
+            "side",
+            "by"
+          ]
+        },
+        {
+          "description": "Broad shoulders, or narrow where `by` is less than 0: slashed from\n`shoulder`, on the shoulder seam, to `armhole`, on the armhole, where\nit hinges, and the shoulder's end turned out until the slash is `by`\nmm open at the shoulder seam (overlapping where less than 0).",
+          "type": "object",
+          "properties": {
+            "armhole": {
+              "$ref": "#/$defs/Pt"
+            },
+            "by": {
+              "type": "number",
+              "format": "double"
+            },
+            "shoulder": {
+              "$ref": "#/$defs/Pt"
+            },
+            "type": {
+              "type": "string",
+              "const": "shoulder"
+            }
+          },
+          "required": [
+            "type",
+            "shoulder",
+            "armhole",
+            "by"
+          ]
+        },
+        {
+          "description": "More room at the waist, or less where `by` is less than 0: a side\nseam moved out square to the grain by `by` mm at `at` (on it, at the\nwaist) and beyond, tapering to nothing at `to` (on it too, at the\nhip). The edges meeting it stretch to meet it.",
+          "type": "object",
+          "properties": {
+            "at": {
+              "$ref": "#/$defs/Pt"
+            },
+            "by": {
+              "type": "number",
+              "format": "double"
+            },
+            "to": {
+              "$ref": "#/$defs/Pt"
+            },
+            "type": {
+              "type": "string",
+              "const": "waist"
+            }
+          },
+          "required": [
+            "type",
+            "at",
+            "to",
+            "by"
+          ]
+        },
+        {
+          "description": "More room at the hip, or less: as for the waist, the side seam moved\nout by `by` mm at `at` (at the hip) and beyond (down to the hem),\ntapering to nothing at `to` (at the waist).",
+          "type": "object",
+          "properties": {
+            "at": {
+              "$ref": "#/$defs/Pt"
+            },
+            "by": {
+              "type": "number",
+              "format": "double"
+            },
+            "to": {
+              "$ref": "#/$defs/Pt"
+            },
+            "type": {
+              "type": "string",
+              "const": "hip"
+            }
+          },
+          "required": [
+            "type",
+            "at",
+            "to",
+            "by"
+          ]
         }
       ]
     },

@@ -60,8 +60,26 @@ function alteredPaths(piece: Piece): { drawn: Path2D | null; alterLines: Path2D 
         line(change.apex, change.armhole)
         line(change.apex, change.side)
         break
-      // A pivoted dart shows where it went.
+      case 'swayback':
+        line(change.centre, change.side)
+        break
+      // Down the grain from the shoulder seam, then across to the armhole.
+      case 'shoulder': {
+        const g = piece.grainline
+        const d = g ? [g.to[0] - g.from[0], g.to[1] - g.from[1]] : [0, 1]
+        const n = Math.hypot(d[0]!, d[1]!) || 1
+        const down = [d[0]! / n, d[1]! / n] as const
+        const s = change.shoulder
+        const k = (change.armhole[0] - s[0]) * down[0] + (change.armhole[1] - s[1]) * down[1]
+        const bend: [number, number] = [s[0] + down[0] * k, s[1] + down[1] * k]
+        line(s, bend)
+        line(bend, change.armhole)
+        break
+      }
+      // A pivoted dart shows where it went; a side seam moved shows itself.
       case 'pivot':
+      case 'waist':
+      case 'hip':
         break
     }
   }

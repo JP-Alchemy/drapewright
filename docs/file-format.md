@@ -391,6 +391,31 @@ edge come back as far; in part, the dart stays where it was, narrower, and
 the new one is the step's id with `.dart` after it. The slash must run
 inside the piece, and `to` must be away from the dart.
 
+**Change** `swayback` — `{ "type": "swayback", "centre": [x, y], "side":
+[x, y], "by": mm }`: a swayback adjustment on a back. A wedge `by` mm deep
+at `centre` (on the centre back) is folded out, tapering to nothing at
+`side` (on the side seam): the piece is slashed straight between them and
+the smaller part turns about `side` (let out instead where `by` is less
+than 0). The centre back must be a seam: a piece cut on the fold there is
+refused.
+
+**Change** `shoulder` — `{ "type": "shoulder", "shoulder": [x, y],
+"armhole": [x, y], "by": mm }`: broader shoulders (narrower where `by` is
+less than 0). The piece is slashed down the grain from `shoulder` (on the
+shoulder seam) to the level of `armhole` (on the armhole), then across to
+it, and the part with the shoulder's end turns about `armhole` until that
+end has moved `by` mm along the shoulder seam. The seam jogs where it was
+slashed, to be trued.
+
+**Change** `waist` and `hip` — `{ "type": "waist", "at": [x, y], "to": [x,
+y], "by": mm }`: more room at a side seam (less where `by` is less than
+0). Both points are on the side seam; it moves out square to the grain by
+`by` mm at `at` and beyond it (away from `to`), tapering to nothing at
+`to`, and the edges meeting it stretch to meet it. For the waist, `at` is
+at the waist and `to` at the hip; for the hip, `at` is at the hip (the
+seam moves out from there down to the hem) and `to` at the waist. The two
+kinds differ only in what they are called.
+
 **AlterLine** — `{ "type": "own", "line": id }`: one of the piece's
 internal lines (normally its lengthen or shorten line), straight from its
 start to its end; or `{ "type": "through", "from": [x, y], "to": [x, y] }`:
@@ -602,9 +627,9 @@ How to take each one is shown in the app beside its box.
 
 ### 10.3 More alterations (Phase 4)
 
-Alterations are kept on each piece (§4.13). The kinds still to come are
-swayback, broad and narrow shoulders, waist and hip, and truing seams:
-each a new `change` type, with the same rules.
+Alterations are kept on each piece (§4.13). Still to come: truing the
+seams an alteration leaves with a jog or a corner in them, as a new
+`change` type with the same rules.
 
 ### 10.4 Seams (version 3)
 

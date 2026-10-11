@@ -12,6 +12,39 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 26 — Swayback, shoulders, waist and hip (Phase 4, part 5)
+
+Four more alterations, each placed by tapping two points. The inspector's
+**Alterations** now has a single **Add a step** menu listing every kind,
+each with a line saying what it does.
+
+**Try it:**
+
+1. **Shoulders** (on the test blouse's front): tap the shoulder seam
+   about halfway along, then the armhole where it hinges, level with its
+   notch. The shoulder's end moves 1 cm further out along the seam. The
+   piece is slashed down the grain from the shoulder to the hinge's
+   level, then across to it, and the part with the shoulder's end turns
+   about the hinge. **Narrower** takes it in instead. The shoulder seam
+   jogs where it was slashed, for truing later.
+2. **Swayback** (on the test skirt's back, `fixtures/drapewright/skirt.drapewright`):
+   tap the centre back where the wedge comes out, then the side seam at
+   the same height. A 1.5 cm wedge is folded out at the centre back,
+   tapering to nothing at the side. A back cut on the fold is refused:
+   it needs a centre back seam to take the wedge out of.
+3. **Waist** (on the skirt's front): tap the side seam at the waist, then
+   at the hip. The side seam moves out 1 cm at the waist, tapering to
+   nothing at the hip, and the waist stretches to meet it. **Hip** works
+   the other way round: out from the hip down to the hem, tapering to
+   nothing at the waist. Each side seam moves this much, so a front and a
+   back, each cut on the fold, change the whole skirt by four times as
+   much (the step says so).
+
+**Not yet:** seams left with a jog or a corner (shoulders, swayback,
+lengthening) aren't trued; that's step 27.
+
+---
+
 ## Step 25c — Pivoting a dart (Phase 4, part 4)
 
 Move a dart to another place on the piece: all of it, or half.
