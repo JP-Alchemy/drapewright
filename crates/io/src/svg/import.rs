@@ -186,11 +186,13 @@ fn collect(
                         });
                     }
                     Symbol::Logo => {
-                        // Its paths are marked, so they're left out (and counted).
+                        // Its paths are marked, so they're left out, and
+                        // counted once.
                         let mut logo = Vec::new();
                         collect(g, to_mm, known, group_name, &mut logo, notches);
                         for mut r in logo {
-                            r.hint.push_str(" logo");
+                            r.hint.push_str(" logo ");
+                            r.hint.push_str(g.id());
                             out.push(r);
                         }
                     }

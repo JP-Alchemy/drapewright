@@ -33,6 +33,14 @@ const plural = (n: number, one: string, many: string) =>
 const namesList = (names: string[]) =>
   new Intl.ListFormat('en', { type: 'conjunction' }).format(names.map((n) => `“${n}”`))
 
+/** Who a note is about: “Front”, “Front and Back”, or “All 7 pieces”. */
+const piecesLabel = (names: string[], total: number) => {
+  if (names.length > 1 && names.length === total) {
+    return names.length === 2 ? 'Both pieces' : `All ${names.length} pieces`
+  }
+  return new Intl.ListFormat('en', { type: 'conjunction' }).format(names)
+}
+
 export const t = {
   appName: 'Drapewright',
   untitled: 'Untitled pattern',
@@ -273,12 +281,19 @@ export const t = {
     allowanceNeeded: 'Say whether seam allowance is included to add the pieces.',
     add: (n: number) => plural(n, 'Add the piece', 'Add # pieces'),
     cancel: 'Cancel',
-    note: (n: ImportNote, pieceName: (id: string) => string, units: DisplayUnits): string => {
+    /** `pieces` are the names of the pieces a note is about, of `total` found. */
+    note: (n: ImportNote, pieces: string[], total: number, units: DisplayUnits): string => {
+      const who = piecesLabel(pieces, total)
+      const one = pieces.length === 1
       switch (n.kind) {
         case 'seamLineFound':
-          return `${pieceName(n.piece)}: found both the cutting line and the stitching line, so the allowance (${formatLength(n.allowance, units)}) was measured from the file.`
+          return one
+            ? `${who}: found both the cutting line and the stitching line, so the allowance (${formatLength(n.allowance, units)}) was measured from the file.`
+            : `${who}: found both the cutting and the stitching lines, so the allowance (${formatLength(n.allowance, units)}) was measured from the file.`
         case 'cuttingLineDiffers':
-          return `${pieceName(n.piece)}: the file’s cutting line differs from Drapewright’s by up to ${formatLength(n.maxMm, 'mm')}, usually at corners. You can adjust the corners after adding.`
+          return one
+            ? `${who}: the file’s cutting line differs from Drapewright’s by up to ${formatLength(n.maxMm, 'mm')}, usually at corners. You can adjust the corners after adding.`
+            : `${who}: the file’s cutting lines differ from Drapewright’s by up to ${formatLength(n.maxMm, 'mm')}, usually at corners. You can adjust the corners after adding.`
         case 'smallShapesIgnored':
           return plural(
             n.count,
@@ -312,7 +327,9 @@ export const t = {
             '# curves were stored only as the points they pass through, so Drapewright joined them with straight lines. Check their shape after adding.',
           )
         case 'outlineCrossesItself':
-          return `${pieceName(n.piece)}: the outline crosses itself. Check that piece after adding.`
+          return one
+            ? `${who}: the outline crosses itself. Check that piece after adding.`
+            : `${who}: the outlines cross themselves. Check those pieces after adding.`
       }
     },
   },

@@ -501,11 +501,14 @@ pub(crate) fn assemble(
     let mut candidates: Vec<Candidate> = Vec::new();
     let mut small: Vec<usize> = Vec::new();
     let mut open: Vec<usize> = Vec::new();
-    // Logos (FreeSewing signs a piece with one) are left out like other decorations.
-    let mut logos = 0u32;
+    // Logos (FreeSewing signs a piece with one) are left out like other
+    // decorations. One logo can be many paths with the same hint.
+    let mut logos: Vec<&str> = Vec::new();
     for (i, r) in raw.iter().enumerate() {
         if r.hint.split_whitespace().any(|w| w == "logo") {
-            logos += 1;
+            if !logos.contains(&r.hint.as_str()) {
+                logos.push(&r.hint);
+            }
             continue;
         }
         if !r.closed {
@@ -755,7 +758,7 @@ pub(crate) fn assemble(
         }
     }
 
-    let mut ignored = logos;
+    let mut ignored = u32::try_from(logos.len()).unwrap_or(u32::MAX);
     for &i in &small {
         let r = &raw[i];
         if r.hint.contains("grain") {

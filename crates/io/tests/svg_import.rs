@@ -257,6 +257,11 @@ fn freesewing_patterns_keep_their_names_folds_notches_and_cutting() {
         r.notes
             .contains(&ImportNote::LinesOnOutlineIgnored { count: 2 })
     );
+    // The logo counts once; the rest are the grainlines' 14 arrowheads.
+    assert!(
+        r.notes
+            .contains(&ImportNote::SmallShapesIgnored { count: 15 })
+    );
 }
 
 #[test]

@@ -38,10 +38,11 @@ pnpm dev        # then open http://localhost:5173
      and the second copies it draws of the front neckline and back armhole.
      A copy left in would stay behind as a ghost line when you reshape that
      seam.
-   * Each piece notes that FreeSewing's cutting line differs from
-     Drapewright's by up to 1 cm. That is only at corners: FreeSewing cuts
-     its corners off at 45°, while Drapewright points them (open
-     question 3).
+   * The import says once, for all 7 pieces, that FreeSewing's cutting
+     lines differ from Drapewright's by up to 1 cm. That is only at
+     corners: FreeSewing cuts its corners off at 45°, while Drapewright
+     points them (open question 3). Notes that say the same about several
+     pieces are now always said once.
 3. `fixtures/svg/freesewing-sasha-no-allowance.svg` is the same dress
    without allowance. Its outlines could be either line, so you are asked
    about allowance. The fold still comes from FreeSewing's cut-on-fold

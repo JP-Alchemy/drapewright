@@ -15,6 +15,7 @@ import {
 import { outlineSize, type PendingImport, type Session } from '../state/session.ts'
 import { useStore } from '../state/store.ts'
 import { formatLength, t } from '../strings/en.ts'
+import { groupNotes } from './import-notes.ts'
 import { LengthField } from './LengthField.tsx'
 
 /** The size to offer first: the file's sample size if it holds it, else the middle one. */
@@ -72,7 +73,10 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
     const sb = outlineSize(b)
     return sb.width * sb.height - sa.width * sa.height
   })[0]
-  const pieceName = (id: string) => pieces.find((p) => p.id === id)?.name ?? id
+  const pieceName = (id: string) => {
+    const piece = pieces.find((p) => p.id === id)
+    return piece ? shownName(piece) : id
+  }
   const answered = asked.length === 0 || mode !== null
 
   const sizeAt = (option: ScaleOption) => {
@@ -210,8 +214,10 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
 
           {notes.length > 0 && (
             <ul className="notes">
-              {notes.map((n, i) => (
-                <li key={i}>{t.importing.note(n, pieceName, units)}</li>
+              {groupNotes(notes).map(({ note, pieces: about }, i) => (
+                <li key={i}>
+                  {t.importing.note(note, about.map(pieceName), pieces.length, units)}
+                </li>
               ))}
             </ul>
           )}
