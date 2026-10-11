@@ -465,6 +465,7 @@ version = "0.1.0"
 dependencies = [
  "drapewright-body",
  "drapewright-pattern-core",
+ "drapewright-project",
  "drapewright-seams",
  "spade",
  "tiny-skia",
@@ -476,8 +477,11 @@ version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "drapewright-body",
+ "drapewright-pattern-core",
  "drapewright-project",
  "drapewright-render",
+ "drapewright-seams",
+ "drapewright-sim",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",

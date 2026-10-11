@@ -30,8 +30,8 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
-      - name: Generated files (TS types, schema, allowance gallery) are committed and current
-        run: git diff --exit-code -- packages/engine/src/generated docs/schema crates/pattern-core/tests/gallery
+      - name: Generated files (TS types, schema, allowance gallery, test skirt) are committed and current
+        run: git diff --exit-code -- packages/engine/src/generated docs/schema crates/pattern-core/tests/gallery fixtures/drapewright
 
   licences:
     name: Licences and advisories

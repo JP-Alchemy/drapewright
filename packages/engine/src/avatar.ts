@@ -1,17 +1,31 @@
-// The avatar and the 3D view: the engine's 3D side (`pkg-3d/`, built by
-// `pnpm wasm`). Only the sim worker imports this entry, so the 2D app never
-// loads it.
+// The avatar, the 3D view and the drape: the engine's 3D side (`pkg-3d/`,
+// built by `pnpm wasm`). Only the sim worker imports this entry, so the 2D
+// app never loads it.
 
-import init, { Avatar as AvatarHandle, View as ViewHandle } from '../pkg-3d/drapewright_wasm_3d.js'
-import type { AvatarFit, AvatarRequest, AvatarSettings } from './types'
+import init, {
+  Avatar as AvatarHandle,
+  Draping as DrapingHandle,
+  View as ViewHandle,
+} from '../pkg-3d/drapewright_wasm_3d.js'
+import type { AvatarFit, AvatarRequest, AvatarSettings, DrapeProgress, DrapeRequest } from './types'
 
-export type { AvatarFit, AvatarRequest, AvatarSettings } from './types'
+export type {
+  AvatarFit,
+  AvatarRequest,
+  AvatarSettings,
+  DrapeProgress,
+  DrapeRequest,
+  DrapeStage,
+  FabricPreset,
+} from './types'
 
 let ready: Promise<void> | undefined
 const loaded = () => (ready ??= init().then(() => undefined))
 
 /** Each avatar's handle, for the view to draw it. */
 const handles = new WeakMap<Avatar, AvatarHandle>()
+/** Each drape's handle, for the view to draw its cloth. */
+const drapings = new WeakMap<Draping, DrapingHandle>()
 
 /** The avatar's body, loaded and ready to fit. */
 export class Avatar {
@@ -29,12 +43,44 @@ export class Avatar {
   fit(request: AvatarRequest): AvatarFit {
     return handles.get(this)!.fit(request) as AvatarFit
   }
+
+  /**
+   * Starts draping the project's garment on the avatar. Throws if it
+   * cannot be: nothing sewn yet, or a piece that cannot be meshed.
+   */
+  drape(request: DrapeRequest): Draping {
+    const draping = Object.create(Draping.prototype) as Draping
+    drapings.set(draping, handles.get(this)!.drape(request))
+    return draping
+  }
+}
+
+/** A drape in progress on the avatar, moved on a frame at a time. */
+export class Draping {
+  private constructor() {}
+
+  /** The pieces left out, sewn to nothing, by id. */
+  get leftOut(): string[] {
+    return drapings.get(this)!.leftOut
+  }
+
+  /** Moves the drape on a frame (1/60 s of the cloth's time). */
+  step(): DrapeProgress {
+    return drapings.get(this)!.step() as DrapeProgress
+  }
+
+  /** Frees the drape in the 3D module; the view keeps the cloth it shows. */
+  free(): void {
+    drapings.get(this)?.free()
+    drapings.delete(this)
+  }
 }
 
 /** The view's colours, as on the page: sRGB, each part 0 to 1. */
 export interface ViewColours {
   background: [number, number, number]
   figure: [number, number, number]
+  cloth: [number, number, number]
 }
 
 /** The 3D view, drawing on a canvas handed over by the page. */
@@ -67,6 +113,17 @@ export class AvatarView {
   /** Shows the avatar shaped by these settings; framed whole the first time. */
   show(avatar: Avatar, settings: AvatarSettings): void {
     this.#handle.show(handles.get(avatar)!, settings)
+  }
+
+  /** Shows a drape's cloth as it is now. */
+  showCloth(draping: Draping): void {
+    const handle = drapings.get(draping)
+    if (handle) this.#handle.showCloth(handle)
+  }
+
+  /** Takes the cloth off. */
+  hideCloth(): void {
+    this.#handle.hideCloth()
   }
 
   /** Turns round the figure for a drag of `dx`, `dy` CSS pixels. */

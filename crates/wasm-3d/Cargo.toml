@@ -1,6 +1,6 @@
 [package]
 name = "drapewright-wasm-3d"
-description = "WebAssembly facade for Drapewright's 3D side (the avatar; the view and the drape to come), run in the sim worker"
+description = "WebAssembly facade for Drapewright's 3D side (the avatar, the view of it and the drape), run in the sim worker"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,6 +12,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 drapewright-body.workspace = true
+drapewright-pattern-core.workspace = true
+drapewright-seams.workspace = true
+drapewright-sim.workspace = true
 wasm-bindgen.workspace = true
 serde.workspace = true
 serde-wasm-bindgen.workspace = true

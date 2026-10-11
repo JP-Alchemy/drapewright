@@ -154,6 +154,17 @@ impl BodyModel {
         Region::from_u8(self.asset.regions[vertex])
     }
 
+    /// The triangles drawn: the skin, without the joint markers.
+    pub fn skin(&self) -> Vec<[u32; 3]> {
+        let shown = self.asset.shown;
+        self.asset
+            .triangles
+            .iter()
+            .filter(|t| t.iter().all(|&v| v < shown))
+            .copied()
+            .collect()
+    }
+
     /// For each triangle, the regions of its corners, one bit each.
     pub(crate) fn corner_regions(&self) -> &[u16] {
         &self.corners

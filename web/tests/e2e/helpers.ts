@@ -155,3 +155,24 @@ export async function notchesOf(page: Page, pieceIndex: number) {
     }
   }, pieceIndex)
 }
+
+/** Whether a screenshot shows something in its middle unlike its corner. */
+export async function drawnInTheMiddle(page: Page, png: Buffer): Promise<boolean> {
+  return page.evaluate(async (data) => {
+    const image = new Image()
+    image.src = `data:image/png;base64,${data}`
+    await image.decode()
+    const canvas = new OffscreenCanvas(image.width, image.height)
+    const context = canvas.getContext('2d')!
+    context.drawImage(image, 0, 0)
+    const at = (x: number, y: number) => context.getImageData(x, y, 1, 1).data
+    const corner = at(4, 4)
+    // Down the middle, where the figure stands.
+    for (let y = Math.round(image.height * 0.3); y < image.height * 0.7; y += 4) {
+      const p = at(Math.round(image.width / 2), y)
+      const difference = [0, 1, 2].reduce((d, i) => d + Math.abs(p[i]! - corner[i]!), 0)
+      if (difference > 30) return true
+    }
+    return false
+  }, png.toString('base64'))
+}

@@ -32,6 +32,7 @@ cargo run --release -p drapewright-io --example import_report -- ~/Source/drapew
 | `pdf/sizes-layers-aes128.pdf`, `pdf/sizes-layers-aes256.pdf` | `sizes-layers.pdf` "protected" as Acrobat does it: AES-128 (security handler revision 4) and AES-256 (revision 6), owner password only, so they open without one |
 | `pdf/sizes-layers-password.pdf` | The same with a password needed to open it ("open sesame"): refused, with a plain message |
 | `pdf/freesewing-sasha-a0-protected.pdf` | The same, rewritten by Ghostscript 10 as a PDF 1.7 with object streams and a cross-reference stream, and "protected" (RC4 128-bit, owner password only: it opens without one; printing allowed, copying not), as many bought patterns are |
+| `drapewright/skirt.drapewright` | A Drapewright project: the skirt the drape tests use, a front cut on the fold and a back cut as a pair, with its side seams and centre back seam sewn. Written by `cargo test -p drapewright-sim --test fixture` |
 
 The DXF files are written by `dxf/make_fixtures.py`, the `sizes-*` PDFs by
 `pdf/make_fixtures.py` and their encrypted copies by `pdf/protect.py`, which

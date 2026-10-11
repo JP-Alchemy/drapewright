@@ -1,3 +1,4 @@
+import type { AvatarSettings, DrapeRequest, FabricPreset } from '@drapewright/engine'
 import type { ViewColours } from '@drapewright/engine/avatar'
 import { ChevronDown, RotateCcw, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -16,7 +17,7 @@ import type { Session } from '../state/session.ts'
 import { useStore } from '../state/store.ts'
 import { t } from '../strings/en.ts'
 import { sim } from '../workers/sim-client.ts'
-import { SimError } from '../workers/sim-protocol.ts'
+import { type DrapeUpdate, SimError } from '../workers/sim-protocol.ts'
 import { CLOSE_MM, STANDARD_FIGURE, avatarRequest } from './avatar.ts'
 
 /** "rgb(239, 233, 223)" as sRGB parts, 0 to 1. */
@@ -25,11 +26,19 @@ function rgb(css: string): [number, number, number] {
   return [r / 255, g / 255, b / 255]
 }
 
-/** The view's colours, from the page's theme. */
+/** The view's colours, from the page's theme: the cloth's from a swatch in it. */
 function colours(el: HTMLElement): ViewColours {
   const style = getComputedStyle(el)
-  return { background: rgb(style.backgroundColor), figure: rgb(style.color) }
+  const swatch = el.querySelector('.avatar-cloth-swatch')
+  return {
+    background: rgb(style.backgroundColor),
+    figure: rgb(style.color),
+    cloth: rgb(swatch ? getComputedStyle(swatch).color : 'rgb(91, 120, 150)'),
+  }
 }
+
+/** The fabrics, in the order offered. */
+const FABRICS = Object.keys(t.avatar.fabrics) as FabricPreset[]
 
 type Status =
   | { kind: 'starting' }
@@ -38,17 +47,52 @@ type Status =
   | { kind: 'fitted'; close: number; of: number }
   | { kind: 'failed'; text: string }
 
+/** The garment on the avatar: off, being draped, or draped (in `fabric`). */
+type Drape =
+  | { kind: 'off' }
+  | { kind: 'draping'; fabric: FabricPreset; update: DrapeUpdate | null }
+  | { kind: 'draped'; fabric: FabricPreset; update: DrapeUpdate }
+  | { kind: 'failed'; text: string }
+
 function failure(error: unknown): string {
   if (error instanceof SimError && error.failure === 'noBodyFile')
     return t.measure.avatar.noBodyFile
   if (error instanceof SimError && error.failure === 'noView') return t.avatar.noView
+  if (error instanceof SimError && error.failure === 'cannotDrape')
+    return t.avatar.cannotDrape(error.message)
   return t.measure.avatar.failed(error instanceof Error ? error.message : String(error))
+}
+
+/** What the drape bar says of the garment on the avatar. */
+function drapeText(drape: Drape): string {
+  const text = t.avatar
+  switch (drape.kind) {
+    case 'off':
+      return ''
+    case 'failed':
+      return drape.text
+    case 'draping':
+    case 'draped': {
+      const update = drape.update
+      const fabric = text.fabrics[drape.fabric].toLowerCase()
+      const said =
+        drape.kind === 'draping'
+          ? update?.stage === 'settling'
+            ? text.settling
+            : text.sewing
+          : update?.stage === 'stopped'
+            ? text.stillMoving(fabric)
+            : text.draped(fabric)
+      const left = update?.leftOut.length ?? 0
+      return left > 0 ? `${said} ${text.leftOut(left)}` : said
+    }
+  }
 }
 
 /** The avatar in 3D, fitted to someone's measurements, beside the table. */
 export function AvatarPane({ session }: { session: Session }) {
   useEngineState(session)
-  const { avatarPerson } = useStore(session.ui)
+  const { avatarPerson, drapeFabric } = useStore(session.ui)
   const sets = session.engine.document().measurementSets
   const set = sets.find((s) => s.id === avatarPerson) ?? sets[0] ?? null
   const host = useRef<HTMLDivElement>(null)
@@ -56,6 +100,11 @@ export function AvatarPane({ session }: { session: Session }) {
   // The view could not start: the avatar is still fitted and reported.
   const [viewFailed, setViewFailed] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>({ kind: 'starting' })
+  // The figure in the view, to drape on.
+  const shown = useRef<AvatarSettings | null>(null)
+  const [drape, setDrape] = useState<Drape>({ kind: 'off' })
+  // Counts drapes asked for: an answer for one overtaken is dropped.
+  const drapes = useRef(0)
 
   // The canvas, handed to the sim worker to draw on. Made here rather than
   // by React: a canvas can be handed over only once, and effects may run
@@ -115,14 +164,22 @@ export function AvatarPane({ session }: { session: Session }) {
     let live = true
     const drawing = backend !== null
     const show = async () => {
+      // A new figure: the garment comes off it.
+      drapes.current++
+      shown.current = null
+      setDrape({ kind: 'off' })
       if (!measured) {
         if (drawing) await sim.showAvatar(STANDARD_FIGURE)
-        if (live) setStatus({ kind: 'standard' })
+        if (live) {
+          shown.current = STANDARD_FIGURE
+          setStatus({ kind: 'standard' })
+        }
         return
       }
       setStatus({ kind: 'fitting' })
       const fit = await sim.fitAvatar(request)
       if (drawing) await sim.showAvatar(fit.settings)
+      if (live) shown.current = fit.settings
       const residuals = Object.values(fit.residuals)
       const close = residuals.filter((r) => Math.abs(r) <= CLOSE_MM).length
       if (live) setStatus({ kind: 'fitted', close, of: residuals.length })
@@ -134,6 +191,44 @@ export function AvatarPane({ session }: { session: Session }) {
     // `key` stands for the request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, backend, key])
+
+  /** Drapes the project's garment on the figure shown, in `fabric`. */
+  const startDrape = (fabric: FabricPreset) => {
+    const settings = shown.current
+    if (!settings) return
+    const doc = session.engine.document()
+    const mine = ++drapes.current
+    if (!doc.seams.some((s) => s.confirmed)) {
+      setDrape({ kind: 'failed', text: t.avatar.nothingSewn })
+      return
+    }
+    const request: DrapeRequest = { pieces: doc.pieces, seams: doc.seams, fabric, settings }
+    setDrape({ kind: 'draping', fabric, update: null })
+    sim
+      .drape(request, (update) => {
+        if (mine === drapes.current) setDrape({ kind: 'draping', fabric, update })
+      })
+      .then(
+        (last) => {
+          if (mine !== drapes.current) return
+          setDrape(last ? { kind: 'draped', fabric, update: last } : { kind: 'off' })
+        },
+        (error: unknown) => {
+          if (mine === drapes.current) setDrape({ kind: 'failed', text: failure(error) })
+        },
+      )
+  }
+  const takeOff = () => {
+    drapes.current++
+    setDrape({ kind: 'off' })
+    void sim.undrape()
+  }
+  const chooseFabric = (fabric: FabricPreset) => {
+    session.chooseDrapeFabric(fabric)
+    // On the avatar already: draped again in the new fabric.
+    if (drape.kind === 'draping' || drape.kind === 'draped') startDrape(fabric)
+  }
+  const canDrape = backend !== null && (status.kind === 'standard' || status.kind === 'fitted')
 
   const text = t.avatar
   const said =
@@ -202,9 +297,58 @@ export function AvatarPane({ session }: { session: Session }) {
         tabIndex={0}
         aria-label={viewFailed ?? text.viewLabel(measured ? (set?.name ?? null) : null)}
       >
+        <span className="avatar-cloth-swatch" aria-hidden="true" />
         {viewFailed && <p className="avatar-cannot">{viewFailed}</p>}
+        {backend && <span className="avatar-backend muted small">{text.drawnWith(backend)}</span>}
       </div>
-      {backend && <span className="avatar-backend muted small">{text.drawnWith(backend)}</span>}
+      {backend && (
+        <div className="avatar-drape" role="group" aria-label={text.drapeGroup}>
+          <Select
+            className="avatar-fabric"
+            selectedKey={drapeFabric}
+            onSelectionChange={(f) => chooseFabric(f as FabricPreset)}
+          >
+            <Label>{text.fabric}</Label>
+            <Button className="select-button">
+              <SelectValue>{() => text.fabrics[drapeFabric]}</SelectValue>
+              <ChevronDown size={16} aria-hidden="true" />
+            </Button>
+            <Popover className="popover">
+              <ListBox className="menu">
+                {FABRICS.map((f) => (
+                  <ListBoxItem key={f} id={f} className="menu-item">
+                    {text.fabrics[f]}
+                  </ListBoxItem>
+                ))}
+              </ListBox>
+            </Popover>
+          </Select>
+          {drape.kind === 'draping' ? (
+            <Button className="button" onPress={takeOff}>
+              {text.stop}
+            </Button>
+          ) : (
+            <Button
+              className={drape.kind === 'draped' ? 'button' : 'button primary'}
+              isDisabled={!canDrape}
+              onPress={() => startDrape(drapeFabric)}
+            >
+              {drape.kind === 'draped' ? text.drapeAgain : text.drape}
+            </Button>
+          )}
+          {drape.kind === 'draped' && (
+            <Button className="button" onPress={takeOff}>
+              {text.takeOff}
+            </Button>
+          )}
+          <span
+            className={drape.kind === 'failed' ? 'measure-warning small' : 'muted small'}
+            role="status"
+          >
+            {drapeText(drape)}
+          </span>
+        </div>
+      )}
     </section>
   )
 }

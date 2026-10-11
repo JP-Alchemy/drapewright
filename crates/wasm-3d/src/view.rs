@@ -6,7 +6,7 @@ use drapewright_render::{Look, Mesh, Orbit, Renderer};
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
-use crate::{Avatar, AvatarSettings};
+use crate::{Avatar, AvatarSettings, Draping};
 
 fn error(e: impl std::fmt::Display) -> JsError {
     JsError::new(&e.to_string())
@@ -20,6 +20,7 @@ const TURN: f32 = 0.008;
 struct Colours {
     background: [f32; 3],
     figure: [f32; 3],
+    cloth: [f32; 3],
 }
 
 /// The 3D view, drawing on a canvas.
@@ -125,14 +126,15 @@ impl View {
         }
     }
 
-    /// The page's colours: `{ background, figure }`, each `[r, g, b]` from
-    /// 0 to 1.
+    /// The page's colours: `{ background, figure, cloth }`, each
+    /// `[r, g, b]` from 0 to 1.
     #[wasm_bindgen(js_name = setLook)]
     pub fn set_look(&mut self, colours: JsValue) -> Result<(), JsError> {
         let c: Colours = serde_wasm_bindgen::from_value(colours).map_err(error)?;
         self.look = Look {
             background: c.background,
             figure: c.figure,
+            cloth: c.cloth,
         };
         Ok(())
     }
@@ -143,20 +145,12 @@ impl View {
         let settings: AvatarSettings = serde_wasm_bindgen::from_value(settings).map_err(error)?;
         let model = &avatar.model;
         let body = model.shape(&Shape::from(settings));
-        let shown = model.asset.shown;
         let positions: Vec<[f32; 3]> = body
             .vertices
             .iter()
             .map(|p| [p[0] as f32, p[1] as f32, p[2] as f32])
             .collect();
-        let triangles: Vec<[u32; 3]> = model
-            .asset
-            .triangles
-            .iter()
-            .filter(|t| t.iter().all(|&v| v < shown))
-            .copied()
-            .collect();
-        let mesh = Mesh::new(positions, &triangles);
+        let mesh = Mesh::new(positions, &model.skin());
         let (low, high) = mesh.bounds();
         self.renderer.set_mesh(&self.device, &mesh);
         match &mut self.orbit {
@@ -168,6 +162,19 @@ impl View {
         }
         self.bounds = Some((low, high));
         Ok(())
+    }
+
+    /// Shows the cloth of a drape as it is now.
+    #[wasm_bindgen(js_name = showCloth)]
+    pub fn show_cloth(&mut self, draping: &Draping) {
+        let mesh = Mesh::new(draping.0.points(), draping.0.triangles());
+        self.renderer.set_cloth(&self.device, &self.queue, &mesh);
+    }
+
+    /// Takes the cloth off.
+    #[wasm_bindgen(js_name = hideCloth)]
+    pub fn hide_cloth(&mut self) {
+        self.renderer.clear_cloth();
     }
 
     /// Turns round the figure for a drag of `dx`, `dy` CSS pixels.

@@ -23,6 +23,8 @@
   /* The avatar: a clay-coloured figure before a soft backdrop. */
   --avatar-bg: #e4ddd1;
   --avatar-figure: #cdbbab;
+  /* Cloth draped on it: a mid blue, as an undyed calico would vanish. */
+  --avatar-cloth: #5b7896;
 
   --radius: 12px;
   --radius-sm: 8px;
@@ -54,6 +56,7 @@
     --seam: #a78bfa;
     --avatar-bg: #1b2122;
     --avatar-figure: #b9a999;
+    --avatar-cloth: #87a3c4;
   }
 }
 
@@ -78,6 +81,7 @@
   --seam: #a78bfa;
   --avatar-bg: #1b2122;
   --avatar-figure: #b9a999;
+  --avatar-cloth: #87a3c4;
 }
 
 *,
@@ -300,7 +304,7 @@ h2 {
 .avatar-pane {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
   border-left: 1px solid var(--border);
@@ -366,6 +370,37 @@ h2 {
   right: 12px;
   bottom: 8px;
   pointer-events: none;
+}
+
+/* The colour the cloth is drawn in, read by the view. */
+.avatar-cloth-swatch {
+  display: none;
+  color: var(--avatar-cloth);
+}
+
+/* Draping the garment on the avatar: the fabric, the button, how it goes. */
+.avatar-drape {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.avatar-fabric {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar-fabric > label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.avatar-drape [role='status'] {
+  flex: 1 1 14em;
 }
 
 /* Floating things on the table */

@@ -1,6 +1,6 @@
-//! A drape, from flat panels to cloth settled on the body: first sewn
-//! (no gravity, the stitches tightening as the seams close round the
-//! body), then hung, until it is still.
+//! A drape, from flat panels to cloth settled on the body: sewn, the
+//! stitches tightening as the seams close round the body while the cloth
+//! hangs, then left to settle until it is still.
 
 use crate::cloth::{Cloth, ClothBuilder, V3};
 use crate::collide::BodyField;
@@ -15,6 +15,10 @@ const SEWING: [(f32, f32); 3] = [(0.4, 1e-3), (0.4, 1e-5), (0.4, 1e-8)];
 const SUBSTEPS: u32 = 30;
 /// Settled: the cloth's mean speed below this, m/s.
 const STILL: f32 = 0.004;
+/// No point moves faster than this, m/s: the placing leaves the cloth
+/// strained where it is stretched round the body, and let go all at once
+/// that strain would fling it.
+const MAX_SPEED: f32 = 1.0;
 
 /// A drape in progress.
 #[derive(Debug)]
@@ -61,6 +65,7 @@ impl Drape {
         }
         let mut cloth = builder.build();
         cloth.damping = 6.0;
+        cloth.max_speed = MAX_SPEED;
         cloth.stitch_compliance = SEWING[0].1;
         let points: Vec<V3> = body
             .0

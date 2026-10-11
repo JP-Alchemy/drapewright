@@ -10,12 +10,11 @@
 #[path = "../tests/common/mod.rs"]
 mod common;
 
-use drapewright_body::measure::trunk_sections;
-use drapewright_body::{BodyModel, Shape, measure};
+use drapewright_body::{BodyModel, Shape};
 use drapewright_sim::drape::Drape;
 use drapewright_sim::fabric::preset;
 use drapewright_sim::garment::assemble;
-use drapewright_sim::place::{Figure, Section, place};
+use drapewright_sim::place::{Figure, place};
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Transform};
 
 /// Pixels per millimetre.
@@ -126,24 +125,8 @@ fn main() {
     let model =
         BodyModel::from_bytes(&std::fs::read(asset).expect("body file")).expect("a body file");
     let body = model.shape(&Shape::default());
-    let (_, marks) = measure(&model, &body);
-    let shoulders = marks.points["shoulderPoint"][1];
-    let figure = Figure {
-        waist: marks.levels["waist"],
-        shoulders,
-        sections: trunk_sections(&model, &body, marks.levels["hip"] - 400.0, shoulders, 20.0)
-            .into_iter()
-            .map(|(y, middle, half)| Section { y, middle, half })
-            .collect(),
-    };
-    let shown = model.asset.shown;
-    let triangles: Vec<[u32; 3]> = model
-        .asset
-        .triangles
-        .iter()
-        .filter(|t| t.iter().all(|&v| v < shown))
-        .copied()
-        .collect();
+    let figure = Figure::of(&model, &body);
+    let triangles = model.skin();
     let (pieces, seams) = common::skirt();
     let garment = assemble(&pieces, &seams, 20.0).expect("a garment");
     let starts = place(&garment, &figure);

@@ -1,6 +1,6 @@
-//! The drawing itself: a pipeline for the figure and one for the shadow
-//! under it, with a depth buffer and (where the device allows) four
-//! samples a pixel, so edges are smooth.
+//! The drawing itself: a pipeline for the figure, one for the cloth draped
+//! on it and one for the shadow under them, with a depth buffer and (where
+//! the device allows) four samples a pixel, so edges are smooth.
 
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
@@ -13,6 +13,7 @@ use crate::mesh::Mesh;
 pub struct Look {
     pub background: [f32; 3],
     pub figure: [f32; 3],
+    pub cloth: [f32; 3],
 }
 
 impl Default for Look {
@@ -20,6 +21,7 @@ impl Default for Look {
         Look {
             background: [0.937, 0.914, 0.875],
             figure: [0.80, 0.74, 0.68],
+            cloth: [0.33, 0.45, 0.58],
         }
     }
 }
@@ -47,6 +49,7 @@ struct Uniforms {
     eye: [f32; 4],
     light: [f32; 4],
     figure: [f32; 4],
+    cloth: [f32; 4],
     sky: [f32; 4],
     ground: [f32; 4],
     floor: [f32; 4],
@@ -73,17 +76,36 @@ struct Figure {
     reach: f32,
 }
 
+/// The cloth's buffers, written again as it moves.
+#[derive(Debug)]
+struct Cloth {
+    vertices: wgpu::Buffer,
+    indices: wgpu::Buffer,
+    points: usize,
+    count: u32,
+}
+
+fn vertices(mesh: &Mesh) -> Vec<Vertex> {
+    mesh.positions
+        .iter()
+        .zip(&mesh.normals)
+        .map(|(&position, &normal)| Vertex { position, normal })
+        .collect()
+}
+
 /// Draws the 3D view on a device, into textures of one format.
 #[derive(Debug)]
 pub struct Renderer {
     format: wgpu::TextureFormat,
     sample_count: u32,
     figure_pipeline: wgpu::RenderPipeline,
+    cloth_pipeline: wgpu::RenderPipeline,
     floor_pipeline: wgpu::RenderPipeline,
     uniforms: wgpu::Buffer,
     bindings: wgpu::BindGroup,
     floor: wgpu::Buffer,
     figure: Option<Figure>,
+    cloth: Option<Cloth>,
     targets: Option<Targets>,
 }
 
@@ -131,40 +153,47 @@ impl Renderer {
             count: sample_count,
             ..Default::default()
         };
-        let figure_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("figure"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("figure_vertex"),
-                compilation_options: Default::default(),
-                buffers: &[Some(wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<Vertex>() as u64,
-                    step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3],
-                })],
-            },
-            primitive: wgpu::PrimitiveState {
-                cull_mode: Some(wgpu::Face::Back),
-                ..Default::default()
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: DEPTH,
-                depth_write_enabled: Some(true),
-                depth_compare: Some(wgpu::CompareFunction::Less),
-                stencil: Default::default(),
-                bias: Default::default(),
-            }),
-            multisample,
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("figure_fragment"),
-                compilation_options: Default::default(),
-                targets: &[Some(format.into())],
-            }),
-            multiview_mask: None,
-            cache: None,
-        });
+        // The figure and the cloth: lit surfaces of points and normals. The
+        // figure's back faces are inside it; either side of the cloth may
+        // be seen.
+        let lit = |label: &str, fragment: &str, cull_mode: Option<wgpu::Face>| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(label),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("figure_vertex"),
+                    compilation_options: Default::default(),
+                    buffers: &[Some(wgpu::VertexBufferLayout {
+                        array_stride: std::mem::size_of::<Vertex>() as u64,
+                        step_mode: wgpu::VertexStepMode::Vertex,
+                        attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3],
+                    })],
+                },
+                primitive: wgpu::PrimitiveState {
+                    cull_mode,
+                    ..Default::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: DEPTH,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                }),
+                multisample,
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some(fragment),
+                    compilation_options: Default::default(),
+                    targets: &[Some(format.into())],
+                }),
+                multiview_mask: None,
+                cache: None,
+            })
+        };
+        let figure_pipeline = lit("figure", "figure_fragment", Some(wgpu::Face::Back));
+        let cloth_pipeline = lit("cloth", "cloth_fragment", None);
         let floor_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("floor"),
             layout: Some(&pipeline_layout),
@@ -217,23 +246,20 @@ impl Renderer {
             format,
             sample_count,
             figure_pipeline,
+            cloth_pipeline,
             floor_pipeline,
             uniforms,
             bindings,
             floor,
             figure: None,
+            cloth: None,
             targets: None,
         }
     }
 
     /// The figure to draw from now on.
     pub fn set_mesh(&mut self, device: &wgpu::Device, mesh: &Mesh) {
-        let vertices: Vec<Vertex> = mesh
-            .positions
-            .iter()
-            .zip(&mesh.normals)
-            .map(|(&position, &normal)| Vertex { position, normal })
-            .collect();
+        let vertices = vertices(mesh);
         let (low, high) = mesh.bounds();
         self.figure = Some(Figure {
             vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -249,6 +275,42 @@ impl Renderer {
             count: mesh.indices.len() as u32,
             reach: (high[0] - low[0]).max(high[2] - low[2]) * 0.75,
         });
+    }
+
+    /// The cloth to draw from now on, draped on the figure. Cloth of as
+    /// many points and triangles as the last is written into its buffers:
+    /// a drape moves its cloth every frame.
+    pub fn set_cloth(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, mesh: &Mesh) {
+        let vertices = vertices(mesh);
+        let count = mesh.indices.len() as u32;
+        if let Some(cloth) = &self.cloth
+            && cloth.points == vertices.len()
+            && cloth.count == count
+        {
+            queue.write_buffer(&cloth.vertices, 0, bytemuck::cast_slice(&vertices));
+            queue.write_buffer(&cloth.indices, 0, bytemuck::cast_slice(&mesh.indices));
+            return;
+        }
+        let usage = wgpu::BufferUsages::COPY_DST;
+        self.cloth = Some(Cloth {
+            vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("cloth"),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsages::VERTEX | usage,
+            }),
+            indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("cloth"),
+                contents: bytemuck::cast_slice(&mesh.indices),
+                usage: wgpu::BufferUsages::INDEX | usage,
+            }),
+            points: vertices.len(),
+            count,
+        });
+    }
+
+    /// No cloth from now on.
+    pub fn clear_cloth(&mut self) {
+        self.cloth = None;
     }
 
     fn targets(&mut self, device: &wgpu::Device, size: (u32, u32)) -> &Targets {
@@ -293,6 +355,7 @@ impl Renderer {
         let aspect = size.0.max(1) as f32 / size.1.max(1) as f32;
         let colour = |c: [f32; 3]| [linear(c[0]), linear(c[1]), linear(c[2]), 1.0];
         let figure = colour(look.figure);
+        let cloth = colour(look.cloth);
         let uniforms = Uniforms {
             view_projection: orbit.view_projection(aspect),
             eye: {
@@ -302,6 +365,7 @@ impl Renderer {
             // From above, in front and a little to the figure's right.
             light: [-0.35, 0.8, 0.5, 0.0],
             figure,
+            cloth,
             sky: [0.42, 0.42, 0.44, 1.0],
             ground: [0.16, 0.15, 0.15, 1.0],
             floor: [
@@ -358,6 +422,12 @@ impl Renderer {
                 pass.set_vertex_buffer(0, figure.vertices.slice(..));
                 pass.set_index_buffer(figure.indices.slice(..), wgpu::IndexFormat::Uint32);
                 pass.draw_indexed(0..figure.count, 0, 0..1);
+                if let Some(cloth) = &self.cloth {
+                    pass.set_pipeline(&self.cloth_pipeline);
+                    pass.set_vertex_buffer(0, cloth.vertices.slice(..));
+                    pass.set_index_buffer(cloth.indices.slice(..), wgpu::IndexFormat::Uint32);
+                    pass.draw_indexed(0..cloth.count, 0, 0..1);
+                }
             }
         }
         queue.submit([encoder.finish()]);
@@ -392,6 +462,7 @@ mod tests {
         for (stage, entry) in [
             (naga::ShaderStage::Vertex, "figure_vertex"),
             (naga::ShaderStage::Fragment, "figure_fragment"),
+            (naga::ShaderStage::Fragment, "cloth_fragment"),
             (naga::ShaderStage::Vertex, "floor_vertex"),
             (naga::ShaderStage::Fragment, "floor_fragment"),
         ] {

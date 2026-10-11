@@ -1,25 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test'
-
-/** Whether a screenshot shows something in its middle unlike its corner. */
-async function drawnInTheMiddle(page: Page, png: Buffer): Promise<boolean> {
-  return page.evaluate(async (data) => {
-    const image = new Image()
-    image.src = `data:image/png;base64,${data}`
-    await image.decode()
-    const canvas = new OffscreenCanvas(image.width, image.height)
-    const context = canvas.getContext('2d')!
-    context.drawImage(image, 0, 0)
-    const at = (x: number, y: number) => context.getImageData(x, y, 1, 1).data
-    const corner = at(4, 4)
-    // Down the middle, where the figure stands.
-    for (let y = Math.round(image.height * 0.3); y < image.height * 0.7; y += 4) {
-      const p = at(Math.round(image.width / 2), y)
-      const difference = [0, 1, 2].reduce((d, i) => d + Math.abs(p[i]! - corner[i]!), 0)
-      if (difference > 30) return true
-    }
-    return false
-  }, png.toString('base64'))
-}
+import { drawnInTheMiddle } from './helpers.ts'
 
 /** The figure is drawn in the middle of the view, and a drag turns it. */
 async function seeItDrawnAndTurned(page: Page, view: Locator) {
@@ -52,8 +32,9 @@ test('the avatar is seen in 3D, turned, and fitted to the measurements', async (
   const cannot = pane.getByText('This browser can’t draw the avatar in 3D.')
   await expect(drawnWith.or(cannot)).toBeVisible({ timeout: 60_000 })
   const drawing = await drawnWith.isVisible()
+  // The first status is the avatar's; the drape has its own.
   console.log(`${test.info().project.name}: ${drawing ? await drawnWith.textContent() : 'no 3D'}`)
-  await expect(pane.getByRole('status')).toHaveText(
+  await expect(pane.getByRole('status').first()).toHaveText(
     'A standard figure: add measurements to see someone’s.',
     { timeout: 60_000 },
   )
@@ -75,7 +56,7 @@ test('the avatar is seen in 3D, turned, and fitted to the measurements', async (
     await field.press('Tab')
   }
   await dialog.getByRole('button', { name: 'Done' }).click()
-  await expect(pane.getByRole('status')).toHaveText('All 4 measurements within 1 cm', {
+  await expect(pane.getByRole('status').first()).toHaveText('All 4 measurements within 1 cm', {
     timeout: 60_000,
   })
   if (drawing) await expect(pane.getByRole('img', { name: /in Me’s figure/ })).toBeVisible()

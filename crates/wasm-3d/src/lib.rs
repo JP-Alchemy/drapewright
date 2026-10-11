@@ -1,17 +1,21 @@
-//! WebAssembly facade for Drapewright's 3D side: the avatar and the view
-//! of it now, the drape to come. It runs in the sim worker, apart from the
-//! 2D engine, and is loaded only when the avatar is first wanted.
+//! WebAssembly facade for Drapewright's 3D side: the avatar, the view of
+//! it, and the project's garment draped on it. It runs in the sim worker,
+//! apart from the 2D engine, and is loaded only when the avatar is first
+//! wanted.
 //!
 //! Like the 2D facade it only converts between JavaScript and Rust types;
-//! shaping, measuring and fitting live in `drapewright-body`. Values cross
+//! shaping, measuring and fitting live in `drapewright-body`, draping in
+//! `drapewright-sim`. Values cross
 //! the boundary as plain JavaScript objects shaped like the TypeScript
 //! types generated from the Rust ones (`packages/engine/src/generated`).
 
+pub mod drape;
 #[cfg(target_arch = "wasm32")]
 mod view;
 
 use std::collections::BTreeMap;
 
+pub use drape::{DrapeProgress, DrapeRequest, DrapeStage, FabricPreset};
 use drapewright_body::shape::{OLD, YOUNG};
 use drapewright_body::{BodyModel, Shape, fit};
 use serde::{Deserialize, Serialize};
@@ -140,6 +144,37 @@ impl Avatar {
         let request: AvatarRequest =
             serde_wasm_bindgen::from_value(request).map_err(|e| JsError::new(&e.to_string()))?;
         fit_avatar(&self.model, &request)
+            .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Starts draping a `DrapeRequest` on the avatar.
+    pub fn drape(&self, request: JsValue) -> Result<Draping, JsError> {
+        let request: DrapeRequest =
+            serde_wasm_bindgen::from_value(request).map_err(|e| JsError::new(&e.to_string()))?;
+        drape::Draping::start(&self.model, &request)
+            .map(Draping)
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+}
+
+/// A drape in progress on the avatar, moved on a frame at a time.
+#[wasm_bindgen]
+#[derive(Debug)]
+pub struct Draping(drape::Draping);
+
+#[wasm_bindgen]
+impl Draping {
+    /// The pieces left out, sewn to nothing, by id.
+    #[wasm_bindgen(getter, js_name = leftOut)]
+    pub fn left_out(&self) -> Vec<String> {
+        self.0.left_out.clone()
+    }
+
+    /// Moves the drape on a frame, giving a `DrapeProgress`.
+    pub fn step(&mut self) -> Result<JsValue, JsError> {
+        self.0
+            .step()
             .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
             .map_err(|e| JsError::new(&e.to_string()))
     }

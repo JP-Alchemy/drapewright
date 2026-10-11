@@ -1,5 +1,17 @@
-import type { AvatarFit, AvatarRequest, AvatarSettings } from '@drapewright/engine'
+import type {
+  AvatarFit,
+  AvatarRequest,
+  AvatarSettings,
+  DrapeProgress,
+  DrapeRequest,
+} from '@drapewright/engine'
 import type { ViewColours } from '@drapewright/engine/avatar'
+
+/** How a drape is going, as the sim worker tells the page. */
+export interface DrapeUpdate extends DrapeProgress {
+  /** The pieces left out, sewn to nothing, by id. */
+  leftOut: string[]
+}
 
 /** What the sim worker can be asked, and what each answers. */
 export interface SimMethods {
@@ -7,10 +19,18 @@ export interface SimMethods {
   fitAvatar(request: AvatarRequest): AvatarFit
   /** Starts the 3D view on a canvas handed over by the page; how it draws. */
   attachView(canvas: OffscreenCanvas, colours: ViewColours): string
-  /** Shows the avatar with these settings in the view. */
+  /** Shows the avatar with these settings in the view, taking off any garment. */
   showAvatar(settings: AvatarSettings): null
   /** Stops the view (its canvas is gone). */
   detachView(): null
+  /**
+   * Drapes the project's garment on the avatar in the view, telling the
+   * page how it goes (`SimUpdate`s). Answers its last update once it is
+   * done, or null if it was taken off first.
+   */
+  drape(request: DrapeRequest): DrapeUpdate | null
+  /** Takes the garment off. */
+  undrape(): null
 }
 
 export type SimMethod = keyof SimMethods
@@ -30,8 +50,14 @@ export type SimNote =
   | { note: 'slide'; dx: number; dy: number; pixelRatio: number }
   | { note: 'reset' }
 
+/** What the worker tells the page unasked: how the drape asked for by request `drape` is going. */
+export interface SimUpdate {
+  drape: number
+  update: DrapeUpdate
+}
+
 /** Failures the app explains in its own words. */
-export type SimFailure = 'noBodyFile' | 'noView'
+export type SimFailure = 'noBodyFile' | 'noView' | 'cannotDrape'
 
 export type SimResponse =
   | { id: number; ok: true; result: unknown }

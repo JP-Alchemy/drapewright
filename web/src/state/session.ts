@@ -6,6 +6,7 @@ import type {
   Command,
   DispatchOptions,
   Engine,
+  FabricPreset,
   Hit,
   ImportResult,
   Piece,
@@ -123,6 +124,8 @@ export interface UiState {
   avatar: boolean
   /** Whose measurements the avatar is fitted to: a measurement set's id. */
   avatarPerson: string | null
+  /** The fabric the garment is draped on the avatar in. */
+  drapeFabric: FabricPreset
 }
 
 /** Space left between imported pieces and what is already on the table, mm. */
@@ -161,6 +164,7 @@ export class Session {
       sewing: null,
       avatar: false,
       avatarPerson: null,
+      drapeFabric: 'poplin',
     })
     // Back where the project was left; a project saved without a view
     // (the engine's default) shows all its pieces instead.
@@ -348,6 +352,11 @@ export class Session {
   /** Fits the avatar to this person's measurements. */
   chooseAvatarPerson(id: string | null): void {
     this.ui.set((s) => ({ ...s, avatarPerson: id }))
+  }
+
+  /** Drapes the garment on the avatar in this fabric from now on. */
+  chooseDrapeFabric(fabric: FabricPreset): void {
+    this.ui.set((s) => ({ ...s, drapeFabric: fabric }))
   }
 
   notify(notice: Notice | null): void {

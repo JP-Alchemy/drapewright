@@ -8,13 +8,15 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+# The avatar the garment is draped on.
+drapewright-body.workspace = true
 drapewright-pattern-core.workspace = true
 drapewright-seams.workspace = true
 spade.workspace = true
 
 [dev-dependencies]
-# Draping on the avatar in the tests.
-drapewright-body.workspace = true
+# The test skirt written as a project, for the app's tests.
+drapewright-project.workspace = true
 # Pictures of a drape, to check by eye (the drape_picture example).
 tiny-skia.workspace = true
 

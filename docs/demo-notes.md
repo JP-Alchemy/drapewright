@@ -12,6 +12,56 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 21b — Draping in the app (Phase 3, part 7)
+
+Sew the pattern's pieces on the avatar in a chosen fabric, and watch it
+settle.
+
+**Try it:**
+
+1. Open a project whose pieces are sewn together (**Seams**). To try it
+   straight away, open the test skirt: **Open pattern** and choose
+   `fixtures/drapewright/skirt.drapewright` (a front cut on the fold and a
+   back cut as a pair, its seams sewn).
+2. Press **Avatar**. Under the figure: **Fabric** (poplin to start) and
+   **Drape**.
+3. Press **Drape**: "Sewing the seams…", then "Letting it settle…", then
+   "Draped in poplin." A skirt takes a couple of seconds. The figure can be
+   turned and zoomed all the while.
+4. Choose another fabric while it is on: it is draped again in that one.
+5. **Drape again** after changing the pattern; **Take off** takes it off.
+   Choosing someone else's figure takes it off too, as it no longer fits.
+6. Pieces sewn to nothing are left off, and it says so; with nothing sewn
+   at all it asks for the seams first.
+
+**Found by testing:** on CI's Linux computers the skirt from step 21a never
+settled; on a Mac it did, by the luck of rounding. Each row of the cloth
+was corrected in the same order, across from one side, at every step. A
+garment placed exactly symmetrically was therefore nudged the same way
+every time, and it crept round the body for ever. Now the cloth is
+corrected from the top down in 1 cm bands, in a scrambled order within
+each band, and no point moves faster than 1 m/s: placing the pieces round
+the body strains them, and that strain could fling them. The skirt now
+settles in about two seconds of cloth time in all 12 fabrics, however its
+start is nudged. A test checks that it stays put once settled.
+
+**What's under the hood:** the page sends the project's pieces and seams,
+the fabric and the figure to the sim worker. The worker meshes, places and
+sews them (`drapewright-sim`) and moves the cloth on for up to 12 ms each
+frame before drawing it. So the view stays smooth, and a fast computer
+drapes faster than real time. The cloth is a second surface in the
+renderer, lit on whichever side faces you, its points rewritten every
+frame. The test skirt is written as a project by a Rust test, so it cannot
+drift from the one the drape tests use. End-to-end tests drape it in
+Chromium (WebGL2) and WebKit (WebGPU), in poplin and then denim, and take
+it off. The 3D module is now 2.7 MB (1.1 MB compressed).
+
+**Not yet:** the drape following each change to the pattern (step 28 makes
+it live); sleeves and trousers placed round arms and legs; where the
+garment is tight or loose (step 22).
+
+---
+
 ## Step 21a — Draping: the engine (Phase 3, part 6)
 
 The cloth simulation that drapes a pattern on the avatar, as a library for

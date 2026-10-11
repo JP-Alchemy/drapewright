@@ -166,15 +166,26 @@ impl ClothBuilder {
 
     pub fn build(mut self) -> Cloth {
         let n = self.x.len();
-        // Solved from the top down: a garment hangs from its shoulders and
-        // waist, and in one pass a correction then carries all the way
-        // down instead of being shared out a little at a time.
-        let height = |i: u32| self.x[i as usize][1];
-        self.edges
-            .sort_by(|a, b| (height(b.i) + height(b.j)).total_cmp(&(height(a.i) + height(a.j))));
-        self.bends.sort_by(|a, b| {
-            let h = |bend: &Bend| bend.i.iter().map(|&i| height(i)).sum::<f32>();
-            h(b).total_cmp(&h(a))
+        // Solved from the top down, a band at a time: a garment hangs from
+        // its shoulders and waist, and in one pass a correction then
+        // carries all the way down instead of being shared out a little at
+        // a time. Within a band, in a scrambled order: always across the
+        // same way, a garment's two halves are corrected unevenly at every
+        // step, and it creeps round the body for ever.
+        let band = |heights: f32| -((heights / BAND).floor() as i64);
+        let x = &self.x;
+        let height = |i: u32| x[i as usize][1];
+        self.edges.sort_by_cached_key(|e| {
+            (
+                band((height(e.i) + height(e.j)) / 2.0),
+                scramble(&[e.i, e.j]),
+            )
+        });
+        self.bends.sort_by_cached_key(|b| {
+            (
+                band(b.i.iter().map(|&i| height(i)).sum::<f32>() / 4.0),
+                scramble(&b.i),
+            )
         });
         Cloth {
             p: self.x.clone(),
@@ -194,9 +205,25 @@ impl ClothBuilder {
             gravity: [0.0, -9.81, 0.0],
             stitch_compliance: 1e-6,
             damping: 3.0,
+            max_speed: f32::INFINITY,
             contacts: Vec::new(),
         }
     }
+}
+
+/// The height of the bands constraints are solved in, m.
+const BAND: f32 = 0.01;
+
+/// A number that scrambles the order of points' constraints, the same for
+/// the same points every time.
+fn scramble(points: &[u32]) -> u64 {
+    points.iter().fold(0x9E37_79B9_7F4A_7C15, |h, &i| {
+        // SplitMix64's mixing.
+        let mut z = h ^ u64::from(i).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    })
 }
 
 /// The cloth as it moves.
@@ -222,6 +249,8 @@ pub struct Cloth {
     pub stitch_compliance: f32,
     /// Velocity lost each second, as a fraction.
     pub damping: f32,
+    /// No point moves faster than this, m/s.
+    pub max_speed: f32,
     /// Points touching the body this step, and which way is out.
     contacts: Vec<(u32, V3)>,
 }
@@ -303,6 +332,11 @@ impl Cloth {
             for k in 0..self.x.len() {
                 let d = sub(self.x[k], self.p[k]);
                 self.v[k] = d.map(|c| c / h);
+                let speed = length(self.v[k]);
+                if speed > self.max_speed {
+                    let keep = self.max_speed / speed;
+                    self.v[k] = self.v[k].map(|c| c * keep);
+                }
             }
             // Resting on the body, a point is not moving towards it or away:
             // being pushed out is not speed.
@@ -380,6 +414,22 @@ impl Cloth {
         }
     }
 
+    /// Point `k`, `pressed` m into the body's gap, pushed out along `n`,
+    /// with friction (Coulomb, by position): its slide along the body this
+    /// step, cancelled if small for how hard it presses on it, else cut
+    /// down by that much.
+    fn rest_on(&mut self, k: usize, pressed: f32, n: V3, mu: f32) {
+        axpy(&mut self.x[k], pressed, n);
+        self.contacts.push((k as u32, n));
+        let moved = sub(self.x[k], self.p[k]);
+        let along = sub(moved, n.map(|c| c * dot(moved, n)));
+        let slide = length(along);
+        if slide > 0.0 {
+            let held = (mu * pressed / slide).min(1.0);
+            axpy(&mut self.x[k], -held, along);
+        }
+    }
+
     fn collide(&mut self, body: &dyn Collider) {
         // Its thickness and a little air: the body is curved between the
         // cloth's points, and must not show through in the middle of a
@@ -395,31 +445,21 @@ impl Cloth {
             if d >= gap {
                 continue;
             }
-            let pressed = gap - d;
-            axpy(&mut self.x[k], pressed, n);
-            self.contacts.push((k as u32, n));
-            // Friction (Coulomb, by position): the slide along the body this
-            // step, cancelled if small for how hard the point presses on
-            // it, else cut down by that much.
-            let moved = sub(self.x[k], self.p[k]);
-            let along = sub(moved, n.map(|c| c * dot(moved, n)));
-            let slide = length(along);
-            if slide > 0.0 {
-                let held = (mu * pressed / slide).min(1.0);
-                axpy(&mut self.x[k], -held, along);
-            }
+            self.rest_on(k, gap - d, n, mu);
         }
         // The middles of triangles too: the body is curved between points.
-        for t in &self.triangles {
-            let [a, b, c] = t.map(|i| self.x[i as usize]);
+        // Their corners then rest on the body as a point would.
+        for t in 0..self.triangles.len() {
+            let corners = self.triangles[t];
+            let [a, b, c] = corners.map(|i| self.x[i as usize]);
             let middle = [0, 1, 2].map(|k| (a[k] + b[k] + c[k]) / 3.0);
             let (d, n) = body.distance(middle);
             if d >= gap {
                 continue;
             }
-            for &i in t {
+            for i in corners {
                 if self.w[i as usize] > 0.0 {
-                    axpy(&mut self.x[i as usize], gap - d, n);
+                    self.rest_on(i as usize, gap - d, n, mu);
                 }
             }
         }

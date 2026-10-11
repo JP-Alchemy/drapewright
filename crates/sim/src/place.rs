@@ -8,6 +8,9 @@
 use std::collections::HashMap;
 use std::f64::consts::TAU;
 
+use drapewright_body::measure::trunk_sections;
+use drapewright_body::{Body, BodyModel, measure};
+
 use crate::garment::{Copy, Garment, Half};
 
 /// What placing needs to know of the figure, mm (y up, z to the front).
@@ -29,6 +32,24 @@ pub struct Section {
 }
 
 impl Figure {
+    /// The avatar's figure: its waist and shoulders where it is measured,
+    /// and its trunk's sections every 20 mm from 400 mm below the hip to
+    /// the shoulders.
+    pub fn of(model: &BodyModel, body: &Body) -> Figure {
+        let (_, marks) = measure(model, body);
+        let shoulders = marks.points["shoulderPoint"][1];
+        let hip = marks.levels["hip"];
+        let sections = trunk_sections(model, body, hip - 400.0, shoulders, 20.0)
+            .into_iter()
+            .map(|(y, middle, half)| Section { y, middle, half })
+            .collect();
+        Figure {
+            waist: marks.levels["waist"],
+            shoulders,
+            sections,
+        }
+    }
+
     /// The trunk's section at height `y`, averaged over 60 mm above and
     /// below: its shape changing quickly from one height to the next would
     /// twist the cloth placed round it.

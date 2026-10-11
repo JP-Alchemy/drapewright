@@ -1,12 +1,14 @@
-import type { AvatarFit, AvatarRequest, AvatarSettings } from '@drapewright/engine'
+import type { AvatarFit, AvatarRequest, AvatarSettings, DrapeRequest } from '@drapewright/engine'
 import type { ViewColours } from '@drapewright/engine/avatar'
 import {
+  type DrapeUpdate,
   SimError,
   type SimMethod,
   type SimMethods,
   type SimNote,
   type SimRequest,
   type SimResponse,
+  type SimUpdate,
 } from './sim-protocol.ts'
 
 /**
@@ -23,12 +25,18 @@ class SimClient {
   #nextId = 1
   /** Recent fits by what they were fitted to: the same person is not fitted twice. */
   readonly #fits = new Map<string, Promise<AvatarFit>>()
+  /** The drape asked for last, by request, and who hears how it goes. */
+  #drape: { id: number; onUpdate: (update: DrapeUpdate) => void } | null = null
 
   #start(): Worker {
     if (this.#worker) return this.#worker
     const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' })
-    worker.onmessage = (event: MessageEvent<SimResponse>) => {
+    worker.onmessage = (event: MessageEvent<SimResponse | SimUpdate>) => {
       const response = event.data
+      if ('update' in response) {
+        if (response.drape === this.#drape?.id) this.#drape.onUpdate(response.update)
+        return
+      }
       const pending = this.#pending.get(response.id)
       if (!pending) return
       this.#pending.delete(response.id)
@@ -52,8 +60,8 @@ class SimClient {
     method: M,
     args: Parameters<SimMethods[M]>,
     transfer: Transferable[] = [],
+    id = this.#nextId++,
   ): Promise<ReturnType<SimMethods[M]>> {
-    const id = this.#nextId++
     const request: SimRequest<M> = { id, method, args }
     return new Promise((resolve, reject) => {
       this.#pending.set(id, { resolve: resolve as (v: unknown) => void, reject })
@@ -86,6 +94,26 @@ class SimClient {
 
   detachView(): Promise<null> {
     return this.#call('detachView', [])
+  }
+
+  /**
+   * Drapes the project's garment on the avatar in the view; `onUpdate`
+   * hears how it goes. Its last update once it is done, or null if it was
+   * taken off (or another drape asked for) first.
+   */
+  drape(
+    request: DrapeRequest,
+    onUpdate: (update: DrapeUpdate) => void,
+  ): Promise<DrapeUpdate | null> {
+    const id = this.#nextId++
+    this.#drape = { id, onUpdate }
+    return this.#call('drape', [request], [], id)
+  }
+
+  /** Takes the garment off. */
+  undrape(): Promise<null> {
+    this.#drape = null
+    return this.#call('undrape', [])
   }
 
   /** A change to the view that needs no answer. */
