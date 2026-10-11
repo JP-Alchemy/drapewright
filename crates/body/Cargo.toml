@@ -1,0 +1,21 @@
+[package]
+name = "drapewright-body"
+description = "The avatar for Drapewright: a body shaped from MakeHuman's CC0 data, measured as a tape would, and fitted to measurements"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+flate2.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+# Building the body file from MakeHuman's data (the build_body example).
+serde_json.workspace = true
+# Pictures of figures, to check them by eye (the picture example).
+tiny-skia.workspace = true
+
+[lints]
+workspace = true

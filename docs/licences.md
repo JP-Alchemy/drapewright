@@ -63,5 +63,5 @@ Project licence: **not yet chosen** (see
 | UI font | — | System font stack; nothing bundled. |
 | PDF font | — | Helvetica, one of the 14 standard PDF fonts, referenced and not embedded. |
 | Test fixtures in `fixtures/` | CC0-1.0 unless noted | Drawn for this project; each folder has a `LICENCE` note. |
-| Body model (Phase 3) | to verify | ANNY; check model and asset licences before use. |
+| Body model, `assets/body/adult.dwbody` | CC0-1.0 data; Apache-2.0 method | MakeHuman's mesh, shape targets and skin weights (via MPFB2, CC0-1.0), prepared as in Anny (Copyright 2025 NAVER Corp., Apache-2.0): the adult shape blending and mesh edits. Built by `crates/body/examples/build_body.rs`; see `assets/body/README.md`. Never Anny's non-commercial `smplx` topology, never SMPL. |
 | Fabric textures (Phase 3) | to choose | Prefer CC0 sources. |

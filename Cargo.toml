@@ -17,6 +17,7 @@ drapewright-io = { path = "crates/io" }
 drapewright-project = { path = "crates/project" }
 drapewright-pdf-import = { path = "crates/pdf-import" }
 drapewright-seams = { path = "crates/seams" }
+drapewright-body = { path = "crates/body" }
 
 # Geometry
 kurbo = "0.13.1"
@@ -74,3 +75,8 @@ panic = "abort"
 # while keeping our own crates debuggable.
 [profile.dev.package."*"]
 opt-level = 2
+
+# Shaping, measuring and fitting bodies is heavy arithmetic: optimised even
+# in tests.
+[profile.dev.package.drapewright-body]
+opt-level = 3

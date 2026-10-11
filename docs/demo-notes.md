@@ -12,6 +12,75 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 19a — The avatar: shaped, measured and fitted (Phase 3, part 3)
+
+The body patterns will be draped on, as a library for now: shaped from
+MakeHuman's data, measured as a tape measure would, and fitted to a
+person's measurements. It comes into the app with step 19b ("Fit the
+avatar" in the Measurements panel), and is seen in 3D with step 20.
+
+**Try it** (from the command line for now):
+
+1. A picture of a figure, front and side, showing where each measurement
+   is taken; it prints them all:
+
+   ```bash
+   cargo run --release -p drapewright-body --example picture -- assets/body/adult.dwbody figure.png weight=0.7 cup=0.75
+   ```
+
+   Settings run from 0 to 1: `woman`, `weight`, `muscle`, `height`,
+   `proportions`, `cup`, `firmness`; `age` is in years.
+2. A figure fitted to measurements, in cm:
+
+   ```bash
+   cargo run --release -p drapewright-body --example fit -- assets/body/adult.dwbody woman height=165 highBust=86 bust=91 underbust=75 waist=71 hip=97 backWaistLength=41 armLength=58
+   ```
+
+   It prints the settings found and how close each measurement comes
+   ("wanted 91.0 cm, figure 91.0 cm"), this one in about half a second.
+3. `export_obj` writes a figure for any 3D viewer.
+
+**How it measures:** as a tape would. Round measurements go round the
+outside of a slice, bridging the hollow between the breasts:
+* the bust at the bust point;
+* the high bust level across the back under the arms, and rising in front
+  over the chest above the breasts, so the gap between bust and high bust
+  is the one a full bust adjustment works from (about 3 cm on the average
+  figure, 12 cm on the fullest cup);
+* the underbust at the fold under the breasts, also where a full breast
+  hangs;
+* the waist at the narrowest, or level with the elbow on a figure with no
+  waist;
+* the hip at the seat's fullest.
+
+Lengths follow the body's back and front.
+
+**How it fits:** first weight and muscle on a coarse grid (they shape a
+figure together, and unevenly); then height, weight, muscle and cup size
+to the main measurements; then all of those with MakeHuman's measure
+shapes to every measurement given. A measurement the figure cannot reach
+is left short, and said to be, without pulling the others away.
+
+**How close:** a commercial pattern size chart from size 6 to 30W, and
+men's chests from 36" to 48", fit to within 2 mm on bust, waist, hip and
+height; with eight measurements, usually within half a centimetre. A B
+cup's high bust (5 cm under the bust) is reached up to size 22. At 26W and
+30W the figure's frame is not broad enough for it: the high bust is left
+3 to 10 cm short, and the bust can come up to 3 cm short with it.
+
+**Not yet:** in the app (19b); in 3D (step 20). The figure stands as
+MakeHuman's does, arms held out, so across front and back are
+approximate. The model's extremes (the heaviest figures with a flat
+chest) measure less well.
+
+**What's under the hood:** `crates/body`: the body file (`asset.rs`),
+shaping (`shape.rs`), measuring (`measure.rs`) and fitting (`fit.rs`).
+`assets/body/adult.dwbody` (4.4 MB) is built by the `build_body` example
+from Anny's copy of MakeHuman's data: CC0 data, and Anny's method under
+Apache-2.0 (see `assets/body/README.md` and `docs/licences.md`).
+
+---
+
 ## Step 18 — Seams (Phase 3, part 2)
 
 Which edges are sewn together. Seams are useful already in 2D, for walking
