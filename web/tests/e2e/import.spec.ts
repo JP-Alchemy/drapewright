@@ -93,7 +93,7 @@ test('a file with every size asks which, and adds only those', async ({ page }) 
   // The size the pattern was made in comes first.
   const sample = dialog.getByRole('button', { name: 'M, the size the pattern was made in' })
   await expect(sample).toHaveAttribute('aria-pressed', 'true')
-  const found = dialog.locator('.found-list li')
+  const found = dialog.locator('.found-list .piece-name')
   await expect(found).toHaveText(['Front', 'Back'])
 
   // Comparing two sizes: each piece says which it is.
@@ -112,7 +112,7 @@ test('opens a FreeSewing pattern with its names, fold, notches and cutting', asy
   await page.getByTestId('pattern-file').setInputFiles(fixture('freesewing-sasha-sa10.svg'))
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: 'Found 7 pieces' })).toBeVisible()
-  await expect(dialog.locator('.found-list li')).toHaveText([
+  await expect(dialog.locator('.found-list .piece-name')).toHaveText([
     'Front inside',
     'Pocket',
     'Front outside above',
@@ -150,7 +150,7 @@ test('opens a PDF pattern, putting its pages back together', async ({ page }) =>
   await page.getByTestId('pattern-file').setInputFiles(fixture('freesewing-sasha-a0-protected.pdf'))
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: 'Found 7 pieces' })).toBeVisible()
-  await expect(dialog.locator('.found-list li')).toContainText([
+  await expect(dialog.locator('.found-list .piece-name')).toContainText([
     'Front inside',
     'Front outside above',
     'Back inside',
@@ -209,7 +209,7 @@ test('a PDF in several colours asks which size, showing each size’s line', asy
     'border-top-color',
     'rgb(217, 26, 26)',
   )
-  await expect(dialog.locator('.found-list li')).toHaveText(['Front bodice', 'Sleeve'])
+  await expect(dialog.locator('.found-list .piece-name')).toHaveText(['Front bodice', 'Sleeve'])
   await expect(dialog).toContainText('Found the 10 cm test square')
 
   await dialog.getByRole('button', { name: '12', exact: true }).click()
@@ -223,4 +223,21 @@ test('a PDF in several colours asks which size, showing each size’s line', asy
   const list = page.getByRole('listbox', { name: 'Pieces' })
   await expect(list.getByRole('option')).toHaveCount(2)
   await expect(list.getByRole('option', { name: /Front bodice/ })).toBeVisible()
+})
+
+test('pieces that are not pattern pieces can be left out', async ({ page }) => {
+  await page.goto('/?debug')
+  await page.getByTestId('pattern-file').setInputFiles(fixture('freesewing-sasha-a0.pdf'))
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: 'Found 7 pieces' })).toBeVisible()
+  const pieces = dialog.getByRole('group', { name: 'Pieces to add' })
+  // Tapping a piece's name unticks it.
+  await pieces.getByText('Pocket', { exact: true }).click()
+  await pieces.getByText('Sleeve', { exact: true }).click()
+  await expect(pieces.getByRole('checkbox', { name: 'Pocket' })).not.toBeChecked()
+  await dialog.getByRole('button', { name: 'Add 5 pieces' }).click()
+  await expect(dialog).toBeHidden()
+  const list = page.getByRole('listbox', { name: 'Pieces' })
+  await expect(list.getByRole('option')).toHaveCount(5)
+  await expect(list.getByRole('option', { name: /Pocket/ })).toHaveCount(0)
 })

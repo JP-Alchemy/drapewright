@@ -221,6 +221,8 @@ export const t = {
     foundSized: (pieces: number, sizes: number) =>
       `${plural(pieces, 'Found 1 piece', 'Found # pieces')} in ${sizes} sizes`,
     sizeQuestion: 'Which size?',
+    piecesToAdd: 'Pieces to add',
+    untickHint: 'Untick anything that is not a pattern piece, such as a diagram or a title box.',
     sizeHint:
       'The file has several sizes of this pattern. Pick yours, or more than one to compare them.',
     sampleSize: 'sample',

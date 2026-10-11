@@ -356,6 +356,7 @@ export class Session {
     scale: ScaleOption,
     allowance: AllowanceAnswer | null,
     sizes: string[] | null = null,
+    keep: string[] | null = null,
   ): Promise<void> {
     const pending = this.ui.get().pendingImport
     if (!pending) return
@@ -369,7 +370,9 @@ export class Session {
       })
       return
     }
-    const pieces = this.#besideExisting(result.pieces)
+    // Pieces she left out (by id, which the answers don't change) stay out.
+    const chosen = keep ? result.pieces.filter((p) => keep.includes(p.id)) : result.pieces
+    const pieces = this.#besideExisting(chosen)
     const outcome = this.engine.dispatch({ type: 'addPieces', pieces })
     this.ui.set((s) => ({ ...s, pendingImport: null }))
     if (outcome.status === 'rejected') {

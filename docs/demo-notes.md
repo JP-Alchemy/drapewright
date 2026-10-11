@@ -43,6 +43,16 @@ own, with what the sizes share (grainlines, names, cutting, notches).
   stitching line. The styles' outlines must also nest, so pieces merely
   drawn in different colours stay one size.
 
+**Every piece found is a suggestion:** the list of pieces in the import
+now has a tick box for each, with its size. Untick anything that isn't a
+pattern piece (a diagram from an instructions page, a title box) and it
+isn't added.
+
+**Protected PDFs, as Acrobat makes them:** `fixtures/pdf/sizes-layers-aes128.pdf`
+and `…-aes256.pdf` open like the plain file. They use AES-128 and AES-256,
+which is what Acrobat and InDesign write. `…-password.pdf` needs a password
+to open, and the import says so and what to do.
+
 **Not yet:** sizes whose lines share a stretch (a common centre front
 drawn once for all sizes). Each size's line must go all the way round.
 

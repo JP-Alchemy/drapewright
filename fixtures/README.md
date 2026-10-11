@@ -29,11 +29,15 @@ cargo run --release -p drapewright-io --example import_report -- ~/Source/drapew
 | `pdf/freesewing-sasha-a0.pdf` | The FreeSewing dress above, printed by Drapewright on A0 for a copy shop: a cover page (test squares, page map) and the sheet on two pages, each drawing every piece it touches, clipped. Stitching lines dashed, notches cut into the cutting lines, grainlines and fold brackets with arrowheads, names and cutting printed on each piece |
 | `pdf/sizes-layers.pdf` | A front bodice (cut on the fold) and a sleeve in sizes 8, 10 and 12, nested, each size on its own layer ("Size 8"…), all in black; shared grainlines with arrowheads, names, cutting, "PLACE ON FOLD" and a 10 cm test square |
 | `pdf/sizes-colours.pdf` | The same with no layers: each size in its own colour, with a legend (a sample of each line beside its size) |
+| `pdf/sizes-layers-aes128.pdf`, `pdf/sizes-layers-aes256.pdf` | `sizes-layers.pdf` "protected" as Acrobat does it: AES-128 (security handler revision 4) and AES-256 (revision 6), owner password only, so they open without one |
+| `pdf/sizes-layers-password.pdf` | The same with a password needed to open it ("open sesame"): refused, with a plain message |
 | `pdf/freesewing-sasha-a0-protected.pdf` | The same, rewritten by Ghostscript 10 as a PDF 1.7 with object streams and a cross-reference stream, and "protected" (RC4 128-bit, owner password only: it opens without one; printing allowed, copying not), as many bought patterns are |
 
-The DXF files are written by `dxf/make_fixtures.py`, and the `sizes-*`
-PDFs by `pdf/make_fixtures.py` (run them from the repository root after
-changing them).
+The DXF files are written by `dxf/make_fixtures.py`, the `sizes-*` PDFs by
+`pdf/make_fixtures.py` and their encrypted copies by `pdf/protect.py`, which
+needs the `openssl` command (run them from the repository root after
+changing them; poppler's `pdfinfo` and `pdftotext` confirm the encrypted
+files are valid).
 
 The `freesewing-*` files were made with FreeSewing 4.10.2
 (`@freesewing/sasha`, `sa: 10` and `sa: 0`); the PDFs are Drapewright's

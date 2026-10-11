@@ -311,3 +311,14 @@ fn pieces_in_different_colours_are_not_sizes() {
     assert!(result.sizes.names.is_empty());
     assert_eq!(result.pieces.len(), 3);
 }
+
+#[test]
+fn protected_with_aes_like_acrobat() {
+    // fixtures/pdf/protect.py: owner password only, as most bought patterns.
+    for file in ["pdf/sizes-layers-aes128.pdf", "pdf/sizes-layers-aes256.pdf"] {
+        check_sizes(&import_pdf(&fixture(file), None).unwrap());
+    }
+    // One that needs a password to open is refused, saying what to do.
+    let e = import_pdf(&fixture("pdf/sizes-layers-password.pdf"), None).unwrap_err();
+    assert!(e.to_string().contains("needs a password"), "{e}");
+}

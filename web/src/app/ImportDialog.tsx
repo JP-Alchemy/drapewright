@@ -1,7 +1,10 @@
 import type { AllowanceMode, ImportSizes, Piece, ScaleOption } from '@drapewright/engine'
 import { useId, useState } from 'react'
+import { Check } from 'lucide-react'
 import {
   Button,
+  Checkbox,
+  CheckboxGroup,
   Dialog,
   Heading,
   Label,
@@ -53,6 +56,10 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
     return !graded || size === undefined || chosenSizes.includes(size)
   }
   const pieces = result.pieces.filter((p) => kept(p.id))
+  // Every piece found is a suggestion: she can leave out what isn't one (a
+  // diagram, a title box).
+  const [leftOut, setLeftOut] = useState<ReadonlySet<string>>(new Set())
+  const toAdd = pieces.filter((p) => !leftOut.has(p.id))
   const notes = result.notes.filter((n) => !('piece' in n) || kept(n.piece))
   // As the pieces will be named: comparing sizes, each says its own.
   const shownName = (p: Piece) => {
@@ -62,7 +69,7 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
 
   const [choice, setChoice] = useState<string | null>(null)
   const [mode, setMode] = useState<AllowanceMode | null>(allowance.suggested)
-  const asked = pieces.filter((p) => allowance.pieces.includes(p.id))
+  const asked = toAdd.filter((p) => allowance.pieces.includes(p.id))
   const [width, setWidth] = useState(asked[0]?.allowance.seam ?? 0)
   const [adding, setAdding] = useState(false)
 
@@ -97,6 +104,7 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
         chosen,
         mode && asked.length > 0 ? { mode, width } : null,
         graded ? chosenSizes : null,
+        leftOut.size > 0 ? toAdd.map((p) => p.id) : null,
       )
     } finally {
       setAdding(false)
@@ -167,11 +175,33 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
             </div>
           )}
           {pieces.length > 0 && (
-            <ul className="found-list">
-              {pieces.map((p) => (
-                <li key={p.id}>{shownName(p)}</li>
-              ))}
-            </ul>
+            <CheckboxGroup
+              aria-label={t.importing.piecesToAdd}
+              value={toAdd.map((p) => p.id)}
+              onChange={(ids) =>
+                setLeftOut(new Set(pieces.map((p) => p.id).filter((id) => !ids.includes(id))))
+              }
+            >
+              {pieces.length > 1 && <p className="muted small">{t.importing.untickHint}</p>}
+              <ul className="found-list choosable">
+                {pieces.map((p) => {
+                  const { width: w, height: h } = outlineSize(p)
+                  return (
+                    <li key={p.id}>
+                      <Checkbox value={p.id} className="piece-check">
+                        <span className="piece-box" aria-hidden="true">
+                          <Check size={14} strokeWidth={3} />
+                        </span>
+                        <span className="piece-name">{shownName(p)}</span>
+                        <span className="piece-size" aria-hidden="true">
+                          {formatLength(w, units)} × {formatLength(h, units)}
+                        </span>
+                      </Checkbox>
+                    </li>
+                  )
+                })}
+              </ul>
+            </CheckboxGroup>
           )}
 
           {pieces.length > 0 &&
@@ -242,10 +272,10 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
               <Button
                 className="button primary"
                 onPress={add}
-                isDisabled={adding || !answered}
+                isDisabled={adding || !answered || toAdd.length === 0}
                 autoFocus
               >
-                {t.importing.add(pieces.length)}
+                {t.importing.add(toAdd.length)}
               </Button>
             )}
           </div>
