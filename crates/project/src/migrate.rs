@@ -28,7 +28,7 @@ const EARLIER_FORMAT: &str = "soom-project";
 type Migration = fn(&mut Value) -> Result<(), String>;
 
 /// `MIGRATIONS[i]` upgrades version `i + 1` to `i + 2`.
-const MIGRATIONS: &[Migration] = &[v1_to_v2, v2_to_v3];
+const MIGRATIONS: &[Migration] = &[v1_to_v2, v2_to_v3, v3_to_v4];
 
 /// Version 2 adds people's measurements: none yet.
 fn v1_to_v2(value: &mut Value) -> Result<(), String> {
@@ -49,6 +49,11 @@ fn v2_to_v3(value: &mut Value) -> Result<(), String> {
     object
         .entry("seams")
         .or_insert_with(|| Value::Array(Vec::new()));
+    Ok(())
+}
+
+/// Version 4 adds a person's age to their measurements: not known before.
+fn v3_to_v4(_: &mut Value) -> Result<(), String> {
     Ok(())
 }
 

@@ -1,6 +1,6 @@
 # The Drapewright project format
 
-Status: **schema version 1** (Phase 1). Sections marked *draft* describe
+Status: **schema version 4** (Phase 3). Sections marked *draft* describe
 how later phases will extend the format; they become normative, with a
 version bump and a migration, when they are implemented.
 
@@ -49,7 +49,7 @@ single exception of sidecars it references explicitly.
 ```json
 {
   "format": "drapewright-project",
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "generator": "Drapewright 0.1.0",
   "meta": {
     "id": "7f3c9a2e5b1d4e8f",
@@ -71,7 +71,7 @@ single exception of sidecars it references explicitly.
 | Field | Type | Notes |
 |---|---|---|
 | `format` | `"drapewright-project"` | Identifies the file type. |
-| `schemaVersion` | integer | `3` for this document. See §8. |
+| `schemaVersion` | integer | `4` for this document. See §8. |
 | `generator` | string | Free text naming the program that wrote the file. |
 | `meta.id` | string | Stable project identifier. |
 | `meta.name` | string | Shown to the user. |
@@ -373,6 +373,7 @@ Non-semantic: readers may ignore it.
 | 1 | The first. |
 | 2 | `measurementSets` (§10.2). Version 1 files have none. |
 | 3 | `seams` (§10.4). Earlier files have none. |
+| 4 | A measurement set's `age` (§10.2). Earlier files leave it unknown. |
 
 ## 9. Validation
 
@@ -430,7 +431,7 @@ No longer a draft: written since schema version 2.
 
 ```json
 "measurementSets": [{
-  "id": "m7", "name": "Me", "figure": "woman", "revision": 2, "takenOn": "2026-10-01",
+  "id": "m7", "name": "Me", "figure": "woman", "revision": 2, "takenOn": "2026-10-01", "age": 41,
   "values": { "height": 1650, "bust": 960, "highBust": 880, "underbust": 800, "waist": 780,
               "hip": 1040, "shoulderWidth": 390, "backWaistLength": 410, "armLength": 590, "inseam": 770 },
   "previous": [{ "revision": 1, "takenOn": "2026-06-12", "values": { "bust": 950 } }]
@@ -444,6 +445,7 @@ No longer a draft: written since schema version 2.
 | `figure` | `"woman"` \| `"man"` | Which measurements apply, and the avatar's shape. Default `"woman"`. |
 | `revision` | integer | Counts up each time the person is measured again. Default `1`. |
 | `takenOn` | `YYYY-MM-DD` \| null | The day they were taken. |
+| `age` | integer \| null | Their age in years, 1 to 120, for the avatar's shape (version 4). |
 | `values` | object | Key → millimetres, each more than zero. |
 | `previous` | array | Earlier revisions (`revision`, `takenOn`, `values`), newest first. |
 

@@ -21,8 +21,8 @@ measurements and see how close it comes, measurement by measurement.
 
 1. Open **Measurements**, add a person, and enter at least height, bust,
    waist and hip (in centimetres, say 165, 91, 71 and 97).
-2. Under **The avatar**, set the age if you like (25 to 90), and press
-   **Fit the avatar**. The first time, the 3D side and the body file load
+2. Under **The avatar**, enter the person's age if you like (kept with
+   their measurements; 35 if left empty), and press **Fit the avatar**. The first time, the 3D side and the body file load
    (4 MB); after that, fitting takes about a second.
 3. A table lists each measurement given: as measured, the avatar's, and
    the difference ("Same", "0.7 cm larger", "1.2 cm shorter"). "The avatar
@@ -38,10 +38,13 @@ measurements and see how close it comes, measurement by measurement.
    hasn't been downloaded yet.
 
 AI assistants get `fit_avatar`, the same report for a person's
-measurements.
+measurements; `set_measurements` takes their age.
 
-**Not yet:** the age isn't kept with the measurements (35 unless changed),
-and the fitted avatar isn't kept with the project either: it is fitted
+**What changed in the file:** schema version 4: a person's measurements
+keep their age (`age`, in years), for the avatar's shape. Earlier files
+open with it unknown.
+
+**Not yet:** the fitted avatar isn't kept with the project: it is fitted
 again when wanted. Seeing it in 3D comes with step 20.
 
 **What's under the hood:** a second WebAssembly module, `crates/wasm-3d`

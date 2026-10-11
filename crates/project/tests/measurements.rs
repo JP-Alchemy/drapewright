@@ -19,9 +19,23 @@ fn me(values: &[(&str, f64)]) -> MeasurementSet {
         figure: Figure::Woman,
         revision: 1,
         taken_on: Some("2026-10-01".into()),
+        age: Some(40),
         values: values.iter().map(|(k, v)| (k.to_string(), *v)).collect(),
         previous: Vec::new(),
     }
+}
+
+#[test]
+fn a_version_3_project_opens_with_no_ages() {
+    let v3 = include_str!("fixtures/project-v3.json");
+    assert!(v3.contains("\"schemaVersion\": 3"));
+    let (e, issues) = Engine::open(v3, "test").unwrap();
+    assert!(issues.is_empty(), "{issues:?}");
+    let me = &e.document().measurement_sets[0];
+    assert_eq!((me.name.as_str(), me.age), ("Me", None));
+    let saved = e.to_json("2026-10-12T10:00:00Z");
+    assert!(saved.contains(&format!("\"schemaVersion\": {SCHEMA_VERSION}")));
+    assert!(saved.contains("\"age\": null"));
 }
 
 #[test]
@@ -119,6 +133,10 @@ fn impossible_measurements_are_refused() {
         me(&[("wiast", 780.0)]),
         MeasurementSet {
             name: "  ".into(),
+            ..me(&[])
+        },
+        MeasurementSet {
+            age: Some(200),
             ..me(&[])
         },
     ] {

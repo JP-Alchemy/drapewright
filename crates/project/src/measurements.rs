@@ -234,6 +234,9 @@ pub struct MeasurementSet {
     /// The day they were taken (`YYYY-MM-DD`).
     #[serde(default)]
     pub taken_on: Option<String>,
+    /// Their age in years, for the avatar's shape.
+    #[serde(default)]
+    pub age: Option<u32>,
     /// Measurement key → mm. Keys are the vocabulary's, or custom ones
     /// starting with `x-`.
     #[serde(default)]
@@ -269,6 +272,9 @@ impl MeasurementSet {
             && !is_date(date)
         {
             return Some(format!("“{date}” is not a date (use YYYY-MM-DD)."));
+        }
+        if self.age.is_some_and(|age| !(1..=120).contains(&age)) {
+            return Some("An age is in years, from 1 to 120.".into());
         }
         for (key, value) in &self.values {
             if !is_valid_key(key) {
@@ -327,6 +333,7 @@ mod tests {
             figure: Figure::Woman,
             revision: 1,
             taken_on: Some("2026-10-11".into()),
+            age: Some(40),
             values: BTreeMap::from([("bust".into(), 960.0), ("x-elbow".into(), 260.0)]),
             previous: Vec::new(),
         };
@@ -340,6 +347,11 @@ mod tests {
         set.values.remove("waist");
         set.taken_on = Some("2026-13-01".into());
         assert!(set.problem().is_some());
+        set.taken_on = None;
+        set.age = Some(0);
+        assert!(set.problem().unwrap().contains("years"));
+        set.age = None;
+        assert_eq!(set.problem(), None);
         assert!(!is_valid_key("x-"));
     }
 }

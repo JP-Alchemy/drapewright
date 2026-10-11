@@ -77,6 +77,7 @@ function MeasurementsForm({ session, close }: { session: Session; close: () => v
         figure: 'woman',
         revision: 1,
         takenOn: today(),
+        age: null,
         values: {},
         previous: [],
       },
@@ -236,7 +237,12 @@ function SetEditor({
           </section>
         )
       })}
-      <AvatarFitter set={set} vocabulary={vocabulary} units={units} />
+      <AvatarFitter
+        set={set}
+        vocabulary={vocabulary}
+        units={units}
+        onAge={(age) => update({ age })}
+      />
       <div className="measure-delete">
         {confirming ? (
           <>

@@ -18,6 +18,10 @@ test('the avatar is fitted to the measurements and says how close it comes', asy
     await field.fill(cm)
     await field.press('Tab')
   }
+  // The age is kept with the measurements, for the avatar's shape.
+  const age = dialog.getByRole('textbox', { name: 'Age' })
+  await age.fill('52')
+  await age.press('Tab')
   // The 3D side and the body file load with the first fit.
   await fit.click()
   await expect(
@@ -39,6 +43,14 @@ test('the avatar is fitted to the measurements and says how close it comes', asy
     timeout: 60_000,
   })
   await expect(dialog.getByText(/changed since the avatar was fitted/)).toHaveCount(0)
+
+  await dialog.getByRole('button', { name: 'Done' }).click()
+  await expect(page.getByTestId('save-status')).toHaveText('Saved')
+  await page.reload()
+  await page.getByRole('button', { name: 'Measurements' }).click()
+  await expect(
+    page.getByRole('dialog', { name: 'Measurements' }).getByRole('textbox', { name: 'Age' }),
+  ).toHaveValue('52')
 })
 
 test('the avatar fits offline once it has been fitted', async ({ page, context }, info) => {

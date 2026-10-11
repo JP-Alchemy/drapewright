@@ -42,14 +42,17 @@ export function AvatarFitter({
   set,
   vocabulary,
   units,
+  onAge,
 }: {
   set: MeasurementSet
   /** The measurements taken for this figure. */
   vocabulary: MeasurementInfo[]
   units: DisplayUnits
+  onAge(age: number | null): void
 }) {
   const text = t.measure.avatar
-  const [age, setAge] = useState(35)
+  // Unknown: the avatar is fitted at 35.
+  const age = set.age ?? 35
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const [fitted, setFitted] = useState<Fitted | null>(null)
@@ -89,11 +92,11 @@ export function AvatarFitter({
       <div className="avatar-controls">
         <NumberField
           className="field compact avatar-age"
-          value={age}
-          minValue={25}
-          maxValue={90}
+          value={set.age ?? Number.NaN}
+          minValue={1}
+          maxValue={120}
           step={1}
-          onChange={(v) => Number.isFinite(v) && setAge(v)}
+          onChange={(v) => onAge(Number.isFinite(v) && v > 0 ? Math.round(v) : null)}
         >
           <Label>{text.age}</Label>
           <Group className="number-group">

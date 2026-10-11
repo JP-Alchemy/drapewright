@@ -504,12 +504,21 @@ fn an_assistant_sees_how_close_the_avatar_comes() {
     ok(
         &mut s,
         "set_measurements",
-        json!({ "name": "Anna", "values_mm": { "height": 1650, "bust": 910, "waist": 710,
-                "hip": 970, "x-elbow": 260 } }),
+        json!({ "name": "Anna", "age": 52, "values_mm": { "height": 1650, "bust": 910,
+                "waist": 710, "hip": 970, "x-elbow": 260 } }),
     );
-    let fitted = ok_json(&mut s, "fit_avatar", json!({ "age": 52 }));
+    assert_eq!(
+        ok_json(&mut s, "get_measurements", json!({}))["people"][0]["age"],
+        52
+    );
+    // The age kept with the measurements, unless another is given.
+    let fitted = ok_json(&mut s, "fit_avatar", json!({}));
     assert_eq!(fitted["person"], "Anna");
     assert_eq!(fitted["age"], 52.0);
+    assert_eq!(
+        ok_json(&mut s, "fit_avatar", json!({ "age": 30 }))["age"],
+        30.0
+    );
     let rows = fitted["measurements"].as_array().unwrap();
     let keys: Vec<&str> = rows.iter().map(|r| r["key"].as_str().unwrap()).collect();
     assert_eq!(keys, ["height", "bust", "waist", "hip"]);

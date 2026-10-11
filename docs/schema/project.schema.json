@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Drapewright project (project.json)",
-  "description": "A Drapewright sewing pattern project, schema version 3. See docs/file-format.md.",
+  "description": "A Drapewright sewing pattern project, schema version 4. See docs/file-format.md.",
   "type": "object",
   "properties": {
     "extensions": {
@@ -524,6 +524,16 @@
       "description": "One person's measurements, mm, with the earlier ones kept.",
       "type": "object",
       "properties": {
+        "age": {
+          "description": "Their age in years, for the avatar's shape.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "default": null,
+          "minimum": 0
+        },
         "figure": {
           "$ref": "#/$defs/Figure",
           "default": "woman"

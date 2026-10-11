@@ -626,7 +626,7 @@ export const t = {
       intro:
         'A figure shaped to these measurements, to drape patterns on. Fit it to see how close it comes.',
       age: 'Age',
-      ageHint: 'The avatar is an adult’s, 25 to 90.',
+      ageHint: 'The avatar is an adult’s, 25 to 90; 35 if left empty.',
       fit: 'Fit the avatar',
       again: 'Fit again',
       fitting: 'Fitting…',

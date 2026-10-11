@@ -19,6 +19,10 @@ revision: number,
  */
 takenOn: string | null, 
 /**
+ * Their age in years, for the avatar's shape.
+ */
+age: number | null, 
+/**
  * Measurement key → mm. Keys are the vocabulary's, or custom ones
  * starting with `x-`.
  */

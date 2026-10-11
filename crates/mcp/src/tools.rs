@@ -298,7 +298,7 @@ pub fn all() -> Vec<Tool> {
             "get_measurements",
             "Get measurements",
             Reads,
-            "Each person's body measurements kept in the project (mm), with the measurements Drapewright knows: their keys, whether taken around or along the body, their usual adult range, and FreeSewing's name for each.",
+            "Each person's body measurements kept in the project (mm) and their age, with the measurements Drapewright knows: their keys, whether taken around or along the body, their usual adult range, and FreeSewing's name for each.",
             get_measurements,
         ),
         tool(
@@ -2083,6 +2083,7 @@ fn get_measurements(session: &mut Session, _: NoArgs) -> Result<Output, ToolErro
                 "figure": m.figure,
                 "measurement": m.revision,
                 "takenOn": m.taken_on,
+                "age": m.age,
                 "valuesMm": m.values,
                 "earlierMeasurements": m.previous.len(),
             })
@@ -2116,6 +2117,8 @@ struct MeasurementArgs {
     figure: Option<Figure>,
     /// The day they were taken, YYYY-MM-DD.
     taken_on: Option<String>,
+    /// Their age in years, for the avatar's shape.
+    age: Option<u32>,
     /// Values to set, mm, by key ("bust": 960). Keys from get_measurements,
     /// or custom ones starting with "x-".
     values_mm: Option<std::collections::BTreeMap<String, f64>>,
@@ -2172,6 +2175,7 @@ fn set_measurements(session: &mut Session, a: MeasurementArgs) -> Result<Output,
             figure: Figure::Woman,
             revision: 1,
             taken_on: None,
+            age: None,
             values: Default::default(),
             previous: Vec::new(),
         },
@@ -2184,6 +2188,9 @@ fn set_measurements(session: &mut Session, a: MeasurementArgs) -> Result<Output,
     }
     if let Some(date) = a.taken_on {
         set.taken_on = Some(date);
+    }
+    if let Some(age) = a.age {
+        set.age = Some(age);
     }
     for key in a.remove.iter().flatten() {
         set.values.remove(key);
@@ -2246,7 +2253,8 @@ struct AvatarArgs {
     /// Id of the person's measurements (see get_measurements); leave out
     /// for the first person.
     person: Option<String>,
-    /// Their age in years (25 to 90); 35 if left out.
+    /// Their age in years (25 to 90); if left out, the age kept with their
+    /// measurements, or 35.
     age: Option<f64>,
 }
 
@@ -2274,7 +2282,11 @@ fn fit_avatar(session: &mut Session, a: AvatarArgs) -> Result<Output, ToolError>
         })
         .map(|(k, v)| (k.clone(), *v))
         .collect();
-    let age = a.age.unwrap_or(35.0).clamp(25.0, 90.0);
+    let age = a
+        .age
+        .or(set.age.map(f64::from))
+        .unwrap_or(35.0)
+        .clamp(25.0, 90.0);
     let fitted = drapewright_body::fit(body_model(), &values, woman, age);
     let rows: Vec<Value> = MeasurementKey::ALL
         .iter()
