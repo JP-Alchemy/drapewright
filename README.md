@@ -20,6 +20,8 @@ Projects are saved on the device and can be backed up as `.drapewright` files.
   waiting for an answer
 * [Licences](docs/licences.md): every dependency and asset
 * [Demo notes](docs/demo-notes.md): what you can try after each step
+* [Working with an AI assistant](docs/ai-assistants.md): the MCP server,
+  so assistants such as Claude can open, check and change projects
 
 ## Development
 
@@ -39,6 +41,19 @@ cargo test --workspace   # Rust: unit, property and golden tests
 pnpm test                # TypeScript unit tests
 pnpm e2e                 # Playwright, Chromium + WebKit
 ```
+
+## AI assistants (MCP)
+
+`drapewright-mcp` lets an AI assistant work on Drapewright projects on your
+computer: import patterns, look at the pieces, name them, set allowances,
+cutting, notches and grainlines, and save a project to open in the app.
+
+```bash
+cargo build --release -p drapewright-mcp
+claude mcp add drapewright -- "$PWD/target/release/drapewright-mcp"
+```
+
+Details and other assistants: [docs/ai-assistants.md](docs/ai-assistants.md).
 
 ## Hosting
 

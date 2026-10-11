@@ -36,6 +36,9 @@ flate2 = "1.1.10"
 # Deflate only, through flate2 (shared with the PDF writer); no clock, no crypto.
 zip = { version = "9.0.1", default-features = false, features = ["deflate-flate2"] }
 
+# Pictures of a project for AI assistants (MCP server only)
+tiny-skia = "0.12.0"
+
 # WebAssembly facade (the CLI used by wasm-pack must match this version exactly)
 wasm-bindgen = "=0.2.129"
 serde-wasm-bindgen = "0.6.5"

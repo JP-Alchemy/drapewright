@@ -172,6 +172,25 @@ impl Engine {
         Ok(set)
     }
 
+    /// Applies several commands as one undo step, labelled by the first.
+    /// If any is rejected, nothing changes.
+    pub fn dispatch_all(&mut self, commands: Vec<Command>) -> Result<ChangeSet, CommandError> {
+        let Some(label) = commands.first().map(Command::label) else {
+            return Ok(ChangeSet::default());
+        };
+        let before = self.document().clone();
+        let mut doc = before.clone();
+        let mut ids = self.ids.clone();
+        for command in commands {
+            apply(&mut doc, command, &mut ids)?;
+        }
+        self.ids = ids;
+        let set = ChangeSet::between(&before, &doc);
+        self.history.push(doc, label, None);
+        self.revision += 1;
+        Ok(set)
+    }
+
     pub fn undo(&mut self) -> Option<ChangeSet> {
         let before = self.document().clone();
         if !self.history.undo() {
@@ -268,6 +287,54 @@ mod tests {
 
     fn engine() -> Engine {
         Engine::new("prj", "Test", "2026-10-10T00:00:00Z", "test")
+    }
+
+    #[test]
+    fn several_commands_make_one_step_or_none() {
+        let mut e = engine();
+        let added = e
+            .dispatch(
+                Command::AddPieces {
+                    pieces: vec![square("A")],
+                },
+                Default::default(),
+            )
+            .unwrap()
+            .added;
+        let id = added[0].clone();
+        let set = e
+            .dispatch_all(vec![
+                Command::RenamePiece {
+                    piece: id.clone(),
+                    name: "Front".into(),
+                },
+                Command::MovePieces {
+                    ids: vec![id.clone()],
+                    dx: 10.0,
+                    dy: 0.0,
+                },
+            ])
+            .unwrap();
+        assert_eq!(set.changed, vec![id.clone()]);
+        assert_eq!(e.state().undo_label.as_deref(), Some("rename piece"));
+        e.undo();
+        assert_eq!(e.document().pieces[0].name, "A");
+
+        // A rejected command leaves the project as it was.
+        let revision = e.state().revision;
+        let err = e.dispatch_all(vec![
+            Command::RenamePiece {
+                piece: id.clone(),
+                name: "Back".into(),
+            },
+            Command::RenamePiece {
+                piece: "nope".into(),
+                name: "X".into(),
+            },
+        ]);
+        assert!(err.is_err());
+        assert_eq!(e.document().pieces[0].name, "A");
+        assert_eq!(e.state().revision, revision);
     }
 
     #[test]

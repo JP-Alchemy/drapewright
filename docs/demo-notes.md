@@ -12,6 +12,54 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 12 — Working with an AI assistant (MCP server)
+
+**Try it** with Claude Code (Claude Desktop works too; see
+[ai-assistants.md](ai-assistants.md)):
+
+```bash
+cargo build --release -p drapewright-mcp
+claude mcp add drapewright -- "$PWD/target/release/drapewright-mcp"
+```
+
+Then start `claude` in the repository folder and ask:
+
+1. *"Import fixtures/dxf/aama-graded.dxf."* The assistant can't import it
+   until it asks you three things, because the server refuses to guess
+   them: which size (S, M or L, made in M), how big the file is (it only
+   says "metric"), and whether seam allowance is included.
+2. *"Import fixtures/svg/freesewing-sasha-sa10.svg and show me the
+   pieces."* No questions this time. The assistant gets a picture: each
+   piece numbered and filled, with folds in blue, the stitching line
+   dashed, notches and grainlines.
+3. *"Show the front with its edge ids, call the fold edge centre front,
+   rename the pocket to Patch pocket, cut 2 in lining, and add a
+   70 × 8 cm waistband."* Each request is one undo step (*"undo that"*
+   works).
+4. *"Lay everything out for 150 cm fabric and save it to
+   ~/Desktop/sasha.drapewright."* Open that file in the app with
+   **Projects → Restore a backup…**. The project is all there, with the
+   original pattern files kept inside it.
+
+**How it behaves:** it reads and writes only the files it is given, makes
+no network connections, never overwrites a file or drops unsaved changes
+without being told to, and changes projects only through the app's own
+commands.
+
+**Found by testing:** piece numbers placed at the middle of a piece's
+bounding box fell outside curved pieces, such as the dress front. They now
+go at the point farthest inside the piece.
+
+**What's under the hood:** `crates/mcp` speaks the protocol (JSON-RPC over
+stdio) in `lib.rs`, and its 25 tools are in `tools.rs`. Each tool's
+arguments are a Rust type, so its JSON Schema is generated and can't drift.
+Several commands now apply as one all-or-nothing undo step
+(`Engine::dispatch_all`). Previews are drawn with tiny-skia, labelled with
+a small built-in stroke font so they need no font files (`render.rs`,
+`font.rs`).
+
+---
+
 ## Step 11 — Real patterns: every size in one file, and FreeSewing (after Phase 1)
 
 **Try it:**

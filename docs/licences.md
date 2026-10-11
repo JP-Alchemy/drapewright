@@ -32,6 +32,7 @@ Project licence: **not yet chosen** (see
 | schemars | MIT | JSON Schema generation for the public format | pattern-core, project |
 | ts-rs | MIT | TypeScript types generated from Rust | project, wasm-core |
 | wasm-bindgen | MIT OR Apache-2.0 | JS bindings (facade crate only) | wasm-core |
+| tiny-skia (with png) | BSD-3-Clause | Pictures of pieces for AI assistants | mcp |
 | serde-wasm-bindgen | MIT | Passing data across the boundary | wasm-core |
 | proptest *(dev)* | MIT OR Apache-2.0 | Property-based tests | tests |
 | insta *(dev)* | Apache-2.0 | Golden-file snapshot tests | tests |

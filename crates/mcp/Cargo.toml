@@ -1,0 +1,25 @@
+[package]
+name = "drapewright-mcp"
+description = "A Model Context Protocol server, so AI assistants can open, check and change Drapewright projects"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "drapewright-mcp"
+path = "src/main.rs"
+
+[dependencies]
+drapewright-pattern-core.workspace = true
+drapewright-project.workspace = true
+drapewright-io.workspace = true
+kurbo.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+tiny-skia.workspace = true
+
+[lints]
+workspace = true

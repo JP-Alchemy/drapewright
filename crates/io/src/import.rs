@@ -137,7 +137,8 @@ pub struct PieceSize {
 }
 
 impl ImportSizes {
-    fn of(&self, piece: &Id) -> Option<&str> {
+    /// The size a piece is, when the file says.
+    pub fn of(&self, piece: &Id) -> Option<&str> {
         self.pieces
             .iter()
             .find(|ps| &ps.piece == piece)
