@@ -64,6 +64,9 @@ jobs:
           size=$(stat -c %s packages/engine/pkg/drapewright_wasm_core_bg.wasm)
           echo "drapewright_wasm_core_bg.wasm: $size bytes"
           test "$size" -lt 3000000
+          size=$(stat -c %s packages/engine/pkg-3d/drapewright_wasm_3d_bg.wasm)
+          echo "drapewright_wasm_3d_bg.wasm: $size bytes"
+          test "$size" -lt 1000000
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check

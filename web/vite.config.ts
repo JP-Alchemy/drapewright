@@ -40,6 +40,16 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,wasm,webmanifest}'],
         maximumFileSizeToCacheInBytes: 16 * 1024 * 1024,
+        // The avatar's body file (4 MB) is fetched the first time the
+        // avatar is wanted, then kept for offline use. Its name changes with
+        // its contents, so a cached copy never goes stale.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.endsWith('.dwbody'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'drapewright-body', expiration: { maxEntries: 2 } },
+          },
+        ],
       },
     }),
   ],

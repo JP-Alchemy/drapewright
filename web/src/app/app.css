@@ -1141,6 +1141,66 @@ h2 {
   font-weight: 600;
 }
 
+/* The avatar: fitted to the measurements, with how close it comes. */
+.avatar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 8px 16px;
+}
+
+.avatar-controls .avatar-age {
+  width: min(220px, 100%);
+}
+
+.avatar-age .number-group {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.avatar-age .number-input {
+  text-align: start;
+}
+
+.avatar-controls > .button {
+  margin-top: 22px;
+}
+
+.avatar-report-wrap {
+  overflow-x: auto;
+}
+
+.avatar-report {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.avatar-report th,
+.avatar-report td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: end;
+  white-space: nowrap;
+}
+
+.avatar-report thead th {
+  color: var(--ink-muted);
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
+.avatar-report th[scope='row'],
+.avatar-report thead th:first-child {
+  text-align: start;
+  font-weight: 500;
+  white-space: normal;
+}
+
+.avatar-report tr.far td:last-child {
+  color: var(--danger);
+  font-weight: 600;
+}
+
 /* Print dialog: settings beside a preview of the pages on wide screens. */
 .modal.wide {
   width: min(880px, 100%);

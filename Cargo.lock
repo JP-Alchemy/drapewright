@@ -309,6 +309,7 @@ dependencies = [
 name = "drapewright-mcp"
 version = "0.1.0"
 dependencies = [
+ "drapewright-body",
  "drapewright-io",
  "drapewright-pattern-core",
  "drapewright-project",
@@ -377,6 +378,20 @@ dependencies = [
  "serde",
  "serde_json",
  "ts-rs",
+]
+
+[[package]]
+name = "drapewright-wasm-3d"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "drapewright-body",
+ "drapewright-project",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "ts-rs",
+ "wasm-bindgen",
 ]
 
 [[package]]

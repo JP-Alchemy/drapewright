@@ -1,7 +1,12 @@
-// How pieces' edges and seam sides are named in the app.
+// How pieces' edges, seam sides and measurements are named in the app.
 
-import type { Document, Piece, SeamSide } from '@drapewright/engine'
+import type { Document, Figure, MeasurementKey, Piece, SeamSide } from '@drapewright/engine'
 import { t } from '../strings/en.ts'
+
+/** A measurement's name and how to take it, for this figure. */
+export function measurementText(key: MeasurementKey, figure: Figure): readonly [string, string] {
+  return key === 'bust' && figure === 'man' ? t.measure.chest : t.measure.names[key]
+}
 
 /** "Side seam"; "the hem" or "the fold" when unnamed; else "edge 3". */
 export function edgeLabel(piece: Piece, edgeId: string): string {

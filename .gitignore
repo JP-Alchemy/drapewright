@@ -7,8 +7,9 @@ dist/
 .vite/
 coverage/
 
-# Generated WebAssembly package (built by `pnpm wasm`)
+# Generated WebAssembly packages (built by `pnpm wasm`)
 /packages/engine/pkg/
+/packages/engine/pkg-3d/
 
 # Test output
 test-results/

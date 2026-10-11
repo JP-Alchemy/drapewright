@@ -1,6 +1,7 @@
 target
 pnpm-lock.yaml
 packages/engine/pkg
+packages/engine/pkg-3d
 packages/engine/src/generated
 **/dist
 **/dev-dist

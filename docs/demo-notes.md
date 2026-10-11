@@ -12,14 +12,56 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 19b — The avatar in the app (Phase 3, part 4)
+
+The avatar comes into the Measurements panel: fit it to a person's
+measurements and see how close it comes, measurement by measurement.
+
+**Try it:**
+
+1. Open **Measurements**, add a person, and enter at least height, bust,
+   waist and hip (in centimetres, say 165, 91, 71 and 97).
+2. Under **The avatar**, set the age if you like (25 to 90), and press
+   **Fit the avatar**. The first time, the 3D side and the body file load
+   (4 MB); after that, fitting takes about a second.
+3. A table lists each measurement given: as measured, the avatar's, and
+   the difference ("Same", "0.7 cm larger", "1.2 cm shorter"). "The avatar
+   matches all 6 measurements to within 1 cm", or how many of them; any
+   further off are marked, as close as the avatar's figure can be shaped.
+4. Change a measurement: the report says it has changed since the avatar
+   was fitted, until **Fit again**.
+5. A man's figure leaves out the bust's shape, as the form does. A
+   measurement of your own (from an AI assistant, starting "x-") is said
+   to be not on the avatar.
+6. Offline: once fitted, the body file is kept, and fitting works without
+   a connection. Offline before the first fit, it says the avatar's figure
+   hasn't been downloaded yet.
+
+AI assistants get `fit_avatar`, the same report for a person's
+measurements.
+
+**Not yet:** the age isn't kept with the measurements (35 unless changed),
+and the fitted avatar isn't kept with the project either: it is fitted
+again when wanted. Seeing it in 3D comes with step 20.
+
+**What's under the hood:** a second WebAssembly module, `crates/wasm-3d`
+(226 KB, built for speed), runs in its own worker (`sim.worker.ts`), which
+starts the first time the avatar is wanted, so the 2D app loads exactly as
+before. The worker fetches the body file (`?url`; the service worker keeps
+it on first use) and fits with `drapewright-body`. In the app,
+`AvatarFitter.tsx`; for assistants, `fit_avatar` in `crates/mcp`, with the
+body file built into the server. `pnpm wasm` builds both modules.
+
+---
+
 ## Step 19a — The avatar: shaped, measured and fitted (Phase 3, part 3)
 
-The body patterns will be draped on, as a library for now: shaped from
+The body patterns will be draped on, as a library: shaped from
 MakeHuman's data, measured as a tape measure would, and fitted to a
 person's measurements. It comes into the app with step 19b ("Fit the
 avatar" in the Measurements panel), and is seen in 3D with step 20.
 
-**Try it** (from the command line for now):
+**Try it** (from the command line):
 
 1. A picture of a figure, front and side, showing where each measurement
    is taken; it prints them all:
@@ -68,7 +110,7 @@ cup's high bust (5 cm under the bust) is reached up to size 22. At 26W and
 30W the figure's frame is not broad enough for it: the high bust is left
 3 to 10 cm short, and the bust can come up to 3 cm short with it.
 
-**Not yet:** in the app (19b); in 3D (step 20). The figure stands as
+**Not yet:** in 3D (step 20); in the app since 19b. The figure stands as
 MakeHuman's does, arms held out, so across front and back are
 approximate. The model's extremes (the heaviest figures with a flat
 chest) measure less well.

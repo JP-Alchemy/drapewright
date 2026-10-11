@@ -9,6 +9,7 @@ export default defineConfig([
     '**/dist',
     '**/dev-dist',
     'packages/engine/pkg',
+    'packages/engine/pkg-3d',
     'packages/engine/src/generated',
     'target',
     'test-results',

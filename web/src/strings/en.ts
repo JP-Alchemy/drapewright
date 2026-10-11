@@ -621,6 +621,37 @@ export const t = {
     } satisfies Record<MeasurementKey, readonly [string, string]>,
     /** Men's figures say chest, not bust. */
     chest: ['Chest', 'Around the fullest part of the chest, under the arms, the tape level.'],
+    avatar: {
+      heading: 'The avatar',
+      intro:
+        'A figure shaped to these measurements, to drape patterns on. Fit it to see how close it comes.',
+      age: 'Age',
+      ageHint: 'The avatar is an adult’s, 25 to 90.',
+      fit: 'Fit the avatar',
+      again: 'Fit again',
+      fitting: 'Fitting…',
+      need: 'Enter some measurements first: height, bust, waist and hip are enough to start.',
+      changed: 'These measurements have changed since the avatar was fitted.',
+      failed: (why: string) => `The avatar could not be fitted: ${why}.`,
+      noBodyFile:
+        'The avatar’s figure hasn’t been downloaded yet: connect to the internet once and fit it again. After that it works offline too.',
+      report: 'How close the avatar comes',
+      columns: ['Measurement', 'Measured', 'Avatar', 'Difference'],
+      same: 'Same',
+      larger: (by: string) => `${by} larger`,
+      smaller: (by: string) => `${by} smaller`,
+      longer: (by: string) => `${by} longer`,
+      shorter: (by: string) => `${by} shorter`,
+      summary: (close: number, of: number) =>
+        close === of
+          ? plural(
+              of,
+              'The avatar matches the measurement to within 1 cm.',
+              'The avatar matches all # measurements to within 1 cm.',
+            )
+          : `The avatar matches ${close} of ${of} measurements to within 1 cm; the others are as close as its figure can be shaped.`,
+      notTaken: (names: string) => `Not on the avatar: ${names}.`,
+    },
   },
 
   crash: {

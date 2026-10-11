@@ -18,6 +18,7 @@ drapewright-project = { path = "crates/project" }
 drapewright-pdf-import = { path = "crates/pdf-import" }
 drapewright-seams = { path = "crates/seams" }
 drapewright-body = { path = "crates/body" }
+drapewright-wasm-3d = { path = "crates/wasm-3d" }
 
 # Geometry
 kurbo = "0.13.1"
@@ -77,6 +78,12 @@ panic = "abort"
 opt-level = 2
 
 # Shaping, measuring and fitting bodies is heavy arithmetic: optimised even
-# in tests.
+# in tests, and for speed rather than size in the browser.
 [profile.dev.package.drapewright-body]
+opt-level = 3
+
+[profile.release.package.drapewright-body]
+opt-level = 3
+
+[profile.release.package.drapewright-wasm-3d]
 opt-level = 3

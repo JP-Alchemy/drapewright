@@ -12,6 +12,7 @@ name = "drapewright-mcp"
 path = "src/main.rs"
 
 [dependencies]
+drapewright-body.workspace = true
 drapewright-pattern-core.workspace = true
 drapewright-project.workspace = true
 drapewright-seams.workspace = true

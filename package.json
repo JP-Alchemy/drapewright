@@ -7,9 +7,12 @@
     "node": ">=22"
   },
   "scripts": {
-    "wasm": "wasm-pack build crates/wasm-core --target web --out-dir ../../packages/engine/pkg --release && pnpm wasm:opt",
+    "wasm": "pnpm wasm:2d && pnpm wasm:3d",
+    "wasm:2d": "wasm-pack build crates/wasm-core --target web --out-dir ../../packages/engine/pkg --release && pnpm wasm:opt",
     "wasm:opt": "wasm-opt -Oz --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals --enable-reference-types --enable-multivalue packages/engine/pkg/drapewright_wasm_core_bg.wasm -o packages/engine/pkg/drapewright_wasm_core_bg.wasm",
-    "wasm:dev": "wasm-pack build crates/wasm-core --target web --out-dir ../../packages/engine/pkg --dev",
+    "wasm:3d": "wasm-pack build crates/wasm-3d --target web --out-dir ../../packages/engine/pkg-3d --release && pnpm wasm:opt-3d",
+    "wasm:opt-3d": "wasm-opt -O3 --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals --enable-reference-types --enable-multivalue packages/engine/pkg-3d/drapewright_wasm_3d_bg.wasm -o packages/engine/pkg-3d/drapewright_wasm_3d_bg.wasm",
+    "wasm:dev": "wasm-pack build crates/wasm-core --target web --out-dir ../../packages/engine/pkg --dev && wasm-pack build crates/wasm-3d --target web --out-dir ../../packages/engine/pkg-3d --dev",
     "dev": "pnpm --filter @drapewright/web dev",
     "build": "pnpm wasm && pnpm --filter @drapewright/web build",
     "preview": "pnpm --filter @drapewright/web preview",

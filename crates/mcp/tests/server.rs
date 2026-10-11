@@ -496,6 +496,36 @@ fn an_assistant_keeps_a_persons_measurements() {
 }
 
 #[test]
+fn an_assistant_sees_how_close_the_avatar_comes() {
+    let mut s = server();
+    ok(&mut s, "new_project", json!({ "name": "Blouse for Anna" }));
+    let none = fails(&mut s, "fit_avatar", json!({}));
+    assert!(none.contains("set_measurements"), "{none}");
+    ok(
+        &mut s,
+        "set_measurements",
+        json!({ "name": "Anna", "values_mm": { "height": 1650, "bust": 910, "waist": 710,
+                "hip": 970, "x-elbow": 260 } }),
+    );
+    let fitted = ok_json(&mut s, "fit_avatar", json!({ "age": 52 }));
+    assert_eq!(fitted["person"], "Anna");
+    assert_eq!(fitted["age"], 52.0);
+    let rows = fitted["measurements"].as_array().unwrap();
+    let keys: Vec<&str> = rows.iter().map(|r| r["key"].as_str().unwrap()).collect();
+    assert_eq!(keys, ["height", "bust", "waist", "hip"]);
+    for r in rows {
+        assert!(r["differenceMm"].as_f64().unwrap().abs() < 10.0, "{r}");
+    }
+    assert_eq!(fitted["notOnTheAvatar"], json!(["x-elbow"]));
+    assert!(
+        fitted["summary"]
+            .as_str()
+            .unwrap()
+            .contains("4 of 4 measurements")
+    );
+}
+
+#[test]
 fn an_assistant_sews_and_unpicks_seams() {
     let mut s = server();
     ok(&mut s, "new_project", json!({ "name": "Cushion" }));

@@ -92,6 +92,7 @@ assistant that file.
 | `delete_pieces` | Removes pieces (undo brings them back) |
 | `move_pieces`, `rotate_piece`, `arrange_pieces` | Arrange the work table, e.g. in rows as wide as the fabric |
 | `get_measurements`, `set_measurements` | People's body measurements kept in the project; values outside the usual range are pointed out |
+| `fit_avatar` | Fits the avatar to a person's measurements and says how close it comes to each |
 | `get_seams`, `sew_edges`, `unpick_seams` | Which edges are sewn together, each side's length and how the notches meet; seams Drapewright suggests (to confirm with the user) |
 | `undo`, `redo` | One tool call is one step |
 | `print_settings` | How the project prints, and its print settings |

@@ -28,16 +28,13 @@ import { useEngineState } from '../state/hooks.ts'
 import type { Session } from '../state/session.ts'
 import { t } from '../strings/en.ts'
 import { fromDisplay, lengthFormat, lengthStep, toDisplay } from '../strings/units.ts'
+import { AvatarFitter } from './AvatarFitter.tsx'
 import { CommitTextField } from './Inspector.tsx'
+import { measurementText } from './labels.ts'
 
 /** Today in the device's time zone, as `YYYY-MM-DD`. */
 function today(): string {
   return new Date().toLocaleDateString('en-CA')
-}
-
-/** A measurement's name and how to take it, for this figure. */
-export function measurementText(key: MeasurementKey, figure: Figure): readonly [string, string] {
-  return key === 'bust' && figure === 'man' ? t.measure.chest : t.measure.names[key]
 }
 
 /** Whether a value is outside the usual range for adults (wrong units, most likely). */
@@ -239,6 +236,7 @@ function SetEditor({
           </section>
         )
       })}
+      <AvatarFitter set={set} vocabulary={vocabulary} units={units} />
       <div className="measure-delete">
         {confirming ? (
           <>

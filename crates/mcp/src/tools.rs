@@ -2,10 +2,11 @@
 //! commands as the app, as one undo step, so it can be undone and the
 //! project stays valid.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
+use drapewright_body::BodyModel;
 use drapewright_io::pdf::{PdfTexts, PrintPlan, export_pdf, plan_print};
 use drapewright_io::svg::{SvgExportOptions, export_svg};
 use drapewright_io::{AllowanceAnswer, ImportResult};
@@ -306,6 +307,13 @@ pub fn all() -> Vec<Tool> {
             Edits,
             "Adds a person's measurements, or changes one person's: name, figure (\"woman\" or \"man\"), the date taken, and values in mm by key (see get_measurements; custom keys start with \"x-\"). With measure_again the current values are kept as an earlier measurement first. Values outside the usual range are reported, as they are often in the wrong units.",
             set_measurements,
+        ),
+        tool(
+            "fit_avatar",
+            "Fit the avatar",
+            Reads,
+            "Fits the avatar (the figure patterns will be draped on) to a person's measurements, and says how close it comes to each: the person's, the avatar's and the difference, mm. The avatar is an adult's (25 to 90); from pattern sizes 6 to 30W it matches height, bust, waist and hip within a few mm, and says where it cannot come closer.",
+            fit_avatar,
         ),
         tool(
             "get_seams",
@@ -2221,6 +2229,90 @@ fn set_measurements(session: &mut Session, a: MeasurementArgs) -> Result<Output,
         ));
     }
     Ok(Output::text(text))
+}
+
+/// The avatar's body, built into the server and loaded when first wanted.
+fn body_model() -> &'static BodyModel {
+    static BODY: OnceLock<BodyModel> = OnceLock::new();
+    BODY.get_or_init(|| {
+        BodyModel::from_bytes(include_bytes!("../../../assets/body/adult.dwbody"))
+            .expect("the body file built in")
+    })
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct AvatarArgs {
+    /// Id of the person's measurements (see get_measurements); leave out
+    /// for the first person.
+    person: Option<String>,
+    /// Their age in years (25 to 90); 35 if left out.
+    age: Option<f64>,
+}
+
+fn fit_avatar(session: &mut Session, a: AvatarArgs) -> Result<Output, ToolError> {
+    let doc = session.project()?.engine.document();
+    let set = match &a.person {
+        Some(id) => doc.measurement_sets.iter().find(|m| &m.id == id),
+        None => doc.measurement_sets.first(),
+    }
+    .ok_or_else(|| {
+        ToolError::new(match &a.person {
+            Some(id) => {
+                format!("There are no measurements \"{id}\". get_measurements lists them.")
+            }
+            None => "There are no measurements yet: add some with set_measurements.".into(),
+        })
+    })?;
+    // A man's figure has no bust's shape, as in the app.
+    let woman = set.figure == Figure::Woman;
+    let values: BTreeMap<String, f64> = set
+        .values
+        .iter()
+        .filter(|(k, _)| {
+            MeasurementKey::from_name(k).is_none_or(|key| woman || !key.info().women_only)
+        })
+        .map(|(k, v)| (k.clone(), *v))
+        .collect();
+    let age = a.age.unwrap_or(35.0).clamp(25.0, 90.0);
+    let fitted = drapewright_body::fit(body_model(), &values, woman, age);
+    let rows: Vec<Value> = MeasurementKey::ALL
+        .iter()
+        .filter_map(|key| {
+            let name = key.name();
+            let difference = fitted.residuals.get(&name)?;
+            Some(json!({
+                "key": name,
+                "personMm": values[&name],
+                "avatarMm": round_tenth(values[&name] + difference),
+                "differenceMm": round_tenth(*difference),
+            }))
+        })
+        .collect();
+    let close = fitted
+        .residuals
+        .values()
+        .filter(|d| d.abs() <= 10.0)
+        .count();
+    let not_taken: Vec<&String> = values
+        .keys()
+        .filter(|k| !fitted.residuals.contains_key(*k))
+        .collect();
+    Ok(Output::json(&json!({
+        "person": set.name,
+        "figure": set.figure,
+        "age": age,
+        "summary": format!(
+            "The avatar matches {close} of {} measurements to within 1 cm.",
+            rows.len()
+        ),
+        "measurements": rows,
+        "notOnTheAvatar": not_taken,
+    })))
+}
+
+fn round_tenth(mm: f64) -> f64 {
+    (mm * 10.0).round() / 10.0
 }
 
 fn undo(session: &mut Session, _: NoArgs) -> Result<Output, ToolError> {

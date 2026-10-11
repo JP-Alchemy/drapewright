@@ -33,7 +33,7 @@ itself), `wasm-pack`, Node 22+, pnpm 9+.
 
 ```bash
 pnpm install
-pnpm wasm      # build the Rust engine to WebAssembly (and shrink it with wasm-opt)
+pnpm wasm      # build the Rust engine to WebAssembly: the 2D engine (shrunk with wasm-opt) and the 3D side
 pnpm dev       # http://localhost:5173 (served cross-origin isolated)
 ```
 
