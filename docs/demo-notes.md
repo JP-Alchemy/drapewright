@@ -41,12 +41,23 @@ every logo is strokes. These now import.
    * The words and the brand logo on each piece are left out, and the
      import says so. The logo is drawn at three sizes. The round "+"
      outlines become button marks.
-2. On two real bought patterns (A0 copy-shop files, kept out of the repo):
+2. The same drawing printed on A4 the way plotter drivers tile it:
+
+   ```bash
+   PLOTTED_TILES=tiles.pdf cargo test -p drapewright-io --test pdf_plotter
+   ```
+
+   Eight pages, each with a frame and only its own part of the drawing,
+   to trim at the frame and butt together. The import says **8 pages
+   joined** and gives the same three pieces as the one sheet.
+3. On two real bought patterns (kept out of the repo), each sold as an A0
+   copy-shop file and as A4 pages (36 and 24):
    * the blouse gives 10 pieces, 9 with their stitching lines (the 10th has
      none drawn), all with grainlines, and the 12 buttons;
    * the trousers give 7 pieces, 5 with stitching lines (the other two have
      none), all with grainlines, the fly's end, the dart's point and the
-     waistband button.
+     waistband button;
+   * the A4 files give the same pieces as the A0 ones.
 
 **How the strokes become outlines:**
 * Strokes join end to end. Where several lines meet, the outline goes on
@@ -63,6 +74,12 @@ every logo is strokes. These now import.
   apart ("to") and a dash between words. Logos are the same intricate
   letter shapes repeated on the pieces at any size, with the dots beside
   them.
+* **Pages to trim and butt:** each page has a frame drawn round its part
+  of the drawing, and no shape is on two pages. A line cut off at one
+  page's frame carries on from the next page's frame, so the page grid
+  (how many across, rows from the top or the bottom) is the one under
+  which the most lines carry on. Then each line's two ends are stitched
+  together across the join. Footers touching every frame are ignored.
 * Arrowheads drawn as triangle outlines (as big as 3 cm) make grainlines,
   even when "grainline" is written right beside them. A piece's grainline
   is its longest arrow. Shorter ones show which way to press a dart.
@@ -71,18 +88,20 @@ every logo is strokes. These now import.
 * **Piece names and cutting counts:** they are drawn as strokes too, so
   pieces are named *Piece 1*, *Piece 2*… The import says so. Reading
   plotter lettering is a later step.
-* **The A4 versions of these files:** each page holds only its own part of
-  the drawing (with a 2.5 cm overlap), so pages share few whole shapes.
-  These come next: matching the pages by their strokes in the overlaps.
-* An allowance that curves from one width into another (the fly above)
-  becomes a square step, and the import gives the largest difference
-  from the drawn cutting line (9 mm there).
+* An allowance that curves from one width into another (the end of the
+  real trousers' fly) becomes a square step, and the import gives the
+  largest difference from the drawn cutting line (9 mm there).
 
-**What's under the hood:** `crates/io/src/pdf/loops.rs` (the network of
-lines and its outer edges), `lettering.rs` (words, logos, round "+"
-marks), the stepped allowances and three-sided stitching lines in
-`assemble.rs`, and triangle arrowheads in `marks.rs`. The test
-`crates/io/tests/pdf_plotter.rs` draws each case as a plotter would.
+**Found by testing:** a rectangular piece bigger than 80% of an A4 page,
+printed across several tiles, was taken for a page's frame and left out.
+A frame must now lie on its page.
+
+**What's under the hood:** `crates/io/src/pdf/butt.rs` (frames, the page
+grid, stitches), `loops.rs` (the network of lines and its outer edges),
+`lettering.rs` (words, logos, round "+" marks), the stepped allowances and
+three-sided stitching lines in `assemble.rs`, and triangle arrowheads in
+`marks.rs`. The test `crates/io/tests/pdf_plotter.rs` draws each case as a
+plotter would, on one sheet and on butted A4 tiles.
 
 ---
 

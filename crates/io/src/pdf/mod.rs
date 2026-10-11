@@ -3,6 +3,7 @@
 //! at exactly 100 % and join edge to edge, or printed whole on large paper
 //! at a copy shop. And reading PDF patterns back in (`import_pdf`).
 
+mod butt;
 mod import;
 mod lettering;
 mod loops;

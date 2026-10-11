@@ -13,6 +13,7 @@ use drapewright_pattern_core::{
 use drapewright_pdf_import::{Document, Page, Shape, TextRun};
 use kurbo::{Affine, BezPath, CubicBez, Line, ParamCurve, PathEl, PathSeg, Point, Rect, Vec2};
 
+use super::butt::{Edges, Stitch, butt_grid, drawn_frame};
 use super::lettering::{
     find_crosses, find_lettering, find_outlined_crosses, find_repeated_decorations,
 };
@@ -150,8 +151,18 @@ fn is_page_frame(segs: &[PathSeg], page: Rect) -> bool {
         PathSeg::Line(l) => (l.p0.x - l.p1.x).abs() < 0.5 || (l.p0.y - l.p1.y).abs() < 0.5,
         _ => false,
     });
-    axis_aligned && b.width() >= 0.8 * page.width() && b.height() >= 0.8 * page.height()
+    // On the page: a rectangular piece across several pages of a tiled
+    // print is no page's frame.
+    let on_page = page.inflate(1.0, 1.0);
+    axis_aligned
+        && on_page.contains(b.origin())
+        && on_page.contains(Point::new(b.x1, b.y1))
+        && b.width() >= 0.8 * page.width()
+        && b.height() >= 0.8 * page.height()
 }
+
+/// Pages put together on one sheet: each page, and where it goes.
+type PageGroup = Vec<(usize, Vec2)>;
 
 /// A path read from a page, how it is drawn, and whether any of it shows
 /// on that page (tiles draw shapes beyond their edges too).
@@ -422,6 +433,9 @@ struct PageContent {
     height: f64,
     /// The area most of the drawing is clipped to: on a tile, its frame.
     frame: Option<Rect>,
+    /// The frame was drawn round the drawing, which stops at it: a tile to
+    /// trim there and butt to the next.
+    drawn_frame: bool,
 }
 
 fn read_page(
@@ -453,18 +467,192 @@ fn read_page(
             None => clips.push((r, 1)),
         }
     }
-    let frame = clips
+    let mut paths: Vec<PagePath> = paths;
+    let mut frame = clips
         .into_iter()
         .max_by_key(|(_, n)| *n)
         .filter(|(r, n)| *n >= 3 && r.width() > 50.0 && r.height() > 50.0)
         .map(|(r, _)| r);
+    // A frame drawn round a drawing that stops at it: the lines of the
+    // frame are no part of the pattern.
+    let drawn = frame.is_none().then(|| {
+        drawn_frame(
+            paths.iter().map(|(r, _, _)| r.segs.as_slice()),
+            Vec2::new(width, height),
+        )
+    });
+    let drawn_frame = if let Some(Some(f)) = drawn {
+        paths.retain(|(r, _, _)| !on_frame(&r.segs, f));
+        frame = Some(f);
+        true
+    } else {
+        false
+    };
     Ok(PageContent {
         paths,
         labels: text_lines(&page.drawing.texts, to_mm),
         width,
         height,
         frame,
+        drawn_frame,
     })
+}
+
+/// Takes out the moments where a path doubles back on itself (a stretch
+/// under half a millimetre going back the way it came): the middle of the
+/// stretch stands for both its ends.
+fn despike(segs: &mut Vec<PathSeg>, closed: bool) {
+    const SHORT: f64 = 0.5;
+    let way = |s: &PathSeg| {
+        let d = s.end() - s.start();
+        if d.hypot() < 1e-9 {
+            Vec2::ZERO
+        } else {
+            d / d.hypot()
+        }
+    };
+    let mut k = 0;
+    while segs.len() > 3 && k < segs.len() {
+        let n = segs.len();
+        let seg = segs[k];
+        let back = (k > 0 || closed).then(|| segs[(k + n - 1) % n]);
+        let on = (k + 1 < n || closed).then(|| segs[(k + 1) % n]);
+        let doubles_back = matches!(seg, PathSeg::Line(_))
+            && seg.start().distance(seg.end()) < SHORT
+            && [back, on]
+                .iter()
+                .flatten()
+                .any(|o| matches!(o, PathSeg::Line(_)) && way(o).dot(way(&seg)) < -0.5);
+        if !doubles_back {
+            k += 1;
+            continue;
+        }
+        let mid = seg.start().midpoint(seg.end());
+        let (prev, next) = ((k + n - 1) % n, (k + 1) % n);
+        let moved = |s: PathSeg, start: Option<Point>, end: Option<Point>| match s {
+            PathSeg::Line(mut l) => {
+                l.p0 = start.unwrap_or(l.p0);
+                l.p1 = end.unwrap_or(l.p1);
+                PathSeg::Line(l)
+            }
+            other => other,
+        };
+        if back.is_some() {
+            segs[prev] = moved(segs[prev], None, Some(mid));
+        }
+        if on.is_some() {
+            segs[next] = moved(segs[next], Some(mid), None);
+        }
+        segs.remove(k);
+        k = k.saturating_sub(1);
+    }
+}
+
+/// A line drawn along a side of `frame`.
+fn on_frame(segs: &[PathSeg], frame: Rect) -> bool {
+    let pts = flatten_segs(segs, 0.1);
+    let near = |v: f64, at: f64| (v - at).abs() <= 0.3;
+    [
+        pts.iter().all(|p| near(p.x, frame.x0)),
+        pts.iter().all(|p| near(p.x, frame.x1)),
+        pts.iter().all(|p| near(p.y, frame.y0)),
+        pts.iter().all(|p| near(p.y, frame.y1)),
+    ]
+    .contains(&true)
+}
+
+/// Pages whose drawings stop at a frame drawn round them, all one size,
+/// placed by the grid under which lines cut off at one page's frame carry
+/// on from the next's. The pages left over stay on their own. Also the
+/// lines to stitch together across the joins (by page index).
+fn butt_pages(pages: &[PageContent]) -> Option<(Vec<PageGroup>, Vec<Stitch>)> {
+    let framed: Vec<(usize, Rect)> = pages
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| p.drawn_frame)
+        .filter_map(|(i, p)| p.frame.map(|f| (i, f)))
+        .collect();
+    // The frame size most pages have.
+    let size = |f: &Rect| {
+        (
+            (f.width() * 2.0).round() as i64,
+            (f.height() * 2.0).round() as i64,
+        )
+    };
+    let mut counts: HashMap<(i64, i64), usize> = HashMap::new();
+    for (_, f) in &framed {
+        *counts.entry(size(f)).or_default() += 1;
+    }
+    let (common, _) = counts.into_iter().max_by_key(|(k, n)| (*n, *k))?;
+    let tiles: Vec<(usize, Rect)> = framed
+        .into_iter()
+        .filter(|(_, f)| size(f) == common)
+        .collect();
+    if tiles.len() < 2 {
+        return None;
+    }
+    // Each page's strokes joined into lines first: lettering's are short.
+    let edges: Vec<Edges> = tiles
+        .iter()
+        .map(|(i, f)| {
+            let strokes = pages[*i]
+                .paths
+                .iter()
+                .map(|(r, _, _)| r.segs.clone())
+                .collect();
+            let lines = chain(strokes, JOIN);
+            Edges::of(
+                lines
+                    .iter()
+                    .filter(|(_, closed)| !closed)
+                    .map(|(s, _)| s.as_slice()),
+                *f,
+            )
+        })
+        .collect();
+    let edges = Edges::without_furniture(edges);
+    let frames: Vec<Rect> = tiles.iter().map(|(_, f)| *f).collect();
+    let (at, stitches) = butt_grid(&edges, &frames)?;
+    let mut groups = vec![tiles.iter().map(|(i, _)| *i).zip(at).collect::<Vec<_>>()];
+    groups.extend(
+        (0..pages.len())
+            .filter(|i| !tiles.iter().any(|(t, _)| t == i))
+            .map(|i| vec![(i, Vec2::ZERO)]),
+    );
+    let page = |k: usize| tiles[k].0;
+    let stitches = stitches
+        .into_iter()
+        .map(|((a, p), (b, q))| ((page(a), p), (page(b), q)))
+        .collect();
+    Some((groups, stitches))
+}
+
+/// Brings together the two ends of each line cut off at a join of butted
+/// tiles: both move to the middle of the hair between them. `placed` takes
+/// a page's millimetres to the sheet's.
+fn stitch(paths: &mut [PagePath], stitches: &[Stitch], placed: &HashMap<usize, Affine>) {
+    for ((a, p), (b, q)) in stitches {
+        let (Some(ta), Some(tb)) = (placed.get(a), placed.get(b)) else {
+            continue;
+        };
+        let (p, q) = (*ta * *p, *tb * *q);
+        let middle = p.midpoint(q);
+        for end in [p, q] {
+            for (r, _, _) in paths.iter_mut() {
+                let n = r.segs.len();
+                if let Some(PathSeg::Line(l)) = r.segs.first_mut()
+                    && l.p0.distance(end) <= 0.01
+                {
+                    l.p0 = middle;
+                }
+                if let Some(PathSeg::Line(l)) = r.segs.get_mut(n.saturating_sub(1))
+                    && l.p1.distance(end) <= 0.01
+                {
+                    l.p1 = middle;
+                }
+            }
+        }
+    }
 }
 
 /// Marks for joining tiles, drawn where they meet: lines along the joins,
@@ -570,7 +758,20 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         })
         .collect();
     let page_sizes: Vec<Vec2> = pages.iter().map(|p| Vec2::new(p.width, p.height)).collect();
-    let groups = arrange(&prints, &page_sizes);
+    let mut groups = arrange(&prints, &page_sizes);
+    // Tiles that share no shapes, each cut off at its frame: placed by
+    // where their lines are cut off. They have no marks for joining them.
+    let mut butted = false;
+    let mut stitches = Vec::new();
+    if !groups.iter().any(|g| g.len() > 1)
+        && let Some((placed, lines)) = butt_pages(&pages)
+    {
+        groups = placed;
+        stitches = lines;
+        butted = true;
+    }
+    // Where each page went on the sheets.
+    let mut placed: HashMap<usize, Affine> = HashMap::new();
     let tiled = groups.iter().any(|g| g.len() > 1);
     let mut notes = Vec::new();
     let mut styled: Vec<PagePath> = Vec::new();
@@ -618,6 +819,7 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         );
         for (i, at) in group {
             let to_sheet = Affine::translate(*at + Vec2::new(x - sheet.x0, -sheet.y0));
+            placed.insert(*i, to_sheet);
             page_areas.push(to_sheet.transform_rect_bbox(Rect::new(
                 0.0,
                 0.0,
@@ -625,6 +827,7 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
                 pages[*i].height,
             )));
             if group.len() > 1
+                && !butted
                 && let Some(f) = pages[*i].frame
             {
                 let f = to_sheet.transform_rect_bbox(f);
@@ -673,6 +876,8 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
     if left_out > 0 {
         notes.push(ImportNote::PagesLeftOut { count: left_out });
     }
+
+    stitch(&mut styled, &stitches, &placed);
 
     // What shows nowhere (off every page) is not part of the pattern.
     let mut styled: Vec<(RawPath, Style)> = styled
@@ -767,6 +972,13 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         }
         svg.push_str("</svg>");
         let _ = std::fs::write(out, svg);
+    }
+
+    // Where tiles each draw a hair past their frame, the two halves of a
+    // line crossing the join overlap: joined end to end, the line doubles
+    // back on itself there for a moment.
+    for (r, _) in &mut raw {
+        despike(&mut r.segs, r.closed);
     }
 
     // The test square checks the print; it is not a piece (nor a size).

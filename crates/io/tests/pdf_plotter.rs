@@ -9,21 +9,21 @@ use drapewright_io::pdf::import_pdf;
 use drapewright_pattern_core::{MarkKind, Piece};
 use pdf_writer::{Content, Finish, Pdf, Rect, Ref};
 
-/// Page height, mm; the drawing's y runs down from the top.
-const HEIGHT: f64 = 600.0;
+/// The sheet's size, mm; its y runs down from the top.
+const SHEET: P = (700.0, 600.0);
 const MM: f64 = 72.0 / 25.4;
 
 type P = (f64, f64);
 
+/// One pen stroke: through its points, and back to the first if closed.
+type Stroke = (Vec<P>, bool);
+
+#[derive(Default)]
 struct Plotter {
-    c: Content,
+    strokes: Vec<Stroke>,
 }
 
 impl Plotter {
-    fn pt(p: P) -> (f32, f32) {
-        ((p.0 * MM) as f32, ((HEIGHT - p.1) * MM) as f32)
-    }
-
     /// A line through `points`, one stroke every `step` mm or so.
     fn line(&mut self, points: &[P], step: f64) {
         for w in points.windows(2) {
@@ -31,24 +31,15 @@ impl Plotter {
             let n = ((b.0 - a.0).hypot(b.1 - a.1) / step).ceil().max(1.0) as usize;
             let at = |t: f64| (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t);
             for k in 0..n {
-                let (p, q) = (
-                    Self::pt(at(k as f64 / n as f64)),
-                    Self::pt(at((k + 1) as f64 / n as f64)),
-                );
-                self.c.move_to(p.0, p.1).line_to(q.0, q.1).stroke();
+                let (p, q) = (at(k as f64 / n as f64), at((k + 1) as f64 / n as f64));
+                self.strokes.push((vec![p, q], false));
             }
         }
     }
 
     /// A closed shape, as one path.
     fn shape(&mut self, points: &[P]) {
-        let p = Self::pt(points[0]);
-        self.c.move_to(p.0, p.1);
-        for &q in &points[1..] {
-            let q = Self::pt(q);
-            self.c.line_to(q.0, q.1);
-        }
-        self.c.close_path().stroke();
+        self.strokes.push((points.to_vec(), true));
     }
 
     /// A closed shape drawn as three strokes that miss each other by a
@@ -62,14 +53,9 @@ impl Plotter {
             &ring[third..=2 * third],
             &ring[2 * third..],
         ] {
-            let nudge = |p: P| (p.0 + 0.15, p.1);
-            let p = Self::pt(nudge(part[0]));
-            self.c.move_to(p.0, p.1);
-            for &q in &part[1..] {
-                let q = Self::pt(q);
-                self.c.line_to(q.0, q.1);
-            }
-            self.c.stroke();
+            let mut part = part.to_vec();
+            part[0].0 += 0.15;
+            self.strokes.push((part, false));
         }
     }
 
@@ -161,9 +147,9 @@ impl Plotter {
     }
 }
 
-fn plotted() -> Vec<u8> {
-    let mut p = Plotter { c: Content::new() };
-    p.c.set_line_width(0.6);
+/// The made-up pattern, as a plotter draws it.
+fn drawing() -> Vec<Stroke> {
+    let mut p = Plotter::default();
 
     // Piece A: a cut-on fly makes the allowance 40 mm along the top half of
     // the right edge, 10 mm elsewhere. Its notches start on corners of the
@@ -265,22 +251,134 @@ fn plotted() -> Vec<u8> {
     let d = std::f64::consts::FRAC_1_SQRT_2;
     p.head((605.0, 290.0), (d, -d), 10.0, 6.0);
     p.logo((575.0, 150.0), 0.8);
+    p.strokes
+}
 
+/// A PDF of pages `size` mm (y down from the top), each with its strokes.
+fn pdf(size: P, pages: &[Vec<Stroke>]) -> Vec<u8> {
     let mut pdf = Pdf::new();
+    let n = pages.len() as i32;
     pdf.catalog(Ref::new(1)).pages(Ref::new(2));
-    pdf.pages(Ref::new(2)).kids([Ref::new(3)]).count(1);
-    let mut page = pdf.page(Ref::new(3));
-    page.media_box(Rect::new(
-        0.0,
-        0.0,
-        (700.0 * MM) as f32,
-        (HEIGHT * MM) as f32,
-    ))
-    .parent(Ref::new(2))
-    .contents(Ref::new(4));
-    page.finish();
-    pdf.stream(Ref::new(4), &p.c.finish());
+    pdf.pages(Ref::new(2))
+        .kids((0..n).map(|k| Ref::new(3 + 2 * k)))
+        .count(n);
+    let pt = |p: P| ((p.0 * MM) as f32, ((size.1 - p.1) * MM) as f32);
+    for (k, strokes) in pages.iter().enumerate() {
+        let (page_ref, content_ref) = (Ref::new(3 + 2 * k as i32), Ref::new(4 + 2 * k as i32));
+        let mut page = pdf.page(page_ref);
+        page.media_box(Rect::new(
+            0.0,
+            0.0,
+            (size.0 * MM) as f32,
+            (size.1 * MM) as f32,
+        ))
+        .parent(Ref::new(2))
+        .contents(content_ref);
+        page.finish();
+        let mut c = Content::new();
+        c.set_line_width(0.6);
+        for (points, closed) in strokes {
+            let first = pt(points[0]);
+            c.move_to(first.0, first.1);
+            for &q in &points[1..] {
+                let q = pt(q);
+                c.line_to(q.0, q.1);
+            }
+            if *closed {
+                c.close_path();
+            }
+            c.stroke();
+        }
+        pdf.stream(content_ref, &c.finish());
+    }
     pdf.finish()
+}
+
+/// The drawing on one sheet, as a copy shop prints it.
+fn plotted() -> Vec<u8> {
+    pdf(SHEET, &[drawing()])
+}
+
+/// The drawing on A4 pages to trim at a frame and butt together, as plotter
+/// drivers tile it: 190 × 276 mm of the sheet inside each page's frame
+/// (each page draws a hair past it), pages numbered along the rows from the
+/// bottom, a footer on each page touching its frame.
+fn tiled() -> Vec<u8> {
+    const FRAME: P = (190.0, 276.0);
+    // Joins kept clear of the small marks.
+    const ORIGIN: P = (-7.0, 40.0);
+    let (cols, rows) = (4, 2);
+    let strokes = drawing();
+    let mut pages = Vec::new();
+    for k in 0..cols * rows {
+        let (c, r) = (k % cols, rows - 1 - k / cols);
+        let x0 = ORIGIN.0 + FRAME.0 * c as f64;
+        let y0 = ORIGIN.1 + FRAME.1 * r as f64;
+        let to_page = |p: P| (p.0 - x0 + 10.0, p.1 - y0 + 10.0);
+        let hair = 0.08;
+        let area = (
+            x0 - hair,
+            y0 - hair,
+            x0 + FRAME.0 + hair,
+            y0 + FRAME.1 + hair,
+        );
+        let inside = |p: &P| area.0 <= p.0 && p.0 <= area.2 && area.1 <= p.1 && p.1 <= area.3;
+        let mut page: Vec<Stroke> = Vec::new();
+        for (points, closed) in &strokes {
+            if points.iter().all(inside) {
+                page.push((points.iter().map(|p| to_page(*p)).collect(), *closed));
+                continue;
+            }
+            // Cut off at the frame, a side at a time.
+            let mut ring = points.clone();
+            if *closed {
+                ring.push(points[0]);
+            }
+            for w in ring.windows(2) {
+                if let Some((a, b)) = clip(w[0], w[1], area) {
+                    page.push((vec![to_page(a), to_page(b)], false));
+                }
+            }
+        }
+        // The frame, and a footer with a stroke touching it.
+        let corners = [(10.0, 10.0), (200.0, 10.0), (200.0, 286.0), (10.0, 286.0)];
+        for i in 0..4 {
+            page.push((vec![corners[i], corners[(i + 1) % 4]], false));
+        }
+        for i in 0..6 {
+            let x = 14.0 + 3.0 * f64::from(i);
+            page.push((vec![(x, 281.0), (x, 283.5)], false));
+        }
+        page.push((vec![(34.0, 283.0), (34.0, 286.0)], false));
+        pages.push(page);
+    }
+    pdf((210.0, 297.0), &pages)
+}
+
+/// The part of the line from `a` to `b` inside `area` (x0, y0, x1, y1).
+fn clip(a: P, b: P, area: (f64, f64, f64, f64)) -> Option<(P, P)> {
+    let (mut t0, mut t1) = (0.0f64, 1.0f64);
+    let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+    for (p, q) in [
+        (-dx, a.0 - area.0),
+        (dx, area.2 - a.0),
+        (-dy, a.1 - area.1),
+        (dy, area.3 - a.1),
+    ] {
+        if p == 0.0 {
+            if q < 0.0 {
+                return None;
+            }
+        } else if p < 0.0 {
+            t0 = t0.max(q / p);
+        } else {
+            t1 = t1.min(q / p);
+        }
+    }
+    (t1 - t0 > 1e-9).then_some((
+        (a.0 + dx * t0, a.1 + dy * t0),
+        (a.0 + dx * t1, a.1 + dy * t1),
+    ))
 }
 
 fn piece_at(pieces: &[Piece], x: f64) -> &Piece {
@@ -388,4 +486,50 @@ fn plotter_drawn_pieces() {
         "{:#?}",
         result.notes
     );
+}
+
+/// What a piece came in as, to compare two imports by: size, allowances,
+/// grainline, marks, notches, lines.
+fn summary(result: &drapewright_io::ImportResult) -> Vec<String> {
+    let mut pieces: Vec<&Piece> = result.pieces.iter().collect();
+    pieces.sort_by(|a, b| a.outline.bounds().x0.total_cmp(&b.outline.bounds().x0));
+    pieces
+        .iter()
+        .map(|p| {
+            let b = p.outline.bounds();
+            let mut widths: Vec<String> = (0..p.outline.edges.len())
+                .map(|i| format!("{}", p.edge_allowance(i)))
+                .collect();
+            widths.sort();
+            format!(
+                "{:.0} × {:.0} mm, allowance {} {widths:?}, grain {}, {} marks, {} notches, {} lines",
+                b.width(),
+                b.height(),
+                p.allowance.seam,
+                p.grainline.is_some(),
+                p.marks.len(),
+                p.notches.len(),
+                p.lines.len()
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn plotter_tiles_butted_together() {
+    // PLOTTED_TILES=file.pdf writes the tiles out, to look at.
+    if let Some(out) = std::env::var_os("PLOTTED_TILES") {
+        std::fs::write(out, tiled()).unwrap();
+    }
+    let sheet = import_pdf(&plotted(), None).unwrap();
+    let tiles = import_pdf(&tiled(), None).unwrap();
+    assert!(
+        tiles
+            .notes
+            .iter()
+            .any(|n| matches!(n, ImportNote::PagesJoined { count: 8 })),
+        "{:#?}",
+        tiles.notes
+    );
+    assert_eq!(summary(&tiles), summary(&sheet));
 }
