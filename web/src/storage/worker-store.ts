@@ -11,7 +11,7 @@
 // IndexedDB also keeps a short summary of each project, so the projects
 // list opens without reading every project. Nothing here leaves the device.
 
-import type { SourceFile } from '@soom/engine'
+import type { SourceFile } from '@drapewright/engine'
 import { type IDBPDatabase, openDB } from 'idb'
 
 export interface ProjectSummary {
@@ -37,13 +37,41 @@ const FILES = 'files'
 let db: Promise<IDBPDatabase> | undefined
 
 function database(): Promise<IDBPDatabase> {
-  db ??= openDB('soom', 2, {
+  db ??= openDB('drapewright', 2, {
     upgrade(d, oldVersion) {
       if (oldVersion < 1) d.createObjectStore(SUMMARIES, { keyPath: 'id' })
       if (oldVersion < 2) d.createObjectStore(FILES)
     },
+  }).then(async (d) => {
+    await adoptEarlierList(d).catch(() => undefined)
+    return d
   })
   return db
+}
+
+/** The database from before the app was renamed (it was called Soom). */
+const EARLIER_DATABASE = 'soom'
+
+/**
+ * Projects saved before the rename are listed in the earlier database; the
+ * first time this one is empty, their summaries (and any project files kept
+ * in IndexedDB) are copied across. Files in OPFS never moved.
+ */
+async function adoptEarlierList(d: IDBPDatabase): Promise<void> {
+  if ((await d.count(SUMMARIES)) > 0) return
+  const known = (await indexedDB.databases?.()) ?? []
+  if (!known.some((info) => info.name === EARLIER_DATABASE)) return
+  const earlier = await openDB(EARLIER_DATABASE)
+  try {
+    const stores = earlier.objectStoreNames
+    const summaries = stores.contains(SUMMARIES) ? await earlier.getAll(SUMMARIES) : []
+    const keys = stores.contains(FILES) ? await earlier.getAllKeys(FILES) : []
+    const files = stores.contains(FILES) ? await earlier.getAll(FILES) : []
+    for (const summary of summaries) await d.put(SUMMARIES, summary)
+    for (const [i, key] of keys.entries()) await d.put(FILES, files[i], key)
+  } finally {
+    earlier.close()
+  }
 }
 
 // Worker-only OPFS calls that TypeScript's DOM types leave out. Older

@@ -5,7 +5,7 @@ import type {
   PaperName,
   PrintPlan,
   PrintSettings,
-} from '@soom/engine'
+} from '@drapewright/engine'
 import { ChevronDown, Printer } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import {

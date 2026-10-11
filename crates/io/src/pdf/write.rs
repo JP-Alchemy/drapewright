@@ -8,16 +8,16 @@
 use std::collections::HashMap;
 use std::io::Write as _;
 
+use drapewright_pattern_core::geom::segs_of;
+use drapewright_pattern_core::notches::notch_marks;
+use drapewright_pattern_core::{AllowanceMode, EdgeKind, Id, LineKind, MarkKind};
+use drapewright_project::Document;
+use drapewright_project::document::Assembly;
 use flate2::Compression;
 use flate2::write::ZlibEncoder;
 use kurbo::{Affine, ParamCurve, PathSeg, Point, Rect, Shape as _, Vec2};
 use pdf_writer::{Content, Filter, Finish, Name, Pdf, Rect as PdfRect, Ref, Str, TextStr};
 use serde::{Deserialize, Serialize};
-use soom_pattern_core::geom::segs_of;
-use soom_pattern_core::notches::notch_marks;
-use soom_pattern_core::{AllowanceMode, EdgeKind, Id, LineKind, MarkKind};
-use soom_project::Document;
-use soom_project::document::Assembly;
 use ts_rs::TS;
 
 use super::plan::{PlannedPage, Prepared, PrintError, PrintPlan, prepare, touches};
@@ -758,6 +758,6 @@ pub fn export_pdf(doc: &Document, texts: &PdfTexts) -> Result<Vec<u8>, PrintErro
         .encoding_predefined(Name(b"WinAnsiEncoding"));
     pdf.document_info(info)
         .title(TextStr(&texts.title))
-        .producer(TextStr("Soom"));
+        .producer(TextStr("Drapewright"));
     Ok(pdf.finish())
 }

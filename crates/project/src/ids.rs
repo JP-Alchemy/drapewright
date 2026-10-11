@@ -1,4 +1,4 @@
-use soom_pattern_core::Id;
+use drapewright_pattern_core::Id;
 
 /// Hands out project-wide unique ids such as `p7` or `e42`. One counter is
 /// shared by all prefixes, so ids never collide even across kinds.

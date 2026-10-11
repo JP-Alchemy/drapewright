@@ -74,7 +74,7 @@ pub(crate) struct Drawing {
     pub measurement: Option<i64>,
     pub blocks: HashMap<String, Block>,
     pub entities: Vec<Entity>,
-    /// Entities of kinds Soom does not read.
+    /// Entities of kinds Drapewright does not read.
     pub skipped: u32,
 }
 

@@ -2,7 +2,9 @@
 // browser's own storage. It is a convenience of this device, not part of
 // any project. Without it, 100% assumes the web's nominal 96 px to the inch.
 
-const KEY = 'soom.screen.devicePxPerMm'
+const KEY = 'drapewright.screen.devicePxPerMm'
+/** The same setting from before the app was renamed (it was called Soom). */
+const EARLIER_KEY = 'soom.screen.devicePxPerMm'
 
 /**
  * Saved as device pixels per millimetre, which do not change when the
@@ -10,7 +12,7 @@ const KEY = 'soom.screen.devicePxPerMm'
  */
 export function loadScreenScale(): number | null {
   try {
-    const saved = Number(localStorage.getItem(KEY))
+    const saved = Number(localStorage.getItem(KEY) ?? localStorage.getItem(EARLIER_KEY))
     const cssPxPerMm = saved / window.devicePixelRatio
     return Number.isFinite(cssPxPerMm) && cssPxPerMm >= 1 && cssPxPerMm <= 20 ? cssPxPerMm : null
   } catch {

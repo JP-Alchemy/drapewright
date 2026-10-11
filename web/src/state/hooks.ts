@@ -1,4 +1,4 @@
-import type { EngineState } from '@soom/engine'
+import type { EngineState } from '@drapewright/engine'
 import { useSyncExternalStore } from 'react'
 import type { Session } from './session.ts'
 

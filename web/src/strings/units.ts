@@ -1,6 +1,6 @@
 // Converting lengths between millimetres (stored) and the user's units.
 
-import type { DisplayUnits } from '@soom/engine'
+import type { DisplayUnits } from '@drapewright/engine'
 
 const MM_PER: Record<DisplayUnits, number> = { mm: 1, cm: 10, in: 25.4 }
 

@@ -1,4 +1,4 @@
-import type { Piece, PieceView, Segment } from '@soom/engine'
+import type { Piece, PieceView, Segment } from '@drapewright/engine'
 
 /** Canvas paths for one piece, in piece coordinates (mm). */
 export interface PiecePaths {

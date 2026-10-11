@@ -1,7 +1,7 @@
 // What the printed PDF says, built from the strings so the words stay in
 // one place; the engine draws everything else.
 
-import type { Document, Paper, PdfTexts, PrintPlan } from '@soom/engine'
+import type { Document, Paper, PdfTexts, PrintPlan } from '@drapewright/engine'
 import { t } from '../strings/en.ts'
 import { cutSummary } from './PieceDetails.tsx'
 

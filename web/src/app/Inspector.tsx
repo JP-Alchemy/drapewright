@@ -1,4 +1,4 @@
-import type { EdgeKind, Piece, PieceView } from '@soom/engine'
+import type { EdgeKind, Piece, PieceView } from '@drapewright/engine'
 import { useState } from 'react'
 import { Button, Input, Label, Radio, RadioGroup, Switch, TextField } from 'react-aria-components'
 import { useEngineState } from '../state/hooks.ts'

@@ -1,5 +1,5 @@
 // Connects the canvas element's DOM events to the input router and the
-// active tool. Everything gesture-related is decided in @soom/input; this
+// active tool. Everything gesture-related is decided in @drapewright/input; this
 // file only translates events.
 
 import {
@@ -8,7 +8,7 @@ import {
   type PointerKind,
   type RawPointer,
   hitRadius,
-} from '@soom/input'
+} from '@drapewright/input'
 import { isTyping } from '../app/shortcuts.ts'
 import type { PartRef, Session, ToolId } from '../state/session.ts'
 import type { Tool } from '../tools/tool.ts'

@@ -1,4 +1,4 @@
-// Framework-free input handling for Soom: pointer routing with palm
+// Framework-free input handling for Drapewright: pointer routing with palm
 // rejection and gestures, and keyboard shortcuts.
 
 export {

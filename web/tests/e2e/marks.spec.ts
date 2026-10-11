@@ -44,7 +44,7 @@ test('the grainline tool snaps to the piece’s axes', async ({ page }, info) =>
   await page.mouse.up()
   const g = await page.evaluate(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    () => (window as any).soom.engine.document().pieces[0].grainline,
+    () => (window as any).drapewright.engine.document().pieces[0].grainline,
   )
   expect(g).not.toBeNull()
   // A few degrees off vertical snaps to vertical.
@@ -62,7 +62,7 @@ test('cutting instructions', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Increase How many' })).toHaveCount(2)
   const cut = await page.evaluate(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    () => (window as any).soom.engine.document().pieces[1].cut,
+    () => (window as any).drapewright.engine.document().pieces[1].cut,
   )
   expect(cut.map((c: { material: string; quantity: number }) => [c.material, c.quantity])).toEqual([
     ['main', 2],

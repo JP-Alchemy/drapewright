@@ -6,15 +6,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use kurbo::{Affine, Point};
-use lopdf::Object;
-use soom_io::pdf::{PdfTexts, PrintError, PrintPlan, export_pdf, plan_print};
-use soom_pattern_core::allowance::allowance_lines;
-use soom_pattern_core::{Edge, EdgeKind, Grainline, Outline, Piece, Pt, Segment};
-use soom_project::Document;
-use soom_project::document::{
+use drapewright_io::pdf::{PdfTexts, PrintError, PrintPlan, export_pdf, plan_print};
+use drapewright_pattern_core::allowance::allowance_lines;
+use drapewright_pattern_core::{Edge, EdgeKind, Grainline, Outline, Piece, Pt, Segment};
+use drapewright_project::Document;
+use drapewright_project::document::{
     Assembly, LayoutItem, Meta, Orientation, Paper, PaperName, PrintSettings,
 };
+use kurbo::{Affine, Point};
+use lopdf::Object;
 
 /// Points per millimetre.
 const PT: f64 = 72.0 / 25.4;

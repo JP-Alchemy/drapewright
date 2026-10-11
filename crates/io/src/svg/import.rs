@@ -4,8 +4,8 @@
 
 use std::collections::HashMap;
 
+use drapewright_pattern_core::SourceFormat;
 use kurbo::{CubicBez, Line, ParamCurve, PathSeg, Point, QuadBez};
-use soom_pattern_core::SourceFormat;
 use usvg::tiny_skia_path::PathSegment;
 
 use super::units::{detect_scale, view_box};

@@ -2,13 +2,13 @@
 
 use std::sync::Arc;
 
+pub use drapewright_pattern_core::notches::NotchStyle;
+use drapewright_pattern_core::{Id, Piece, Pt};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-pub use soom_pattern_core::notches::NotchStyle;
-use soom_pattern_core::{Id, Piece, Pt};
 use ts_rs::TS;
 
-pub const FORMAT: &str = "soom-project";
+pub const FORMAT: &str = "drapewright-project";
 
 /// The schema version this build reads and writes.
 pub const SCHEMA_VERSION: u32 = 1;

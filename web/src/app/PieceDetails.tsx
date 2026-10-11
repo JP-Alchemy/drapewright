@@ -1,7 +1,14 @@
 // Inspector sections for a piece's notches, grainline and cutting
 // instructions.
 
-import type { CutInstruction, Notch, NotchFrom, NotchKind, Piece, PieceView } from '@soom/engine'
+import type {
+  CutInstruction,
+  Notch,
+  NotchFrom,
+  NotchKind,
+  Piece,
+  PieceView,
+} from '@drapewright/engine'
 import {
   Button,
   Group,

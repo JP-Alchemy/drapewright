@@ -6,7 +6,7 @@ import { edgeMiddle, edgesOf, fixture, notchesOf, openWithFixture } from './help
 const saved = (page: import('@playwright/test').Page) =>
   page.evaluate(() =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).soom.engine.document(),
+    (window as any).drapewright.engine.document(),
   )
 
 test('Phase 1 walk-through: open, adjust, mark, print, and find it again', async ({ page }) => {
@@ -47,7 +47,7 @@ test('Phase 1 walk-through: open, adjust, mark, print, and find it again', async
   // Close and come back: everything is still there.
   await expect(page.getByTestId('save-status')).toHaveText('Saved')
   await page.reload()
-  await page.waitForFunction(() => 'soom' in window)
+  await page.waitForFunction(() => 'drapewright' in window)
   const doc = await saved(page)
   expect(doc.pieces).toHaveLength(1)
   expect(doc.pieces[0].allowance.seam).toBeCloseTo(16, 9)
@@ -64,7 +64,7 @@ test('works offline after the first visit', async ({ page, context }, info) => {
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
   await context.setOffline(true)
   await page.reload()
-  await page.waitForFunction(() => 'soom' in window)
+  await page.waitForFunction(() => 'drapewright' in window)
   await page.getByTestId('pattern-file').setInputFiles(fixture('inkscape-mm.svg'))
   const dialog = page.getByRole('dialog')
   await dialog.getByText('Not included', { exact: true }).click()
@@ -89,7 +89,7 @@ test('an edit and its redrawn lines take less than a frame', async ({ page }) =>
 
   const timing = await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const s = (window as any).soom
+    const s = (window as any).drapewright
     const times: number[] = []
     for (let i = 0; i < 30; i++) {
       for (const piece of s.engine.document().pieces) {

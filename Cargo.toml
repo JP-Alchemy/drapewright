@@ -6,15 +6,15 @@ members = ["crates/*"]
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.94"
-repository = "https://github.com/JP-Alchemy/soom"
+repository = "https://github.com/JP-Alchemy/drapewright"
 # The project licence has not been chosen yet (docs/open-questions.md).
 publish = false
 
 [workspace.dependencies]
 # Our crates
-soom-pattern-core = { path = "crates/pattern-core" }
-soom-io = { path = "crates/io" }
-soom-project = { path = "crates/project" }
+drapewright-pattern-core = { path = "crates/pattern-core" }
+drapewright-io = { path = "crates/io" }
+drapewright-project = { path = "crates/project" }
 
 # Geometry
 kurbo = "0.13.1"

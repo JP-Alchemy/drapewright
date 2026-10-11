@@ -25,11 +25,11 @@ pnpm dev        # then open http://localhost:5173
    * Open another project from the list.
    * **Delete** one. You are asked first, and the project that is open
      cannot be deleted.
-3. **Back up** (top bar) saves a `.soom` file holding the project and the
+3. **Back up** (top bar) saves a `.drapewright` file holding the project and the
    original SVG/DXF its pieces came from. Keep it in Files or a cloud
    drive.
 4. **Restore a backup…** (in Projects), or just *Open pattern* and pick a
-   `.soom`. If that project is already on the device, the backup opens as
+   `.drapewright`. If that project is already on the device, the backup opens as
    a copy named "… (restored)". Nothing is overwritten.
 5. **Offline:** after one visit the app loads and works with no internet,
    import and printing included. Nothing is ever uploaded.
@@ -133,7 +133,7 @@ print.
      millimetres, but not always, so you confirm it. Each reading shows how
      big the skirt front would be.
    * **Skirt front:** the file has both its cutting line and its stitching
-     line, so Soom keeps the stitching line as the outline and measures the
+     line, so Drapewright keeps the stitching line as the outline and measures the
      allowance edge by edge: 1.5 cm seams, 4 cm hem, and nothing on the
      centre front, which the file marks as a fold. The notch, grainline,
      drill hole, "Quantity: 1" and "Size: 38" come across too.
@@ -150,14 +150,14 @@ print.
    * *Already included*: the lines are cutting lines, kept as they are.
 
    Getting this wrong makes a garment too big or too small by two
-   allowances at every seam, and the file cannot say which it is, so Soom
+   allowances at every seam, and the file cannot say which it is, so Drapewright
    asks rather than guessing. Files with both lines (like
    `fixtures/svg/cut-and-seam.svg`) are not asked about: their allowance is
    measured.
 3. Open `fixtures/dxf/generic-mm.dxf`, an ordinary CAD drawing. The pocket's
    rounded corners stay curved, within 0.001 mm of true arcs. The flap was drawn as four separate
    lines and still becomes one piece, named by the text inside it. The
-   hatch Soom cannot read yet is reported, not silently dropped.
+   hatch Drapewright cannot read yet is reported, not silently dropped.
 
 **What it reads:**
 * ASCII DXF from any version: lines, polylines (with bulges), arcs,
@@ -235,7 +235,7 @@ with a straight hem).
    seamstress for open questions 3 and 4.**
 4. Tap the left edge and choose **Fold**: no allowance, and the cutting line
    meets the fold squarely. Try **Fold** on a curved edge (the hem of
-   `inkscape-mm.svg`): Soom refuses and explains that a fold must be
+   `inkscape-mm.svg`): Drapewright refuses and explains that a fold must be
    straight.
 5. Any edge can have **its own allowance**; *Use the piece's allowance*
    puts it back.
@@ -283,7 +283,7 @@ glass while drawing with the Pencil; two-finger tap undo; long-press menu.
 These are unit-tested with recorded event sequences, but real hardware is
 the real test.
 
-**Under the hood:** `@soom/input` is framework-free (it does not even see
+**Under the hood:** `@drapewright/input` is framework-free (it does not even see
 the DOM). It turns raw pen, touch and mouse events into pan/zoom, undo/redo,
 context menus and a single stream of tool events, with palm rejection and
 gesture recognition, all unit-tested by replaying event sequences against a
@@ -301,7 +301,7 @@ size.
 
 **Try it:** `pnpm wasm && pnpm dev`, open http://localhost:5173.
 
-1. **Open pattern** and pick `fixtures/svg/inkscape-mm.svg`. Soom reads it in
+1. **Open pattern** and pick `fixtures/svg/inkscape-mm.svg`. Drapewright reads it in
    the background and tells you what it found: two pieces, plus a small
    shape and a stray line it left out. Choose **Add 2 pieces**.
 2. The pieces lie on a green cutting mat with a real 1 cm grid, bolder every
@@ -309,9 +309,9 @@ size.
    dashed **stitching line** 1.5 cm inside (the provisional default
    allowance), the **grainline** arrow, and the name.
 3. Open `fixtures/svg/illustrator-pt.svg`. This file does not say how big it
-   is, so Soom **asks**, showing what each reading would mean ("Pocket would
+   is, so Drapewright **asks**, showing what each reading would mean ("Pocket would
    be 10.0 cm × 5.0 cm"). Pick one; new pieces land beside the existing ones.
-4. `fixtures/svg/cut-and-seam.svg` has both lines; Soom measures the
+4. `fixtures/svg/cut-and-seam.svg` has both lines; Drapewright measures the
    allowance from the file (1.5 cm, with a 3 cm hem) instead of adding its
    own.
 5. Navigate: two-finger scroll pans, pinch (or ⌘/Ctrl + scroll) zooms
@@ -340,7 +340,7 @@ TypeScript types, so the two sides cannot drift.
 
 Still nothing new in the browser: the importer gets its screen in step 5.
 
-**Try it:** `cargo test -p soom-io`. The fixtures in `fixtures/svg/` cover
+**Try it:** `cargo test -p drapewright-io`. The fixtures in `fixtures/svg/` cover
 what real files throw at an importer:
 
 * **Inkscape, in millimetres** (`inkscape-mm.svg`): two pieces found and
@@ -392,7 +392,7 @@ with the stitching line dashed and the cutting line solid:
 These are the pictures to show the seamstress for open questions 3 and 4
 (corner shapes).
 
-`cargo test -p soom-pattern-core` also runs the exact cases and four
+`cargo test -p drapewright-pattern-core` also runs the exact cases and four
 properties over hundreds of random pieces: the cut piece always contains
 the whole stitched piece and never crosses itself, away from corners the
 cutting line is exactly the allowance away (within 0.005 mm), and so on.
@@ -415,7 +415,7 @@ true curve.
 Nothing new in the browser yet; this step is the foundation the next ones
 draw with.
 
-**Try it:** `cargo test -p soom-pattern-core`. Seven property tests run
+**Try it:** `cargo test -p drapewright-pattern-core`. Seven property tests run
 256 random pieces each:
 
 * edge lengths add up to the outline length;

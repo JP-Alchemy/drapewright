@@ -3,12 +3,12 @@
 
 use std::collections::HashSet;
 
+use drapewright_pattern_core::testing::arb_piece;
+use drapewright_pattern_core::validate::validate_piece;
+use drapewright_pattern_core::{Allowance, CornerStyle, EdgeKind, NotchFrom, NotchKind, Severity};
+use drapewright_project::command::all_ids;
+use drapewright_project::{Command, Engine};
 use proptest::prelude::*;
-use soom_pattern_core::testing::arb_piece;
-use soom_pattern_core::validate::validate_piece;
-use soom_pattern_core::{Allowance, CornerStyle, EdgeKind, NotchFrom, NotchKind, Severity};
-use soom_project::command::all_ids;
-use soom_project::{Command, Engine};
 
 #[derive(Clone, Debug)]
 enum Step {

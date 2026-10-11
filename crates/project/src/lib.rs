@@ -1,4 +1,4 @@
-//! The Soom project document: the file format's top level, the commands
+//! The Drapewright project document: the file format's top level, the commands
 //! that change it, unlimited undo, and the derived geometry the app draws.
 //! See `docs/file-format.md`.
 

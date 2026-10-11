@@ -1,9 +1,9 @@
 // The notch tool: tap an edge to add a notch there; drag a notch to slide
 // it along its edge; tap a notch to cycle single → double → triple.
 
-import type { Notch, NotchKind, Piece } from '@soom/engine'
-import type { ToolPointer } from '@soom/input'
-import { TUNING } from '@soom/input'
+import type { Notch, NotchKind, Piece } from '@drapewright/engine'
+import type { ToolPointer } from '@drapewright/input'
+import { TUNING } from '@drapewright/input'
 import { formatLength, t } from '../strings/en.ts'
 import type { Tool, ToolContext } from './tool.ts'
 

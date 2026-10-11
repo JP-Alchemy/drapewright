@@ -15,7 +15,7 @@ test('saved projects match the published JSON Schema', async ({ page }) => {
   const project = () =>
     page.evaluate(() =>
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      JSON.parse((window as any).soom.engine.toJson()),
+      JSON.parse((window as any).drapewright.engine.toJson()),
     )
 
   // Notches, grainline, a fold, marks and both allowance modes.
@@ -27,7 +27,7 @@ test('saved projects match the published JSON Schema', async ({ page }) => {
   // And a project with an imported SVG and print settings changed.
   await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const s = (window as any).soom
+    const s = (window as any).drapewright
     const print = s.engine.document().print
     s.dispatch({
       type: 'setPrintSettings',

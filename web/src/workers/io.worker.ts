@@ -2,7 +2,7 @@
 // own instance of the engine's WebAssembly module, so a big file never
 // freezes the screen and OPFS can be written synchronously.
 
-import { jobs, loadEngine } from '@soom/engine'
+import { jobs, loadEngine } from '@drapewright/engine'
 import { storageJobs } from '../storage/worker-store.ts'
 import type { IoHandlers, IoRequest, IoResponse } from './io-protocol.ts'
 

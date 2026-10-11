@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Writes the DXF test fixtures in this folder. CC0: drawn for Soom's tests.
+"""Writes the DXF test fixtures in this folder. CC0: drawn for Drapewright's tests.
 
 Run from the repository root: python3 fixtures/dxf/make_fixtures.py
-DXF stores y pointing up; Soom flips it on import.
+DXF stores y pointing up; Drapewright flips it on import.
 """
 import math
 import os

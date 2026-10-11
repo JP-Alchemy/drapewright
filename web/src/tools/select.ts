@@ -1,8 +1,8 @@
 // The select tool: tap to select a piece or one of its edges; drag to move
 // pieces on the table; hold an edge to see its length.
 
-import type { ToolPointer } from '@soom/input'
-import { TUNING } from '@soom/input'
+import type { ToolPointer } from '@drapewright/input'
+import { TUNING } from '@drapewright/input'
 import type { Point } from '../canvas/viewport.ts'
 import { formatLength } from '../strings/en.ts'
 import type { Tool, ToolContext } from './tool.ts'

@@ -55,14 +55,14 @@ jobs:
       - run: pnpm wasm
       - name: WebAssembly size budget
         run: |
-          size=$(stat -c %s packages/engine/pkg/soom_wasm_core_bg.wasm)
-          echo "soom_wasm_core_bg.wasm: $size bytes"
+          size=$(stat -c %s packages/engine/pkg/drapewright_wasm_core_bg.wasm)
+          echo "drapewright_wasm_core_bg.wasm: $size bytes"
           test "$size" -lt 3000000
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm test
-      - run: pnpm --filter @soom/web exec playwright install --with-deps chromium webkit
+      - run: pnpm --filter @drapewright/web exec playwright install --with-deps chromium webkit
       - run: pnpm e2e
       - uses: actions/upload-artifact@v4
         if: failure()

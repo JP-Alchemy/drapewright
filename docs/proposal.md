@@ -1,4 +1,4 @@
-# Soom — engineering proposal
+# Drapewright — engineering proposal
 
 Version 0.1 · 2026-10-10 · status: **for review**
 
@@ -19,7 +19,7 @@ until they are answered. Items marked **[you]** need a decision from you.
 | Geometry | `kurbo` Béziers as the exact model. Seam allowance is built per edge on a 0.001 mm flattening, with sewing corner rules, then cleaned with a robust polygon engine (`i_overlay`). | Exact where it matters (the stitching line she edits), boring and robust where it can be (the derived cutting line). Error < 0.001 mm, far below what a printer can show. |
 | 2D view | Canvas 2D in the TS host, drawing render data from the engine. | Fast, crisp at any zoom, works everywhere incl. Safari; WebGPU is kept for 3D. |
 | UI framework | **React 19 + React Aria Components** on Vite. | See §1.5 — accessible, touch/pen-correct press and long-press handling out of the box; biggest contributor pool. |
-| File format | `.soom` = zip of `project.json` (`schemaVersion: 1`, millimetres, y-down) + sidecar files. JSON Schema generated from the Rust types and published in `docs/schema/`. | Open, diffable, documented, and impossible to drift from the code. |
+| File format | `.drapewright` = zip of `project.json` (`schemaVersion: 1`, millimetres, y-down) + sidecar files. JSON Schema generated from the Rust types and published in `docs/schema/`. | Open, diffable, documented, and impossible to drift from the code. |
 | Hosting | Static files + `_headers` (COOP/COEP) on any host that can set headers. | Cross-origin isolation from day one. **[you]** pick the host (Cloudflare Pages or Netlify are free and support `_headers`). |
 | Licence | **[you]** — not chosen. All dependencies picked so far are MIT/Apache/ISC, compatible with any choice. | See [open-questions.md](open-questions.md#licence). |
 
@@ -30,12 +30,12 @@ until they are answered. Items marked **[you]** need a decision from you.
 ### 1.1 Rust workspace
 
 ```
-soom/
+drapewright/
 ├── Cargo.toml              workspace (edition 2024, resolver 3)
 ├── rust-toolchain.toml     pinned stable + wasm32-unknown-unknown
 ├── crates/
 │   ├── pattern-core/   P1  geometry kernel and piece model
-│   ├── project/        P1  project document: schema, migrations, commands, undo, .soom container
+│   ├── project/        P1  project document: schema, migrations, commands, undo, .drapewright container
 │   ├── io/             P1  SVG + DXF import; tiled PDF + SVG export  (DXF-AAMA export P2)
 │   ├── wasm-core/      P1  wasm-bindgen facade for everything 2D (no logic)
 │   ├── sizing/         P2  size tables, measurement sets, size nests, blending, alteration stack (P4)
@@ -53,13 +53,13 @@ soom/
 ```
 
 Crates are created when their phase starts, so the tree stays honest.
-Package names are prefixed (`soom-pattern-core`, `soom-io`, …) so they never
+Package names are prefixed (`drapewright-pattern-core`, `drapewright-io`, …) so they never
 clash on crates.io or with `std::io`.
 
 | Crate | Owns | Depends on |
 |---|---|---|
 | `pattern-core` | `Piece`, `Edge`, segments, notches, marks, grainline; arc length; hit testing; seam allowance engine; edge split/join; mirror on fold; slash-and-spread (P4) | `kurbo`, `i_overlay`, `serde` |
-| `project` | `Project` aggregate; `Command` enum; `History` (undo); derived-geometry cache; schema versioning + migrations; `.soom` zip read/write | `pattern-core`, later `sizing`, `seams`; `zip`, `serde_json`, `schemars` |
+| `project` | `Project` aggregate; `Command` enum; `History` (undo); derived-geometry cache; schema versioning + migrations; `.drapewright` zip read/write | `pattern-core`, later `sizing`, `seams`; `zip`, `serde_json`, `schemars` |
 | `io` | Format adapters. Import returns plain pieces + an `ImportReport` (scale confidence, warnings); export takes pieces + options and returns bytes | `pattern-core`; `usvg`, `pdf-writer` |
 | `wasm-core` | Exposes `Engine` (project + history) and `Jobs` (import/export) to JS. Type conversion only | `project`, `io`, `wasm-bindgen`, `serde-wasm-bindgen` |
 
@@ -74,19 +74,19 @@ Rules enforced in review and CI:
    are passed in. The same inputs always produce the same bytes. This is what
    makes golden-file tests possible.
 4. **No panics across the boundary.** Every public operation returns
-   `Result<_, SoomError>` with a plain-language message and a machine code.
+   `Result<_, DrapewrightError>` with a plain-language message and a machine code.
 
 ### 1.2 TypeScript workspace (pnpm)
 
 ```
-soom/
+drapewright/
 ├── package.json            root scripts: dev, build, test, e2e, wasm
 ├── pnpm-workspace.yaml
 ├── packages/
-│   ├── engine/             @soom/engine — the WASM package (built from crates/wasm-core),
+│   ├── engine/             @drapewright/engine — the WASM package (built from crates/wasm-core),
 │   │                       generated TS types, typed RPC to the IO worker
-│   └── input/              @soom/input — framework-free pointer, gesture, shortcut layer
-└── web/                    @soom/web — the PWA
+│   └── input/              @drapewright/input — framework-free pointer, gesture, shortcut layer
+└── web/                    @drapewright/web — the PWA
     ├── index.html
     ├── vite.config.ts      COOP/COEP headers in dev and preview; PWA plugin
     ├── public/_headers     COOP/COEP for production hosts
@@ -113,7 +113,7 @@ consume them directly. Everything that would differ in a native shell
  │ React UI (panels, dialogs)           │     │ wasm-core instance #2   │   │ wasm-3d (lazy)       │
  │ Input layer → active tool            │     │  • import SVG/DXF/PDF   │   │  • body, sim, render │
  │   │ preview (transient)              │     │  • export PDF/SVG/DXF   │   │  • OffscreenCanvas   │
- │   ▼                                  │ RPC │  • .soom zip pack/unpack│   │    + WebGPU          │
+ │   ▼                                  │ RPC │  • .drapewright zip pack/unpack│   │    + WebGPU          │
  │ Engine (wasm-core instance #1)       │◄───►│  • OPFS sync writes     │   └──────────────────────┘
  │   dispatch(Command) → new revision   │     └─────────────────────────┘
  │   derived geometry (cached per piece)│
@@ -180,10 +180,10 @@ exception). Nothing GPL is used, so every licence option stays open.
 Full specification with field-by-field rules: [file-format.md](file-format.md).
 In short:
 
-* A `.soom` file is a zip: `project.json`, `sources/` (the original imported
+* A `.drapewright` file is a zip: `project.json`, `sources/` (the original imported
   files, so a re-import is always possible), `thumbnails/`, and later
   `meshes/` and `textures/`.
-* `project.json` has `format: "soom-project"` and an integer
+* `project.json` has `format: "drapewright-project"` and an integer
   `schemaVersion`. Any change to the schema bumps it. The app migrates older
   files step by step and refuses newer ones with a clear message. Third-party
   data lives under `extensions` and is preserved untouched.
@@ -251,7 +251,7 @@ PointerEvent / KeyboardEvent / Safari GestureEvent
                                            └──► Command  (to engine; one undo step)
 ```
 
-`@soom/input` contains the router, recognisers and shortcut map with **no
+`@drapewright/input` contains the router, recognisers and shortcut map with **no
 DOM rendering and no React**. It is unit-tested by replaying recorded
 pointer-event sequences (including real iPad traces we capture).
 
@@ -312,17 +312,17 @@ exactly right.*
 | 2 | `pattern-core`: segments, edges, pieces; orientation; arc length and point-at-distance; nearest point; bounds; validation | Property tests: arc length additivity, split/join round-trip, orientation invariants | — |
 | 3 | Seam allowance engine: per-edge widths, `hem` and `fold` kinds, corners (pointed, squared, fold-back mirror), self-intersection clean-up, `included` mode | Property tests on random pieces: cutting line encloses the stitching line, distance = allowance ± 0.001 mm away from corners, no self-intersections; golden SVG snapshots of hard cases | — |
 | 4 | SVG import: units and scale detection with a confidence level; closed paths → pieces; automatic corner detection → edges; open paths → internal lines / grainline candidates; provenance | Golden tests: Inkscape (mm), Illustrator (pt-as-px), unitless, FreeSewing output, transforms and `<use>` | — |
-| 5 | `project`: schema v1, commands, history, migrations scaffold, `.soom` container; `wasm-core` facade; `@soom/engine`; canvas with cutting-mat grid; open SVG → pieces on screen; pan/zoom with mouse and trackpad | Round-trip golden tests for `project.json`; engine command tests | **Open an SVG and see the pieces** |
+| 5 | `project`: schema v1, commands, history, migrations scaffold, `.drapewright` container; `wasm-core` facade; `@drapewright/engine`; canvas with cutting-mat grid; open SVG → pieces on screen; pan/zoom with mouse and trackpad | Round-trip golden tests for `project.json`; engine command tests | **Open an SVG and see the pieces** |
 
 ### Week 2 — sewing marks, true scale, printing
 
 | Day | Tasks | Tests | Demo |
 |---|---|---|---|
-| 6 | `@soom/input`: router, palm rejection, pinch/pan, two/three-finger tap undo/redo, long-press; select/move tool; inspector panel; undo/redo buttons | Recogniser tests from recorded event sequences; tool state-machine tests | Navigate with fingers on iPad; undo with two fingers |
+| 6 | `@drapewright/input`: router, palm rejection, pinch/pan, two/three-finger tap undo/redo, long-press; select/move tool; inspector panel; undo/redo buttons | Recogniser tests from recorded event sequences; tool state-machine tests | Navigate with fingers on iPad; undo with two fingers |
 | 7 | Seam allowance UI: piece default, per-edge override, edge kind (seam/hem/fold), corner chooser with pictures; split edge here / join edges; inline edge lengths | Command tests; derived-geometry snapshots | **Add and edit seam allowance** |
 | 8 | Grainline tool, notch tool (single/double/triple), cut instructions, piece name labels; DXF import (generic DXF and AAMA blocks/layers, `$INSUNITS` and AAMA units) | DXF golden tests incl. AAMA layers 1/2/4/7/8/11/14 | **Mark grainline and notches; open a DXF** |
 | 9 | Tiled PDF export: automatic layout, A4 / Letter / A0, margins, trim or overlap assembly, page grid labels, assembly marks, page map, 10 cm + 4 in test square, `PrintScaling=None`; screen calibration UI for true scale | PDF parsed back in tests: page sizes, test square = 100.000 mm, a known edge has its exact length, every piece is fully covered by pages | **Print a tiled PDF and measure the test square** |
-| 10 | OPFS autosave + IndexedDB project list; one-tap backup (`.soom` download) and restore; offline check; Playwright end-to-end (open SVG → allowance → notches → export → verify PDF); performance check; demo notes | E2E on Chromium + WebKit; 2D edit latency measured in CI | Full Phase 1 walk-through |
+| 10 | OPFS autosave + IndexedDB project list; one-tap backup (`.drapewright` download) and restore; offline check; Playwright end-to-end (open SVG → allowance → notches → export → verify PDF); performance check; demo notes | E2E on Chromium + WebKit; 2D edit latency measured in CI | Full Phase 1 walk-through |
 
 **Phase 1 is done when** the seamstress can open an SVG or DXF of one of her
 pieces, add or adjust the allowance, mark grain and notches, print on A4 or

@@ -53,11 +53,11 @@ test('measuring the screen makes 100% true size, and is remembered', async ({ pa
 
   const pxPerMm = () =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    page.evaluate(() => (window as any).soom.ui.get().viewport.pxPerMm as number)
+    page.evaluate(() => (window as any).drapewright.ui.get().viewport.pxPerMm as number)
   const measured = await pxPerMm()
   expect(measured * 85.6).toBeCloseTo(after, 0)
   await page.reload()
-  await page.waitForFunction(() => 'soom' in window)
+  await page.waitForFunction(() => 'drapewright' in window)
   expect(await pxPerMm()).toBeCloseTo(measured, 6)
   await expect(page.getByRole('button', { name: 'Measure the screen', exact: true })).toBeVisible()
 })

@@ -1,6 +1,6 @@
 [package]
-name = "soom-project"
-description = "The Soom project document: schema, commands, undo history and derived geometry"
+name = "drapewright-project"
+description = "The Drapewright project document: schema, commands, undo history and derived geometry"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +8,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
-soom-pattern-core.workspace = true
+drapewright-pattern-core.workspace = true
 kurbo.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -20,7 +20,7 @@ zip.workspace = true
 flate2.workspace = true
 
 [dev-dependencies]
-soom-pattern-core = { workspace = true, features = ["testing"] }
+drapewright-pattern-core = { workspace = true, features = ["testing"] }
 proptest.workspace = true
 insta.workspace = true
 

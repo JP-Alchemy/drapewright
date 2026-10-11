@@ -1,6 +1,6 @@
-# Soom
+# Drapewright
 
-*(working name)* An open-source garment pattern studio for home sewists that
+An open-source garment pattern studio for home sewists that
 runs in the browser. Open the patterns you already own, fit them to your
 measurements, see them draped in 3D, adjust them, and print them at exactly
 the right size.
@@ -8,13 +8,13 @@ the right size.
 **Status:** Phase 1 (true-scale foundation) is complete for review: open
 SVG and DXF patterns, view them at true size, set seam allowance edge by
 edge, mark notches and grainlines, and print a tiled PDF at exactly 100 %.
-Projects are saved on the device and can be backed up as `.soom` files.
+Projects are saved on the device and can be backed up as `.drapewright` files.
 
 ## Documents
 
 * [Engineering proposal](docs/proposal.md): architecture, layout, input
   design, Phase 1 plan
-* [Project file format](docs/file-format.md): the open `.soom` format, with
+* [Project file format](docs/file-format.md): the open `.drapewright` format, with
   its [JSON Schema](docs/schema/project.schema.json)
 * [Open questions](docs/open-questions.md): sewing and product decisions
   waiting for an answer

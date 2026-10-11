@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, DialogTrigger, Heading, Modal, ModalOverlay } from 'react-aria-components'
 import { useEngineState } from '../state/hooks.ts'
 import type { Session } from '../state/session.ts'
-import type { ProjectSummary } from '../storage/projects.ts'
+import { PROJECT_FILE_TYPES, type ProjectSummary } from '../storage/projects.ts'
 import { t } from '../strings/en.ts'
 import { CommitTextField } from './Inspector.tsx'
 
@@ -12,7 +12,7 @@ export interface ProjectActions {
   open(id: string): Promise<void>
   /** Starts a new, empty project. */
   create(): void
-  /** Opens a .soom backup as a project. */
+  /** Opens a .drapewright backup as a project. */
   restore(file: File): Promise<void>
   /** Deletes a saved project from this device. */
   remove(project: ProjectSummary): Promise<void>
@@ -99,7 +99,7 @@ function ProjectsPanel({
         <input
           ref={restoreInput}
           type="file"
-          accept=".soom"
+          accept={PROJECT_FILE_TYPES}
           hidden
           data-testid="restore-file"
           onChange={(e) => {

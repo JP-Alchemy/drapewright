@@ -1,13 +1,15 @@
 //! Seam allowance: exact cases, sewing corner constructions, and
 //! properties over random pieces.
 
+use drapewright_pattern_core::allowance::{AllowanceNote, allowance_lines};
+use drapewright_pattern_core::geom::flatten_segs;
+use drapewright_pattern_core::testing::{arb_gentle_piece, arb_piece};
+use drapewright_pattern_core::validate::self_intersects;
+use drapewright_pattern_core::{
+    AllowanceMode, CornerStyle, Edge, EdgeKind, Outline, Piece, Pt, Segment,
+};
 use kurbo::{Point, Vec2};
 use proptest::prelude::*;
-use soom_pattern_core::allowance::{AllowanceNote, allowance_lines};
-use soom_pattern_core::geom::flatten_segs;
-use soom_pattern_core::testing::{arb_gentle_piece, arb_piece};
-use soom_pattern_core::validate::self_intersects;
-use soom_pattern_core::{AllowanceMode, CornerStyle, Edge, EdgeKind, Outline, Piece, Pt, Segment};
 
 fn polygon_area(pts: &[Point]) -> f64 {
     let n = pts.len();
@@ -225,7 +227,7 @@ fn sharp_points_are_cut_square_at_the_mitre_limit() {
     };
     // Make it clockwise if needed.
     let mut p = Piece::new("p1", "Point", outline);
-    soom_pattern_core::ops::normalize_orientation(&mut p);
+    drapewright_pattern_core::ops::normalize_orientation(&mut p);
     p.allowance.seam = 10.0;
     let lines = allowance_lines(&p);
     // The tip is at the origin and points along -x, its bisector: the cut

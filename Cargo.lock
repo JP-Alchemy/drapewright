@@ -273,6 +273,74 @@ dependencies = [
 ]
 
 [[package]]
+name = "drapewright-io"
+version = "0.1.0"
+dependencies = [
+ "drapewright-pattern-core",
+ "drapewright-project",
+ "flate2",
+ "insta",
+ "kurbo",
+ "lopdf",
+ "pdf-writer",
+ "proptest",
+ "roxmltree",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "ts-rs",
+ "usvg",
+]
+
+[[package]]
+name = "drapewright-pattern-core"
+version = "0.1.0"
+dependencies = [
+ "drapewright-pattern-core",
+ "i_overlay",
+ "insta",
+ "kurbo",
+ "proptest",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "ts-rs",
+]
+
+[[package]]
+name = "drapewright-project"
+version = "0.1.0"
+dependencies = [
+ "drapewright-pattern-core",
+ "flate2",
+ "insta",
+ "kurbo",
+ "proptest",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "ts-rs",
+ "zip",
+]
+
+[[package]]
+name = "drapewright-wasm-core"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "drapewright-io",
+ "drapewright-pattern-core",
+ "drapewright-project",
+ "kurbo",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "dyn-clone"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -988,74 +1056,6 @@ name = "smallvec"
 version = "1.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b"
-
-[[package]]
-name = "soom-io"
-version = "0.1.0"
-dependencies = [
- "flate2",
- "insta",
- "kurbo",
- "lopdf",
- "pdf-writer",
- "proptest",
- "roxmltree",
- "serde",
- "serde_json",
- "sha2",
- "soom-pattern-core",
- "soom-project",
- "thiserror",
- "ts-rs",
- "usvg",
-]
-
-[[package]]
-name = "soom-pattern-core"
-version = "0.1.0"
-dependencies = [
- "i_overlay",
- "insta",
- "kurbo",
- "proptest",
- "schemars",
- "serde",
- "serde_json",
- "soom-pattern-core",
- "thiserror",
- "ts-rs",
-]
-
-[[package]]
-name = "soom-project"
-version = "0.1.0"
-dependencies = [
- "flate2",
- "insta",
- "kurbo",
- "proptest",
- "schemars",
- "serde",
- "serde_json",
- "soom-pattern-core",
- "thiserror",
- "ts-rs",
- "zip",
-]
-
-[[package]]
-name = "soom-wasm-core"
-version = "0.1.0"
-dependencies = [
- "console_error_panic_hook",
- "kurbo",
- "serde",
- "serde-wasm-bindgen",
- "soom-io",
- "soom-pattern-core",
- "soom-project",
- "wasm-bindgen",
-]
 
 [[package]]
 name = "strict-num"

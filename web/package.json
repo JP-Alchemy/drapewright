@@ -1,5 +1,5 @@
 {
-  "name": "@soom/web",
+  "name": "@drapewright/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,8 +12,8 @@
     "icons": "pwa-assets-generator --preset minimal-2023 public/icon.svg"
   },
   "dependencies": {
-    "@soom/engine": "workspace:*",
-    "@soom/input": "workspace:^",
+    "@drapewright/engine": "workspace:*",
+    "@drapewright/input": "workspace:^",
     "idb": "^8.0.4",
     "lucide-react": "^1.55.0",
     "react": "^19.3.0",

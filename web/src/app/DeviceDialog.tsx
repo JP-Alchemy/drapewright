@@ -1,4 +1,4 @@
-import { engineVersion } from '@soom/engine'
+import { engineVersion } from '@drapewright/engine'
 import { Info } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button, Dialog, DialogTrigger, Heading, Modal, ModalOverlay } from 'react-aria-components'

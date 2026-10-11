@@ -77,7 +77,7 @@ test('opens a garment CAD (AAMA) DXF file', async ({ page }) => {
   await expect(list.getByRole('option', { name: /Skirt front/ })).toContainText('25.0 cm × 60.0 cm')
   const allowances = await page.evaluate(() =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).soom.engine.document().pieces.map((p: any) => [p.name, p.allowance]),
+    (window as any).drapewright.engine.document().pieces.map((p: any) => [p.name, p.allowance]),
   )
   expect(allowances).toEqual([
     ['Skirt front', { mode: 'add', seam: 15, hem: null }],

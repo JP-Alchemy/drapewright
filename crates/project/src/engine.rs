@@ -3,10 +3,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use drapewright_pattern_core::validate::validate_piece;
+use drapewright_pattern_core::{EdgeNearest, Id, Issue, IssueCode, Piece, Pt, Severity};
 use kurbo::Point;
 use serde::{Deserialize, Serialize};
-use soom_pattern_core::validate::validate_piece;
-use soom_pattern_core::{EdgeNearest, Id, Issue, IssueCode, Piece, Pt, Severity};
 use ts_rs::TS;
 
 use crate::command::{ChangeSet, Command, CommandError, all_ids, apply};
@@ -101,7 +101,7 @@ impl Engine {
             .collect();
         let mut seen = std::collections::HashSet::new();
         for p in &file.document.pieces {
-            for id in soom_pattern_core::validate::piece_ids(p) {
+            for id in drapewright_pattern_core::validate::piece_ids(p) {
                 if !seen.insert(id.clone()) && !issues.iter().any(|i| i.item.as_ref() == Some(id)) {
                     issues.push(Issue {
                         severity: Severity::Error,
@@ -248,7 +248,7 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soom_pattern_core::{Edge, Outline, Segment};
+    use drapewright_pattern_core::{Edge, Outline, Segment};
 
     fn square(name: &str) -> Piece {
         Piece::new(
@@ -336,8 +336,8 @@ mod tests {
                 piece,
                 edge,
                 at: 500.0,
-                from: soom_pattern_core::NotchFrom::Start,
-                kind: soom_pattern_core::NotchKind::Single,
+                from: drapewright_pattern_core::NotchFrom::Start,
+                kind: drapewright_pattern_core::NotchKind::Single,
             },
             Default::default(),
         );
@@ -459,8 +459,8 @@ mod tests {
                 piece,
                 edge,
                 at: 40.0,
-                from: soom_pattern_core::NotchFrom::Start,
-                kind: soom_pattern_core::NotchKind::Single,
+                from: drapewright_pattern_core::NotchFrom::Start,
+                kind: drapewright_pattern_core::NotchKind::Single,
             },
             Default::default(),
         )
@@ -498,14 +498,38 @@ mod tests {
     }
 
     #[test]
+    fn opens_projects_saved_under_the_earlier_name() {
+        let mut e = engine();
+        e.dispatch(
+            Command::AddPieces {
+                pieces: vec![square("A")],
+            },
+            Default::default(),
+        )
+        .unwrap();
+        let json = e
+            .to_json("2026-10-11T00:00:00Z")
+            .replace("\"drapewright-project\"", "\"soom-project\"");
+        assert!(json.contains("\"soom-project\""));
+        let (opened, _) = Engine::open(&json, "test").unwrap();
+        assert_eq!(opened.document().pieces, e.document().pieces);
+        // Saved again under the current name.
+        assert!(opened.to_json("now").contains("\"drapewright-project\""));
+    }
+
+    #[test]
     fn refuses_newer_and_foreign_files() {
         assert_eq!(
-            Engine::open(r#"{"format":"soom-project","schemaVersion":99}"#, "t").unwrap_err(),
+            Engine::open(
+                r#"{"format":"drapewright-project","schemaVersion":99}"#,
+                "t"
+            )
+            .unwrap_err(),
             LoadError::TooNew { found: 99 }
         );
         assert_eq!(
             Engine::open(r#"{"format":"other"}"#, "t").unwrap_err(),
-            LoadError::NotSoom
+            LoadError::NotAProject
         );
         assert!(matches!(
             Engine::open("{", "t").unwrap_err(),

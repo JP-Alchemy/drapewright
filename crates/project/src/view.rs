@@ -1,11 +1,11 @@
 //! What the app draws for a piece: derived lines and measurements, computed
 //! once per piece version and cached.
 
+use drapewright_pattern_core::allowance::{AllowanceNote, allowance_lines};
+use drapewright_pattern_core::notches::{NotchMark, NotchStyle, notch_marks};
+use drapewright_pattern_core::{AllowanceMode, EdgeKind, Id, Issue, Piece, Pt, validate_piece};
 use kurbo::Point;
 use serde::{Deserialize, Serialize};
-use soom_pattern_core::allowance::{AllowanceNote, allowance_lines};
-use soom_pattern_core::notches::{NotchMark, NotchStyle, notch_marks};
-use soom_pattern_core::{AllowanceMode, EdgeKind, Id, Issue, Piece, Pt, validate_piece};
 use ts_rs::TS;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -84,7 +84,7 @@ impl PieceView {
             .fold([f64::MAX, f64::MAX, f64::MIN, f64::MIN], |b, p| {
                 [b[0].min(p.x), b[1].min(p.y), b[2].max(p.x), b[3].max(p.y)]
             });
-        let area = soom_pattern_core::geom::polygon_area(&lines.stitching).abs();
+        let area = drapewright_pattern_core::geom::polygon_area(&lines.stitching).abs();
         let ob = outline.bounds();
         PieceView {
             id: piece.id.clone(),

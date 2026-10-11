@@ -6,9 +6,9 @@
 
 use std::path::Path;
 
-use soom_io::dxf::import_dxf;
-use soom_io::{AllowanceAnswer, ImportNote, ImportResult, ScaleReason};
-use soom_pattern_core::{AllowanceMode, EdgeKind, MarkKind, Piece, ScaleBasis};
+use drapewright_io::dxf::import_dxf;
+use drapewright_io::{AllowanceAnswer, ImportNote, ImportResult, ScaleReason};
+use drapewright_pattern_core::{AllowanceMode, EdgeKind, MarkKind, Piece, ScaleBasis};
 
 fn fixture(name: &str) -> ImportResult {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))

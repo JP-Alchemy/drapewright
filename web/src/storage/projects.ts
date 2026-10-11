@@ -1,15 +1,26 @@
 // Projects on this device, from the main thread: the open project is saved
 // a moment after each change; others are listed, opened and deleted; any
-// project can be backed up as a .soom file and restored from one. The IO
+// project can be backed up as a .drapewright file and restored from one. The IO
 // worker does the reading and writing (see worker-store.ts).
 
-import { Engine, type Issue } from '@soom/engine'
+import { Engine, type Issue } from '@drapewright/engine'
 import { type Store, createStore } from '../state/store.ts'
 import { t } from '../strings/en.ts'
 import type { IoClient } from '../workers/io-client.ts'
 import type { ProjectSummary } from './worker-store.ts'
 
 export type { ProjectSummary }
+
+/**
+ * Project files (backups), for a file input's `accept`. `.soom` is what they
+ * were called before the app was renamed; they still open.
+ */
+export const PROJECT_FILE_TYPES = '.drapewright,.soom'
+
+export function isProjectFile(file: File): boolean {
+  const name = file.name.toLowerCase()
+  return name.endsWith('.drapewright') || name.endsWith('.soom')
+}
 
 /** Saves this long after the last change, ms. */
 const AUTOSAVE_DELAY = 800
@@ -146,7 +157,7 @@ export class Projects {
       })
   }
 
-  /** The project as a .soom file, with the source files its pieces came from. */
+  /** The project as a .drapewright file, with the source files its pieces came from. */
   async backup(engine: Engine): Promise<Uint8Array> {
     const doc = engine.document()
     const hashes = new Set(doc.pieces.flatMap((p) => (p.source?.sha256 ? [p.source.sha256] : [])))
@@ -157,15 +168,15 @@ export class Projects {
         [...hashes].map((h) => `${h}-`),
       )
       .catch(() => [])
-    return this.io.call('packSoom', engine.toJson(), sources)
+    return this.io.call('packProject', engine.toJson(), sources)
   }
 
   /**
-   * Opens a .soom file as a project on this device. A backup of a project
+   * Opens a .drapewright file as a project on this device. A backup of a project
    * that is already here becomes a copy beside it; nothing is overwritten.
    */
   async restore(bytes: Uint8Array): Promise<Opened> {
-    const { projectJson, sources } = await this.io.call('unpackSoom', bytes)
+    const { projectJson, sources } = await this.io.call('unpackProject', bytes)
     let json = projectJson
     const parsed = JSON.parse(projectJson) as { meta?: { id?: string; name?: string } }
     const existing = await this.list().catch(() => [])

@@ -1,6 +1,6 @@
 # Licences of dependencies and assets
 
-Every third-party dependency and asset Soom uses, with its licence. CI
+Every third-party dependency and asset Drapewright uses, with its licence. CI
 checks every Rust crate in the build with cargo-deny (`deny.toml`) and
 every production npm package with `pnpm licences`
 (`scripts/check-licences.mjs`), both against the allow-list below. The
@@ -28,7 +28,7 @@ Project licence: **not yet chosen** (see
 | sha2 | MIT OR Apache-2.0 | Hashing imported files for provenance | io |
 | pdf-writer | MIT OR Apache-2.0 | Tiled PDF export | io |
 | flate2 (with miniz_oxide: MIT OR Zlib OR Apache-2.0) | MIT OR Apache-2.0 | Compressing PDF page content | io |
-| zip | MIT | `.soom` container (deflate only, through flate2) | project |
+| zip | MIT | `.drapewright` container (deflate only, through flate2) | project |
 | schemars | MIT | JSON Schema generation for the public format | pattern-core, project |
 | ts-rs | MIT | TypeScript types generated from Rust | project, wasm-core |
 | wasm-bindgen | MIT OR Apache-2.0 | JS bindings (facade crate only) | wasm-core |

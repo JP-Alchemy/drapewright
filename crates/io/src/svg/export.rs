@@ -1,11 +1,11 @@
 //! Writing pieces as SVG at true size (millimetres), readable by Inkscape,
-//! Illustrator and browsers, and by Soom's own importer.
+//! Illustrator and browsers, and by Drapewright's own importer.
 
 use std::fmt::Write as _;
 
+use drapewright_pattern_core::allowance::allowance_lines;
+use drapewright_pattern_core::{Piece, Segment};
 use kurbo::{Affine, Point, Vec2};
-use soom_pattern_core::allowance::allowance_lines;
-use soom_pattern_core::{Piece, Segment};
 
 #[derive(Clone, Debug)]
 pub struct SvgExportOptions {
@@ -153,7 +153,7 @@ pub fn export_svg(pieces: &[Piece], options: &SvgExportOptions) -> String {
     );
     let _ = writeln!(
         svg,
-        "<!-- Made with Soom. Sizes are in millimetres; print at 100%. -->"
+        "<!-- Made with Drapewright. Sizes are in millimetres; print at 100%. -->"
     );
     for p in &prepared {
         let id = escape(&p.piece.id);
@@ -171,7 +171,7 @@ pub fn export_svg(pieces: &[Piece], options: &SvgExportOptions) -> String {
         }
         if options.stitching_line {
             let o = &p.piece.outline;
-            let d = if p.piece.allowance.mode == soom_pattern_core::AllowanceMode::Add {
+            let d = if p.piece.allowance.mode == drapewright_pattern_core::AllowanceMode::Add {
                 // The outline is the stitching line: keep its exact curves.
                 let segs: Vec<Segment> = o
                     .edges

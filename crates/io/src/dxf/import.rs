@@ -13,16 +13,16 @@
 //! traced with straight steps within 0.01 mm. A spline stored only as the
 //! points it passes through is joined by straight lines and reported.
 
+use drapewright_pattern_core::build::{DEFAULT_CORNER_ANGLE, counter, outline_from_path_at};
+use drapewright_pattern_core::geom::{distance_to_polyline, flatten_segs, point_in_polygon};
+use drapewright_pattern_core::ops::normalize_orientation;
+use drapewright_pattern_core::{
+    AllowanceMode, CutInstruction, EdgeKind, Grainline, InternalLine, LineKind, Mark, MarkKind,
+    Notch, NotchFrom, NotchKind, Piece, Pt, ScaleBasis, Source, SourceFormat, SourceScale,
+};
 use kurbo::{
     Affine, Arc, Circle, CubicBez, Line, ParamCurve, PathEl, PathSeg, Point, QuadBez, Shape as _,
     SvgArc, Vec2,
-};
-use soom_pattern_core::build::{DEFAULT_CORNER_ANGLE, counter, outline_from_path_at};
-use soom_pattern_core::geom::{distance_to_polyline, flatten_segs, point_in_polygon};
-use soom_pattern_core::ops::normalize_orientation;
-use soom_pattern_core::{
-    AllowanceMode, CutInstruction, EdgeKind, Grainline, InternalLine, LineKind, Mark, MarkKind,
-    Notch, NotchFrom, NotchKind, Piece, Pt, ScaleBasis, Source, SourceFormat, SourceScale,
 };
 
 use super::reader::{Drawing, Entity, Shape, decode, parse};
@@ -661,8 +661,9 @@ fn aama_parts(placed: &[(Entity, Affine)]) -> AamaParts {
 
 fn largest(paths: &[Vec<PathSeg>]) -> Option<&Vec<PathSeg>> {
     paths.iter().max_by(|a, b| {
-        let area =
-            |p: &Vec<PathSeg>| soom_pattern_core::geom::polygon_area(&flatten_segs(p, 0.5)).abs();
+        let area = |p: &Vec<PathSeg>| {
+            drapewright_pattern_core::geom::polygon_area(&flatten_segs(p, 0.5)).abs()
+        };
         area(a).total_cmp(&area(b))
     })
 }

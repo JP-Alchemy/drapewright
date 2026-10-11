@@ -1,4 +1,4 @@
-import { type CornerStyle, type Piece, previewAllowance } from '@soom/engine'
+import { type CornerStyle, type Piece, previewAllowance } from '@drapewright/engine'
 import { useMemo } from 'react'
 import { Label, Radio, RadioGroup } from 'react-aria-components'
 import type { Session } from '../state/session.ts'

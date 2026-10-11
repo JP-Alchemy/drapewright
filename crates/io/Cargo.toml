@@ -1,6 +1,6 @@
 [package]
-name = "soom-io"
-description = "Import and export of pattern file formats for Soom"
+name = "drapewright-io"
+description = "Import and export of pattern file formats for Drapewright"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +8,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
-soom-pattern-core.workspace = true
+drapewright-pattern-core.workspace = true
 kurbo.workspace = true
 serde.workspace = true
 thiserror.workspace = true
@@ -16,12 +16,12 @@ ts-rs.workspace = true
 sha2.workspace = true
 usvg.workspace = true
 roxmltree.workspace = true
-soom-project.workspace = true
+drapewright-project.workspace = true
 pdf-writer.workspace = true
 flate2.workspace = true
 
 [dev-dependencies]
-soom-pattern-core = { workspace = true, features = ["testing"] }
+drapewright-pattern-core = { workspace = true, features = ["testing"] }
 insta.workspace = true
 serde_json.workspace = true
 proptest.workspace = true

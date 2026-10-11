@@ -4,15 +4,15 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use kurbo::{Affine, Point};
-use serde::{Deserialize, Serialize};
-use soom_pattern_core::build::reassign_ids;
-use soom_pattern_core::ops::{self, OpError};
-use soom_pattern_core::validate::{piece_ids, validate_piece};
-use soom_pattern_core::{
+use drapewright_pattern_core::build::reassign_ids;
+use drapewright_pattern_core::ops::{self, OpError};
+use drapewright_pattern_core::validate::{piece_ids, validate_piece};
+use drapewright_pattern_core::{
     Allowance, CornerStyle, CutInstruction, EdgeKind, Grainline, Id, Notch, NotchFrom, NotchKind,
     Piece, Severity,
 };
+use kurbo::{Affine, Point};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use ts_rs::TS;
 

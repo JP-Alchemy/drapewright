@@ -15,7 +15,7 @@ test('marking a hem and choosing a corner shape', async ({ page }) => {
   // The corner where the side seam meets the hem.
   await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const s = (window as any).soom
+    const s = (window as any).drapewright
     const p = s.engine.document().pieces[0]
     s.select([p.id], { kind: 'corner', piece: p.id, edge: 'e3' })
   })
@@ -48,7 +48,7 @@ test('an edge can have its own allowance, and go back to the piece’s', async (
   expect((await edgesOf(page, 0))[0]?.[3]).toBeNull()
 })
 
-test('a curved edge cannot go on the fold, and Soom says why', async ({ page }) => {
+test('a curved edge cannot go on the fold, and Drapewright says why', async ({ page }) => {
   await openWithFixture(page, 'inkscape-mm.svg', 'Add 2 pieces')
   // The skirt's hem (e4) is curved.
   const hem = await edgeMiddle(page, 0, 'e4')

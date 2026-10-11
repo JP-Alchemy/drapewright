@@ -1,4 +1,4 @@
-import { loadEngine } from '@soom/engine'
+import { loadEngine } from '@drapewright/engine'
 import { Download, FolderOpen, Maximize2, Minus, Plus, Redo2, Undo2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from 'react-aria-components'
@@ -9,7 +9,13 @@ import { fileName, saveFile } from '../platform/save-file.ts'
 import { loadScreenScale } from '../platform/screen.ts'
 import { PATTERN_FILE_TYPES, Session } from '../state/session.ts'
 import { useStore } from '../state/store.ts'
-import { type Opened, type ProjectSummary, Projects } from '../storage/projects.ts'
+import {
+  type Opened,
+  PROJECT_FILE_TYPES,
+  type ProjectSummary,
+  Projects,
+  isProjectFile,
+} from '../storage/projects.ts'
 import { t } from '../strings/en.ts'
 import { IoClient } from '../workers/io-client.ts'
 import { ContextMenu } from './ContextMenu.tsx'
@@ -64,7 +70,7 @@ function TopBar({
       session.syncView()
       await projects.flush()
       const bytes = await projects.backup(session.engine)
-      const file = fileName(name, 'soom')
+      const file = fileName(name, 'drapewright')
       saveFile(bytes, file, 'application/octet-stream')
       session.toast(t.projects.backedUp(file))
     } catch (error) {
@@ -176,14 +182,14 @@ function Workspace({
       <input
         ref={fileInput}
         type="file"
-        accept={`${PATTERN_FILE_TYPES},.soom`}
+        accept={`${PATTERN_FILE_TYPES},${PROJECT_FILE_TYPES}`}
         hidden
         data-testid="pattern-file"
         onChange={(e) => {
           const file = e.currentTarget.files?.[0]
           e.currentTarget.value = ''
           // A backup opens as a project of its own; anything else is imported.
-          if (file?.name.toLowerCase().endsWith('.soom')) void actions.restore(file)
+          if (file && isProjectFile(file)) void actions.restore(file)
           else if (file) void session.openPatternFile(file)
         }}
       />
@@ -366,7 +372,7 @@ function show(projects: Projects, opened: Opened): Session {
   if (problems > 0) session.notify({ kind: 'info', text: t.projects.needsChecking(problems) })
   // Opt-in handle for debugging and end-to-end tests: add ?debug to the URL.
   if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) {
-    Object.assign(window, { soom: session })
+    Object.assign(window, { drapewright: session })
   }
   return session
 }

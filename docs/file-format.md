@@ -1,4 +1,4 @@
-# The Soom project format
+# The Drapewright project format
 
 Status: **schema version 1** (Phase 1). Sections marked *draft* describe
 how later phases will extend the format; they become normative, with a
@@ -12,7 +12,7 @@ JSON Schema, generated from the reference implementation, is in
 
 ## 1. Container
 
-A project is saved as a single file with the extension **`.soom`**. It is a
+A project is saved as a single file with the extension **`.drapewright`**. It is a
 standard zip archive:
 
 | Path | Required | Contents |
@@ -48,9 +48,9 @@ single exception of sidecars it references explicitly.
 
 ```json
 {
-  "format": "soom-project",
+  "format": "drapewright-project",
   "schemaVersion": 1,
-  "generator": "Soom 0.1.0",
+  "generator": "Drapewright 0.1.0",
   "meta": {
     "id": "7f3c9a2e5b1d4e8f",
     "name": "A-line skirt",
@@ -68,7 +68,7 @@ single exception of sidecars it references explicitly.
 
 | Field | Type | Notes |
 |---|---|---|
-| `format` | `"soom-project"` | Identifies the file type. |
+| `format` | `"drapewright-project"` | Identifies the file type. |
 | `schemaVersion` | integer | `1` for this document. See §8. |
 | `generator` | string | Free text naming the program that wrote the file. |
 | `meta.id` | string | Stable project identifier. |
@@ -294,7 +294,7 @@ changes a piece's shape or its printed result.
 
 | Field | Notes |
 |---|---|
-| `format` | `svg`, `dxf`, `pdf`, `soom`, `drafted`. |
+| `format` | `svg`, `dxf`, `pdf`, `project` (taken from another project), `drafted`. |
 | `file`, `sha256` | Original file name and hash; the file itself is in `sources/`. |
 | `ref` | Element id, layer or block name inside the source. |
 | `scale.mmPerUnit` | Millimetres per source unit used at import. |

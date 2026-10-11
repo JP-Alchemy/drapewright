@@ -1,4 +1,4 @@
-//! WebAssembly facade for Soom's 2D engine.
+//! WebAssembly facade for Drapewright's 2D engine.
 //!
 //! This crate only converts between JavaScript and Rust types. All logic
 //! lives in the platform-independent crates it wraps, so a native shell can
@@ -6,15 +6,15 @@
 //! JavaScript objects shaped like the TypeScript types generated from the
 //! Rust ones (`packages/engine/src/generated`).
 
+use drapewright_io::pdf::PdfTexts;
+use drapewright_io::svg::{SvgExportOptions, export_svg};
+use drapewright_io::{AllowanceAnswer, ImportResult, ScaleOption};
+use drapewright_pattern_core::{Issue, Piece, Pt};
+use drapewright_project::container::{self, Sidecar, Unpacked};
+use drapewright_project::document::ViewState;
+use drapewright_project::{Command, CommandError, DispatchOptions, Document, Engine};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use soom_io::pdf::PdfTexts;
-use soom_io::svg::{SvgExportOptions, export_svg};
-use soom_io::{AllowanceAnswer, ImportResult, ScaleOption};
-use soom_pattern_core::{Issue, Piece, Pt};
-use soom_project::container::{self, Sidecar, Unpacked};
-use soom_project::document::ViewState;
-use soom_project::{Command, CommandError, DispatchOptions, Document, Engine};
 use wasm_bindgen::prelude::*;
 
 /// Called once by the host after the module is instantiated.
@@ -26,11 +26,11 @@ pub fn start() {
 /// Engine version, shown in the app's About panel.
 #[wasm_bindgen(js_name = engineVersion)]
 pub fn engine_version() -> String {
-    soom_pattern_core::VERSION.to_string()
+    drapewright_pattern_core::VERSION.to_string()
 }
 
 fn generator() -> String {
-    format!("Soom {}", soom_pattern_core::VERSION)
+    format!("Drapewright {}", drapewright_pattern_core::VERSION)
 }
 
 fn to_js<T: Serialize + ?Sized>(value: &T) -> Result<JsValue, JsError> {
@@ -48,8 +48,12 @@ fn from_js<T: DeserializeOwned>(value: JsValue) -> Result<T, JsError> {
 #[derive(Serialize)]
 #[serde(tag = "status", rename_all = "camelCase")]
 enum DispatchResult {
-    Ok { changes: soom_project::ChangeSet },
-    Rejected { error: RejectedError },
+    Ok {
+        changes: drapewright_project::ChangeSet,
+    },
+    Rejected {
+        error: RejectedError,
+    },
 }
 
 #[derive(Serialize)]
@@ -183,10 +187,10 @@ pub fn preview_allowance(piece: JsValue) -> Result<JsValue, JsError> {
     struct Preview {
         cutting: Vec<f64>,
         stitching: Vec<f64>,
-        notes: Vec<soom_pattern_core::allowance::AllowanceNote>,
+        notes: Vec<drapewright_pattern_core::allowance::AllowanceNote>,
     }
     let piece: Piece = from_js(piece)?;
-    let lines = soom_pattern_core::allowance::allowance_lines(&piece);
+    let lines = drapewright_pattern_core::allowance::allowance_lines(&piece);
     let flat = |pts: &[kurbo::Point]| pts.iter().flat_map(|p| [p.x, p.y]).collect();
     to_js(&Preview {
         cutting: flat(&lines.cutting),
@@ -198,7 +202,7 @@ pub fn preview_allowance(piece: JsValue) -> Result<JsValue, JsError> {
 /// Reads pattern pieces from an SVG file.
 #[wasm_bindgen(js_name = importSvg)]
 pub fn import_svg(data: &[u8], file_name: Option<String>) -> Result<JsValue, JsError> {
-    let result = soom_io::svg::import_svg(data, file_name.as_deref())
+    let result = drapewright_io::svg::import_svg(data, file_name.as_deref())
         .map_err(|e| JsError::new(&e.to_string()))?;
     to_js(&result)
 }
@@ -207,7 +211,7 @@ pub fn import_svg(data: &[u8], file_name: Option<String>) -> Result<JsValue, JsE
 /// garment pattern files).
 #[wasm_bindgen(js_name = importDxf)]
 pub fn import_dxf(data: &[u8], file_name: Option<String>) -> Result<JsValue, JsError> {
-    let result = soom_io::dxf::import_dxf(data, file_name.as_deref())
+    let result = drapewright_io::dxf::import_dxf(data, file_name.as_deref())
         .map_err(|e| JsError::new(&e.to_string()))?;
     to_js(&result)
 }
@@ -243,7 +247,7 @@ pub fn export_svg_js(pieces: JsValue) -> Result<String, JsError> {
 #[wasm_bindgen(js_name = planPrint)]
 pub fn plan_print(document: JsValue) -> Result<JsValue, JsError> {
     let doc: Document = from_js(document)?;
-    let plan = soom_io::pdf::plan_print(&doc).map_err(|e| JsError::new(&e.to_string()))?;
+    let plan = drapewright_io::pdf::plan_print(&doc).map_err(|e| JsError::new(&e.to_string()))?;
     to_js(&plan)
 }
 
@@ -252,22 +256,22 @@ pub fn plan_print(document: JsValue) -> Result<JsValue, JsError> {
 pub fn export_pdf(document: JsValue, texts: JsValue) -> Result<Vec<u8>, JsError> {
     let doc: Document = from_js(document)?;
     let texts: PdfTexts = from_js(texts)?;
-    soom_io::pdf::export_pdf(&doc, &texts).map_err(|e| JsError::new(&e.to_string()))
+    drapewright_io::pdf::export_pdf(&doc, &texts).map_err(|e| JsError::new(&e.to_string()))
 }
 
-/// Builds a `.soom` file: the project, then the files it was imported from.
+/// Builds a `.drapewright` file: the project, then the files it was imported from.
 #[wasm_bindgen]
 #[derive(Debug)]
-pub struct SoomWriter {
+pub struct ProjectWriter {
     project_json: String,
     sidecars: Vec<Sidecar>,
 }
 
 #[wasm_bindgen]
-impl SoomWriter {
+impl ProjectWriter {
     #[wasm_bindgen(constructor)]
-    pub fn new(project_json: String) -> SoomWriter {
-        SoomWriter {
+    pub fn new(project_json: String) -> ProjectWriter {
+        ProjectWriter {
             project_json,
             sidecars: Vec::new(),
         }
@@ -279,25 +283,25 @@ impl SoomWriter {
         self.sidecars.push(Sidecar { path, data });
     }
 
-    /// The `.soom` file's bytes.
+    /// The `.drapewright` file's bytes.
     pub fn finish(self) -> Result<Vec<u8>, JsError> {
         container::pack(&self.project_json, &self.sidecars)
             .map_err(|e| JsError::new(&e.to_string()))
     }
 }
 
-/// What a `.soom` file holds: the project text and its source files.
+/// What a `.drapewright` file holds: the project text and its source files.
 #[wasm_bindgen]
 #[derive(Debug)]
-pub struct SoomReader {
+pub struct ProjectReader {
     unpacked: Unpacked,
 }
 
 #[wasm_bindgen]
-impl SoomReader {
-    pub fn open(bytes: &[u8]) -> Result<SoomReader, JsError> {
+impl ProjectReader {
+    pub fn open(bytes: &[u8]) -> Result<ProjectReader, JsError> {
         container::unpack(bytes)
-            .map(|unpacked| SoomReader { unpacked })
+            .map(|unpacked| ProjectReader { unpacked })
             .map_err(|e| JsError::new(&e.to_string()))
     }
 

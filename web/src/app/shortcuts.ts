@@ -1,6 +1,6 @@
 // Keyboard shortcuts for the whole window. Ignored while typing in a field.
 
-import { matchShortcut, platformOf } from '@soom/input'
+import { matchShortcut, platformOf } from '@drapewright/input'
 import { actualSize, zoomAt } from '../canvas/viewport.ts'
 import type { Session } from '../state/session.ts'
 

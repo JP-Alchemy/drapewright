@@ -8,13 +8,13 @@
 //! so pages meet edge to edge; with overlapping pages it is shorter by the
 //! overlap.
 
+use drapewright_pattern_core::allowance::allowance_lines;
+use drapewright_pattern_core::geom::point_in_polygon;
+use drapewright_pattern_core::{Id, Piece};
+use drapewright_project::Document;
+use drapewright_project::document::{Assembly, Orientation};
 use kurbo::{Affine, Point, Rect};
 use serde::{Deserialize, Serialize};
-use soom_pattern_core::allowance::allowance_lines;
-use soom_pattern_core::geom::point_in_polygon;
-use soom_pattern_core::{Id, Piece};
-use soom_project::Document;
-use soom_project::document::{Assembly, Orientation};
 use thiserror::Error;
 use ts_rs::TS;
 

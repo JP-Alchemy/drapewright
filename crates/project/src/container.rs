@@ -1,4 +1,4 @@
-//! The `.soom` file: a zip archive with `project.json` and, under
+//! The `.drapewright` file: a zip archive with `project.json` and, under
 //! `sources/`, the files the pieces were imported from
 //! (docs/file-format.md §1).
 //!
@@ -16,16 +16,16 @@ pub const PROJECT_JSON: &str = "project.json";
 /// Folder of original imported files: `sources/<sha256>-<file name>`.
 pub const SOURCES: &str = "sources/";
 
-/// Most a `.soom` may unpack to, all files together. A larger archive is
+/// Most a `.drapewright` may unpack to, all files together. A larger archive is
 /// refused rather than allowed to fill the device.
 const MAX_UNPACKED: u64 = 1 << 30;
-/// Most files a `.soom` may hold.
+/// Most files a `.drapewright` may hold.
 const MAX_FILES: usize = 10_000;
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum ContainerError {
-    #[error("This is not a Soom project file (.soom).")]
-    NotSoom,
+    #[error("This is not a Drapewright project file (.drapewright).")]
+    NotAProject,
     #[error("This project file has no project in it.")]
     NoProject,
     #[error("This project file is damaged: {0}")]
@@ -51,7 +51,7 @@ pub fn safe_source_name(name: &str) -> bool {
         && !name.contains(['/', '\\', '\0'])
 }
 
-/// Packs `project.json` and its sidecars into a `.soom` file. Sidecars
+/// Packs `project.json` and its sidecars into a `.drapewright` file. Sidecars
 /// outside `sources/`, or with unsafe names, are refused.
 pub fn pack(project_json: &str, sidecars: &[Sidecar]) -> Result<Vec<u8>, ContainerError> {
     let options = SimpleFileOptions::default()
@@ -82,7 +82,7 @@ pub fn pack(project_json: &str, sidecars: &[Sidecar]) -> Result<Vec<u8>, Contain
     Ok(cursor.into_inner())
 }
 
-/// What a `.soom` file holds.
+/// What a `.drapewright` file holds.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Unpacked {
     /// The `project.json` text, to be opened (and migrated) by the engine.
@@ -92,9 +92,9 @@ pub struct Unpacked {
     pub sidecars: Vec<Sidecar>,
 }
 
-/// Reads a `.soom` file.
+/// Reads a `.drapewright` file.
 pub fn unpack(bytes: &[u8]) -> Result<Unpacked, ContainerError> {
-    let mut zip = ZipArchive::new(Cursor::new(bytes)).map_err(|_| ContainerError::NotSoom)?;
+    let mut zip = ZipArchive::new(Cursor::new(bytes)).map_err(|_| ContainerError::NotAProject)?;
     if zip.len() > MAX_FILES {
         return Err(ContainerError::TooLarge);
     }
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn packs_and_unpacks_the_project_and_its_sources() {
-        let json = r#"{"format":"soom-project","schemaVersion":1}"#;
+        let json = r#"{"format":"drapewright-project","schemaVersion":1}"#;
         let sources = [
             sidecar("sources/b2-skirt.dxf", b"0\nSECTION\n"),
             sidecar("sources/a1-front.svg", b"<svg/>"),
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn refuses_what_is_not_a_project() {
-        assert_eq!(unpack(b"not a zip"), Err(ContainerError::NotSoom));
+        assert_eq!(unpack(b"not a zip"), Err(ContainerError::NotAProject));
         let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
         zip.start_file("readme.txt", SimpleFileOptions::default())
             .unwrap();

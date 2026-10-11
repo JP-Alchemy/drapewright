@@ -1,7 +1,7 @@
 # Test fixtures
 
-Pattern files used by Soom's tests. Unless a folder says otherwise, every
-file here was drawn for Soom's tests and is dedicated to the public domain
+Pattern files used by Drapewright's tests. Unless a folder says otherwise, every
+file here was drawn for Drapewright's tests and is dedicated to the public domain
 under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
 
 Never add a commercial pattern here. Real patterns used for private testing

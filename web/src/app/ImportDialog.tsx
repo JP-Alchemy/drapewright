@@ -1,4 +1,4 @@
-import type { AllowanceMode, ScaleOption } from '@soom/engine'
+import type { AllowanceMode, ScaleOption } from '@drapewright/engine'
 import { useState } from 'react'
 import {
   Button,

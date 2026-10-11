@@ -8,7 +8,7 @@ import { draw, readTheme } from './renderer.ts'
 
 /**
  * The work table. Draws on demand (once per animation frame at most) when
- * the project or the view changes; input goes through @soom/input.
+ * the project or the view changes; input goes through @drapewright/input.
  */
 export function PatternCanvas({ session }: { session: Session }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)

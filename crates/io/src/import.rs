@@ -1,10 +1,10 @@
 //! What every importer returns.
 
+use drapewright_pattern_core::ops::transform;
+use drapewright_pattern_core::{AllowanceMode, Id, Piece, ScaleBasis};
 use kurbo::Affine;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use soom_pattern_core::ops::transform;
-use soom_pattern_core::{AllowanceMode, Id, Piece, ScaleBasis};
 use thiserror::Error;
 use ts_rs::TS;
 
@@ -79,7 +79,7 @@ pub enum ImportNote {
     /// The file has both the cutting line and the stitching line of a
     /// piece. The stitching line is used, with this allowance.
     SeamLineFound { piece: Id, allowance: f64 },
-    /// Soom's cutting line for the piece differs from the one in the file
+    /// Drapewright's cutting line for the piece differs from the one in the file
     /// by up to this much, usually at corners.
     CuttingLineDiffers { piece: Id, max_mm: f64 },
     /// Small closed shapes that are not pieces, such as arrowheads,
@@ -89,7 +89,7 @@ pub enum ImportNote {
     LooseLinesIgnored { count: u32 },
     /// The file has lines but no closed shapes, so no pieces were found.
     NoClosedShapes,
-    /// Parts of the drawing Soom does not read yet (3D faces, hatches…).
+    /// Parts of the drawing Drapewright does not read yet (3D faces, hatches…).
     UnsupportedEntities { count: u32 },
     /// Curves stored only as points they pass through, joined by straight
     /// lines: their shape may differ slightly from the original.
@@ -100,7 +100,7 @@ pub enum ImportNote {
 
 /// Seam allowance the file does not settle. A piece drawn with one outline
 /// could have been drawn on either line, and the two differ by the
-/// allowance all round, so the user says which rather than Soom guessing.
+/// allowance all round, so the user says which rather than Drapewright guessing.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]

@@ -12,7 +12,7 @@ import type {
   PaperName,
   ScaleBasis,
   ScaleReason,
-} from '@soom/engine'
+} from '@drapewright/engine'
 
 /** A length in the user's units: "45.2 cm", "452 mm" or "17.8 in". */
 export function formatLength(mm: number, units: DisplayUnits): string {
@@ -34,7 +34,7 @@ const namesList = (names: string[]) =>
   new Intl.ListFormat('en', { type: 'conjunction' }).format(names.map((n) => `“${n}”`))
 
 export const t = {
-  appName: 'Soom',
+  appName: 'Drapewright',
   untitled: 'Untitled pattern',
 
   actions: {
@@ -199,7 +199,7 @@ export const t = {
   importing: {
     reading: (name: string) => `Reading ${name}…`,
     unsupported: (name: string) =>
-      `Soom can open SVG and DXF files for now; “${name}” is neither. PDF is coming.`,
+      `Drapewright can open SVG and DXF files for now; “${name}” is neither. PDF is coming.`,
     failed: (message: string) => `This file could not be opened. ${message}`,
     found: (n: number) => plural(n, 'Found 1 piece', 'Found # pieces'),
     nothingFound: 'No pieces were found in this file.',
@@ -257,7 +257,8 @@ export const t = {
         'The file marks these outlines as cutting lines, so the allowance is already included. Check its width.',
       ),
     allowanceAdd: 'Not included',
-    allowanceAddDetail: 'The lines are stitching lines. Soom adds the allowance around them.',
+    allowanceAddDetail:
+      'The lines are stitching lines. Drapewright adds the allowance around them.',
     allowanceIncluded: 'Already included',
     allowanceIncludedDetail:
       'The lines are cutting lines, kept exactly as drawn. The stitching line is shown inside.',
@@ -270,7 +271,7 @@ export const t = {
         case 'seamLineFound':
           return `${pieceName(n.piece)}: found both the cutting line and the stitching line, so the allowance (${formatLength(n.allowance, units)}) was measured from the file.`
         case 'cuttingLineDiffers':
-          return `${pieceName(n.piece)}: the file’s cutting line differs from Soom’s by up to ${formatLength(n.maxMm, 'mm')}, usually at corners. You can adjust the corners after adding.`
+          return `${pieceName(n.piece)}: the file’s cutting line differs from Drapewright’s by up to ${formatLength(n.maxMm, 'mm')}, usually at corners. You can adjust the corners after adding.`
         case 'smallShapesIgnored':
           return plural(
             n.count,
@@ -284,18 +285,18 @@ export const t = {
             'Left out # lines outside the pieces (titles or borders).',
           )
         case 'noClosedShapes':
-          return 'The file has lines but no closed shapes. Soom needs each piece’s outline drawn as one closed shape.'
+          return 'The file has lines but no closed shapes. Drapewright needs each piece’s outline drawn as one closed shape.'
         case 'unsupportedEntities':
           return plural(
             n.count,
-            'Left out 1 part of the drawing Soom cannot read yet (such as a hatch or a 3D face).',
-            'Left out # parts of the drawing Soom cannot read yet (such as hatches or 3D faces).',
+            'Left out 1 part of the drawing Drapewright cannot read yet (such as a hatch or a 3D face).',
+            'Left out # parts of the drawing Drapewright cannot read yet (such as hatches or 3D faces).',
           )
         case 'curvesTraced':
           return plural(
             n.count,
-            '1 curve was stored only as the points it passes through, so Soom joined them with straight lines. Check its shape after adding.',
-            '# curves were stored only as the points they pass through, so Soom joined them with straight lines. Check their shape after adding.',
+            '1 curve was stored only as the points it passes through, so Drapewright joined them with straight lines. Check its shape after adding.',
+            '# curves were stored only as the points they pass through, so Drapewright joined them with straight lines. Check their shape after adding.',
           )
         case 'outlineCrossesItself':
           return `${pieceName(n.piece)}: the outline crosses itself. Check that piece after adding.`
@@ -373,7 +374,7 @@ export const t = {
     new: 'New project',
     restore: 'Restore a backup…',
     backup: 'Back up',
-    backupHint: 'Save a .soom file of this project, with the files it came from.',
+    backupHint: 'Save a .drapewright file of this project, with the files it came from.',
     empty: 'No other projects on this device yet.',
     loading: 'Looking for projects…',
     summary: (pieces: number, modified: string) =>
@@ -427,7 +428,7 @@ export const t = {
 
   crash: {
     heading: 'Something went wrong',
-    body: 'Soom hit a problem showing this screen. Reloading usually fixes it.',
+    body: 'Drapewright hit a problem showing this screen. Reloading usually fixes it.',
     reload: 'Reload',
   },
 

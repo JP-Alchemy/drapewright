@@ -4,15 +4,15 @@
 
 use std::path::Path;
 
-use soom_project::ProjectFile;
+use drapewright_project::ProjectFile;
 
 #[test]
 fn json_schema_is_up_to_date() {
     let mut schema = schemars::schema_for!(ProjectFile);
-    schema.insert("title".into(), "Soom project (project.json)".into());
+    schema.insert("title".into(), "Drapewright project (project.json)".into());
     schema.insert(
         "description".into(),
-        "A Soom sewing pattern project, schema version 1. See docs/file-format.md.".into(),
+        "A Drapewright sewing pattern project, schema version 1. See docs/file-format.md.".into(),
     );
     let text = serde_json::to_string_pretty(&schema).unwrap() + "\n";
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/schema/project.schema.json");

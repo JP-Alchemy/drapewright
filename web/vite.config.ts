@@ -18,8 +18,8 @@ export default defineConfig({
       injectRegister: null,
       includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'icon.svg'],
       manifest: {
-        name: 'Soom pattern studio',
-        short_name: 'Soom',
+        name: 'Drapewright pattern studio',
+        short_name: 'Drapewright',
         description: 'Open your sewing patterns, fit them, and print them at true size.',
         theme_color: '#2f5d50',
         background_color: '#efe9df',

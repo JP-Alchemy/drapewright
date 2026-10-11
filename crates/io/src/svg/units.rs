@@ -7,7 +7,7 @@
 //! used 90 per inch. Clues in the file decide which reading comes first,
 //! but only stated units make the scale certain.
 
-use soom_pattern_core::ScaleBasis;
+use drapewright_pattern_core::ScaleBasis;
 
 use crate::import::{ScaleInfo, ScaleOption, ScaleReason};
 

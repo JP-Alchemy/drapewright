@@ -31,7 +31,7 @@ export async function openWithFixture(
 export async function pieceCentre(page: Page, index: number): Promise<{ x: number; y: number }> {
   return page.evaluate((i) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const s = (window as any).soom
+    const s = (window as any).drapewright
     const v = s.ui.get().viewport
     const sp = s.scene()[i]
     const [x0, y0, x1, y1] = sp.view.bounds
@@ -47,7 +47,7 @@ export async function pieceCentre(page: Page, index: number): Promise<{ x: numbe
 export async function placementOf(page: Page, index: number) {
   return page.evaluate(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (i) => (window as any).soom.engine.document().pieces[i].placement,
+    (i) => (window as any).drapewright.engine.document().pieces[i].placement,
     index,
   )
 }
@@ -87,7 +87,7 @@ export async function edgeMiddle(page: Page, pieceIndex: number, edgeId: string)
   return page.evaluate(
     ({ i, edgeId }) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const s = (window as any).soom
+      const s = (window as any).drapewright
       const v = s.ui.get().viewport
       const sp = s.scene()[i]
       const ev = sp.view.edges.find((e: { id: string }) => e.id === edgeId)
@@ -107,7 +107,7 @@ export async function edgesOf(page: Page, pieceIndex: number) {
   return page.evaluate(
     (i) =>
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).soom.engine
+      (window as any).drapewright.engine
         .document()
         .pieces[i].outline.edges.map(
           (e: { id: string; kind: string; endCorner: string; allowance: number | null }) => [
@@ -126,7 +126,7 @@ export async function toPage(page: Page, x: number, y: number) {
   return page.evaluate(
     ({ x, y }) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const v = (window as any).soom.ui.get().viewport
+      const v = (window as any).drapewright.ui.get().viewport
       const scale = v.pxPerMm * v.zoom
       const r = document.querySelector('canvas')!.getBoundingClientRect()
       return {
@@ -142,7 +142,7 @@ export async function toPage(page: Page, x: number, y: number) {
 export async function notchesOf(page: Page, pieceIndex: number) {
   return page.evaluate((i) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const s = (window as any).soom
+    const s = (window as any).drapewright
     const piece = s.engine.document().pieces[i]
     const marks = s.scene()[i].view.notches
     return {

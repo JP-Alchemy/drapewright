@@ -1,8 +1,8 @@
 // The grainline tool: drag inside a piece to draw its grainline. It snaps
 // to 15° steps of the piece's own axes; hold Shift for any angle.
 
-import type { Piece } from '@soom/engine'
-import type { ToolPointer } from '@soom/input'
+import type { Piece } from '@drapewright/engine'
+import type { ToolPointer } from '@drapewright/input'
 import type { Tool, ToolContext } from './tool.ts'
 
 /** Shortest grainline worth keeping, mm. */

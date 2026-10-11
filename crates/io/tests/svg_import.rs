@@ -6,11 +6,13 @@
 
 use std::path::Path;
 
+use drapewright_io::svg::{SvgExportOptions, export_svg, import_svg};
+use drapewright_io::{ImportNote, ImportResult, ScaleReason};
+use drapewright_pattern_core::geom::flatten_segs;
+use drapewright_pattern_core::{
+    Edge, Grainline, MarkKind, Outline, Piece, Pt, ScaleBasis, Segment,
+};
 use kurbo::{Point, Rect};
-use soom_io::svg::{SvgExportOptions, export_svg, import_svg};
-use soom_io::{ImportNote, ImportResult, ScaleReason};
-use soom_pattern_core::geom::flatten_segs;
-use soom_pattern_core::{Edge, Grainline, MarkKind, Outline, Piece, Pt, ScaleBasis, Segment};
 
 fn fixture(name: &str) -> ImportResult {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -197,7 +199,9 @@ fn sample_outline(p: &Piece) -> Vec<Point> {
 }
 
 fn max_gap(a: &[Point], b: &[Point]) -> f64 {
-    let d = |p: Point, pts: &[Point]| soom_pattern_core::geom::distance_to_polyline(p, pts, true);
+    let d = |p: Point, pts: &[Point]| {
+        drapewright_pattern_core::geom::distance_to_polyline(p, pts, true)
+    };
     a.iter()
         .map(|p| d(*p, b))
         .chain(b.iter().map(|p| d(*p, a)))
@@ -262,7 +266,7 @@ fn export_then_import_gives_back_the_pieces() {
         let b = piece(&back, &o.name);
         // Same stitching line (moved by the placement used for export).
         let mut moved = o.clone();
-        soom_pattern_core::ops::transform(
+        drapewright_pattern_core::ops::transform(
             &mut moved,
             kurbo::Affine::translate((o.placement.x, o.placement.y)),
         );

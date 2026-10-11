@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Soom project (project.json)",
-  "description": "A Soom sewing pattern project, schema version 1. See docs/file-format.md.",
+  "title": "Drapewright project (project.json)",
+  "description": "A Drapewright sewing pattern project, schema version 1. See docs/file-format.md.",
   "type": "object",
   "properties": {
     "extensions": {
@@ -931,13 +931,21 @@
       ]
     },
     "SourceFormat": {
-      "type": "string",
-      "enum": [
-        "svg",
-        "dxf",
-        "pdf",
-        "soom",
-        "drafted"
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "svg",
+            "dxf",
+            "pdf",
+            "drafted"
+          ]
+        },
+        {
+          "description": "Pieces taken from another project file.",
+          "type": "string",
+          "const": "project"
+        }
       ]
     },
     "SourceScale": {

@@ -1,4 +1,4 @@
-import type { Jobs } from '@soom/engine'
+import type { Jobs } from '@drapewright/engine'
 import type { StorageJobs } from '../storage/worker-store.ts'
 
 /** Everything the IO worker can do: engine jobs and project storage. */

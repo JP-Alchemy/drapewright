@@ -19,7 +19,7 @@ test('work is saved on the device and comes back after a reload', async ({ page 
   // browsing.
   const store = await page.evaluate(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    () => (window as any).soom.io.call('storageStatus') as Promise<{ kind: string }>,
+    () => (window as any).drapewright.io.call('storageStatus') as Promise<{ kind: string }>,
   )
   if (test.info().project.name === 'chromium') expect(store.kind).toBe('opfs')
   else expect(['opfs', 'indexeddb']).toContain(store.kind)
@@ -44,12 +44,12 @@ test('projects can be switched, backed up, restored and deleted', async ({ page 
   await dialog.getByRole('button', { name: /Untitled pattern.*1 piece/ }).click()
   await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(1)
 
-  // Back up: a .soom file with the project and the SVG it came from.
+  // Back up: a .drapewright file with the project and the SVG it came from.
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Back up' }).click()
   const file = await download
   // WebKit on Linux saves spaces in file names as underscores.
-  expect(file.suggestedFilename()).toMatch(/^Untitled[ _]pattern\.soom$/)
+  expect(file.suggestedFilename()).toMatch(/^Untitled[ _]pattern\.drapewright$/)
   const path = await file.path()
   const zip = (await readFile(path)).toString('latin1')
   expect(zip.startsWith('PK')).toBe(true)
@@ -70,4 +70,58 @@ test('projects can be switched, backed up, restored and deleted', async ({ page 
   await expect(dialog.getByRole('alertdialog')).toContainText('This cannot be undone')
   await dialog.getByRole('button', { name: 'Delete', exact: true }).click()
   await expect(dialog.getByRole('button', { name: /Untitled pattern.*1 piece/ })).toHaveCount(0)
+})
+
+test('projects saved before the rename (as Soom) still open', async ({ page }) => {
+  await page.goto('/?debug')
+  await page.waitForFunction(() => 'drapewright' in window)
+  // Store a project the way the app did under its earlier name: its list in
+  // the "soom" database and its format called "soom-project".
+  await page.evaluate(async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s = (window as any).drapewright
+    const { kind } = await s.io.call('storageStatus')
+    const json = JSON.parse(s.engine.toJson())
+    json.format = 'soom-project'
+    json.meta.id = 'earlier-1'
+    json.meta.name = 'Saved before the rename'
+    const bytes = new TextEncoder().encode(JSON.stringify(json))
+    await new Promise<void>((resolve, reject) => {
+      const open = indexedDB.open('soom', 2)
+      open.onupgradeneeded = () => {
+        open.result.createObjectStore('projects', { keyPath: 'id' })
+        open.result.createObjectStore('files')
+      }
+      open.onerror = () => reject(open.error)
+      open.onsuccess = () => {
+        const db = open.result
+        const tx = db.transaction(['projects', 'files'], 'readwrite')
+        tx.objectStore('projects').put({
+          id: 'earlier-1',
+          name: 'Saved before the rename',
+          modified: '2026-10-10T10:00:00Z',
+          pieces: 0,
+        })
+        if (kind === 'indexeddb') tx.objectStore('files').put(bytes, ['earlier-1', 'project.json'])
+        tx.oncomplete = () => {
+          db.close()
+          resolve()
+        }
+        tx.onerror = () => reject(tx.error)
+      }
+    })
+    if (kind === 'opfs') {
+      const root = await navigator.storage.getDirectory()
+      const projects = await root.getDirectoryHandle('projects', { create: true })
+      const dir = await projects.getDirectoryHandle('earlier-1', { create: true })
+      const file = await dir.getFileHandle('project.json', { create: true })
+      const writer = await file.createWritable()
+      await writer.write(bytes)
+      await writer.close()
+    }
+  })
+  await page.reload()
+  await expect(
+    page.getByRole('button', { name: /open now: Saved before the rename/ }),
+  ).toBeVisible()
 })

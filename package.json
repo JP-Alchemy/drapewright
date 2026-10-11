@@ -1,5 +1,5 @@
 {
-  "name": "soom",
+  "name": "drapewright",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@9.15.4",
@@ -8,17 +8,17 @@
   },
   "scripts": {
     "wasm": "wasm-pack build crates/wasm-core --target web --out-dir ../../packages/engine/pkg --release && pnpm wasm:opt",
-    "wasm:opt": "wasm-opt -Oz --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals --enable-reference-types --enable-multivalue packages/engine/pkg/soom_wasm_core_bg.wasm -o packages/engine/pkg/soom_wasm_core_bg.wasm",
+    "wasm:opt": "wasm-opt -Oz --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals --enable-reference-types --enable-multivalue packages/engine/pkg/drapewright_wasm_core_bg.wasm -o packages/engine/pkg/drapewright_wasm_core_bg.wasm",
     "wasm:dev": "wasm-pack build crates/wasm-core --target web --out-dir ../../packages/engine/pkg --dev",
-    "dev": "pnpm --filter @soom/web dev",
-    "build": "pnpm wasm && pnpm --filter @soom/web build",
-    "preview": "pnpm --filter @soom/web preview",
+    "dev": "pnpm --filter @drapewright/web dev",
+    "build": "pnpm wasm && pnpm --filter @drapewright/web build",
+    "preview": "pnpm --filter @drapewright/web preview",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "e2e": "pnpm --filter @soom/web e2e",
+    "e2e": "pnpm --filter @drapewright/web e2e",
     "licences": "node scripts/check-licences.mjs"
   },
   "devDependencies": {

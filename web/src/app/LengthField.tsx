@@ -1,4 +1,4 @@
-import type { DisplayUnits } from '@soom/engine'
+import type { DisplayUnits } from '@drapewright/engine'
 import { Minus, Plus } from 'lucide-react'
 import { Button, Group, Input, Label, NumberField, Text } from 'react-aria-components'
 import { fromDisplay, lengthFormat, lengthStep, toDisplay } from '../strings/units.ts'

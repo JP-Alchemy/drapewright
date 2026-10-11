@@ -10,7 +10,7 @@ import type {
   ImportResult,
   Piece,
   ScaleOption,
-} from '@soom/engine'
+} from '@drapewright/engine'
 import { buildPaths } from '../canvas/paths.ts'
 import { type ScenePiece, sceneBounds } from '../canvas/renderer.ts'
 import { NOMINAL_PX_PER_MM, type ViewportState, fit, initialViewport } from '../canvas/viewport.ts'
@@ -41,7 +41,7 @@ export interface PendingImport {
   bytes: Uint8Array
 }
 
-/** The pattern files Soom reads, by file extension and media type. */
+/** The pattern files Drapewright reads, by file extension and media type. */
 const PATTERN_FORMATS: {
   importer: 'importSvg' | 'importDxf'
   extensions: string[]

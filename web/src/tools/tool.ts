@@ -3,8 +3,8 @@
 // in undo) or commands (one undo step each). They never change the document
 // directly, so a cancelled gesture can never leave half an edit behind.
 
-import type { Hit } from '@soom/engine'
-import { type ToolPointer, hitRadius } from '@soom/input'
+import type { Hit } from '@drapewright/engine'
+import { type ToolPointer, hitRadius } from '@drapewright/input'
 import type { Point } from '../canvas/viewport.ts'
 import { scaleOf, toWorld } from '../canvas/viewport.ts'
 import type { Session } from '../state/session.ts'

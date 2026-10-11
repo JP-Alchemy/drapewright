@@ -4,7 +4,7 @@ import type { AllowanceMode } from "./AllowanceMode";
 /**
  * Seam allowance the file does not settle. A piece drawn with one outline
  * could have been drawn on either line, and the two differ by the
- * allowance all round, so the user says which rather than Soom guessing.
+ * allowance all round, so the user says which rather than Drapewright guessing.
  */
 export type AllowanceQuestion = { 
 /**

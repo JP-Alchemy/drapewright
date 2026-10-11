@@ -9,18 +9,18 @@
 
 use std::collections::HashMap;
 
-use kurbo::{ParamCurve, PathSeg, Point, Rect};
-use soom_pattern_core::allowance::allowance_lines;
-use soom_pattern_core::build::{DEFAULT_CORNER_ANGLE, counter, outline_from_path};
-use soom_pattern_core::geom::{
+use drapewright_pattern_core::allowance::allowance_lines;
+use drapewright_pattern_core::build::{DEFAULT_CORNER_ANGLE, counter, outline_from_path};
+use drapewright_pattern_core::geom::{
     distance_to_polyline, flatten_segs, point_in_polygon, polygon_area, ray_hit,
 };
-use soom_pattern_core::ops::normalize_orientation;
-use soom_pattern_core::validate::self_intersects;
-use soom_pattern_core::{
+use drapewright_pattern_core::ops::normalize_orientation;
+use drapewright_pattern_core::validate::self_intersects;
+use drapewright_pattern_core::{
     EdgeGeom, Grainline, InternalLine, LineKind, Mark, MarkKind, Piece, Pt, Segment, Source,
     SourceFormat, SourceScale,
 };
+use kurbo::{ParamCurve, PathSeg, Point, Rect};
 
 use crate::import::{ImportNote, ScaleInfo};
 

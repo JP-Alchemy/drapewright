@@ -1,6 +1,6 @@
 [package]
-name = "soom-pattern-core"
-description = "Geometry kernel and piece model for Soom"
+name = "drapewright-pattern-core"
+description = "Geometry kernel and piece model for Drapewright"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -22,7 +22,7 @@ proptest = { workspace = true, optional = true }
 
 [dev-dependencies]
 # Enables the `testing` feature for this crate's own integration tests.
-soom-pattern-core = { path = ".", features = ["testing"] }
+drapewright-pattern-core = { path = ".", features = ["testing"] }
 proptest.workspace = true
 insta.workspace = true
 serde_json.workspace = true

@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "soom-dev",
+      "name": "drapewright-dev",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@soom/web", "dev"],
+      "runtimeArgs": ["--filter", "@drapewright/web", "dev"],
       "port": 5173
     }
   ]

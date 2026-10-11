@@ -30,8 +30,7 @@ test fixtures?
 ☐ **Hosting** for the installable app, once she should try it on her iPad:
 Cloudflare Pages or Netlify (free, both support the isolation headers), or
 something you already use.
-☐ **Name**: is "Soom" staying for now? It only affects the app title and
-package names.
+☑ **Name**: Drapewright.
 
 ---
 

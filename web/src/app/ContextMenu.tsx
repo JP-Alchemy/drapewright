@@ -1,4 +1,4 @@
-import type { EdgeKind } from '@soom/engine'
+import type { EdgeKind } from '@drapewright/engine'
 import { useRef } from 'react'
 import { Menu, MenuItem, Popover, Separator } from 'react-aria-components'
 import type { Session } from '../state/session.ts'

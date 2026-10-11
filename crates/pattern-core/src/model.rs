@@ -385,7 +385,8 @@ pub enum SourceFormat {
     Svg,
     Dxf,
     Pdf,
-    Soom,
+    /// Pieces taken from another project file.
+    Project,
     Drafted,
 }
 

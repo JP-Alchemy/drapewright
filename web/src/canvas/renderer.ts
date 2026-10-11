@@ -1,8 +1,8 @@
 // Draws the work table: a cutting mat with a true-size centimetre grid and
 // the pieces laid on it like pattern paper.
 
-import type { Hit, Piece, PieceView } from '@soom/engine'
-import type { DisplayUnits } from '@soom/engine'
+import type { Hit, Piece, PieceView } from '@drapewright/engine'
+import type { DisplayUnits } from '@drapewright/engine'
 import type { GrainPreview, MovePreview, PartRef } from '../state/session.ts'
 import { cutSummary } from '../app/PieceDetails.tsx'
 import { formatLength } from '../strings/en.ts'

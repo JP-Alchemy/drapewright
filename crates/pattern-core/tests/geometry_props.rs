@@ -1,14 +1,14 @@
 //! Property tests for measuring and editing outlines.
 
+use drapewright_pattern_core::geom::ARCLEN_ACCURACY;
+use drapewright_pattern_core::ops::{join_with_next, normalize_orientation, reverse, split_edge};
+use drapewright_pattern_core::testing::{arb_outline, arb_piece};
+use drapewright_pattern_core::{Notch, NotchFrom, NotchKind, Piece};
 use proptest::prelude::*;
-use soom_pattern_core::geom::ARCLEN_ACCURACY;
-use soom_pattern_core::ops::{join_with_next, normalize_orientation, reverse, split_edge};
-use soom_pattern_core::testing::{arb_outline, arb_piece};
-use soom_pattern_core::{Notch, NotchFrom, NotchKind, Piece};
 
 use kurbo::ParamCurveArclen;
 
-fn piece_with(outline: soom_pattern_core::Outline) -> Piece {
+fn piece_with(outline: drapewright_pattern_core::Outline) -> Piece {
     Piece::new("p1", "Random", outline)
 }
 

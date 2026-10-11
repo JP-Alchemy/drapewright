@@ -1,6 +1,6 @@
 [package]
-name = "soom-wasm-core"
-description = "WebAssembly facade exposing Soom's 2D engine to the browser host"
+name = "drapewright-wasm-core"
+description = "WebAssembly facade exposing Drapewright's 2D engine to the browser host"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,9 +11,9 @@ publish.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-soom-pattern-core.workspace = true
-soom-io.workspace = true
-soom-project.workspace = true
+drapewright-pattern-core.workspace = true
+drapewright-io.workspace = true
+drapewright-project.workspace = true
 kurbo.workspace = true
 wasm-bindgen.workspace = true
 serde.workspace = true
