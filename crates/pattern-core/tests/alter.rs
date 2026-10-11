@@ -491,6 +491,18 @@ fn a_full_bust_adjustment_adds_room_and_a_side_dart() {
         tip.distance(apex) > 20.0 && tip.distance(apex) < 60.0,
         "tip {tip:?}"
     );
+    // Known as a dart on the side seam: its legs, from where the side seam
+    // goes in to where it comes out again.
+    assert_eq!(fuller.darts.len(), 1);
+    let dart = &fuller.darts[0];
+    assert_eq!(dart.edge, "side");
+    let legs = dart.to - dart.from;
+    let side = fuller.outline.edge_geom(3);
+    let mouth = side.point_at(dart.from).distance(side.point_at(dart.to));
+    assert!(
+        legs > 2.0 * 25.0 && mouth > 10.0,
+        "legs {legs}, mouth {mouth}"
+    );
     // The centre front longer, and the waist wider, by as much as the side
     // moved.
     let length = |s: &Drawn, i: usize| s.outline.edge_geom(i).length();
@@ -506,6 +518,7 @@ fn a_small_bust_adjustment_takes_room_away() {
     let (drawn, step) = bust(-15.0);
     let smaller = alter(&drawn, &[step]).unwrap();
     assert!(smaller.outline.closure_gap() < 1e-9);
+    assert!(smaller.darts.is_empty());
     let (before, after) = (width_at(&drawn, 260.0), width_at(&smaller, 260.0));
     assert!((before - after - 15.0).abs() < 3.0, "{before} to {after}");
 }

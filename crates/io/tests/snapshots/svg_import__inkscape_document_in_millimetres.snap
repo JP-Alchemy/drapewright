@@ -1,6 +1,5 @@
 ---
 source: crates/io/tests/svg_import.rs
-assertion_line: 91
 expression: r
 ---
 {
@@ -118,6 +117,7 @@ expression: r
         "oneWay": false
       },
       "notches": [],
+      "darts": [],
       "marks": [
         {
           "id": "m11",
@@ -240,6 +240,7 @@ expression: r
       ],
       "grainline": null,
       "notches": [],
+      "darts": [],
       "marks": [],
       "lines": [],
       "labels": [],

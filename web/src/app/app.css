@@ -335,9 +335,15 @@ h2 {
   margin: 0;
 }
 
-.avatar-view {
+/* The view, with notes over it. */
+.avatar-stage {
   position: relative;
   min-height: 0;
+}
+
+.avatar-view {
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   background: var(--avatar-bg);
   color: var(--avatar-figure);
@@ -378,9 +384,39 @@ h2 {
 
 .avatar-backend {
   position: absolute;
+  top: 8px;
   right: 12px;
-  bottom: 8px;
   pointer-events: none;
+}
+
+/* Over the foot of the view, letting taps through to it: what the drape is
+   doing or what was read, and a heatmap's key. */
+.avatar-notes {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  left: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.avatar-say,
+.avatar-notes .avatar-legend {
+  max-width: 32em;
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
+/* Nothing to say: kept (for screen readers to hear what it says next), but
+   not seen. */
+.avatar-say.quiet {
+  padding: 0;
+  background: none;
 }
 
 /* The colour the cloth is drawn in, read by the view. */
@@ -389,14 +425,20 @@ h2 {
   color: var(--avatar-cloth);
 }
 
-/* Draping the garment on the avatar: the fabric, the button, how it goes. */
+/* Draping the garment on the avatar: the fabric and the buttons, then what
+   the cloth is shown as. */
 .avatar-drape {
+  display: grid;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.avatar-drape-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
-  padding: 8px 12px;
-  border-top: 1px solid var(--border);
 }
 
 .avatar-fabric {
@@ -410,11 +452,8 @@ h2 {
   font-weight: 600;
 }
 
-.avatar-drape [role='status'] {
-  flex: 1 1 14em;
-}
-
 .avatar-shows {
+  justify-self: start;
   margin: 0;
 }
 
@@ -429,7 +468,6 @@ h2 {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--ink-muted);
 }
 
 .avatar-legend-bar {
@@ -1014,6 +1052,16 @@ h2 {
 .segment[data-focus-visible] {
   outline: 3px solid var(--focus-ring);
   outline-offset: 1px;
+}
+
+.segment[data-disabled] {
+  color: var(--ink-muted);
+  cursor: default;
+}
+
+.segment[data-disabled][data-selected] {
+  background: none;
+  box-shadow: none;
 }
 
 /* An alteration in the inspector: switched on or off, and how. */

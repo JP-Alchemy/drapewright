@@ -12,7 +12,7 @@ use ts_rs::TS;
 use crate::Pt;
 use crate::geom::{EdgeGeom, SAME_POINT, flatten_segs, point_in_polygon, segs_of};
 use crate::model::{
-    Grainline, Id, InternalLine, Label, Mark, Notch, NotchFrom, Outline, Piece, Segment,
+    Dart, Grainline, Id, InternalLine, Label, Mark, Notch, NotchFrom, Outline, Piece, Segment,
 };
 
 /// The piece's shape: what alterations change.
@@ -25,6 +25,8 @@ pub struct Drawn {
     pub grainline: Option<Grainline>,
     #[serde(default)]
     pub notches: Vec<Notch>,
+    #[serde(default)]
+    pub darts: Vec<Dart>,
     #[serde(default)]
     pub marks: Vec<Mark>,
     #[serde(default)]
@@ -40,6 +42,7 @@ impl Drawn {
             outline: piece.outline.clone(),
             grainline: piece.grainline,
             notches: piece.notches.clone(),
+            darts: piece.darts.clone(),
             marks: piece.marks.clone(),
             lines: piece.lines.clone(),
             labels: piece.labels.clone(),
@@ -51,6 +54,7 @@ impl Drawn {
         piece.outline = self.outline;
         piece.grainline = self.grainline;
         piece.notches = self.notches;
+        piece.darts = self.darts;
         piece.marks = self.marks;
         piece.lines = self.lines;
         piece.labels = self.labels;
@@ -234,9 +238,8 @@ pub fn alter(drawn: &Drawn, alterations: &[Alteration]) -> Result<Drawn, AlterEr
                 by,
             } => full_bust(
                 &shape,
-                (*apex).into(),
-                (*armhole).into(),
-                (*side).into(),
+                &a.id,
+                [(*apex).into(), (*armhole).into(), (*side).into()],
                 *by,
             )?,
         };
@@ -441,6 +444,28 @@ fn cut_shape(cut: &dyn Cut, shape: &Drawn) -> Drawn {
             }
         })
         .collect();
+    // Darts too: each end where it was on its edge's cloth.
+    let darts = shape
+        .darts
+        .iter()
+        .map(|dart| {
+            let Some(i) = outline.edge_index(&dart.edge) else {
+                return dart.clone();
+            };
+            let (before, after) = (outline.edge_geom(i), altered.edge_geom(i));
+            let moved = |along: f64| {
+                let p = before.point_at(along);
+                let p = cut.part(p) * p;
+                after.nearest(p).map_or(along, |n| n.along)
+            };
+            let (from, to) = (moved(dart.from), moved(dart.to));
+            Dart {
+                from: from.min(to),
+                to: from.max(to),
+                ..dart.clone()
+            }
+        })
+        .collect();
     let point = |p: Pt| -> Pt {
         let p: Point = p.into();
         (cut.part(p) * p).into()
@@ -453,6 +478,7 @@ fn cut_shape(cut: &dyn Cut, shape: &Drawn) -> Drawn {
             ..g
         }),
         notches,
+        darts,
         marks: shape
             .marks
             .iter()
@@ -914,14 +940,11 @@ fn ray_to_outline(outline: &Outline, from: Point, way: Vec2) -> Option<Point> {
         .min_by(|p, q| p.distance(from).total_cmp(&q.distance(from)))
 }
 
-/// The front with a full (or small) bust adjustment by the Y method.
-fn full_bust(
-    shape: &Drawn,
-    apex: Point,
-    armhole: Point,
-    side: Point,
-    by: f64,
-) -> Result<Drawn, AlterError> {
+/// The front with a full (or small) bust adjustment by the Y method, by
+/// alteration `id`, its points the bust point, the armhole's hinge and the
+/// side seam's slash.
+fn full_bust(shape: &Drawn, id: &str, points: [Point; 3], by: f64) -> Result<Drawn, AlterError> {
+    let [apex, armhole, side] = points;
     const ON_EDGE: f64 = 2.0;
     /// The dart's tip stops this far short of the bust point, mm.
     const TIP: f64 = 25.0;
@@ -1004,7 +1027,7 @@ fn full_bust(
     let to_mouth = mouth - (apex + shift);
     let tip =
         apex + shift + to_mouth / to_mouth.hypot().max(1e-9) * TIP.min(to_mouth.hypot() / 2.0);
-    Ok(cut_shape(
+    let mut altered = cut_shape(
         &Bust {
             apex,
             ends,
@@ -1014,5 +1037,28 @@ fn full_bust(
             dart: (by > 0.0).then_some((upper, lower, tip)),
         },
         shape,
-    ))
+    );
+    // The dart it opens, known as a dart: closed when sewn.
+    if by > 0.0
+        && let Some(i) = edge_of(outline, side)
+    {
+        let edge = altered.outline.edge_geom(i);
+        if let (Some(a), Some(b)) = (edge.nearest(upper), edge.nearest(lower)) {
+            altered.darts.push(Dart {
+                id: format!("{id}.dart"),
+                edge: outline.edges[i].id.clone(),
+                from: a.along.min(b.along),
+                to: a.along.max(b.along),
+            });
+        }
+    }
+    Ok(altered)
+}
+
+/// The edge nearest to `p` (by index).
+fn edge_of(outline: &Outline, p: Point) -> Option<usize> {
+    (0..outline.edges.len())
+        .filter_map(|i| outline.edge_geom(i).nearest(p).map(|n| (i, n.distance)))
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .map(|(i, _)| i)
 }

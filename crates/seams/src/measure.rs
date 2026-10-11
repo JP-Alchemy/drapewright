@@ -3,7 +3,9 @@
 
 use std::borrow::Borrow;
 
-use drapewright_pattern_core::stitching::{along_polyline, polyline_length, stitching_edges};
+use drapewright_pattern_core::stitching::{
+    along_polyline, closed_along, dart_spans, polyline_length, stitching_edges,
+};
 use drapewright_pattern_core::{AllowanceMode, Id, NotchFrom, Piece};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -136,6 +138,9 @@ fn measure_side<P: Borrow<Piece>>(
     }
     let geom = piece.outline.edge_geom(index);
     let outline_length = geom.length();
+    // Measured as sewn, its darts closed.
+    let darts = dart_spans(piece, index, &stitching);
+    let closed = |along: f64| closed_along(&darts, along);
     let mut notches: Vec<NotchAt> = piece
         .notches
         .iter()
@@ -154,16 +159,16 @@ fn measure_side<P: Borrow<Piece>>(
                 .then(|| NotchAt {
                     notch: n.id.clone(),
                     at: if from_end {
-                        to - on_stitching
+                        closed(to) - closed(on_stitching)
                     } else {
-                        on_stitching - from
+                        closed(on_stitching) - closed(from)
                     },
                 })
         })
         .collect();
     notches.sort_by(|a, b| a.at.total_cmp(&b.at));
     Ok(Measured {
-        length: to - from,
+        length: closed(to) - closed(from),
         notches,
     })
 }

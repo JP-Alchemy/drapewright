@@ -36,6 +36,8 @@ pub enum IssueCode {
     NegativeAllowance,
     NotchUnknownEdge,
     NotchOutOfRange,
+    /// A dart refers to an edge that does not exist, or is not on it.
+    DartOffEdge,
     DuplicateId,
     ZeroQuantity,
 }
@@ -60,6 +62,7 @@ pub fn piece_ids(piece: &Piece) -> impl Iterator<Item = &Id> {
     std::iter::once(&piece.id)
         .chain(piece.outline.edges.iter().map(|e| &e.id))
         .chain(piece.notches.iter().map(|n| &n.id))
+        .chain(piece.darts.iter().map(|d| &d.id))
         .chain(piece.marks.iter().map(|m| &m.id))
         .chain(piece.lines.iter().map(|l| &l.id))
         .chain(piece.labels.iter().map(|l| &l.id))
@@ -229,6 +232,19 @@ pub fn validate_piece(piece: &Piece) -> Vec<Issue> {
                     );
                 }
             }
+        }
+    }
+    for dart in &piece.darts {
+        let fits = outline.edge_index(&dart.edge).is_some_and(|i| {
+            0.0 <= dart.from && dart.from < dart.to && dart.to <= lengths[i] + SAME_POINT
+        });
+        if !fits {
+            push(
+                Severity::Error,
+                IssueCode::DartOffEdge,
+                Some(&dart.id),
+                format!("A dart on “{name}” is not where its edge is."),
+            );
         }
     }
     issues

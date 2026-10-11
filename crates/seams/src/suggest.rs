@@ -6,7 +6,9 @@
 
 use std::borrow::Borrow;
 
-use drapewright_pattern_core::stitching::{polyline_length, stitching_edges};
+use drapewright_pattern_core::stitching::{
+    closed_along, closed_polyline, dart_spans, polyline_length, stitching_edges,
+};
 use drapewright_pattern_core::{EdgeKind, Id, NotchFrom, NotchKind, Piece};
 use kurbo::{Point, Vec2};
 use schemars::JsonSchema;
@@ -181,6 +183,15 @@ fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -
     let mut out = Vec::new();
     for (pi, piece) in pieces.iter().map(Borrow::borrow).enumerate() {
         let stitching = stitching_edges(piece);
+        // As sewn: each edge's darts closed.
+        let darts: Vec<Vec<(f64, f64)>> = (0..stitching.len())
+            .map(|e| dart_spans(piece, e, &stitching[e]))
+            .collect();
+        let sewn: Vec<Vec<Point>> = stitching
+            .iter()
+            .zip(&darts)
+            .map(|(line, spans)| closed_polyline(line, spans))
+            .collect();
         let edges = &piece.outline.edges;
         let n = edges.len();
         let pair = piece
@@ -194,10 +205,10 @@ fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -
         let mirrored = if pair || piece.has_fold() {
             vec![None; n]
         } else {
-            counterparts(piece, &stitching, grain.unwrap_or(Vec2::new(0.0, 1.0)))
+            counterparts(piece, &sewn, grain.unwrap_or(Vec2::new(0.0, 1.0)))
         };
         for (ei, edge) in edges.iter().enumerate() {
-            let points = &stitching[ei];
+            let points = &sewn[ei];
             let length = polyline_length(points);
             let used = taken.iter().any(|(p, e)| *p == piece.id && *e == edge.id);
             if points.len() < 2
@@ -207,7 +218,7 @@ fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -
             }
             let outline_length = piece.outline.edge_geom(ei).length();
             let scale = if outline_length > 0.0 {
-                length / outline_length
+                polyline_length(&stitching[ei]) / outline_length
             } else {
                 1.0
             };
@@ -220,7 +231,7 @@ fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -
                         NotchFrom::Start => m.at,
                         NotchFrom::End => outline_length - m.at,
                     };
-                    (m.kind, at * scale)
+                    (m.kind, closed_along(&darts[ei], at * scale))
                 })
                 .collect();
             notches.sort_by(|a, b| a.1.total_cmp(&b.1));

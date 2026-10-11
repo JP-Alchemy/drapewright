@@ -142,6 +142,10 @@ pub fn reassign_ids(piece: &mut Piece, next_id: &mut dyn FnMut(&str) -> Id) {
             rename("n", &mut notch.id);
             rename("e", &mut notch.edge);
         }
+        for dart in &mut shape.darts {
+            rename("d", &mut dart.id);
+            rename("e", &mut dart.edge);
+        }
         for m in &mut shape.marks {
             rename("m", &mut m.id);
         }

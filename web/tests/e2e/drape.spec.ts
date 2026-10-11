@@ -53,7 +53,8 @@ test('the skirt is draped, read where it pulls, draped in another fabric, and ta
   const pane = page.getByRole('region', { name: 'Avatar' })
   const view = pane.getByRole('img', { name: /standard figure/ })
   const drape = pane.getByRole('group', { name: 'Drape the garment' })
-  const status = drape.getByRole('status')
+  // The drape's status, over the view (after the figure's, in its head).
+  const status = pane.getByRole('status').last()
   await expect(pane.getByRole('status').first()).toHaveText(
     'A standard figure: add measurements to see someone’s.',
     { timeout: 60_000 },
@@ -76,7 +77,7 @@ test('the skirt is draped, read where it pulls, draped in another fabric, and ta
   // Where it pulls, and the room it has: heatmaps, read where tapped.
   const inFabric = await view.screenshot()
   await drape.getByText('Pulling', { exact: true }).click()
-  await expect(drape.getByRole('img', { name: 'Pulling: from None to Hard' })).toBeVisible()
+  await expect(pane.getByRole('img', { name: 'Pulling: from None to Hard' })).toBeVisible()
   await expect
     .poll(async () => differing(page, inFabric, await view.screenshot()), { timeout: 10_000 })
     .toBeGreaterThan(0.02)
@@ -87,7 +88,7 @@ test('the skirt is draped, read where it pulls, draped in another fabric, and ta
     /^Here it is (hardly pulled|pulled lightly|pulled firmly|pulled hard) \(\d+ N\/m\), stretched \d+\.\d%, and (resting on the body|[\d.]+ cm from the body)\.$/,
   )
   await drape.getByText('Room', { exact: true }).click()
-  await expect(drape.getByRole('img', { name: 'Room: from Touching to 4.0 cm away' })).toBeVisible()
+  await expect(pane.getByRole('img', { name: 'Room: from Touching to 4.0 cm away' })).toBeVisible()
 
   // Another fabric: draped again in it.
   await drape.getByRole('button', { name: /Fabric/ }).click()
@@ -105,13 +106,12 @@ test('the skirt is draped, read where it pulls, draped in another fabric, and ta
 test('nothing is draped until something is sewn', async ({ page }) => {
   await openWithFixture(page, 'flared-skirt.svg', 'Add the piece')
   test.skip(!(await openTheAvatar(page)), 'Draping is seen in the 3D view')
-  const drape = page
-    .getByRole('region', { name: 'Avatar' })
-    .getByRole('group', { name: 'Drape the garment' })
+  const pane = page.getByRole('region', { name: 'Avatar' })
+  const drape = pane.getByRole('group', { name: 'Drape the garment' })
   const button = drape.getByRole('button', { name: 'Drape', exact: true })
   await expect(button).toBeEnabled({ timeout: 60_000 })
   await button.click()
-  await expect(drape.getByRole('status')).toHaveText(
+  await expect(pane.getByRole('status').last()).toHaveText(
     'Nothing is sewn yet: sew the pieces’ edges together first.',
   )
 })

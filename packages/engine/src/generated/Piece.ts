@@ -2,6 +2,7 @@
 import type { Allowance } from "./Allowance";
 import type { Alteration } from "./Alteration";
 import type { CutInstruction } from "./CutInstruction";
+import type { Dart } from "./Dart";
 import type { Drawn } from "./Drawn";
 import type { Grainline } from "./Grainline";
 import type { InternalLine } from "./InternalLine";
@@ -12,7 +13,11 @@ import type { Outline } from "./Outline";
 import type { Placement } from "./Placement";
 import type { Source } from "./Source";
 
-export type Piece = { id: string, name: string, notes: string, outline: Outline, allowance: Allowance, cut: Array<CutInstruction>, grainline: Grainline | null, notches: Array<Notch>, marks: Array<Mark>, lines: Array<InternalLine>, labels: Array<Label>, placement: Placement, source: Source | null, 
+export type Piece = { id: string, name: string, notes: string, outline: Outline, allowance: Allowance, cut: Array<CutInstruction>, grainline: Grainline | null, notches: Array<Notch>, 
+/**
+ * Darts opening in its edges.
+ */
+darts: Array<Dart>, marks: Array<Mark>, lines: Array<InternalLine>, labels: Array<Label>, placement: Placement, source: Source | null, 
 /**
  * Changes to the piece kept as steps, applied in order to `drawn`
  * (see `alter`): the piece's outline, grainline, notches, marks, lines

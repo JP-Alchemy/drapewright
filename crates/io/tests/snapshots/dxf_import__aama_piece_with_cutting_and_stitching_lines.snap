@@ -1,6 +1,5 @@
 ---
 source: crates/io/tests/dxf_import.rs
-assertion_line: 97
 expression: r
 ---
 {
@@ -111,6 +110,7 @@ expression: r
           "angle": 0.0
         }
       ],
+      "darts": [],
       "marks": [
         {
           "id": "m7",
@@ -243,6 +243,7 @@ expression: r
         "oneWay": false
       },
       "notches": [],
+      "darts": [],
       "marks": [],
       "lines": [],
       "labels": [],

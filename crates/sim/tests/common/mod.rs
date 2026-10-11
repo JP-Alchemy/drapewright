@@ -1,7 +1,8 @@
 //! Garments for the tests.
 
 use drapewright_pattern_core::{
-    CutInstruction, Edge, EdgeKind, Grainline, Outline, Piece, Pt, Segment,
+    Alteration, Change, CutInstruction, Drawn, Edge, EdgeKind, Grainline, Outline, Piece, Pt,
+    Segment, alter,
 };
 use drapewright_seams::{Seam, SeamSide};
 
@@ -231,6 +232,31 @@ pub fn blouse() -> (Vec<Piece>, Vec<Seam>) {
         ),
     ];
     (vec![front, back, sleeve], seams)
+}
+
+/// The blouse with a full bust adjustment of 25 mm on its front: a dart in
+/// each side seam, its tip by the bust point, sewn closed.
+#[allow(dead_code)] // Not every test drapes it.
+pub fn full_bust_blouse() -> (Vec<Piece>, Vec<Seam>) {
+    let (mut pieces, seams) = blouse();
+    let front = pieces.iter_mut().find(|p| p.id == "front").unwrap();
+    let armhole = front.outline.edge_geom(2);
+    let hinge = armhole.point_at(armhole.length() * 0.7);
+    let step = Alteration {
+        id: "bust".into(),
+        on: true,
+        change: Change::FullBust {
+            apex: Pt::new(95.0, 260.0),
+            armhole: Pt::new(hinge.x, hinge.y),
+            side: Pt::new(250.0 + 85.0 / 385.0 * 5.0, 300.0),
+            by: 25.0,
+        },
+    };
+    let fuller = alter(&Drawn::of(front), std::slice::from_ref(&step)).unwrap();
+    assert_eq!(fuller.darts.len(), 1, "a dart in the side seam");
+    fuller.put(front);
+    front.alterations = vec![step];
+    (pieces, seams)
 }
 
 /// The blouse with sleeves to the wrist, 22 cm round there.

@@ -97,6 +97,7 @@ single exception of sidecars it references explicitly.
   "cut": [{ "material": "main", "quantity": 1, "onFold": true }],
   "grainline": { "from": [120, 150], "to": [120, 450] },
   "notches": [ /* Notch */ ],
+  "darts": [ /* Dart */ ],
   "marks": [ /* Mark */ ],
   "lines": [ /* InternalLine */ ],
   "labels": [ /* Label */ ],
@@ -117,6 +118,7 @@ single exception of sidecars it references explicitly.
 | `cut` | array of CutInstruction | `[{ "material": "main", "quantity": 1 }]` | §4.5. |
 | `grainline` | Grainline \| null | `null` | §4.6. |
 | `notches` | array of Notch | `[]` | §4.7. |
+| `darts` | array of Dart | `[]` | §4.14 (version 5). |
 | `marks` | array of Mark | `[]` | §4.8. |
 | `lines` | array of InternalLine | `[]` | §4.9. |
 | `labels` | array of Label | `[]` | §4.10. |
@@ -125,7 +127,7 @@ single exception of sidecars it references explicitly.
 | `alterations` | array of Alteration | `[]` | §4.13 (version 5). |
 | `drawn` | Drawn \| null | `null` | The piece as drawn, before its alterations; §4.13. |
 
-All piece geometry (outline, notches, marks, lines, labels, grainline) is
+All piece geometry (outline, notches, darts, marks, lines, labels, grainline) is
 in the piece's own coordinate system. `placement` positions the piece on the
 work table without changing its shape.
 
@@ -326,7 +328,7 @@ kept beside them, so that nothing is changed for good.
     }
   }
 ],
-"drawn": { "outline": { /* Outline */ }, "grainline": null, "notches": [], "marks": [], "lines": [], "labels": [] }
+"drawn": { "outline": { /* Outline */ }, "grainline": null, "notches": [], "darts": [], "marks": [], "lines": [], "labels": [] }
 ```
 
 | Field | Type | Default | Notes |
@@ -335,13 +337,14 @@ kept beside them, so that nothing is changed for good.
 | `on` | boolean | `true` | Switched off, the step is kept but not applied. |
 | `change` | Change | — | What it does (below). |
 
-`drawn` holds the piece's outline, grainline, notches, marks, internal
-lines and labels as drawn. A piece with any alterations must have it, and
-its own outline, grainline, notches, marks, lines and labels are then
-exactly `drawn` with the steps that are on applied in order. Readers may
-recompute them; writers must keep them so. With no alterations, `drawn` is
-`null` and the piece is as drawn. Ids of edges, notches, marks, lines and
-labels are the same in the piece and in `drawn`.
+`drawn` holds the piece's outline, grainline, notches, darts, marks,
+internal lines and labels as drawn. A piece with any alterations must have
+it, and its own outline, grainline, notches, darts, marks, lines and labels
+are then exactly `drawn` with the steps that are on applied in order.
+Readers may recompute them; writers must keep them so. With no
+alterations, `drawn` is `null` and the piece is as drawn. Ids of edges,
+notches, darts, marks, lines and labels are the same in the piece and in
+`drawn`.
 
 **Change** `lengthen` — `{ "type": "lengthen", "line": AlterLine, "by":
 mm }`: longer by `by` across the line (shorter where `by` is less than
@@ -351,8 +354,8 @@ spread apart along the line and an edge crossing it is bridged straight
 across the gap. Shortened, a tuck as deep as `|by|` is folded out beyond
 the line: what lay in the tuck lies along the line (a jog in a slanted
 edge), and what lay beyond it moves back. Notches stay where they were
-on their edges' cloth; marks, labels, internal lines and the grainline
-move with the part they are on.
+on their edges' cloth, and so do darts' legs; marks, labels, internal
+lines and the grainline move with the part they are on.
 
 **Change** `spread` — `{ "type": "spread", "from": [x, y], "hinge": [x,
 y], "by": mm, "turns": "right" | "left" }`: slash and spread. The piece is
@@ -370,8 +373,9 @@ it to `armhole` (on the armhole, where it hinges), from it to `side` (on
 the side seam), and from it straight across to the centre front. The side
 turns about the hinge until the bust point has moved `by` mm out; the part
 below the side seam slash moves with it, opening a dart in the side seam
-whose tip is 25 mm short of the bust point; the centre front below the
-bust drops to meet the side at the waist. Closing (a small bust) overlaps
+whose tip is 25 mm short of the bust point (added to the piece's `darts`,
+its id the step's with `.dart` after it); the centre front below the bust
+drops to meet the side at the waist. Closing (a small bust) overlaps
 instead, with no dart.
 
 **AlterLine** — `{ "type": "own", "line": id }`: one of the piece's
@@ -380,6 +384,26 @@ start to its end; or `{ "type": "through", "from": [x, y], "to": [x, y] }`:
 the line through two points in the piece's coordinates.
 
 More kinds of change follow in Phase 4 (§10.3).
+
+### 4.14 Darts (version 5)
+
+```json
+{ "id": "d1", "edge": "e4", "from": 120, "to": 196 }
+```
+
+| Field | Type | Default | Notes |
+|---|---|---|---|
+| `edge` | edge id | — | The edge the dart opens in. |
+| `from`, `to` | number | — | Where its legs meet the edge: mm **along** the edge from its start, `0 ≤ from < to ≤` the edge length. |
+
+A dart is a wedge folded out of the piece and sewn closed. The outline
+draws it open: between `from` and `to` the edge runs in along one leg to
+the dart's tip and back out along the other. Sewn, the dart is closed, its
+two legs stitched together from `from` and `to` to the tip, so the two
+points meet. A seam along the edge sews past it: its length, the
+difference between its sides and where its notches meet are measured on
+the stitching line with the edge's darts closed (a seam side's `from` and
+`to` are still measured along the edge as drawn, darts open).
 
 ## 5. Derived geometry (not stored)
 
@@ -450,7 +474,7 @@ Non-semantic: readers may ignore it.
 | 2 | `measurementSets` (§10.2). Version 1 files have none. |
 | 3 | `seams` (§10.4). Earlier files have none. |
 | 4 | A measurement set's `age` (§10.2). Earlier files leave it unknown. |
-| 5 | A piece's `alterations` and `drawn` (§4.13). Earlier pieces have none. |
+| 5 | A piece's `alterations` and `drawn` (§4.13), and its `darts` (§4.14). Earlier pieces have none. |
 
 ## 9. Validation
 
@@ -461,7 +485,8 @@ A file is valid when it matches the JSON Schema and:
 3. every outline is clockwise on screen (positive signed area with y down);
 4. `fold` edges are straight;
 5. every notch refers to an edge of its own piece and `0 ≤ at ≤` the edge
-   length;
+   length, and every dart to an edge of its own piece with `0 ≤ from < to
+   ≤` the edge length;
 6. allowances and quantities are non-negative.
 
 Readers should **warn**, not refuse, when an outline crosses itself, since
@@ -596,8 +621,9 @@ No longer a draft: written since schema version 3.
 | `confirmed` | boolean | Confirmed by the user. Default `true`. |
 
 Lengths, the difference between the sides and how their notches meet are
-always derived, on the stitching line: where an outline is the cutting line
-(allowance included), each edge is first moved in by its allowance.
+always derived, on the stitching line with darts closed (§4.14): where an
+outline is the cutting line (allowance included), each edge is first moved
+in by its allowance.
 
 A seam must not sew a side to itself, and every side must lie on its edge.
 The reference implementation removes a piece's seams with the piece, and

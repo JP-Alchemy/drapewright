@@ -277,6 +277,8 @@ export function AvatarPane({ session }: { session: Session }) {
     if (drape.kind === 'draping' || drape.kind === 'draped') startDrape(fabric)
   }
   const canDrape = backend !== null && (status.kind === 'standard' || status.kind === 'fitted')
+  // What the drape is doing, or what was read where tapped.
+  const drapeSaid = on && reading ? readingText(reading, units) : drapeText(drape)
 
   const text = t.avatar
   const said =
@@ -338,94 +340,106 @@ export function AvatarPane({ session }: { session: Session }) {
           <X size={18} aria-hidden="true" />
         </Button>
       </div>
-      <div
-        ref={host}
-        className="avatar-view"
-        role="img"
-        tabIndex={0}
-        aria-label={viewFailed ?? text.viewLabel(measured ? (set?.name ?? null) : null)}
-      >
-        <span className="avatar-cloth-swatch" aria-hidden="true" />
-        {viewFailed && <p className="avatar-cannot">{viewFailed}</p>}
-        {backend && <span className="avatar-backend muted small">{text.drawnWith(backend)}</span>}
+      <div className="avatar-stage">
+        <div
+          ref={host}
+          className="avatar-view"
+          role="img"
+          tabIndex={0}
+          aria-label={viewFailed ?? text.viewLabel(measured ? (set?.name ?? null) : null)}
+        >
+          <span className="avatar-cloth-swatch" aria-hidden="true" />
+          {viewFailed && <p className="avatar-cannot">{viewFailed}</p>}
+          {backend && <span className="avatar-backend muted small">{text.drawnWith(backend)}</span>}
+        </div>
+        {backend && (
+          // Over the view (taps go through to it), so that the view keeps
+          // its size: what the drape is doing or what was read where
+          // tapped, and a heatmap's key.
+          <div className="avatar-notes">
+            {on && legend && (
+              <div
+                className="avatar-legend small"
+                role="img"
+                aria-label={text.legend(text.showsAs[shows], legend[0]!, legend[1]!)}
+              >
+                <span>{legend[0]}</span>
+                <span
+                  className={`avatar-legend-bar ${shows}`}
+                  title={`0–${shows === 'pull' ? `${PULL_SCALE} N/m` : formatLength(ROOM_SCALE, units)}`}
+                />
+                <span>{legend[1]}</span>
+              </div>
+            )}
+            <p
+              className={`avatar-say small${drape.kind === 'failed' ? ' measure-warning' : ''}${drapeSaid ? '' : ' quiet'}`}
+              role="status"
+            >
+              {drapeSaid}
+            </p>
+          </div>
+        )}
       </div>
       {backend && (
         <div className="avatar-drape" role="group" aria-label={text.drapeGroup}>
-          <Select
-            className="avatar-fabric"
-            selectedKey={drapeFabric}
-            onSelectionChange={(f) => chooseFabric(f as FabricPreset)}
+          <div className="avatar-drape-row">
+            <Select
+              className="avatar-fabric"
+              selectedKey={drapeFabric}
+              onSelectionChange={(f) => chooseFabric(f as FabricPreset)}
+            >
+              <Label>{text.fabric}</Label>
+              <Button className="select-button">
+                <SelectValue>{() => text.fabrics[drapeFabric]}</SelectValue>
+                <ChevronDown size={16} aria-hidden="true" />
+              </Button>
+              <Popover className="popover">
+                <ListBox className="menu">
+                  {FABRICS.map((f) => (
+                    <ListBoxItem key={f} id={f} className="menu-item">
+                      {text.fabrics[f]}
+                    </ListBoxItem>
+                  ))}
+                </ListBox>
+              </Popover>
+            </Select>
+            {drape.kind === 'draping' ? (
+              <Button className="button" onPress={takeOff}>
+                {text.stop}
+              </Button>
+            ) : (
+              <Button
+                className={drape.kind === 'draped' ? 'button' : 'button primary'}
+                isDisabled={!canDrape}
+                onPress={() => startDrape(drapeFabric)}
+              >
+                {drape.kind === 'draped' ? text.drapeAgain : text.drape}
+              </Button>
+            )}
+            {drape.kind === 'draped' && (
+              <Button className="button" onPress={takeOff}>
+                {text.takeOff}
+              </Button>
+            )}
+          </div>
+          {/* Always there, so that the bar keeps its height: until something
+              is draped, there is nothing to show. */}
+          <RadioGroup
+            className="segmented avatar-shows"
+            orientation="horizontal"
+            aria-label={text.shows}
+            value={shows}
+            isDisabled={!on}
+            onChange={(as) => show(as as ClothShows)}
           >
-            <Label>{text.fabric}</Label>
-            <Button className="select-button">
-              <SelectValue>{() => text.fabrics[drapeFabric]}</SelectValue>
-              <ChevronDown size={16} aria-hidden="true" />
-            </Button>
-            <Popover className="popover">
-              <ListBox className="menu">
-                {FABRICS.map((f) => (
-                  <ListBoxItem key={f} id={f} className="menu-item">
-                    {text.fabrics[f]}
-                  </ListBoxItem>
-                ))}
-              </ListBox>
-            </Popover>
-          </Select>
-          {drape.kind === 'draping' ? (
-            <Button className="button" onPress={takeOff}>
-              {text.stop}
-            </Button>
-          ) : (
-            <Button
-              className={drape.kind === 'draped' ? 'button' : 'button primary'}
-              isDisabled={!canDrape}
-              onPress={() => startDrape(drapeFabric)}
-            >
-              {drape.kind === 'draped' ? text.drapeAgain : text.drape}
-            </Button>
-          )}
-          {drape.kind === 'draped' && (
-            <Button className="button" onPress={takeOff}>
-              {text.takeOff}
-            </Button>
-          )}
-          {on && (
-            <RadioGroup
-              className="segmented avatar-shows"
-              orientation="horizontal"
-              aria-label={text.shows}
-              value={shows}
-              onChange={(as) => show(as as ClothShows)}
-            >
-              <div className="segments">
-                {SHOWS.map((as) => (
-                  <Radio key={as} value={as} className="segment">
-                    {text.showsAs[as]}
-                  </Radio>
-                ))}
-              </div>
-            </RadioGroup>
-          )}
-          {on && legend && (
-            <div
-              className="avatar-legend small"
-              role="img"
-              aria-label={text.legend(text.showsAs[shows], legend[0]!, legend[1]!)}
-            >
-              <span>{legend[0]}</span>
-              <span
-                className={`avatar-legend-bar ${shows}`}
-                title={`0–${shows === 'pull' ? `${PULL_SCALE} N/m` : formatLength(ROOM_SCALE, units)}`}
-              />
-              <span>{legend[1]}</span>
+            <div className="segments">
+              {SHOWS.map((as) => (
+                <Radio key={as} value={as} className="segment">
+                  {text.showsAs[as]}
+                </Radio>
+              ))}
             </div>
-          )}
-          <span
-            className={drape.kind === 'failed' ? 'measure-warning small' : 'muted small'}
-            role="status"
-          >
-            {on && reading ? readingText(reading, units) : drapeText(drape)}
-          </span>
+          </RadioGroup>
         </div>
       )}
     </section>

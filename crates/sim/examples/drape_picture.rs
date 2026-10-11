@@ -2,11 +2,11 @@
 //! pieces are placed, when they are sewn, and when they have settled.
 //!
 //!     cargo run --release -p drapewright-sim --example drape_picture -- \
-//!         assets/body/adult.dwbody out [fabric] [skirt|blouse|long]
+//!         assets/body/adult.dwbody out [fabric] [skirt|blouse|long|bust]
 //!
 //! writes out-placed.png, out-sewn.png and out-settled.png, draping a
-//! skirt, a blouse, or a blouse with long sleeves, cut for the standard
-//! figure.
+//! skirt, a blouse, a blouse with long sleeves, or one with a full bust
+//! adjustment, cut for the standard figure.
 
 #[path = "../tests/common/mod.rs"]
 mod common;
@@ -119,7 +119,7 @@ fn picture(
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let [asset, out, rest @ ..] = args.as_slice() else {
-        eprintln!("usage: drape_picture <body file> <out> [fabric] [skirt|blouse|long]");
+        eprintln!("usage: drape_picture <body file> <out> [fabric] [skirt|blouse|long|bust]");
         std::process::exit(2);
     };
     let fabric = preset(rest.first().map_or("poplin", String::as_str)).expect("a fabric preset");
@@ -131,6 +131,7 @@ fn main() {
     let (pieces, seams) = match rest.get(1).map_or("skirt", String::as_str) {
         "blouse" => common::blouse(),
         "long" => common::long_sleeved_blouse(),
+        "bust" => common::full_bust_blouse(),
         _ => common::skirt(),
     };
     let garment = assemble(&pieces, &seams, 20.0).expect("a garment");

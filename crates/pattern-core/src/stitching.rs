@@ -48,6 +48,97 @@ pub fn stitching_edges(piece: &Piece) -> Vec<Vec<Point>> {
     moved
 }
 
+/// Where an edge's darts are on its stitching line (`stitching`, as
+/// `stitching_edges` gives it): from and to, mm along it, in order.
+pub fn dart_spans(piece: &Piece, index: usize, stitching: &[Point]) -> Vec<(f64, f64)> {
+    let edge = &piece.outline.edges[index];
+    let geom = piece.outline.edge_geom(index);
+    let at = |along: f64| match piece.allowance.mode {
+        crate::AllowanceMode::Add => along,
+        crate::AllowanceMode::Included => along_polyline(stitching, geom.point_at(along)),
+    };
+    let mut spans: Vec<(f64, f64)> = piece
+        .darts
+        .iter()
+        .filter(|d| d.edge == edge.id)
+        .map(|d| {
+            let (a, b) = (at(d.from), at(d.to));
+            (a.min(b), a.max(b))
+        })
+        .collect();
+    spans.sort_by(|x, y| x.0.total_cmp(&y.0));
+    spans
+}
+
+/// How far along a stitching line `along` is with its darts (`spans`)
+/// closed, as it is sewn, mm. In a dart, it is where the dart closes.
+pub fn closed_along(spans: &[(f64, f64)], along: f64) -> f64 {
+    let folded: f64 = spans
+        .iter()
+        .map(|&(from, to)| (along.min(to) - from).max(0.0))
+        .sum();
+    along - folded
+}
+
+/// Where along a stitching line a place `closed` along it as sewn is (its
+/// darts, `spans`, closed): the inverse of `closed_along`. Where a dart
+/// closes, the side before it.
+pub fn opened_along(spans: &[(f64, f64)], closed: f64) -> f64 {
+    let mut along = closed;
+    for &(from, to) in spans {
+        if along > from {
+            along += to - from;
+        }
+    }
+    along
+}
+
+/// A stitching line (`points`) as sewn, its darts (`spans`) closed: the
+/// line beyond each dart moved back to meet the line before it. It is as
+/// long as `closed_along` measures.
+pub fn closed_polyline(points: &[Point], spans: &[(f64, f64)]) -> Vec<Point> {
+    if spans.is_empty() || points.len() < 2 {
+        return points.to_vec();
+    }
+    // How far along the line each of its points is.
+    let mut walked = vec![0.0];
+    for w in points.windows(2) {
+        walked.push(walked[walked.len() - 1] + w[0].distance(w[1]));
+    }
+    let at = |s: f64| {
+        let i = walked
+            .partition_point(|&w| w < s)
+            .clamp(1, points.len() - 1);
+        let len = walked[i] - walked[i - 1];
+        let t = if len > 0.0 {
+            (s - walked[i - 1]) / len
+        } else {
+            1.0
+        };
+        points[i - 1].lerp(points[i], t.clamp(0.0, 1.0))
+    };
+    // The line's points outside its darts, and where each dart starts (its
+    // other side meets it there).
+    let mut kept: Vec<f64> = walked
+        .iter()
+        .copied()
+        .filter(|&s| !spans.iter().any(|&(from, to)| from < s && s <= to))
+        .chain(spans.iter().map(|&(from, _)| from))
+        .collect();
+    kept.sort_by(f64::total_cmp);
+    kept.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+    kept.into_iter()
+        .map(|s| {
+            let back: Vec2 = spans
+                .iter()
+                .filter(|&&(_, to)| to < s)
+                .map(|&(from, to)| at(from) - at(to))
+                .fold(Vec2::ZERO, |sum, v| sum + v);
+            at(s) + back
+        })
+        .collect()
+}
+
 /// The length of a polyline, mm.
 pub fn polyline_length(points: &[Point]) -> f64 {
     points.windows(2).map(|w| w[0].distance(w[1])).sum()
@@ -230,6 +321,48 @@ mod tests {
         assert!(edges[0][0].distance(Point::new(10.0, 10.0)) < 1e-6);
         // A point on the cutting line is found along the stitching line.
         assert!((along_polyline(&edges[0], Point::new(30.0, 0.0)) - 20.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn darts_close_along_a_line_and_open_again() {
+        // Two darts, 20 and 10 mm between their legs' ends, along a line
+        // 200 mm long.
+        let spans = [(50.0, 70.0), (120.0, 130.0)];
+        let near = |a: f64, b: f64| (a - b).abs() < 1e-9;
+        assert!(near(closed_along(&spans, 40.0), 40.0));
+        // In a dart: where it closes.
+        assert!(near(closed_along(&spans, 60.0), 50.0));
+        assert!(near(closed_along(&spans, 200.0), 170.0));
+        // And back again; where a dart closes, the side before it.
+        for along in [0.0, 40.0, 50.0, 100.0, 120.0, 150.0, 200.0] {
+            let back = opened_along(&spans, closed_along(&spans, along));
+            assert!(near(back, along), "{along} came back {back}");
+        }
+        assert!(near(opened_along(&spans, closed_along(&spans, 70.0)), 50.0));
+    }
+
+    #[test]
+    fn a_line_with_a_dart_closed_runs_past_it() {
+        // Down 100, in 50 to a tip and back out (its mouth 20 across),
+        // down 100 more.
+        let points = [
+            Point::new(0.0, 0.0),
+            Point::new(0.0, 100.0),
+            Point::new(-50.0, 110.0),
+            Point::new(0.0, 120.0),
+            Point::new(0.0, 220.0),
+        ];
+        let leg = 50f64.hypot(10.0);
+        let spans = [(100.0, 100.0 + 2.0 * leg)];
+        let closed = closed_polyline(&points, &spans);
+        assert_eq!(closed.len(), 3, "{closed:?}");
+        assert!(
+            closed[2].distance(Point::new(0.0, 200.0)) < 1e-9,
+            "{closed:?}"
+        );
+        let total = polyline_length(&points);
+        assert!((polyline_length(&closed) - closed_along(&spans, total)).abs() < 1e-9);
+        assert_eq!(closed_polyline(&points, &[]), points);
     }
 
     #[test]

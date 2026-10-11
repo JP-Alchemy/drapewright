@@ -359,6 +359,33 @@
         }
       }
     },
+    "Dart": {
+      "description": "A dart: a wedge folded out of the piece and sewn closed. Where it opens\nin an edge, the edge runs in along one leg to the tip and back out along\nthe other between `from` and `to` (mm along the edge from its start).\nSewn, the dart is closed: those two points meet, and a seam along the\nedge sews past it.",
+      "type": "object",
+      "properties": {
+        "edge": {
+          "description": "The edge it opens in.",
+          "type": "string"
+        },
+        "from": {
+          "type": "number",
+          "format": "double"
+        },
+        "id": {
+          "type": "string"
+        },
+        "to": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "id",
+        "edge",
+        "from",
+        "to"
+      ]
+    },
     "DisplayUnits": {
       "type": "string",
       "enum": [
@@ -371,6 +398,13 @@
       "description": "The piece's shape: what alterations change.",
       "type": "object",
       "properties": {
+        "darts": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Dart"
+          }
+        },
         "grainline": {
           "anyOf": [
             {
@@ -970,6 +1004,14 @@
           ],
           "items": {
             "$ref": "#/$defs/CutInstruction"
+          }
+        },
+        "darts": {
+          "description": "Darts opening in its edges.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Dart"
           }
         },
         "drawn": {

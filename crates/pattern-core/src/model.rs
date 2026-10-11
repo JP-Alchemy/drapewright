@@ -269,6 +269,22 @@ impl NotchKind {
     }
 }
 
+/// A dart: a wedge folded out of the piece and sewn closed. Where it opens
+/// in an edge, the edge runs in along one leg to the tip and back out along
+/// the other between `from` and `to` (mm along the edge from its start).
+/// Sewn, the dart is closed: those two points meet, and a seam along the
+/// edge sews past it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Dart {
+    pub id: Id,
+    /// The edge it opens in.
+    pub edge: Id,
+    pub from: f64,
+    pub to: f64,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -460,6 +476,9 @@ pub struct Piece {
     pub grainline: Option<Grainline>,
     #[serde(default)]
     pub notches: Vec<Notch>,
+    /// Darts opening in its edges.
+    #[serde(default)]
+    pub darts: Vec<Dart>,
     #[serde(default)]
     pub marks: Vec<Mark>,
     #[serde(default)]
@@ -496,6 +515,7 @@ impl Piece {
             cut: default_cut(),
             grainline: None,
             notches: Vec::new(),
+            darts: Vec::new(),
             marks: Vec::new(),
             lines: Vec::new(),
             labels: Vec::new(),

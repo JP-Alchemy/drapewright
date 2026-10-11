@@ -12,6 +12,42 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 25b — Darts known as darts: measured and sewn closed (Phase 4, part 3)
+
+The dart a full bust adjustment opens is now known as a dart: seams are
+measured with it closed, and the drape sews it closed.
+
+**Try it** (on the test blouse, `fixtures/drapewright/blouse.drapewright`):
+
+1. Give **Blouse front** a full bust adjustment, as in 25a. Its side seam
+   still reads **Same length, 38.5 cm** in the seams list: measured as
+   sewn, with the dart closed, it is as long as the back's. (In 25a it read
+   much longer, its dart's legs counted in.)
+2. Open the avatar and **Drape**. The dart is sewn closed, leg to leg from
+   the side seam in to its tip, and the side seam is sewn to the back past
+   it: the place where the dart closes meets the right place on the back.
+   The blouse hangs as evenly as before, with more room over the bust.
+3. The avatar view now keeps its size. The drape's progress, what was read
+   where you tapped, and a heatmap's key show over the foot of the view.
+   The bar under it stays the same height: **Show the cloth as** is always
+   there, greyed out until something is draped. Before, a reading made the
+   view shorter, so the figure moved under your finger.
+
+**How it works:** a piece keeps its darts in the file (`darts`, §4.14 of
+the file format). Each names the edge it opens in and where its legs meet
+that edge. Seams are measured along the stitching line with each dart's
+span taken out, so notches beyond a dart meet where they should; seam
+suggestions measure the same way. In the drape, each dart becomes a seam
+of its own, one leg sewn to the other from its mouth to its tip. A seam
+that runs past a dart is split there, and its other side is split where
+the dart closes.
+
+**Not yet:** darts drawn in imported patterns (as V notches or cut-outs)
+aren't recognised as darts. A dart can't yet be added or moved by hand;
+pivoting a dart to another place comes next.
+
+---
+
 ## Step 25a — Slash and spread; full and small bust adjustments (Phase 4, part 2)
 
 Two more kinds of alteration, each placed by tapping points on the piece.

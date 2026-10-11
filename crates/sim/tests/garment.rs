@@ -4,7 +4,7 @@ mod common;
 
 use std::collections::{HashMap, HashSet};
 
-use common::{blouse, skirt};
+use common::{blouse, full_bust_blouse, skirt};
 use drapewright_sim::garment::{Copy, Half, assemble};
 use drapewright_sim::mesh::PanelMesh;
 
@@ -165,6 +165,90 @@ fn both_sides_of_a_garment_are_meshed_alike() {
                 );
             }
         }
+    }
+}
+
+#[test]
+fn a_dart_is_sewn_closed_and_its_seam_matched_past_it() {
+    let (pieces, seams) = full_bust_blouse();
+    // Measured with the dart closed, the front's side is as long as the
+    // back's still: the adjustment turned it, and the dart took up the rest.
+    let side = seams.iter().find(|s| s.id == "side").unwrap();
+    let report = drapewright_seams::measure(side, &pieces);
+    assert!(report.difference.abs() < 1.0, "{report:?}");
+    let g = assemble(&pieces, &seams, 20.0).unwrap();
+    // Only seams join panels: the darts sew the front to itself.
+    assert_eq!(g.links.len(), 10);
+    let (front, back) = (&g.panels[0], &g.panels[1]);
+    let at = |panel: &drapewright_sim::garment::Panel, i: u32| panel.mesh.points[i as usize];
+    let apart = |p: [f64; 2], q: [f64; 2]| (p[0] - q[0]).hypot(p[1] - q[1]);
+    for half in [Half::A, Half::B] {
+        let side = front.edge("fs", half).unwrap();
+        let on_side = |s: &(usize, u32)| s.0 == 0 && side.points.contains(&s.1);
+        // The dart: its legs sewn point for point, from its mouth in to its
+        // tip, each stitch shorter than the last.
+        let dart: Vec<(u32, u32)> = g
+            .stitches
+            .iter()
+            .filter(|[x, y]| on_side(x) && on_side(y))
+            .map(|[x, y]| (x.1, y.1))
+            .collect();
+        let widths: Vec<f64> = dart
+            .iter()
+            .map(|&(p, q)| apart(at(front, p), at(front, q)))
+            .collect();
+        assert!(widths.len() >= 3, "{half:?}: {widths:?}");
+        assert!(widths[0] > 10.0, "{half:?}: its mouth {widths:?}");
+        assert!(
+            widths.windows(2).all(|w| w[1] < w[0]),
+            "{half:?}: {widths:?}"
+        );
+        // Every point of the side seam sewn, to the back or in the dart,
+        // but the dart's tip, where its legs meet.
+        let sewn: HashSet<u32> = g
+            .stitches
+            .iter()
+            .flatten()
+            .filter(|s| on_side(s))
+            .map(|s| s.1)
+            .collect();
+        assert_eq!(sewn.len(), side.points.len() - 1, "{half:?}");
+        // Sewn to the back as far along each side, the dart closed.
+        let index = |i: u32| side.points.iter().position(|&p| p == i).unwrap();
+        let (mouth0, mouth1) = (index(dart[0].0), index(dart[0].1));
+        let (mouth0, mouth1) = (mouth0.min(mouth1), mouth0.max(mouth1));
+        let front_points: Vec<[f64; 2]> = side.points.iter().map(|&i| at(front, i)).collect();
+        let open = |k: usize| along(&front.mesh.points, &side.points, k);
+        let closed = |k: usize| {
+            let (a0, a1) = (open(mouth0), open(mouth1));
+            let s = open(k);
+            s - (s - a0).clamp(0.0, a1 - a0)
+        };
+        let front_total = closed(front_points.len() - 1);
+        let back_side = back.edge("bs", half).unwrap();
+        let back_total = along(
+            &back.mesh.points,
+            &back_side.points,
+            back_side.points.len() - 1,
+        );
+        let mut matched = 0;
+        for [x, y] in &g.stitches {
+            let (f, b) = match (on_side(x), y.0 == 1 && back_side.points.contains(&y.1)) {
+                (true, true) => (x.1, y.1),
+                _ if on_side(y) && x.0 == 1 && back_side.points.contains(&x.1) => (y.1, x.1),
+                _ => continue,
+            };
+            let k = back_side.points.iter().position(|&p| p == b).unwrap();
+            let sf = closed(index(f)) / front_total;
+            let sb = along(&back.mesh.points, &back_side.points, k) / back_total;
+            assert!(
+                (sf - sb).abs() < 0.01,
+                "{half:?}: {sf} on the front, {sb} on the back"
+            );
+            matched += 1;
+        }
+        // The back's point where the dart closes sewn to both its legs.
+        assert_eq!(matched, back_side.points.len() + 1, "{half:?}");
     }
 }
 

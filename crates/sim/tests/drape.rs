@@ -104,6 +104,11 @@ fn long_sleeves_follow_the_arms_to_the_wrists() {
     blouse_hangs(common::long_sleeved_blouse());
 }
 
+#[test]
+fn a_blouse_with_a_full_bust_adjustment_drapes_with_its_darts_closed() {
+    blouse_hangs(common::full_bust_blouse());
+}
+
 fn blouse_hangs(
     (pieces, seams): (
         Vec<drapewright_pattern_core::Piece>,

@@ -92,6 +92,8 @@ test('a bust adjustment is placed by tapping the bust point, armhole and side se
   // Wider across the bust and longer at the centre front.
   await expect(front).not.toContainText('25.5 cm × 60.0 cm')
   await expect(front).toContainText(/2[6-9]\.\d cm × 6[1-3]\.\d cm/)
+  // The side seam measured with the new dart closed: as long as the back's.
+  await expect(page.getByText(/^Same length, 38\.\d cm/)).toBeVisible()
   // A small bust adjustment instead.
   await page.getByText('Small bust', { exact: true }).click()
   await expect(page.getByRole('switch', { name: 'Small bust adjustment, 2.0 cm' })).toBeChecked()

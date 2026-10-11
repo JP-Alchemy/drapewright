@@ -9,7 +9,9 @@
 use std::collections::HashMap;
 use std::fmt;
 
-use drapewright_pattern_core::stitching::stitching_edges;
+use drapewright_pattern_core::stitching::{
+    closed_along, dart_spans, opened_along, stitching_edges,
+};
 use drapewright_pattern_core::{EdgeKind, Id, Piece};
 use drapewright_seams::Seam;
 
@@ -146,6 +148,8 @@ struct Layout {
     grain: P2,
     /// Unfolded: the fold, from its start to its end.
     fold: Option<(P2, P2)>,
+    /// Each edge's darts: where they are along its stitching line.
+    darts: Vec<Vec<(f64, f64)>>,
 }
 
 fn reflect(p: P2, a: P2, b: P2) -> P2 {
@@ -198,7 +202,11 @@ fn counter_clockwise(
 fn layouts(pieces: &[Piece]) -> Vec<Layout> {
     let mut out = Vec::new();
     for (k, piece) in pieces.iter().enumerate() {
-        let lines: Vec<Vec<P2>> = stitching_edges(piece)
+        let stitching = stitching_edges(piece);
+        let spans: Vec<Vec<(f64, f64)>> = (0..stitching.len())
+            .map(|e| dart_spans(piece, e, &stitching[e]))
+            .collect();
+        let lines: Vec<Vec<P2>> = stitching
             .into_iter()
             .map(|e| e.into_iter().map(|p| [p.x, -p.y]).collect())
             .collect();
@@ -229,10 +237,12 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
             let (a, b) = (lines[f][0], lines[f][lines[f].len() - 1]);
             let mut edges = Vec::new();
             let mut order = Vec::new();
+            let mut darts = Vec::new();
             // Half A from the fold's end round to its start, as drawn ...
             for step in 1..n {
                 let e = (f + step) % n;
                 edges.push((kinds[e].0.clone(), Half::A, kinds[e].1, lines[e].clone()));
+                darts.push(spans[e].clone());
                 order.push((edges.len() - 1, false));
             }
             // ... then half B, mirrored in the fold, back round to its end.
@@ -240,6 +250,7 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                 let e = (f + step) % n;
                 let mirrored = lines[e].iter().map(|&p| reflect(p, a, b)).collect();
                 edges.push((kinds[e].0.clone(), Half::B, kinds[e].1, mirrored));
+                darts.push(spans[e].clone());
                 order.push((edges.len() - 1, true));
             }
             let order = counter_clockwise(&edges, order);
@@ -250,6 +261,7 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                 order,
                 grain,
                 fold: Some((a, b)),
+                darts,
             });
             continue;
         }
@@ -276,6 +288,7 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                 order,
                 grain: [flip * grain[0], grain[1]],
                 fold: None,
+                darts: spans.clone(),
             });
         }
     }
@@ -439,6 +452,93 @@ fn mirrored_mesh(
     }
 }
 
+/// Where a dart's tip is along a stitching line, between its mouth's ends
+/// `from` and `to`: the furthest point from its mouth (a corner of the
+/// line, or where it is curved, a point along it).
+fn tip_along(line: &[P2], from: f64, to: f64) -> f64 {
+    let (a, b) = (at_length(line, from), at_length(line, to));
+    let mouth = [b[0] - a[0], b[1] - a[1]];
+    let width = mouth[0].hypot(mouth[1]).max(1e-9);
+    let off = |p: P2| ((p[0] - a[0]) * mouth[1] - (p[1] - a[1]) * mouth[0]).abs() / width;
+    let mut walked = 0.0;
+    let mut corners = Vec::new();
+    for w in line.windows(2) {
+        walked += (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1]);
+        if from < walked && walked < to {
+            corners.push((walked, w[1]));
+        }
+    }
+    let along = (0..=64).map(|k| {
+        let u = from + (to - from) * f64::from(k) / 64.0;
+        (u, at_length(line, u))
+    });
+    corners
+        .into_iter()
+        .chain(along)
+        .max_by(|s, t| off(s.1).total_cmp(&off(t.1)))
+        .map_or((from + to) / 2.0, |(u, _)| u)
+}
+
+/// Side `x` with a dart of its edge in it taken out, and side `y` it is
+/// sewn to split where that dart closes, as sewn: the parts before and
+/// after the dart (along `x`) that are left, each pair sewn as `x` and `y`
+/// were. None without such a dart.
+fn past_dart(layouts: &[Layout], x: &Side, y: &Side, reversed: bool) -> Option<Vec<(Side, Side)>> {
+    const SHORT: f64 = 1e-6;
+    let spans = &layouts[x.panel].darts[x.edge];
+    let (lo, hi) = (x.from.min(x.to), x.from.max(x.to));
+    let &(d0, d1) = spans
+        .iter()
+        .find(|&&(d0, d1)| lo < d1 - SHORT && d0 + SHORT < hi)?;
+    let closed = |v: f64| closed_along(spans, v);
+    let sewn = (closed(x.to) - closed(x.from)).abs();
+    if sewn < SHORT {
+        // All dart: nothing of it is sewn.
+        return Some(Vec::new());
+    }
+    // The parts of `x`, its own way, and how far along it as sewn the dart
+    // closes.
+    let (first, second, f) = if x.from <= x.to {
+        (
+            (x.from, d0.max(x.from)),
+            (d1.min(x.to), x.to),
+            (closed(d0) - closed(x.from)) / sewn,
+        )
+    } else {
+        (
+            (x.from, d1.min(x.from)),
+            (d0.max(x.to), x.to),
+            (closed(x.from) - closed(d1)) / sewn,
+        )
+    };
+    // The same place along `y`, as sewn.
+    let y_spans = &layouts[y.panel].darts[y.edge];
+    let y_closed = |v: f64| closed_along(y_spans, v);
+    let g = if reversed { 1.0 - f } else { f };
+    let split = opened_along(
+        y_spans,
+        y_closed(y.from) + g * (y_closed(y.to) - y_closed(y.from)),
+    );
+    let side = |s: &Side, (from, to): (f64, f64)| Side {
+        from,
+        to,
+        ..s.clone()
+    };
+    let (y_first, y_second) = if reversed {
+        ((split, y.to), (y.from, split))
+    } else {
+        ((y.from, split), (split, y.to))
+    };
+    let long = |(from, to): (f64, f64)| (to - from).abs() > SHORT;
+    Some(
+        [(first, y_first), (second, y_second)]
+            .into_iter()
+            .filter(|&(xs, _)| long(xs))
+            .map(|(xs, ys)| (side(x, xs), side(y, ys)))
+            .collect(),
+    )
+}
+
 /// A stretch of an edge to sew: from and to (mm along it), in how many
 /// steps, for which seam, and whether it is that seam's second side.
 type Stretch = (f64, f64, usize, usize, bool);
@@ -501,6 +601,47 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             };
             if let (Some(a), Some(b)) = (side(&seam.a, ha), side(&seam.b, hb)) {
                 sewn.push((a, b, seam.reversed, seam.name.clone()));
+            }
+        }
+    }
+    // A seam runs past a dart in its edge, the dart closed: each side split
+    // where the dart is, at the same place on the other side as sewn.
+    let mut split = Vec::new();
+    for seam in sewn {
+        let mut parts = vec![seam];
+        while let Some((a, b, reversed, name)) = parts.pop() {
+            let around = past_dart(&layouts, &a, &b, reversed).or_else(|| {
+                past_dart(&layouts, &b, &a, reversed)
+                    .map(|v| v.into_iter().map(|(y, x)| (x, y)).collect())
+            });
+            match around {
+                // In order: the first part next.
+                Some(around) => parts.extend(
+                    around
+                        .into_iter()
+                        .rev()
+                        .map(|(x, y)| (x, y, reversed, name.clone())),
+                ),
+                None => split.push((a, b, reversed, name)),
+            }
+        }
+    }
+    let mut sewn = split;
+    // Seams, then darts: only seams join panels.
+    let seams_sewn = sewn.len();
+    // Darts sewn closed, leg to leg, from the mouth to the tip.
+    for (p, layout) in layouts.iter().enumerate() {
+        for (e, spans) in layout.darts.iter().enumerate() {
+            let line = &layout.edges[e].3;
+            for &(from, to) in spans {
+                let tip = tip_along(line, from, to);
+                let leg = |end: f64| Side {
+                    panel: p,
+                    edge: e,
+                    from: end,
+                    to: tip,
+                };
+                sewn.push((leg(from), leg(to), false, String::new()));
             }
         }
     }
@@ -627,15 +768,23 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
         if *reversed {
             va.reverse();
         }
-        for (x, y) in va.into_iter().zip(vb) {
+        // A dart's legs meet at its tip: the same point.
+        for (x, y) in va.into_iter().zip(vb).filter(|(x, y)| x != y) {
             stitches.push([x, y]);
         }
+        if k >= seams_sewn {
+            continue;
+        }
         let half = |s: &Side| layouts[s.panel].edges[s.edge].1;
-        links.push(Link {
+        let link = Link {
             a: (a.panel, layouts[a.panel].edges[a.edge].0.clone(), half(a)),
             b: (b.panel, layouts[b.panel].edges[b.edge].0.clone(), half(b)),
             name: name.clone(),
-        });
+        };
+        // A seam in parts either side of a dart: one link.
+        if !links.contains(&link) {
+            links.push(link);
+        }
     }
     Ok(Garment {
         panels,

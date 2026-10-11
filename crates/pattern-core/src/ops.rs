@@ -15,6 +15,8 @@ pub enum OpError {
     TooCloseToCorner,
     #[error("A piece needs at least two edges to join one with the next.")]
     NothingToJoin,
+    #[error("That point is in a dart: split the edge beside it.")]
+    InDart,
 }
 
 /// Closest a split may be to either end of an edge, mm.
@@ -77,6 +79,15 @@ pub fn reverse(piece: &mut Piece) {
             NotchFrom::End => NotchFrom::Start,
         };
     }
+    // A dart's place along its edge, measured from the other end.
+    let lengths: Vec<(Id, f64)> = (0..n)
+        .map(|k| (outline.edges[k].id.clone(), outline.edge_geom(k).length()))
+        .collect();
+    for dart in &mut piece.darts {
+        if let Some((_, len)) = lengths.iter().find(|(id, _)| *id == dart.edge) {
+            (dart.from, dart.to) = (len - dart.to, len - dart.from);
+        }
+    }
 }
 
 /// Makes the outline run clockwise on screen (positive area with y down).
@@ -107,6 +118,13 @@ pub fn split_edge(piece: &mut Piece, edge_id: &str, along: f64, new_id: Id) -> R
     if !(MIN_SPLIT_DISTANCE..=len - MIN_SPLIT_DISTANCE).contains(&along) {
         return Err(OpError::TooCloseToCorner);
     }
+    if piece
+        .darts
+        .iter()
+        .any(|d| d.edge == edge_id && d.from < along && along < d.to)
+    {
+        return Err(OpError::InDart);
+    }
     let (k, t) = geom.locate(along);
     let edge = &piece.outline.edges[i];
     let mut first: Vec<Segment> = edge.segments[..k].to_vec();
@@ -136,6 +154,13 @@ pub fn split_edge(piece: &mut Piece, edge_id: &str, along: f64, new_id: Id) -> R
     edge.end_corner = CornerStyle::Auto;
     piece.outline.edges.insert(i + 1, new_edge);
 
+    for dart in piece.darts.iter_mut().filter(|d| d.edge == edge_id) {
+        if dart.from >= along {
+            dart.edge = new_id.clone();
+            dart.from -= along;
+            dart.to -= along;
+        }
+    }
     for notch in piece.notches.iter_mut().filter(|n| n.edge == edge_id) {
         let from_start = match notch.from {
             NotchFrom::Start => notch.at,
@@ -179,6 +204,11 @@ pub fn join_with_next(piece: &mut Piece, edge_id: &str) -> Result<(), OpError> {
         } else if notch.edge == edge_id && notch.from == NotchFrom::End {
             notch.at += len_j;
         }
+    }
+    for dart in piece.darts.iter_mut().filter(|d| d.edge == next.id) {
+        dart.edge = edge_id.to_string();
+        dart.from += len_i;
+        dart.to += len_i;
     }
 
     let edge = &mut piece.outline.edges[i];
