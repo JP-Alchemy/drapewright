@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Locator, type Page, test } from '@playwright/test'
 
 /** Whether a screenshot shows something in its middle unlike its corner. */
 async function drawnInTheMiddle(page: Page, png: Buffer): Promise<boolean> {
@@ -21,19 +21,8 @@ async function drawnInTheMiddle(page: Page, png: Buffer): Promise<boolean> {
   }, png.toString('base64'))
 }
 
-test('the avatar is seen in 3D, turned, and fitted to the measurements', async ({ page }) => {
-  await page.goto('/')
-  await page.getByRole('button', { name: 'Avatar' }).click()
-  const pane = page.getByRole('region', { name: 'Avatar' })
-  const drawnWith = pane.getByText(/^Drawn with (WebGPU|WebGL2)$/)
-  await expect(drawnWith).toBeVisible({ timeout: 60_000 })
-  // Which way it drew here: WebGPU, or the WebGL2 fallback.
-  console.log(`${test.info().project.name}: ${await drawnWith.textContent()}`)
-  await expect(pane.getByRole('status')).toHaveText(
-    'A standard figure: add measurements to see someone’s.',
-    { timeout: 60_000 },
-  )
-  const view = pane.getByRole('img', { name: /standard figure/ })
+/** The figure is drawn in the middle of the view, and a drag turns it. */
+async function seeItDrawnAndTurned(page: Page, view: Locator) {
   // Drawn on the worker's next frame, after the status says so.
   let before = await view.screenshot()
   await expect
@@ -51,6 +40,25 @@ test('the avatar is seen in 3D, turned, and fitted to the measurements', async (
   await expect
     .poll(async () => !(await view.screenshot()).equals(before), { timeout: 10_000 })
     .toBe(true)
+}
+
+test('the avatar is seen in 3D, turned, and fitted to the measurements', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Avatar' }).click()
+  const pane = page.getByRole('region', { name: 'Avatar' })
+  const drawnWith = pane.getByText(/^Drawn with (WebGPU|WebGL2)$/)
+  // Where the browser can't draw in 3D (WebKit on Linux, as in CI), it says
+  // so, and the avatar is still fitted and reported.
+  const cannot = pane.getByText('This browser can’t draw the avatar in 3D.')
+  await expect(drawnWith.or(cannot)).toBeVisible({ timeout: 60_000 })
+  const drawing = await drawnWith.isVisible()
+  console.log(`${test.info().project.name}: ${drawing ? await drawnWith.textContent() : 'no 3D'}`)
+  await expect(pane.getByRole('status')).toHaveText(
+    'A standard figure: add measurements to see someone’s.',
+    { timeout: 60_000 },
+  )
+  const view = pane.getByRole('img', { name: /standard figure/ })
+  if (drawing) await seeItDrawnAndTurned(page, view)
 
   // Someone's measurements: the avatar takes their figure.
   await page.getByRole('button', { name: 'Measurements' }).click()
@@ -70,7 +78,7 @@ test('the avatar is seen in 3D, turned, and fitted to the measurements', async (
   await expect(pane.getByRole('status')).toHaveText('All 4 measurements within 1 cm', {
     timeout: 60_000,
   })
-  await expect(pane.getByRole('img', { name: /in Me’s figure/ })).toBeVisible()
+  if (drawing) await expect(pane.getByRole('img', { name: /in Me’s figure/ })).toBeVisible()
 
   await pane.getByRole('button', { name: 'Close the avatar' }).click()
   await expect(pane).toHaveCount(0)

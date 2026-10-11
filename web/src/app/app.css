@@ -350,6 +350,17 @@ h2 {
   height: 100%;
 }
 
+.avatar-cannot {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 24px;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
 .avatar-backend {
   position: absolute;
   right: 12px;

@@ -53,6 +53,8 @@ export function AvatarPane({ session }: { session: Session }) {
   const set = sets.find((s) => s.id === avatarPerson) ?? sets[0] ?? null
   const host = useRef<HTMLDivElement>(null)
   const [backend, setBackend] = useState<string | null>(null)
+  // The view could not start: the avatar is still fitted and reported.
+  const [viewFailed, setViewFailed] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>({ kind: 'starting' })
 
   // The canvas, handed to the sim worker to draw on. Made here rather than
@@ -76,7 +78,7 @@ export function AvatarPane({ session }: { session: Session }) {
     let live = true
     sim.attachView(canvas.transferControlToOffscreen(), colours(el)).then(
       (drawnWith) => live && setBackend(drawnWith),
-      (error: unknown) => live && setStatus({ kind: 'failed', text: failure(error) }),
+      (error: unknown) => live && setViewFailed(failure(error)),
     )
     const resize = new ResizeObserver(() => {
       const [width, height] = pixels()
@@ -107,18 +109,20 @@ export function AvatarPane({ session }: { session: Session }) {
   const request = set ? avatarRequest(set) : null
   const measured = request !== null && Object.keys(request.values).length > 0
   const key = measured ? JSON.stringify(request) : 'standard'
+  const ready = backend !== null || viewFailed !== null
   useEffect(() => {
-    if (backend === null) return
+    if (!ready) return
     let live = true
+    const drawing = backend !== null
     const show = async () => {
       if (!measured) {
-        await sim.showAvatar(STANDARD_FIGURE)
+        if (drawing) await sim.showAvatar(STANDARD_FIGURE)
         if (live) setStatus({ kind: 'standard' })
         return
       }
       setStatus({ kind: 'fitting' })
       const fit = await sim.fitAvatar(request)
-      await sim.showAvatar(fit.settings)
+      if (drawing) await sim.showAvatar(fit.settings)
       const residuals = Object.values(fit.residuals)
       const close = residuals.filter((r) => Math.abs(r) <= CLOSE_MM).length
       if (live) setStatus({ kind: 'fitted', close, of: residuals.length })
@@ -129,7 +133,7 @@ export function AvatarPane({ session }: { session: Session }) {
     }
     // `key` stands for the request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backend, key])
+  }, [ready, backend, key])
 
   const text = t.avatar
   const said =
@@ -196,8 +200,10 @@ export function AvatarPane({ session }: { session: Session }) {
         className="avatar-view"
         role="img"
         tabIndex={0}
-        aria-label={text.viewLabel(measured ? (set?.name ?? null) : null)}
-      />
+        aria-label={viewFailed ?? text.viewLabel(measured ? (set?.name ?? null) : null)}
+      >
+        {viewFailed && <p className="avatar-cannot">{viewFailed}</p>}
+      </div>
       {backend && <span className="avatar-backend muted small">{text.drawnWith(backend)}</span>}
     </section>
   )
