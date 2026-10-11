@@ -1,0 +1,531 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg
+ xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:lang="en" xmlns:freesewing="http://freesewing.org/namespaces/freesewing" freesewing="4.10.2" class="freesewing" width="1633.19mm" height="994.31mm" viewBox="0 0 1633.19 994.31"
+>
+<style type="text/css"> <![CDATA[ 
+
+/* Sample classes */
+svg.freesewing path.sample {
+  stroke-width: 0.75
+}
+svg.freesewing path.sample-focus {
+  stroke-width: 1.5; fill: rgba(0,0,0,0.1)
+}
+/* Paperless grid */
+svg.freesewing path.grid {
+  stroke: #555;
+  stroke-width: 0.3;
+}
+svg.freesewing path.gridline {
+  stroke: #555;
+  stroke-width: 0.2;
+  fill: none;
+}
+svg.freesewing path.gridline-lg {
+  stroke: #777;
+  stroke-width: 0.2;
+  stroke-dasharray: 1.5,1.5;
+  fill: none;
+}
+svg.freesewing path.gridline-sm {
+  stroke: #999;
+  stroke-width: 0.1;
+  fill: none;
+}
+svg.freesewing path.gridline-xs {
+  stroke: #999;
+  stroke-width: 0.1;
+  stroke-dasharray: 0.5,0.5;
+  fill: none;
+}
+svg.freesewing path.gridbox {
+  fill: url(#grid);
+}
+  /* Reset */
+  svg.freesewing path,
+  svg.freesewing circle,
+  svg.freesewing rect {
+    fill: none;
+    stroke: none;
+  }
+
+  /* Defaults */
+  svg.freesewing path,
+  svg.freesewing circle {
+    stroke: #000;
+    stroke-opacity: 1;
+    stroke-width: 0.3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Stroke classes */
+  svg.freesewing .fabric {
+    stroke-width: 0.6;
+    stroke: #212121;
+  }
+  svg.freesewing .lining {
+    stroke-width: 0.6;
+    stroke: #10b981;
+  }
+  svg.freesewing .interfacing {
+    stroke-width: 0.6;
+    stroke: #a3a3a3;
+  }
+  svg.freesewing .canvas {
+    stroke-width: 0.6;
+    stroke: #d97706;
+  }
+  svg.freesewing .various {
+    stroke-width: 0.6;
+    stroke: #ef4444;
+  }
+  svg.freesewing .note {
+    stroke-width: 0.4;
+    stroke: #8b5cf6;
+  }
+  svg.freesewing .mark {
+    stroke-width: 0.4;
+    stroke: #3b82f6;
+  }
+  svg.freesewing .contrast {
+    stroke-width: 0.8;
+    stroke: #ec4899;
+  }
+
+  svg.freesewing .stroke-xs {
+    stroke-width: 0.1;
+  }
+  svg.freesewing .stroke-sm {
+    stroke-width: 0.2;
+  }
+  svg.freesewing .stroke-lg {
+    stroke-width: 0.6;
+  }
+  svg.freesewing .stroke-xl {
+    stroke-width: 1;
+  }
+  svg.freesewing .stroke-xxl,
+  svg.freesewing .stroke-2xl {
+    stroke-width: 2;
+  }
+  svg.freesewing .stroke-3xl {
+    stroke-width: 3;
+  }
+  svg.freesewing .stroke-4xl {
+    stroke-width: 4;
+  }
+
+  svg.freesewing .sa {
+    stroke-dasharray: 0.4, 0.8;
+  }
+  svg.freesewing .help {
+    stroke-width: 0.2;
+    stroke-dasharray: 15, 1.5, 1, 1.5;
+  }
+  svg.freesewing .dotted {
+    stroke-dasharray: 0.4, 0.8;
+  }
+  svg.freesewing .dashed {
+    stroke-dasharray: 1, 1.5;
+  }
+  svg.freesewing .lashed {
+    stroke-dasharray: 6, 6;
+  }
+  svg.freesewing .hidden {
+    stroke: none;
+    fill: none;
+  }
+  svg.freesewing .no-stroke { stroke: none !important; }
+  svg.freesewing .no-fill { fill: none !important; }
+  svg.freesewing .muted {
+    stroke-opacity: 0.15;
+    fill-opacity: 0.15;
+  }
+
+  /* Fill classes */
+  svg.freesewing .fill-fabric {
+    fill: #212121;
+  }
+  svg.freesewing .fill-lining {
+    fill: #10b981;
+  }
+  svg.freesewing .fill-interfacing {
+    fill: #a3a3a3;
+  }
+  svg.freesewing .fill-canvas {
+    fill: #d97706;
+  }
+  svg.freesewing .fill-various {
+    fill: #ef4444;
+  }
+  svg.freesewing .fill-note {
+    fill: #8b5cf6;
+  }
+  svg.freesewing .fill-mark {
+    fill: #3b82f6;
+  }
+  svg.freesewing .fill-contrast {
+    fill: #ec4899;
+  }
+
+  /* Text */
+  svg.freesewing text {
+    font-size: 5px;
+    font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+      Arial, sans-serif;
+    fill: #000;
+    text-anchor: start;
+    font-weight: 200;
+    dominant-baseline: ideographic;
+  }
+  svg.freesewing .text-xs {
+    font-size: 3px;
+  }
+  svg.freesewing .text-sm {
+    font-size: 4px;
+  }
+  svg.freesewing .text-lg {
+    font-size: 7px;
+  }
+  svg.freesewing .text-xl {
+    font-size: 9px;
+  }
+  svg.freesewing .text-xxl {
+    font-size: 12px;
+  }
+  svg.freesewing .text-4xl {
+    font-size: 36px;
+  }
+
+  svg.freesewing .center {
+    text-anchor: middle;
+  }
+  svg.freesewing .baseline-center {
+    alignment-baseline: central;
+    dominant-baseline: central;
+  }
+
+  svg.freesewing .right {
+    text-anchor: end;
+  }
+
+  /* Bartack */
+  svg.freesewing path.bartack {
+    stroke-width: 2;
+    stroke: #fd7e14;
+    stroke-linecap: butt;
+  }
+
+]]>
+</style>
+<defs>
+ button="
+<g id="button"
+transform="scale(1)">
+  <circle
+    cx="0" cy="0" r="3.4"
+    class="mark"
+  ></circle>
+  <circle cx="-1" cy="-1" r="0.5" class="no-stroke fill-mark"></circle>
+  <circle cx="1"  cy="-1" r="0.5" class="no-stroke fill-mark"></circle>
+  <circle cx="1"  cy="1"  r="0.5" class="no-stroke fill-mark"></circle>
+  <circle cx="-1" cy="1"  r="0.5" class="no-stroke fill-mark"></circle>
+</g>" buttonhole="
+<g id="buttonhole"
+transform="scale(1)">
+  <path
+    class="mark"
+    d="M -1,-5 L 1,-5 L 1,5 L -1,5 z"
+  ></path>
+</g>" buttonhole-start="
+<g id="buttonhole-start"
+transform="scale(1)">
+  <path
+    class="mark"
+    d="M -1,-10 L 1,-10 L 1,0 L -1,0 z"
+  ></path>
+</g>" buttonhole-end="
+<g id="buttonhole-end"
+transform="scale(1)">
+  <path
+    class="mark"
+    d="M -1,0 L 1,0 L 1,10 L -1,10 z"
+  ></path>
+</g>" snap-stud-grad="
+<radialGradient id="snap-stud-grad" cx="50%" cy="50%" r="50%" fx="50%" fy="50%"
+transform="scale(1)">
+  <stop offset="30%" style="stop-color:rgb(235,235,235); stop-opacity:1"></stop>
+  <stop offset="80%" style="stop-color:rgb(100,100,100);stop-opacity:1"></stop>
+</radialGradient>" snap-stud="
+<g id="snap-stud"
+transform="scale(1)">
+  <circle id="snap-stud-circle-edge" cx="0" cy="0" r="3.4"
+    style="stroke:#666;fill:#dddddd;stroke-width:0.3;"
+  ></circle>
+  <circle id="snap-stud-circle-middle" cx="0" cy="0" r="1.8"
+    style="stroke:none;fill:url(#snap-stud-grad);"
+  ></circle>
+  <path
+    id="snap-stud-lines" style="fill:none;stroke:#666; stroke-width:0.2;"
+    d="M -2,0 L -3,0 M 2,0 L 3,0 M 0,2 L 0,3 M 0,-2 L 0,-3 M 1.5,1.5 L 2.1,2.1 M -1.5,1.5 L -2.1,2.1 M -1.5,-1.5 L -2.1,-2.1 M 1.5,-1.5 L 2.1,-2.1"
+  ></path>
+</g>" snap-socket="
+<g id="snap-socket"
+transform="scale(1)">
+  <circle id="snap-socket-circle-edge" cx="0" cy="0" r="3.4"
+    style="stroke:#666;fill:#bbbbbb;stroke-width:0.3;"
+  ></circle>
+  <circle id="snap-socket-circle-middle" cx="0" cy="0" r="2"
+    style="stroke:#666;fill:#dddddd; stroke-width:0.4;"
+  ></circle>
+  <path
+    style="fill:none;stroke:#666; stroke-width:0.5;"
+    d="M -1.7,-1 L -1.7,1 M 1.7,-1 L 1.7,1" id="snap-socket-lines"
+  ></path>
+</g>" eyelet="
+<g id="eyelet">
+  <circle id="eyelet-circle" cx="0" cy="0" r="3.4" class="no-full stroke-mark mark" stroke-width="1" fill="none" stroke="currentColor">
+  </circle>
+</g>" cutonfoldFrom="
+<marker orient="auto" refY="0" refX="0" id="cutonfoldFrom" style="overflow:visible;" markerWidth="12" markerHeight="8" transform="scale(1)">
+	<path class="note fill-note" d="M 0,0 L 12,-4 C 10,-2 10,2 12,4 z" transform="scale(1)"/>
+</marker>" cutonfoldTo="
+<marker orient="auto" refY="0" refX="0" id="cutonfoldTo" style="overflow:visible;" markerWidth="12" markerHeight="8" transform="scale(1)">
+	<path class="note fill-note" d="M 0,0 L -12,-4 C -10,-2 -10,2 -12,4 z" transform="scale(1)"/>
+</marker>" dimensionFrom="
+<marker orient="auto" refY="0" refX="0" id="dimensionFrom" style="overflow:visible;" markerWidth="12" markerHeight="8">
+	<path class="mark fill-mark" d="M 0,0 L 12,-4 C 10,-2 10,2 12,4 z" transform="scale(1)"/>
+</marker>" dimensionTo="
+<marker orient="auto" refY="0" refX="0" id="dimensionTo" style="overflow:visible;" markerWidth="12" markerHeight="8">
+	<path class="mark fill-mark" d="M 0,0 L -12,-4 C -10,-2 -10,2  -12,4 z" transform="scale(1)"/>
+</marker>" grainlineFrom="
+<marker orient="auto" refY="0" refX="0" id="grainlineFrom" style="overflow:visible;" markerWidth="12" markerHeight="8">
+	<path class="note fill-note" d="M -10,0 L 2,-4 C 0,-2 0,2  2,4 z" transform="scale(1)"/>
+</marker>" grainlineTo="
+<marker orient="auto" refY="0" refX="0" id="grainlineTo" style="overflow:visible;" markerWidth="12" markerHeight="8">
+	<path class="note fill-note" d="M 10,0 L -2,-4 C 0,-2 -2,2  -2,4 z" transform="scale(1)"/>
+</marker>" logo="<g id="logo" transform="scale(2) translate(-12.55 -18)"><path class="logo" fill="currentColor" d="m18.56 0c-0.4945 0.3515-0.469 0.3065-0.8685 0.437-0.916 0.2995-1.7945 0.135-2.837 0.048-0.3135-0.035-0.6245-0.0555-0.928-0.0575-1.5325-0.0105-2.834 0.439-3.0805 1.694-0.4545 0.2755-0.8725 0.609-1.2865 0.943-0.884 0.6975-1.5495 1.55-2.0035 2.5775-0.62 1.5175-0.06 3.146 0.2175 4.684 0.066 0.36 0.135 0.703 0.172 0.8355 0.0525 0.1865 0.145 0.3645 0.2455 0.5245 0.0235 4e-3 0.1475-0.187 0.177-0.2715 0.043-0.123 0.0385-0.3205-0.0085-0.4905-0.104-0.3825-0.203-0.693-0.2115-0.849-0.015-0.293 0.042-0.5635 0.149-0.6975 0.038-0.0475 0.125 0.1975 0.1025 0.2885-0.0265 0.1095-0.0465 0.297-0.038 0.3835 0.0235 0.293 0.0665 0.6065 0.12 0.8805 0.0685 0.3535 0.098 0.5805 0.0855 0.6685-9e-3 0.064-0.039 0.1285-0.154 0.3265-0.1 0.1735-0.152 0.314-0.16 0.438-0.0085 0.121 0.028 0.4235 0.062 0.4975 0.0495 0.1155 0.1985 0.237 0.3285 0.267 0.1245 0.0475 0.187 0.146 0.251 0.2565 0.1555 0.2965 0.2755 0.6575 0.3945 1.2015 0.058 0.2605 0.1065 0.493 0.122 0.615-0.96 1e-3 -2.1895 0.0015-3.3095 0.0015-0.377 6e-3 -1.058-0.171-1.6825-0.212-0.0905-0.977-0.5195-2.112-1.2535-2.178-0.501-0.0455-0.9165 0.145-1.268 0.9365l0.01 0.0425c0.2075-0.1735 0.4265-0.704 1.2155-0.6675 0.606 0.0275 0.808 1.1745 0.868 1.8645-0.369 0.027-0.683 0.1405-0.847 0.424h-0.0035c0 5e-4 0 0.0015 0.0015 0.0025-0.0015 1e-3 -0.0015 2e-3 -0.0015 3e-3h0.0035c0.169 0.2905 0.4945 0.403 0.877 0.4255 0.2555 7.225 7.047 8.157 8.903 8.157 6.924 0 9.348-4.705 9.7125-6.5685 0.1705 0.794-0.3665 1.8055-0.495 2.552 1.4605-1.6885 1.1965-3.312 0.9295-4.945 0.222 0.264 0.5225 0.4275 0.93 0.337-0.2905-0.194-0.6845-0.058-0.9205-0.8765-0.103-0.3535-0.192-0.6185-0.2805-0.841-0.191-0.7165-0.462-1.401-0.795-2.068-0.281-0.7235-0.0955-1.1925-0.1235-1.8135 0.5055 1.667 0.8215 2.1105 1.4115 2.285-1.484-1.788-0.976-4.5565-1.8145-7.0275 0.3795 0.223 0.8125 0.29 1.2735 0.0175-0.446-0.127-0.891 0.2085-1.531-0.732-0.5405-1.0515-1.3235-1.828-2.2735-2.513-0.509-0.332-1.074-0.555-1.642-0.762 0.5785-0.145 1.2245-0.66 1.2545-1.0445zm-0.9705 5.5535c0.762 0.278 1.602 1.334 1.5925 2.37v0.058c-0.0205 1.407-0.66 2.1635-0.633 3.1005 0.0345 1.1035 0.5095 1.4885 0.604 1.6725-0.162-0.6805-0.257-1.5365-0.043-2.2145 0.275-0.872 0.5525-1.594 0.5325-2.277-0.01-0.16-0.078-0.7585-0.1235-1.0235 0.817 1.179-0.177 2.8935 0.109 4.0155 0.497 1.9545 2.7245 2.2015 2.0615 6.1395-0.5835 3.462-4.5815 6.0895-8.6795 6.0895-3.038 0-8.3025-1.6815-8.5625-7.646 0.6175-0.044 1.2815-0.216 1.654-0.21 1.126 0 2.412 5e-4 3.381 1e-3 0.182 0.821 0.3185 1.019 1.009 1.566 0.768 0.604 0.947 0.6775 2.083 0.6885 1.1365 0.0115 1.4735-0.232 2.576-1.275 0.238-0.279 0.341-0.6445 0.4565-0.988 1.134-0.0105 1.961-0.0305 2.7745-0.0685 0.8285-0.0375 0.9455 0 2.2805-0.1375-1.335-0.1375-1.452-0.1-2.2805-0.138-0.792-0.036-1.594-0.0565-2.6785-0.0665 0.091-0.4085 0.221-0.8075 0.3595-1.202 0.0855-0.2325 0.186-0.459 0.289-0.6845l0.1125-0.035c0.217-0.077 0.409-0.242 0.4855-0.465 0.0985-0.2955 0.0285-0.6275-0.162-0.869-0.0655-0.0905-0.147-0.206-0.1805-0.257-0.1005-0.159-0.103-0.2475-0.018-0.8385 0.0715-0.495 0.0795-0.754 0.03-1.005-0.01-0.1435-0.011-0.4385-0.0155-0.518 0.038 0.021 0.1205 0.209 0.204 0.4635 0.083 0.2555 0.0965 0.3085 0.1155 0.526 0.021 0.247-0.0715 0.43-0.1475 0.7985-0.038 0.19-0.0715 0.3665-0.0715 0.3905 0 0.0255 0.018 0.0795 0.037 0.1215 0.0445 0.094 0.128 0.226 0.1435 0.226 0.2725-0.3005 0.4325-0.6715 0.575-1.048 0.15-0.426 0.194-0.878 0.299-1.3165 0.085-0.382 0.183-0.7645 0.2135-1.1565 0.0615-0.765 0.0255-1.305-0.1435-2.102-0.0405-0.18-0.1575-0.5235-0.239-0.6855zm-2.68 3.7685c0.2925-0.0035 0.582 0.032 0.8575 0.1115 0.3745 0.1435 0.427 0.478 0.496 0.8535 0.0385 0.24 0.037 0.4125-0.0065 0.6945-0.0305 0.409-0.193 0.7255-0.548 0.948-0.5355 0.099-1.108 0.1945-1.562-0.16-0.381-0.525-0.6105-1.1885-0.523-1.8355 0.0555-0.2655 0.179-0.4035 0.433-0.486 0.2735-0.0785 0.563-0.1215 0.853-0.126zm-4.4415 0.0475c0.2735-0.0025 0.55 0.0265 0.702 0.1235 0.6525 0.4415 0.443 1.16 0.185 1.7905-0.3755 0.8255-1.1875 0.795-1.9745 0.7885-0.4355-0.1275-0.4755-0.4845-0.5385-0.866-0.054-0.3685-0.169-0.7635-0.073-1.134 0.2465-0.596 1.1475-0.6645 1.699-0.7025zm9.9515 0.103c0.0035 1.5865 0.2745 2.366 0.8185 3.4895-0.3205-0.6115-0.7785-0.9595-0.949-1.6905-0.326-1.4115 0.0255-1.3325 0.1305-1.799zm-7.9065 1.149c0.086 0.087 0.1275 0.207 0.202 0.3025 0.0575-0.0985 0.1165-0.1965 0.1905-0.284 0.0385 1e-3 0.0855 0.077 0.128 0.213 0.182 0.503 0.2175 1.0565 0.4535 1.54 0.2205 0.35-0.0805 0.554-0.411 0.57-0.241-5e-4 -0.343-0.165-0.4845-0.328-0.0365 0.1065-0.106 0.175-0.189 0.247-0.211 0.177-0.6245 0.1115-0.6885-0.1675 0.085-0.533 0.3565-1.0225 0.5345-1.5335 0.0885-0.1865 0.0895-0.3295 0.2645-0.5595zm-3.096 2.6925c0.1065 0 0.399 0.1985 0.4585 0.3105 0.041 0.0745 0.1345 0.3645 0.141 0.435 0.0105 0.084-0.015 0.283-0.041 0.337-0.019 0.0385-0.0335 0.044-0.0555 0.019-0.0185-0.021-0.2635-0.491-0.42-0.802-0.123-0.249-0.136-0.2995-0.083-0.2995zm6.111 0.1555c4e-3 5e-4 0.01 2e-3 0.0155 0.0035 0.033 0.0135 0.01 0.1305-0.114 0.5555-0.0235 0.128-0.0805 0.229-0.164 0.313-0.0275 0-0.04-0.032-0.083-0.2095-0.0365-0.1515-0.0405-0.2865-0.015-0.4075 0.044-0.1515 0.222-0.198 0.3605-0.255zm-0.7415 0.9265c0.0105-2e-3 0.0205 0.0035 0.0335 0.014 0.045 0.0315 0.0515 0.1145 0.0215 0.277-0.0365 0.209-0.0445 0.232-0.0985 0.2535-0.0235 0.0105-0.0655 0.018-0.0935 0.018-0.0505-9e-3 -0.0635-0.05-0.0515-0.112 0-0.13 0.038-0.243 0.124-0.3765 0.0325-0.05 0.049-0.0715 0.0645-0.074zm-4.3165 0.0095c0.0345 0 0.1385 0.075 0.177 0.127 0.043 0.055 0.092 0.3825 0.0645 0.439-0.0315 0.071-0.1855 0.0355-0.228-0.053-0.026-0.053-0.0875-0.339-0.0875-0.407 0-0.063 0.0305-0.106 0.074-0.106zm3.9455 0.0865c0.042 0.06 0.053 0.137 0.044 0.306l-0.0085 0.154-0.044 0.044c-0.0265 0.0245-0.0715 0.0545-0.0985 0.067-0.0595 0.028-0.105 0.0305-0.1135 8e-3 -0.01-0.03 7e-3 -0.221 0.0255-0.2855 0.0215-0.0665 0.118-0.265 0.15-0.307 0.0145-0.0385 0.0315 0.0095 0.045 0.0135zm-2.5105-9e-3c0.0905 0.023 0.1305 0.1045 0.18 0.1785l0.0335 0.066-0.047 0.1635c-0.025 0.09-0.0515 0.171-0.0595 0.18-9e-3 0.01-0.0425 0.015-0.092 0.0145-0.132-0.0035-0.147-9e-3 -0.1825-0.063l-0.033-0.049 0.028-0.1375c0.0405-0.198 0.06-0.2575 0.105-0.3085 0.0235-0.0275 0.047-0.0425 0.0675-0.0445zm-0.8355 0.1415 0.0745 0.0745 0.0125 0.1685c0.0065 0.092 0.0095 0.1775 0.0045 0.188-0.0045 0.0145-0.0315 0.0185-0.115 0.0185h-0.1085c-0.058-0.0635-0.076-0.141-0.1005-0.221-0.057-0.2405-0.057-0.35 2e-3 -0.3645 0.0965 6e-3 0.16 0.076 0.2305 0.136zm2.9-0.1155c0.118 0.0315 0.0945 0.219 0.094 0.353-9e-3 0.217-0.0175 0.262-0.0455 0.29-0.0485 0.0485-0.1835 0.0215-0.249-0.0505-0.0215-0.026-0.0235-0.034-0.0065-0.1395 0.0195-0.1285 0.0445-0.2085 0.1-0.3185 0.0405-0.079 0.0785-0.1285 0.107-0.1345zm-2.663 0.01c0.0065-5e-4 0.017 0 0.027 1e-3 0.075 6e-3 0.145 0.055 0.207 0.145l0.05 0.0735c0.0045 0.1205 0 0.2475-0.0215 0.3595-0.013 0.0065-0.067 0.0165-0.12 0.0215-0.092 0.0085-0.1005 0.0065-0.1325-0.0215-0.0445-0.038-0.057-0.1085-0.068-0.3425-0.0065-0.191-2e-3 -0.2335 0.058-0.2365zm1.1345 0.04c0.0805 0.017 0.1315 0.06 0.154 0.1305 0.018 0.0605 0.029 0.399 0.0115 0.4225-6e-3 0.01-0.044 0.0225-0.0875 0.028-0.162 0.0205-0.305 5e-3 -0.319-0.0335-0.018-0.044 0.1025-0.48 0.147-0.534 0.019-0.042 0.065-0.0095 0.094-0.0135zm1.049 3e-3c0.0355-0.0035 0.0735 0.0305 0.1105 0.103 0.03 0.0605 0.0345 0.0815 0.0345 0.217 0 0.108-0.0065 0.1545-0.018 0.1645-0.01 8e-3 -0.0505 0.0225-0.0935 0.0335-0.075 0.0195-0.0915 0.0215-0.115 0.0135l-0.1125-0.0205 0.0085-0.067c8e-3 -0.0875 0.0655-0.2815 0.106-0.3655 0.024-0.05 0.0515-0.075 0.0795-0.0785zm-0.489 0.0015c0.0235-1e-3 0.0345 0.0045 0.0495 0.021 0.0355 0.042 0.0805 0.166 0.109 0.2985 0.038 0.1865 0.038 0.186-0.0435 0.2105-0.0355 0.011-0.1105 0.0225-0.164 0.0255-0.1765 9e-3 -0.19-0.0015-0.1685-0.1575 0.017-0.139 0.0855-0.358 0.115-0.374 0.032-0.017 0.069-0.0165 0.1025-0.024zm-8.9965 0.7045c0.0015-5e-4 0.0035 0 0.0035 0 0.0045 0.0975 0.0045 0.196 0.0065 0.294-0.2475-0.019-0.4295-0.078-0.4295-0.1475 0-0.0685 0.1755-0.127 0.4195-0.1465zm0.4325 0.0085c0.2005 0.025 0.339 0.0775 0.3365 0.138 0 0.061-0.134 0.113-0.333 0.1375-2e-3 -0.0915-2e-3 -0.1835-0.0035-0.2755zm9.363 0.2665c0.017-0.0015 0.0245-3e-3 0.0505-5e-4 0.104 0.0105 0.119 0.017 0.119 0.052 0 0.046-0.079 0.1845-0.1325 0.2325-0.025 0.024-0.0595 0.044-0.0715 0.044-0.06 0-0.095-0.1265-0.067-0.243 0.017-0.063 0.048-0.0825 0.1015-0.085zm-0.3775 0.0415c0.0465-4e-3 0.0915 0.0085 0.1365 0.0145-0.013 0.1315-0.072 0.239-0.1815 0.3105-0.027 0-0.0405-0.0515-0.0405-0.164 0-0.134 7e-3 -0.1595 0.0855-0.161zm-0.414 0.0485c0.0965 0 0.1815 0.0045 0.1855 0.01 0.018 0.017-0.034 0.146-0.1105 0.277-0.0655 0.1165-0.075 0.125-0.1155 0.128-0.159-0.018-0.1545-0.2045-0.179-0.3325 0-0.076 0.017-0.0825 0.2195-0.0825zm-1.5045 0.0145c0.1105 2e-3 0.1535 0.0185 0.1535 0.061 0 0.054-0.041 0.1615-0.0645 0.175-0.0355 0.0195-0.0385 0.0185-0.1085-0.0545-0.1105-0.124-0.123-0.147 0.0195-0.1815zm0.532 0.0055c2e-3 3e-3 0.0235 0.042 0.045 0.086 0.047 0.0915 0.0505 0.1315 0.017 0.162-0.079 0.045-0.0955 0.0195-0.167-0.026-0.083-0.0785-0.1485-0.184-0.127-0.206 0.074-0.0265 0.1555-0.0165 0.232-0.016zm0.211 0.0025 0.1975 0.0035c0.077 0 0.1435 4e-3 0.147 0.01 0.0135 0.012-0.03 0.269-0.0535 0.327-0.027 0.065-0.1215 0.0655-0.1705-0.0115-0.07-0.1105-0.116-0.2035-0.1175-0.2675z"/></g>" notch="
+<g id="notch" transform="scale(1)">
+  <circle cy="0" cx="0" r="1.4" class="fill-note"></circle>
+  <circle cy="0" cx="0" r="2.8" class="note"></circle>
+</g>" bnotch="
+<g id="bnotch" transform="scale(1)">
+  <path d="M -1.1 -1.1 L 1.1 1.1 M 1.1 -1.1 L -1.1 1.1" class="note"></path>
+  <circle cy="0" cx="0" r="2.8" class="note"></circle>
+</g>" pleat="
+<marker id="pleatTo" markerWidth="10" markerHeight="6" orient="auto" refY="3" refX="10">
+	<path d="M 10,3 L 0,0 C 2,2 2,4 0,6 z" class="fill-note note" transform="scale(1)" />
+</marker>
+" sewTogetherStart="
+<marker id="sewTogetherStart" markerWidth="10" markerHeight="6" orient="auto" refX="1" refY="2">
+	<path d="M 0,2 L 6,0 C 5,1 5,3 6,4 z" class="fill-note note" transform="scale(1)" />
+</marker>" sewTogetherEnd="
+<marker id="sewTogetherEnd" markerWidth="10" markerHeight="6" orient="auto" refX="6" refY="2">
+	<path d="M 6,2 L 0,0 C 1,1 1,3 0,4 z" class="fill-note note" transform="scale(1)" />
+</marker>" sewTogetherCross="
+<marker id="sewTogetherCross" markerWidth="5" markerHeight="5" orient="auto" refX="2.5" refY="2.5">
+  <path d="M 0,0 L 5,5 M 5,0 L 0,5" class="note" transform="scale(1)" />
+</marker>"
+</defs>
+
+
+<!-- Start of group #fs-container -->
+<g id="fs-container">
+
+<!-- Start of group #fs-stack-sasha.frontInside -->
+<g id="fs-stack-sasha.frontInside"  transform="translate(609.2706708859102, 5.559653695170132)">
+
+<!-- Start of group #fs-stack-sasha.frontInside-part-sasha.frontInside -->
+<g id="fs-stack-sasha.frontInside-part-sasha.frontInside"  transform="translate(0, 0)">
+<path  class="fabric sa" id="fs-1" d="M 0,985.7 L 43.26,985.7 C 56.79,985.7 74.49,984.31 92.2,982.43 C 101.35,981.45 110.51,980.35 119.06,979.24 C 143.39,976.09 162.7,972.97 163.67,972.82 L 172.16,960.77 L 53.04,412.88 L 53.26,415 C 53.26,381.24 65.66,348.98 77.88,323.3 C 84.5,309.4 91.11,297.35 95.96,287.89 C 99,281.97 101.44,276.78 102.81,272.81 C 106.47,262.19 108.6,249.26 110.68,235.42 C 111.93,227.06 113.18,218.37 114.81,209.67 C 120.26,180.69 129.91,150.5 164.07,137.57 C 172.04,134.56 181.28,132.48 192.01,131.47 L 201.04,120.58 C 200.94,119.52 200.86,118.46 200.82,117.39 L 200.85,117.88 C 200.66,113.72 200.58,109.66 200.58,105.72 C 200.59,82.79 203.74,63.34 206.9,49.71 C 209.85,36.96 212.8,29.38 213.1,28.57 L 205.44,15.3 L 134.19,2.73 L 98.56,-3.56 L 86.98,4.55 C 78.32,53.61 30.56,103.01 5.1,113.17 C 3.17,113.95 1.46,114.5 0,114.5" />
+<path  class="note" marker-start="url(#cutonfoldFrom)" marker-end="url(#cutonfoldTo)" data-text="plugin-annotations:cutOnFoldAndGrainline" data-text-class="center fill-note" id="fs-2" d="M 0,167.06 L 15,167.06 L 15,933.14 L 0,933.14" />
+<text><textPath xlink:href="#fs-2"  startOffset="50%" ><tspan  class="center fill-note">plugin-annotations:cutOnFoldAndGrainline</tspan></textPath>
+</text>
+<path  class="fabric" id="fs-3" d="M 0,975.7 L 43.26,975.7 C 83.2,975.7 162.39,962.9 162.39,962.9 L 43.26,415 C 43.26,350.5 85.96,291.03 93.36,269.55 C 109.3,223.27 93.61,130.64 191.08,121.52 C 190.98,120.46 190.91,119.4 190.86,118.33 C 188.42,64.31 203.7,25.15 203.7,25.15 L 132.45,12.58 L 96.83,6.29 C 86.39,65.39 22.79,124.5 0,124.5 L 0,415 z" />
+<path  id="fs-4" d="M 0,124.5 C 22.79,124.5 86.39,65.39 96.83,6.29" />
+<text  class="text-4xl fill-note font-bold left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 22.949999999999953 166)" x="22.95" y="166"><tspan>1 </tspan>
+</text>
+<text  class="text-sm fill-current left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 22.949999999999953 166)" x="22.95" y="170"><tspan>Sunday, Oct 11, 2026 </tspan>
+</text>
+<text  transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 22.949999999999953 166)" class="text-lg fill-current font-bold left" x="22.95" y="182"><tspan>frontInside </tspan>
+</text>
+<text  class="fill-note left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 22.949999999999953 166)" x="22.95" y="190"><tspan>FreeSewing Sasha skater dress v4.10.2 ( ephemeral ) </tspan>
+</text>
+<text  class="text-md fill-current left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 22.949999999999953 166)" x="22.95" y="198"><tspan>plugin-annotations:cut,1,plugin-annotations:onFold,plugin-annotations:from,plugin-annotations:fabric,</tspan><tspan x="22.95" dy="8"> </tspan>
+</text>
+<use x="85.69" y="286" xlink:href="#notch"  transform="translate(85.69, 286) scale(1) translate(-85.69, -286)"></use>
+<use x="0" y="415" xlink:href="#notch"  transform="translate(0, 415) scale(1) translate(0, -415)"></use>
+<use x="43.26" y="415" xlink:href="#notch"  transform="translate(43.26, 415) scale(1) translate(-43.26, -415)"></use>
+</g>
+<!-- end of group #fs-stack-sasha.frontInside-part-sasha.frontInside -->
+</g>
+<!-- end of group #fs-stack-sasha.frontInside -->
+
+<!-- Start of group #fs-stack-sasha.pocket -->
+<g id="fs-stack-sasha.pocket"  transform="translate(1258.5605181762862, -36.69921002491867)">
+
+<!-- Start of group #fs-stack-sasha.pocket-part-sasha.pocket -->
+<g id="fs-stack-sasha.pocket-part-sasha.pocket"  transform="translate(0, 0)">
+<path  class="fabric" id="fs-5" d="M 98.29,522.36 L 98.29,614.43 C 99.82,666.53 92.52,701.35 80.66,756.65 C 72.39,860.94 179.75,882.1 253.06,834.3 C 268.45,825.82 276.93,786.73 284.75,744.24 L 284.75,606.86 C 184.06,606.86 98.29,522.36 98.29,522.36" />
+<path  class="fabric sa" id="fs-6" d="M 88.29,522.36 L 88.29,614.43 L 88.3,614.72 C 88.43,619.33 88.5,623.8 88.5,628.17 C 88.49,645.64 87.37,661.55 85.33,677.46 C 82.29,701.17 77.24,724.88 70.88,754.55 L 70.69,755.86 C 70.37,759.95 70.21,763.92 70.21,767.78 C 70.21,809.79 88.62,837.94 115.2,853.69 C 131.97,863.63 152.21,868.59 173.54,868.59 C 182.69,868.59 192.05,867.68 201.4,865.86 C 221.07,862.06 240.74,854.27 258.52,842.68 L 257.88,843.06 C 274.54,833.89 285.91,793.16 294.58,746.05 L 294.75,744.24 L 294.75,606.86 L 284.75,596.86 C 235.99,596.86 191.3,576.39 158.74,556.11 C 126.37,535.95 105.9,515.8 105.2,515.13" />
+<path  class="note" marker-start="url(#grainlineFrom)" marker-end="url(#grainlineTo)" data-text="plugin-annotations:grainline" data-text-class="center fill-note" id="fs-7" d="M 264.75,632.73 L 264.75,738.37" />
+<text><textPath xlink:href="#fs-7"  startOffset="50%" ><tspan  class="center fill-note">plugin-annotations:grainline</tspan></textPath>
+</text>
+<text  class="text-4xl fill-note font-bold left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 175.67568144089898 678.3311059403281)" x="175.68" y="678.33"><tspan>6 </tspan>
+</text>
+<text  class="text-sm fill-current left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 175.67568144089898 678.3311059403281)" x="175.68" y="682.33"><tspan>Sunday, Oct 11, 2026 </tspan>
+</text>
+<text  transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 175.67568144089898 678.3311059403281)" class="text-lg fill-current font-bold left" x="175.68" y="694.33"><tspan>pocket </tspan>
+</text>
+<text  class="fill-note left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 175.67568144089898 678.3311059403281)" x="175.68" y="702.33"><tspan>FreeSewing Sasha skater dress v4.10.2 ( ephemeral ) </tspan>
+</text>
+<text  class="text-md fill-current left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 175.67568144089898 678.3311059403281)" x="175.68" y="710.33"><tspan>plugin-annotations:cut,2,plugin-annotations:mirrored,plugin-annotations:from,plugin-annotations:fabric,</tspan><tspan x="175.68" dy="8"> </tspan>
+</text>
+</g>
+<!-- end of group #fs-stack-sasha.pocket-part-sasha.pocket -->
+</g>
+<!-- end of group #fs-stack-sasha.pocket -->
+
+<!-- Start of group #fs-stack-sasha.frontOutsideAbove -->
+<g id="fs-stack-sasha.frontOutsideAbove"  transform="translate(1030.0189760773428, -148.5257218431666)">
+
+<!-- Start of group #fs-stack-sasha.frontOutsideAbove-part-sasha.frontOutsideAbove -->
+<g id="fs-stack-sasha.frontOutsideAbove-part-sasha.frontOutsideAbove"  transform="translate(0, 0)">
+<path  class="fabric" id="fs-8" d="M 284.75,606.86 L 284.75,416.86 L 239.06,234.01 C 221.14,238.77 185.19,202.52 189.73,161.1 C 92.42,150.39 21.16,291.09 75.65,359.57 C 87.04,373.9 121.24,398.56 121.23,416.86 L 98.29,522.36 L 98.29,614.43 C 99.82,666.53 92.52,701.35 80.66,756.65 C 72.39,860.94 179.75,882.1 253.06,834.3 C 268.45,825.82 276.93,786.73 284.75,744.24 L 284.75,606.86" />
+<path  class="fabric sa" id="fs-9" d="M 294.75,606.86 L 294.75,416.86 L 294.45,414.44 L 248.76,231.59 L 235.67,224.43 C 232.42,224.43 228.73,222.44 224.96,219.7 C 212.11,210.34 199.33,190.56 199.33,168.32 C 199.33,166.29 199.44,164.25 199.67,162.19 L 190.82,151.16 C 186.91,150.73 183.05,150.53 179.22,150.53 C 133.86,150.53 94.3,180.08 70.5,219.72 C 59.91,237.35 52.47,256.89 48.99,276.42 C 47.53,284.67 46.76,292.93 46.76,301.04 C 46.76,324.98 53.39,347.66 67.82,365.8 C 73.17,372.51 83.31,381.47 92.85,390.98 C 101.58,399.67 111.23,408.71 111.23,416.86 L 111.46,414.74 L 88.52,520.24 L 88.29,522.36 L 88.29,614.43 L 88.3,614.72 C 88.43,619.33 88.5,623.8 88.5,628.17 C 88.49,645.64 87.37,661.55 85.33,677.46 C 82.29,701.17 77.24,724.88 70.88,754.55 L 70.69,755.86 C 70.37,759.95 70.21,763.92 70.21,767.78 C 70.21,809.79 88.62,837.94 115.2,853.69 C 131.97,863.63 152.21,868.59 173.54,868.59 C 182.69,868.59 192.05,867.68 201.4,865.86 C 221.07,862.06 240.74,854.27 258.52,842.68 L 257.88,843.06 C 274.54,833.89 285.91,793.16 294.58,746.05 L 294.75,744.24 L 294.75,606.86" />
+<path  class="note" marker-start="url(#grainlineFrom)" marker-end="url(#grainlineTo)" data-text="plugin-annotations:grainline" data-text-class="center fill-note" id="fs-10" d="M 264.75,426.36 L 264.75,597.36" />
+<text><textPath xlink:href="#fs-10"  startOffset="50%" ><tspan  class="center fill-note">plugin-annotations:grainline</tspan></textPath>
+</text>
+<path  class="fabric help" data-text="pocket opening (do not cut)" data-text-class="center" id="fs-11" d="M 98.29,522.36 C 98.29,522.36 184.06,606.86 284.75,606.86" />
+<text><textPath xlink:href="#fs-11"  startOffset="50%" ><tspan  class="center">pocket opening (do not cut)</tspan></textPath>
+</text>
+<text  class="text-4xl fill-note font-bold left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 185.41763939800666 311.0498046615067)" x="185.42" y="311.05"><tspan>2a </tspan>
+</text>
+<text  class="text-sm fill-current left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 185.41763939800666 311.0498046615067)" x="185.42" y="315.05"><tspan>Sunday, Oct 11, 2026 </tspan>
+</text>
+<text  transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 185.41763939800666 311.0498046615067)" class="text-lg fill-current font-bold left" x="185.42" y="327.05"><tspan>frontOutsideAbove </tspan>
+</text>
+<text  class="fill-note left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 185.41763939800666 311.0498046615067)" x="185.42" y="335.05"><tspan>FreeSewing Sasha skater dress v4.10.2 ( ephemeral ) </tspan>
+</text>
+<text  class="text-md fill-current left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 185.41763939800666 311.0498046615067)" x="185.42" y="343.05"><tspan>plugin-annotations:cut,2,plugin-annotations:mirrored,plugin-annotations:from,plugin-annotations:fabric,</tspan><tspan x="185.42" dy="8"> </tspan>
+</text>
+<use x="56.76" y="301" xlink:href="#notch"  transform="translate(56.76, 301) scale(1) translate(-56.76, -301)"></use>
+<use x="284.75" y="416.86" xlink:href="#notch"  transform="translate(284.75, 416.86) scale(1) translate(-284.75, -416.86)"></use>
+<use x="121.23" y="416.86" xlink:href="#notch"  transform="translate(121.23, 416.86) scale(1) translate(-121.23, -416.86)"></use>
+<use x="98.29" y="522.36" xlink:href="#notch"  transform="translate(98.29, 522.36) scale(1) translate(-98.29, -522.36)"></use>
+<use x="284.75" y="606.86" xlink:href="#notch"  transform="translate(284.75, 606.86) scale(1) translate(-284.75, -606.86)"></use>
+</g>
+<!-- end of group #fs-stack-sasha.frontOutsideAbove-part-sasha.frontOutsideAbove -->
+</g>
+<!-- end of group #fs-stack-sasha.frontOutsideAbove -->
+
+<!-- Start of group #fs-stack-sasha.frontOutsideBelow -->
+<g id="fs-stack-sasha.frontOutsideBelow"  transform="translate(1336.4359565638497, -513.1301702983675)">
+
+<!-- Start of group #fs-stack-sasha.frontOutsideBelow-part-sasha.frontOutsideBelow -->
+<g id="fs-stack-sasha.frontOutsideBelow-part-sasha.frontOutsideBelow"  transform="translate(0, 0)">
+<path  class="fabric" id="fs-12" d="M 2.1,964.76 C 41.13,973.25 81.29,977.56 121.23,977.56 L 284.75,977.56 L 284.75,606.86 C 184.06,606.86 98.29,522.36 98.29,522.36 L 2.1,964.76" />
+<path  class="fabric sa" id="fs-13" d="M -0.02,974.53 C 39.7,983.17 80.58,987.56 121.23,987.56 L 284.75,987.56 L 294.75,977.56 L 294.75,606.86 L 284.75,596.86 C 235.99,596.86 191.3,576.39 158.74,556.11 C 126.37,535.95 105.9,515.8 105.2,515.13 L 88.52,520.24 L -7.67,962.64" />
+<path  class="note" marker-start="url(#grainlineFrom)" marker-end="url(#grainlineTo)" data-text="plugin-annotations:grainline" data-text-class="center fill-note" id="fs-14" d="M 264.75,625.4 L 264.75,959.03" />
+<text><textPath xlink:href="#fs-14"  startOffset="50%" ><tspan  class="center fill-note">plugin-annotations:grainline</tspan></textPath>
+</text>
+<text  class="text-4xl fill-note font-bold left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 143.42749604173167 690.810817729422)" x="143.43" y="690.81"><tspan>2b </tspan>
+</text>
+<text  class="text-sm fill-current left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 143.42749604173167 690.810817729422)" x="143.43" y="694.81"><tspan>Sunday, Oct 11, 2026 </tspan>
+</text>
+<text  transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 143.42749604173167 690.810817729422)" class="text-lg fill-current font-bold left" x="143.43" y="706.81"><tspan>frontOutsideBelow </tspan>
+</text>
+<text  class="fill-note left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 143.42749604173167 690.810817729422)" x="143.43" y="714.81"><tspan>FreeSewing Sasha skater dress v4.10.2 ( ephemeral ) </tspan>
+</text>
+<text  class="text-md fill-current left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 143.42749604173167 690.810817729422)" x="143.43" y="722.81"><tspan>plugin-annotations:cut,2,plugin-annotations:mirrored,plugin-annotations:from,plugin-annotations:fabric,</tspan><tspan x="143.43" dy="8"> </tspan>
+</text>
+</g>
+<!-- end of group #fs-stack-sasha.frontOutsideBelow-part-sasha.frontOutsideBelow -->
+</g>
+<!-- end of group #fs-stack-sasha.frontOutsideBelow -->
+
+<!-- Start of group #fs-stack-sasha.backInside -->
+<g id="fs-stack-sasha.backInside"  transform="translate(12, 11.613097890912265)">
+
+<!-- Start of group #fs-stack-sasha.backInside-part-sasha.backInside -->
+<g id="fs-stack-sasha.backInside-part-sasha.backInside"  transform="translate(0, 0)">
+<path  class="note" marker-start="url(#grainlineFrom)" marker-end="url(#grainlineTo)" data-text="plugin-annotations:grainline" data-text-class="center fill-note" id="fs-15" d="M 26.91,69.06 L 26.91,923.25" />
+<text><textPath xlink:href="#fs-15"  startOffset="50%" ><tspan  class="center fill-note">plugin-annotations:grainline</tspan></textPath>
+</text>
+<path  class="fabric sa" id="fs-16" d="M 6.91,980.7 L 111.63,980.7 C 125.15,980.7 142.86,979.31 160.56,977.43 C 169.72,976.45 178.87,975.35 187.42,974.24 L 187.64,974.21 C 211.75,971.09 231.06,967.97 232.04,967.82 L 240.52,955.77 L 121.4,407.88 L 121.63,410 C 121.63,380.32 121.23,357.33 120.82,338.87 C 120.42,320.18 120.02,306.22 120.02,294.59 C 120.02,283.02 120.43,273.73 121.75,264.44 C 122.58,258.64 123.75,252.84 125.39,246.42 L 125.7,243.95 C 125.7,214.29 148.89,173.12 176.99,156.52 C 183.99,152.39 191.31,149.83 198.68,149.83 L 208.55,141.41 L 224.3,42.7 L 217.18,31.51 L 73.67,-9.61 L 63.18,-6.33 C 62.05,-4.95 49.61,11.6 0,11.6 L -10,21.6 C -10,221.52 -3.16,407.99 -3.09,410 L -3.09,970.7 z" />
+<path  id="fs-17" d="M 115.7,243.95 C 115.7,202.3 157.19,139.83 198.68,139.83" />
+<path  class="fabric" id="fs-18" d="M 6.91,970.7 L 111.63,970.7 C 151.56,970.7 230.75,957.9 230.75,957.9 L 111.63,410 C 111.63,299.3 106.04,281.82 115.7,243.95 C 115.7,202.3 157.19,139.83 198.68,139.83 L 214.42,41.12 L 70.92,0 C 70.92,0 56.74,21.6 0,21.6 C 0,221.52 6.91,410 6.91,410 L 6.91,970.7 z" />
+<text  class="text-4xl fill-note font-bold left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 38.914500000000004 96.74861099052242)" x="38.91" y="96.75"><tspan>3 </tspan>
+</text>
+<text  class="text-sm fill-current left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 38.914500000000004 96.74861099052242)" x="38.91" y="100.75"><tspan>Sunday, Oct 11, 2026 </tspan>
+</text>
+<text  transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 38.914500000000004 96.74861099052242)" class="text-lg fill-current font-bold left" x="38.91" y="112.75"><tspan>backInside </tspan>
+</text>
+<text  class="fill-note left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 38.914500000000004 96.74861099052242)" x="38.91" y="120.75"><tspan>FreeSewing Sasha skater dress v4.10.2 ( ephemeral ) </tspan>
+</text>
+<text  class="text-md fill-current left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 38.914500000000004 96.74861099052242)" x="38.91" y="128.75"><tspan>plugin-annotations:cut,2,plugin-annotations:mirrored,plugin-annotations:from,plugin-annotations:fabric,</tspan><tspan x="38.91" dy="8"> </tspan>
+</text>
+<use x="6.91" y="410" xlink:href="#notch"  transform="translate(6.91, 410) scale(1) translate(-6.91, -410)"></use>
+<use x="111.63" y="410" xlink:href="#notch"  transform="translate(111.63, 410) scale(1) translate(-111.63, -410)"></use>
+</g>
+<!-- end of group #fs-stack-sasha.backInside-part-sasha.backInside -->
+</g>
+<!-- end of group #fs-stack-sasha.backInside -->
+
+<!-- Start of group #fs-stack-sasha.backOutside -->
+<g id="fs-stack-sasha.backOutside"  transform="translate(827.3523886277836, -127.83092873060352)">
+
+<!-- Start of group #fs-stack-sasha.backOutside-part-sasha.backOutside -->
+<g id="fs-stack-sasha.backOutside-part-sasha.backOutside"  transform="translate(0, 0)">
+<path  class="note" marker-start="url(#grainlineFrom)" marker-end="url(#grainlineTo)" data-text="plugin-annotations:grainline" data-text-class="center fill-note" id="fs-19" d="M 215.29,258.98 L 212.81,933.24" />
+<text><textPath xlink:href="#fs-19"  startOffset="50%" ><tspan  class="center fill-note">plugin-annotations:grainline</tspan></textPath>
+</text>
+<path  class="fabric sa" id="fs-20" d="M 6.66,967.11 C 46.39,975.75 87.27,980.14 127.91,980.14 L 232.62,980.7 L 242.67,970.7 L 242.67,410 C 242.67,315.76 245.37,223.53 245.43,221.52 L 236.3,211.56 C 226.19,210.68 218.82,204.7 214.17,195.02 C 209.76,185.84 207.63,173.69 207.63,159.08 C 207.63,154.41 207.85,149.51 208.3,144.37 C 208.41,143.15 208.52,141.93 208.64,140.7 L 198.68,129.83 C 171.06,129.83 142.56,153.53 124.53,183.91 C 120.19,191.23 116.46,198.86 113.5,206.5 C 108.48,219.46 105.7,232.44 105.7,243.95 L 106.01,241.48 C 104.04,249.19 103.24,256.16 103.24,263.12 C 103.24,277.63 106.92,292.12 110.71,314.63 C 114.32,336.05 117.91,365.11 117.91,409.44 L 118.14,407.31 L -0.98,955.21 z" />
+<path  class="fabric" id="fs-21" d="M 8.79,957.34 C 47.81,965.82 87.98,970.14 127.91,970.14 L 232.67,970.7 L 232.67,410 C 232.67,315.76 235.43,221.52 235.43,221.52 C 207.97,219.12 194.25,190.25 198.34,143.5 C 198.45,142.28 198.56,141.06 198.68,139.83 C 157.19,139.83 115.7,202.3 115.7,243.95 C 106.04,281.82 127.91,299.3 127.91,409.44 L 8.79,957.34 z" />
+<text  class="text-4xl fill-note font-bold left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 144.94134375 285.4625)" x="144.94" y="285.46"><tspan>4 </tspan>
+</text>
+<text  class="text-sm fill-current left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 144.94134375 285.4625)" x="144.94" y="289.46"><tspan>Sunday, Oct 11, 2026 </tspan>
+</text>
+<text  transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 144.94134375 285.4625)" class="text-lg fill-current font-bold left" x="144.94" y="301.46"><tspan>backOutside </tspan>
+</text>
+<text  class="fill-note left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 144.94134375 285.4625)" x="144.94" y="309.46"><tspan>FreeSewing Sasha skater dress v4.10.2 ( ephemeral ) </tspan>
+</text>
+<text  class="text-md fill-current left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 144.94134375 285.4625)" x="144.94" y="317.46"><tspan>plugin-annotations:cut,2,plugin-annotations:mirrored,plugin-annotations:from,plugin-annotations:fabric,</tspan><tspan x="144.94" dy="8"> </tspan>
+</text>
+<use x="232.67" y="410" xlink:href="#notch"  transform="translate(232.67, 410) scale(1) translate(-232.67, -410)"></use>
+<use x="127.91" y="409.44" xlink:href="#notch"  transform="translate(127.91, 409.44) scale(1) translate(-127.91, -409.44)"></use>
+</g>
+<!-- end of group #fs-stack-sasha.backOutside-part-sasha.backOutside -->
+</g>
+<!-- end of group #fs-stack-sasha.backOutside -->
+
+<!-- Start of group #fs-stack-library.sleeve -->
+<g id="fs-stack-library.sleeve"  transform="translate(430.8973118279665, 110.49016955008341)">
+
+<!-- Start of group #fs-stack-library.sleeve-part-library.sleeve -->
+<g id="fs-stack-library.sleeve-part-library.sleeve"  transform="translate(0, 0)">
+<path  class="fabric" id="fs-22" d="M -164.45,0 L -102,501.51 L 102,501.51 L 164.45,0 C 164.45,0 154.29,1.13 124.93,-13.69 C 80.89,-35.93 90.42,-52.42 52.62,-84.12 C 27.42,-105.26 -28.27,-101.87 -54.35,-81.82 C -75.21,-65.78 -109.92,-27.2 -129.94,-15.82 C -147.95,-5.59 -164.45,0 -164.45,0 z" />
+<path  class="fabric sa" id="fs-23" d="M -174.37,1.24 L -111.92,502.75 L -102,511.51 L 102,511.51 L 111.92,502.75 L 174.37,1.24 L 163.79,-10 C 163.66,-10 163.51,-9.99 163.34,-9.99 C 160.58,-10 152.32,-11.06 129.44,-22.62 C 118.43,-28.18 111.07,-33.29 105.51,-38.45 C 100.35,-43.24 96.76,-48.06 93.15,-53.16 C 85.45,-64.05 77.7,-76.14 59.05,-91.78 C 45.77,-102.92 25.14,-108.49 3.65,-108.49 C 1.96,-108.49 0.27,-108.45 -1.42,-108.38 L -1.85,-108.37 C -24.1,-107.43 -46.22,-100.69 -60.44,-89.75 C -70.11,-82.32 -82.71,-70.17 -95.48,-58 C -96.36,-57.16 -97.25,-56.31 -98.14,-55.47 C -111.63,-42.65 -125.06,-30.09 -134.87,-24.52 C -152.07,-14.75 -165.99,-10.07 -167.81,-9.42 z" />
+<path  class="note" marker-start="url(#grainlineFrom)" marker-end="url(#grainlineTo)" data-text="plugin-annotations:grainline" data-text-class="center fill-note" id="fs-24" d="M 0,476.43 L 0,25.08" />
+<text><textPath xlink:href="#fs-24"  startOffset="50%" ><tspan  class="center fill-note">plugin-annotations:grainline</tspan></textPath>
+</text>
+<text  class="text-4xl fill-note font-bold left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 0 0)" x="0" y="0"><tspan>5 </tspan>
+</text>
+<text  class="text-sm fill-current left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 0 0)" x="0" y="4"><tspan>Sunday, Oct 11, 2026 </tspan>
+</text>
+<text  transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 0 0)" class="text-lg fill-current font-bold left" x="0" y="16"><tspan>sleeve </tspan>
+</text>
+<text  class="fill-note left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 0 0)" x="0" y="24"><tspan>FreeSewing Sasha skater dress v4.10.2 ( ephemeral ) </tspan>
+</text>
+<text  class="text-md fill-current left" transform="matrix(1, 0, 0, 1, 0, 0) rotate(0 0 0)" x="0" y="32"><tspan>plugin-annotations:cut,2,plugin-annotations:mirrored,plugin-annotations:from,plugin-annotations:fabric,</tspan><tspan x="0" dy="8"> </tspan>
+</text>
+<use x="0" y="150.45" xlink:href="#logo"  transform="translate(0, 150.45) scale(1) translate(0, -150.45)"></use>
+<use x="83.37" y="-49.69" xlink:href="#notch"  transform="translate(83.37, -49.69) scale(1) translate(-83.37, 49.69)"></use>
+<use x="-82.97" y="-56.11" xlink:href="#bnotch"  transform="translate(-82.97, -56.11) scale(1) translate(82.97, 56.11)"></use>
+</g>
+<!-- end of group #fs-stack-library.sleeve-part-library.sleeve -->
+</g>
+<!-- end of group #fs-stack-library.sleeve -->
+</g>
+<!-- end of group #fs-container -->
+</svg>

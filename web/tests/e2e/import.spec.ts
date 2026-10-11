@@ -106,3 +106,39 @@ test('a file with every size asks which, and adds only those', async ({ page }) 
   await expect(list.getByRole('option')).toHaveCount(4)
   await expect(list.getByRole('option', { name: /Front \(L\)/ })).toContainText('25.0 cm × 61.0 cm')
 })
+
+test('opens a FreeSewing pattern with its names, fold, notches and cutting', async ({ page }) => {
+  await page.goto('/?debug')
+  await page.getByTestId('pattern-file').setInputFiles(fixture('freesewing-sasha-sa10.svg'))
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: 'Found 7 pieces' })).toBeVisible()
+  await expect(dialog.locator('.found-list li')).toHaveText([
+    'Front inside',
+    'Pocket',
+    'Front outside above',
+    'Front outside below',
+    'Back inside',
+    'Back outside',
+    'Sleeve',
+  ])
+  // Both lines are in the file, so the allowance is measured, not asked.
+  await expect(dialog.getByRole('radiogroup', { name: /seam allowance included/ })).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Add 7 pieces' }).click()
+  await expect(dialog).toBeHidden()
+
+  const front = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const doc = (window as any).drapewright.engine.document()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const p = doc.pieces.find((x: any) => x.name === 'Front inside')
+    return {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      folds: p.outline.edges.filter((e: any) => e.kind === 'fold').length,
+      notches: p.notches.length,
+      seam: p.allowance.seam,
+      cut: [p.cut[0].quantity, p.cut[0].onFold],
+      grainline: p.grainline !== null,
+    }
+  })
+  expect(front).toEqual({ folds: 1, notches: 3, seam: 10, cut: [1, true], grainline: true })
+})

@@ -2,9 +2,11 @@
 //! pieces found, how sure the scale is, and what the importer noted. For
 //! checking the importers against patterns that can't be committed.
 //!
-//!     cargo run -p drapewright-io --example import_report -- <files or folders>…
+//!     cargo run -p drapewright-io --example import_report -- [-v] <files or folders>…
 //!
-//! Folders are searched for .svg and .dxf files. Nothing is written.
+//! Folders are searched for .svg and .dxf files. `-v` also lists each piece:
+//! its edges (folds marked), allowance, notches, internal lines, grainline
+//! and cutting. Nothing is written.
 
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -38,6 +40,9 @@ fn note(n: &ImportNote) -> String {
         ImportNote::CuttingLineDiffers { max_mm, .. } => format!("cut line differs {max_mm} mm"),
         ImportNote::SmallShapesIgnored { count } => format!("{count} small shapes left out"),
         ImportNote::LooseLinesIgnored { count } => format!("{count} loose lines left out"),
+        ImportNote::LinesOnOutlineIgnored { count } => {
+            format!("{count} lines on outlines left out")
+        }
         ImportNote::NoClosedShapes => "no closed shapes".into(),
         ImportNote::UnsupportedEntities { count } => format!("{count} unsupported entities"),
         ImportNote::CurvesTraced { count } => format!("{count} curves traced"),
@@ -64,8 +69,13 @@ fn summarise(r: &ImportResult) -> String {
 
 fn main() {
     let mut files = Vec::new();
+    let mut verbose = false;
     for arg in std::env::args().skip(1) {
-        collect(Path::new(&arg), &mut files);
+        if arg == "-v" {
+            verbose = true;
+        } else {
+            collect(Path::new(&arg), &mut files);
+        }
     }
     if files.is_empty() {
         eprintln!("usage: import_report <files or folders>…");
@@ -136,6 +146,43 @@ fn main() {
                     },
                     summarise(&r),
                 );
+                if verbose {
+                    for p in &r.pieces {
+                        let folds = p
+                            .outline
+                            .edges
+                            .iter()
+                            .filter(|e| e.kind == drapewright_pattern_core::EdgeKind::Fold)
+                            .count();
+                        let cut = p.cut.first().map_or(String::new(), |c| {
+                            format!(
+                                "cut {}{}{} {}",
+                                c.quantity,
+                                if c.mirrored == Some(true) {
+                                    " mirrored"
+                                } else {
+                                    ""
+                                },
+                                if c.on_fold == Some(true) {
+                                    " on fold"
+                                } else {
+                                    ""
+                                },
+                                c.material
+                            )
+                        });
+                        println!(
+                            "         - {}: {} edges ({folds} fold), {:?} {} mm, {} notches, {} lines, grain {}, {cut}",
+                            p.name,
+                            p.outline.edges.len(),
+                            p.allowance.mode,
+                            p.allowance.seam,
+                            p.notches.len(),
+                            p.lines.len(),
+                            if p.grainline.is_some() { "yes" } else { "no" },
+                        );
+                    }
+                }
             }
         }
     }

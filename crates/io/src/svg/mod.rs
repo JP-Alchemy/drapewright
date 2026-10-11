@@ -1,6 +1,7 @@
 //! SVG import and export.
 
 mod export;
+pub(crate) mod freesewing;
 mod import;
 mod units;
 

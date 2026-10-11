@@ -10,7 +10,7 @@ use drapewright_io::svg::{SvgExportOptions, export_svg, import_svg};
 use drapewright_io::{ImportNote, ImportResult, ScaleReason};
 use drapewright_pattern_core::geom::flatten_segs;
 use drapewright_pattern_core::{
-    Edge, Grainline, MarkKind, Outline, Piece, Pt, ScaleBasis, Segment,
+    Edge, EdgeKind, Grainline, MarkKind, NotchKind, Outline, Piece, Pt, ScaleBasis, Segment,
 };
 use kurbo::{Point, Rect};
 
@@ -185,6 +185,96 @@ fn transforms_and_use_elements() {
     sizes.sort_by(|a, b| a.0.total_cmp(&b.0));
     assert_eq!(sizes, [(60.0, 100.0), (100.0, 60.0)]);
     assert!(r.pieces.iter().all(|p| p.outline.signed_area() > 0.0));
+}
+
+#[test]
+fn freesewing_patterns_keep_their_names_folds_notches_and_cutting() {
+    let r = fixture("freesewing-sasha-sa10.svg");
+    let names: Vec<&str> = r.pieces.iter().map(|p| p.name.as_str()).collect();
+    assert_eq!(
+        names,
+        [
+            "Front inside",
+            "Pocket",
+            "Front outside above",
+            "Front outside below",
+            "Back inside",
+            "Back outside",
+            "Sleeve"
+        ]
+    );
+    // Every cutting line pairs with its stitching line, whether FreeSewing
+    // left it open along the fold or at a corner: the allowance is measured.
+    let measured = r
+        .notes
+        .iter()
+        .filter(|n| matches!(n, ImportNote::SeamLineFound { allowance, .. } if *allowance == 10.0))
+        .count();
+    assert_eq!(measured, 7);
+    assert!(r.allowance.pieces.is_empty());
+
+    let front = piece(&r, "Front inside");
+    let folds = front
+        .outline
+        .edges
+        .iter()
+        .filter(|e| e.kind == EdgeKind::Fold)
+        .count();
+    assert_eq!(folds, 1);
+    assert_eq!(
+        (front.cut[0].quantity, front.cut[0].on_fold),
+        (1, Some(true))
+    );
+    assert!(
+        front.grainline.is_some(),
+        "from the cut-on-fold-and-grainline bracket"
+    );
+
+    let pocket = piece(&r, "Pocket");
+    assert_eq!(
+        (pocket.cut[0].quantity, pocket.cut[0].mirrored),
+        (2, Some(true))
+    );
+    // Every notch symbol lands on an outline; the back notch is double.
+    let notches: Vec<NotchKind> = r
+        .pieces
+        .iter()
+        .flat_map(|p| p.notches.iter().map(|n| n.kind))
+        .collect();
+    assert_eq!(notches.len(), 14);
+    assert_eq!(
+        notches.iter().filter(|k| **k == NotchKind::Double).count(),
+        1
+    );
+    assert!(r.pieces.iter().all(|p| p.grainline.is_some()));
+    // The logo on the sleeve and the second copies FreeSewing draws of the
+    // front neckline and back armhole are left out; the pocket opening stays.
+    assert!(piece(&r, "Sleeve").lines.is_empty());
+    assert!(piece(&r, "Back inside").lines.is_empty());
+    assert!(piece(&r, "Front inside").lines.is_empty());
+    assert_eq!(piece(&r, "Front outside above").lines.len(), 1);
+    assert!(
+        r.notes
+            .contains(&ImportNote::LinesOnOutlineIgnored { count: 2 })
+    );
+}
+
+#[test]
+fn freesewing_folds_without_seam_allowance() {
+    let r = fixture("freesewing-sasha-no-allowance.svg");
+    // No cutting lines, so each outline could be either line: she is asked.
+    assert_eq!(r.allowance.pieces.len(), 7);
+    let front = piece(&r, "Front inside");
+    // The fold comes from the cut-on-fold bracket.
+    assert_eq!(
+        front
+            .outline
+            .edges
+            .iter()
+            .filter(|e| e.kind == EdgeKind::Fold)
+            .count(),
+        1
+    );
 }
 
 #[test]

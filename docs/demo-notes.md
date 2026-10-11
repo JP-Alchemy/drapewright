@@ -12,6 +12,68 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 11 — Real patterns: every size in one file, and FreeSewing (after Phase 1)
+
+**Try it:**
+
+1. **A file with every size.** Garment CAD files (Gerber, CLO, Browzwear)
+   carry each piece once per size. Open `fixtures/dxf/aama-graded.dxf`: the
+   import says **Found 2 pieces in 3 sizes** and asks **Which size?**, with
+   the size the pattern was made in (M) chosen. Choose L as well to compare
+   two sizes. Each piece then says which it is, *Front (M)* and *Front (L)*.
+   Only the chosen sizes are added.
+2. **A FreeSewing pattern.** Open `fixtures/svg/freesewing-sasha-sa10.svg`,
+   FreeSewing's Sasha dress in size 36 with 1 cm allowance:
+   * The 7 pieces have FreeSewing's names: *Front inside*, *Pocket*,
+     *Sleeve*…
+   * Both lines are in the file, so the 1 cm allowance is measured, not
+     asked.
+   * *Front inside* is cut on the fold. FreeSewing leaves its cutting line
+     open along the fold, and that edge becomes a **fold** with no
+     allowance.
+   * The 14 notches land on the seams (the back one is double). Every piece
+     has its grainline, and "Cut 2 mirrored" or "Cut 1 on fold" comes
+     across.
+   * Left out, and listed in the import: FreeSewing's logo on the sleeve,
+     and the second copies it draws of the front neckline and back armhole.
+     A copy left in would stay behind as a ghost line when you reshape that
+     seam.
+   * Each piece notes that FreeSewing's cutting line differs from
+     Drapewright's by up to 1 cm. That is only at corners: FreeSewing cuts
+     its corners off at 45°, while Drapewright points them (open
+     question 3).
+3. `fixtures/svg/freesewing-sasha-no-allowance.svg` is the same dress
+   without allowance. Its outlines could be either line, so you are asked
+   about allowance. The fold still comes from FreeSewing's cut-on-fold
+   bracket.
+
+**Checking against real patterns:** the collection in
+`~/Source/drapewright-test-patterns` can't be committed (its README says
+where each file comes from), but you can see how all of it imports:
+
+```bash
+cargo run --release -p drapewright-io --example import_report -- -v ~/Source/drapewright-test-patterns
+```
+
+Every file imports. That covers 44 garment CAD exports from Gerber, Lectra,
+Assyst, CLO and Browzwear, museum patterns from MoMu Antwerp, and the
+FreeSewing dress.
+
+**Not yet:** Lectra and Assyst exports carry only the size the pattern was
+made in. CLO and Browzwear files that come with a `.rul` file hold the base
+size plus rules for the others, and those rules are not applied yet.
+
+**Found by testing:** a line inside two overlapping pieces went to either
+piece, at random, from one import to the next. It now goes to the smaller
+piece, so a file always imports the same way.
+
+**What's under the hood:** FreeSewing's conventions are in
+`crates/io/src/svg/freesewing.rs`. Cutting lines left open (at a fold or
+a corner) are closed in `close_open_outlines` in `crates/io/src/assemble.rs`.
+Sizes are in `ImportResult.sizes`, and `choose_sizes` keeps the chosen ones.
+
+---
+
 ## Step 10 — Projects that stay put: autosave, backup, offline (Phase 1, day 10)
 
 **Try it:**

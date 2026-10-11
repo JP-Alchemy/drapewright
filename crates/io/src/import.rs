@@ -87,6 +87,9 @@ pub enum ImportNote {
     SmallShapesIgnored { count: u32 },
     /// Lines outside every piece, such as titles, borders or a scale box.
     LooseLinesIgnored { count: u32 },
+    /// Lines drawn over a piece's outline, such as a second copy of a seam.
+    /// Kept, they would be left behind when the outline is changed.
+    LinesOnOutlineIgnored { count: u32 },
     /// The file has lines but no closed shapes, so no pieces were found.
     NoClosedShapes,
     /// Parts of the drawing Drapewright does not read yet (3D faces, hatches…).

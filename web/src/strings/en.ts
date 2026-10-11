@@ -291,6 +291,12 @@ export const t = {
             'Left out 1 line outside the pieces (a title or border).',
             'Left out # lines outside the pieces (titles or borders).',
           )
+        case 'linesOnOutlineIgnored':
+          return plural(
+            n.count,
+            'Left out 1 line drawn over a piece’s outline (a second copy of a seam).',
+            'Left out # lines drawn over the pieces’ outlines (second copies of seams).',
+          )
         case 'noClosedShapes':
           return 'The file has lines but no closed shapes. Drapewright needs each piece’s outline drawn as one closed shape.'
         case 'unsupportedEntities':

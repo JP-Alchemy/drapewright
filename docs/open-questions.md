@@ -50,7 +50,10 @@ matters.
    turned up, or a seam pressed open, the end lines up exactly), and
    *automatic*. *Provisional: automatic = folded back where an edge meets a
    hem, pointed elsewhere, with very sharp points cut square.* Is that what
-   she expects to see on a printed pattern?
+   she expects to see on a printed pattern? FreeSewing patterns cut every
+   corner off at 45° (a bevel), so on import their cutting line differs
+   from ours by up to 1 cm at corners. Should Drapewright offer that corner
+   too?
 4. ☐ **"Squared" and "reverse for darts".** The brief lists these corner
    styles. I read *squared* as "cut at a right angle to one of the two
    seams", and *reverse for darts* as the shaped peak in the cutting line at
@@ -103,6 +106,7 @@ matters.
     importers and size systems get the most testing.
 17. ☐ **DXF files from pattern CAD systems** (Gerber, Lectra, Optitex,
     Valentina/Seamly2D, CLO…): does she have any? The AAMA/ASTM reader is
-    tested only on files drawn for our tests; real exports vary between
-    vendors, so a few real files (kept private, outside the repository)
-    would show what needs adjusting.
+    now tested on 44 public exports from Gerber, Lectra, Assyst, CLO and
+    Browzwear, kept privately outside the repository. Real exports vary
+    between vendors, so a few of her own files would still show what needs
+    adjusting.

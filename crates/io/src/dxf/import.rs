@@ -18,7 +18,7 @@ use drapewright_pattern_core::geom::{distance_to_polyline, flatten_segs, point_i
 use drapewright_pattern_core::ops::normalize_orientation;
 use drapewright_pattern_core::{
     AllowanceMode, CutInstruction, EdgeKind, Grainline, InternalLine, LineKind, Mark, MarkKind,
-    Notch, NotchFrom, NotchKind, Piece, Pt, ScaleBasis, Source, SourceFormat, SourceScale,
+    NotchKind, Piece, Pt, ScaleBasis, Source, SourceFormat, SourceScale,
 };
 use kurbo::{
     Affine, Arc, Circle, CubicBez, Line, ParamCurve, PathEl, PathSeg, Point, QuadBez, Shape as _,
@@ -28,7 +28,7 @@ use kurbo::{
 use super::reader::{Drawing, Entity, Shape, decode, parse};
 use crate::assemble::{
     CLOSE_TOLERANCE, RawPath, assemble, chain, is_straight, meaningful_name, measure_allowances,
-    median, to_segments,
+    median, notch_at, to_segments,
 };
 use crate::import::{
     AllowanceQuestion, ImportError, ImportNote, ImportResult, ImportSizes, PieceSize, ScaleInfo,
@@ -561,6 +561,7 @@ fn generic_pieces(
                 hint: hint.clone(),
                 name: name.clone(),
                 reference: Some(layer.clone()),
+                cut: None,
             });
         }
         for (segs, closed) in chain(open_paths, CLOSE_TOLERANCE) {
@@ -571,10 +572,11 @@ fn generic_pieces(
                 hint: hint.clone(),
                 name: name.clone(),
                 reference: Some(layer.clone()),
+                cut: None,
             });
         }
     }
-    let (mut pieces, notes) = assemble(raw, SourceFormat::Dxf, scale, file_name, sha256);
+    let (mut pieces, notes) = assemble(raw, &[], SourceFormat::Dxf, scale, file_name, sha256);
 
     // Names from text inside a piece, when the layer gave none.
     let texts: Vec<(Point, f64, String)> = placed
@@ -849,28 +851,16 @@ fn aama_pieces(
                     .filter_map(|i| piece.outline.edge_geom(i).nearest(p).map(|n| (i, n)))
                     .min_by(|x, y| x.1.distance.total_cmp(&y.1.distance))
             };
-            let candidates = [Some(*a), *b].into_iter().flatten().filter_map(nearest);
-            let Some((i, n)) = candidates.min_by(|x, y| x.1.distance.total_cmp(&y.1.distance))
-            else {
-                continue;
-            };
-            if n.distance > reach {
-                continue;
+            let closer = [Some(*a), *b]
+                .into_iter()
+                .flatten()
+                .filter_map(|p| nearest(p).map(|(_, n)| (p, n.distance)))
+                .min_by(|x, y| x.1.total_cmp(&y.1));
+            if let Some(notch) =
+                closer.and_then(|(p, _)| notch_at(&piece, p, reach, NotchKind::Single, ids("n")))
+            {
+                piece.notches.push(notch);
             }
-            let len = piece.outline.edge_geom(i).length();
-            let from_end = n.along > len / 2.0;
-            piece.notches.push(Notch {
-                id: ids("n"),
-                edge: piece.outline.edges[i].id.clone(),
-                at: if from_end { len - n.along } else { n.along },
-                from: if from_end {
-                    NotchFrom::End
-                } else {
-                    NotchFrom::Start
-                },
-                kind: NotchKind::Single,
-                angle: 0.0,
-            });
         }
 
         if let Some((a, b)) = parts.grain {

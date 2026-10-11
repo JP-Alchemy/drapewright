@@ -17,8 +17,8 @@ use drapewright_pattern_core::geom::{
 use drapewright_pattern_core::ops::normalize_orientation;
 use drapewright_pattern_core::validate::self_intersects;
 use drapewright_pattern_core::{
-    EdgeGeom, Grainline, InternalLine, LineKind, Mark, MarkKind, Piece, Pt, Segment, Source,
-    SourceFormat, SourceScale,
+    CutInstruction, EdgeGeom, EdgeKind, Grainline, InternalLine, LineKind, Mark, MarkKind, Notch,
+    NotchFrom, NotchKind, Piece, Pt, Segment, Source, SourceFormat, SourceScale,
 };
 use kurbo::{ParamCurve, PathSeg, Point, Rect};
 
@@ -52,7 +52,22 @@ pub(crate) struct RawPath {
     pub hint: String,
     pub name: Option<String>,
     pub reference: Option<String>,
+    /// How many to cut, when the file says for the piece this path belongs to.
+    pub cut: Option<CutInstruction>,
 }
+
+/// A notch drawn as a symbol, at its centre, in millimetres.
+pub(crate) struct RawNotch {
+    pub at: Point,
+    pub kind: NotchKind,
+}
+
+/// Notches drawn as symbols sit on the stitching line; this far off still counts, mm.
+const NOTCH_REACH: f64 = 2.0;
+
+/// A line no further than this from an outline along its whole length is
+/// drawn over it, mm.
+const ON_OUTLINE: f64 = 0.25;
 
 impl RawPath {
     fn polyline(&self) -> Vec<Point> {
@@ -68,6 +83,12 @@ impl RawPath {
 /// ones editors write ("path1234", "Layer 1", "XMLID_12_").
 pub(crate) fn meaningful_name(raw: &str) -> Option<String> {
     let s = raw.trim();
+    if let Some(name) = crate::svg::freesewing::part_name(s) {
+        return Some(name);
+    }
+    if crate::svg::freesewing::is_generated_id(s) {
+        return None;
+    }
     let lower = s.to_ascii_lowercase();
     let generated = [
         "path", "rect", "circle", "ellipse", "polygon", "polyline", "line", "g", "use", "layer",
@@ -242,6 +263,172 @@ pub(crate) fn is_straight(points: &[Point]) -> bool {
             .all(|p| ((*p - a).cross(b - a) / len).abs() < 0.1)
 }
 
+/// A notch where `at` meets the piece's outline, if it is within `reach` mm
+/// of it, measured from the nearer end of its edge.
+pub(crate) fn notch_at(
+    piece: &Piece,
+    at: Point,
+    reach: f64,
+    kind: NotchKind,
+    id: String,
+) -> Option<Notch> {
+    let (i, near) = (0..piece.outline.edges.len())
+        .filter_map(|i| piece.outline.edge_geom(i).nearest(at).map(|n| (i, n)))
+        .min_by(|a, b| a.1.distance.total_cmp(&b.1.distance))?;
+    if near.distance > reach {
+        return None;
+    }
+    let len = piece.outline.edge_geom(i).length();
+    let from_end = near.along > len / 2.0;
+    Some(Notch {
+        id,
+        edge: piece.outline.edges[i].id.clone(),
+        at: if from_end {
+            len - near.along
+        } else {
+            near.along
+        },
+        from: if from_end {
+            NotchFrom::End
+        } else {
+            NotchFrom::Start
+        },
+        kind,
+        angle: 0.0,
+    })
+}
+
+/// Distance from `p` to the infinite line through `a` and `b`.
+fn off_line(p: Point, a: Point, b: Point) -> f64 {
+    let ab = b - a;
+    ((p - a).cross(ab) / ab.hypot().max(1e-9)).abs()
+}
+
+/// Most a cutting line may be left open between its ends, mm.
+const MAX_GAP: f64 = 30.0;
+
+/// How an open cutting line was closed, by the line from its end to its start.
+#[derive(Clone, Copy)]
+enum Closing {
+    /// Along a fold: that line is the fold.
+    Fold(Point, Point),
+    /// Across a gap left at a corner: not part of the drawing.
+    Gap,
+}
+
+/// Cutting lines drawn open, as FreeSewing draws them:
+/// - **Fold:** a piece cut on the fold is left open along the fold. Both ends
+///   lie on the line of one straight edge of its stitching line.
+/// - **Gap:** other pieces are left open at the corner where the path
+///   starts, with the ends a few mm apart.
+///
+/// Closed with a straight line, such a path goes around a closed shape (the
+/// stitching line). Those paths are closed; for folds, the closing line is
+/// returned too.
+fn close_open_outlines(raw: &mut [RawPath]) -> Vec<Option<Closing>> {
+    let mut closings = vec![None; raw.len()];
+    // Only shapes big enough to be pieces can be stitching lines.
+    let shapes: Vec<(usize, Vec<Point>, Rect)> = raw
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.closed)
+        .map(|(i, r)| {
+            let poly = r.polyline();
+            let b = bounds(&poly);
+            (i, poly, b)
+        })
+        .filter(|(_, poly, b)| {
+            polygon_area(poly).abs() >= MIN_PIECE_AREA
+                && b.width().hypot(b.height()) >= MIN_PIECE_SPAN
+        })
+        .collect();
+    for i in 0..raw.len() {
+        if raw[i].closed || raw[i].segs.len() < 2 {
+            continue;
+        }
+        let (start, end) = (
+            raw[i].segs[0].start(),
+            raw[i].segs[raw[i].segs.len() - 1].end(),
+        );
+        if start.distance(end) < CLOSE_TOLERANCE {
+            continue;
+        }
+        let along_edge = |shape: usize| {
+            raw[shape].segs.iter().any(|seg| match seg {
+                PathSeg::Line(l) => {
+                    l.p0.distance(l.p1) > 1.0
+                        && off_line(start, l.p0, l.p1) <= 0.5
+                        && off_line(end, l.p0, l.p1) <= 0.5
+                }
+                _ => false,
+            })
+        };
+        let near = start.distance(end) <= MAX_GAP;
+        if !near && !shapes.iter().any(|(k, _, _)| along_edge(*k)) {
+            continue;
+        }
+        let mut closed = raw[i].polyline();
+        closed.push(end);
+        // Within the closed path's bounds first: a cheap test that rules most out.
+        let reach = bounds(&closed).inflate(1.0, 1.0);
+        let around = |k: usize, poly: &Vec<Point>, b: &Rect| {
+            k != i
+                && reach.contains(b.origin())
+                && reach.contains(Point::new(b.x1, b.y1))
+                && inside(poly, &closed)
+        };
+        let fold = shapes
+            .iter()
+            .any(|(k, poly, b)| along_edge(*k) && around(*k, poly, b));
+        let gap = !fold && near && shapes.iter().any(|(k, poly, b)| around(*k, poly, b));
+        if fold || gap {
+            raw[i]
+                .segs
+                .push(PathSeg::Line(kurbo::Line::new(end, start)));
+            raw[i].closed = true;
+            closings[i] = Some(if fold {
+                Closing::Fold(end, start)
+            } else {
+                Closing::Gap
+            });
+        }
+    }
+    closings
+}
+
+/// Marks the piece's straight edges that lie along the line through `a` and
+/// `b` as folds.
+fn mark_folds(piece: &mut Piece, a: Point, b: Point) {
+    for i in 0..piece.outline.edges.len() {
+        let (s, e) = (
+            Point::from(piece.outline.edge_start(i)),
+            Point::from(piece.outline.edge_end(i)),
+        );
+        let straight = is_straight(&flatten_segs(piece.outline.edge_geom(i).segs(), 0.05));
+        if straight && off_line(s, a, b) <= 0.5 && off_line(e, a, b) <= 0.5 {
+            piece.outline.edges[i].kind = EdgeKind::Fold;
+            piece.outline.edges[i].allowance = None;
+        }
+    }
+}
+
+/// The straight run of a grainline drawn as a bracket (FreeSewing's "cut on
+/// fold and grainline"): its longest straight segment, if that is most of it.
+fn grain_segment(segs: &[PathSeg]) -> Option<(Point, Point)> {
+    let pts = flatten_segs(segs, 0.05);
+    if is_straight(&pts) {
+        return Some((pts[0], pts[pts.len() - 1]));
+    }
+    let total: f64 = pts.windows(2).map(|w| w[0].distance(w[1])).sum();
+    segs.iter()
+        .filter_map(|s| match s {
+            PathSeg::Line(l) => Some((l.p0, l.p1)),
+            _ => None,
+        })
+        .max_by(|a, b| a.0.distance(a.1).total_cmp(&b.0.distance(b.1)))
+        .filter(|(a, b)| a.distance(*b) >= 0.6 * total)
+}
+
 /// Joins open paths that meet end to end (within `tolerance` mm) into
 /// longer ones, reversing pieces as needed, and reports which came back to
 /// their start. CAD drawings often build an outline from separate lines and
@@ -302,17 +489,25 @@ struct Candidate {
 }
 
 pub(crate) fn assemble(
-    raw: Vec<RawPath>,
+    mut raw: Vec<RawPath>,
+    notches: &[RawNotch],
     format: SourceFormat,
     scale: &ScaleInfo,
     file_name: Option<&str>,
     sha256: &str,
 ) -> (Vec<Piece>, Vec<ImportNote>) {
+    let closings = close_open_outlines(&mut raw);
     let mut notes = Vec::new();
     let mut candidates: Vec<Candidate> = Vec::new();
     let mut small: Vec<usize> = Vec::new();
     let mut open: Vec<usize> = Vec::new();
+    // Logos (FreeSewing signs a piece with one) are left out like other decorations.
+    let mut logos = 0u32;
     for (i, r) in raw.iter().enumerate() {
+        if r.hint.split_whitespace().any(|w| w == "logo") {
+            logos += 1;
+            continue;
+        }
         if !r.closed {
             open.push(i);
             continue;
@@ -400,13 +595,35 @@ pub(crate) fn assemble(
                         edge.allowance = Some(*w);
                     }
                 }
+                // The edges along a fold the cutting line was left open on.
+                if let Some(Closing::Fold(a, b)) = closings[candidates[c].raw] {
+                    mark_folds(&mut piece, a, b);
+                }
+                if let Some(cut) = outer
+                    .cut
+                    .clone()
+                    .or_else(|| raw[candidates[k].raw].cut.clone())
+                {
+                    piece.cut = vec![cut];
+                }
                 piece.source = Some(source(outer));
                 notes.push(ImportNote::SeamLineFound {
                     piece: piece.id.clone(),
                     allowance: seam,
                 });
                 let computed = allowance_lines(&piece).cutting;
-                let max_mm = hausdorff(&computed, &candidates[c].polyline);
+                let max_mm = match closings[candidates[c].raw] {
+                    // Only the part the file drew: the bridge across the gap
+                    // is ours.
+                    Some(Closing::Gap) => {
+                        let drawn = flatten_segs(&outer.segs[..outer.segs.len() - 1], 0.05);
+                        sample(&drawn, false, 2.0)
+                            .iter()
+                            .map(|p| distance_to_polyline(*p, &computed, true))
+                            .fold(0.0, f64::max)
+                    }
+                    _ => hausdorff(&computed, &candidates[c].polyline),
+                };
                 if max_mm > 0.5 {
                     notes.push(ImportNote::CuttingLineDiffers {
                         piece: piece.id.clone(),
@@ -429,6 +646,9 @@ pub(crate) fn assemble(
                 let mut piece = Piece::new(ids("p"), name, outline);
                 normalize_orientation(&mut piece);
                 piece.source = Some(source(outer));
+                if let Some(cut) = outer.cut.clone() {
+                    piece.cut = vec![cut];
+                }
                 for &other in &children {
                     piece
                         .lines
@@ -457,31 +677,73 @@ pub(crate) fn assemble(
         }
     }
 
+    // Pieces can overlap (a layout drawn across them): a point belongs to the
+    // smallest piece around it, the same one every time.
+    let mut regions: Vec<(usize, &Vec<Point>, f64)> = piece_of
+        .values()
+        .map(|(pi, poly)| (*pi, poly, polygon_area(poly).abs()))
+        .collect();
+    regions.sort_by(|a, b| a.2.total_cmp(&b.2).then(a.0.cmp(&b.0)));
     let find_piece = |pt: Point| {
-        piece_of
-            .values()
-            .find(|(_, poly)| point_in_polygon(pt, poly))
-            .map(|(pi, _)| *pi)
+        regions
+            .iter()
+            .find(|(_, poly, _)| point_in_polygon(pt, poly))
+            .map(|(pi, _, _)| *pi)
     };
 
-    let mut loose = 0u32;
+    // Each piece's outline, and the cutting line the file drew around it.
+    let outlines: Vec<(Vec<Point>, Rect)> = pieces
+        .iter()
+        .map(|p| flatten_segs(&p.outline.path_segs(), 0.05))
+        .chain(regions.iter().map(|(_, poly, _)| (*poly).clone()))
+        .map(|poly| {
+            let b = bounds(&poly).inflate(ON_OUTLINE, ON_OUTLINE);
+            (poly, b)
+        })
+        .collect();
+    let on_outline = |pts: &[Point]| {
+        let b = bounds(pts);
+        outlines.iter().any(|(poly, around)| {
+            around.contains(b.origin())
+                && around.contains(Point::new(b.x1, b.y1))
+                && sample(pts, false, 2.0)
+                    .iter()
+                    .all(|p| distance_to_polyline(*p, poly, true) <= ON_OUTLINE)
+        })
+    };
+
+    let (mut loose, mut copies) = (0u32, 0u32);
     for &i in &open {
         let r = &raw[i];
         let pts = flatten_segs(&r.segs, 0.05);
         let Some(mid) = pts.get(pts.len() / 2).copied() else {
             continue;
         };
+        // A copy of part of an outline (FreeSewing draws some seams twice).
+        if !r.hint.contains("grain") && !r.hint.contains("cutonfold") && on_outline(&pts) {
+            copies += 1;
+            continue;
+        }
         let Some(pi) = find_piece(mid) else {
             loose += 1;
             continue;
         };
         let piece = &mut pieces[pi];
-        if r.hint.contains("grain") && piece.grainline.is_none() && is_straight(&pts) {
+        if r.hint.contains("cutonfold") {
+            // FreeSewing's cut-on-fold bracket: its ends point at the fold.
+            mark_folds(piece, pts[0], pts[pts.len() - 1]);
+        }
+        let grain = (r.hint.contains("grain") && piece.grainline.is_none())
+            .then(|| grain_segment(&r.segs))
+            .flatten();
+        if let Some((from, to)) = grain {
             piece.grainline = Some(Grainline {
-                from: Pt::from(pts[0]),
-                to: Pt::from(pts[pts.len() - 1]),
+                from: Pt::from(from),
+                to: Pt::from(to),
                 one_way: false,
             });
+        } else if r.hint.contains("cutonfold") {
+            // An arrow pointing at the fold, not a line on the piece.
         } else {
             piece.lines.push(InternalLine {
                 id: ids("l"),
@@ -493,7 +755,7 @@ pub(crate) fn assemble(
         }
     }
 
-    let mut ignored = 0u32;
+    let mut ignored = logos;
     for &i in &small {
         let r = &raw[i];
         if r.hint.contains("grain") {
@@ -528,11 +790,37 @@ pub(crate) fn assemble(
         }
     }
 
+    // Notches drawn as symbols go on the outline they sit on.
+    for n in notches {
+        let nearest = |p: &Piece| {
+            (0..p.outline.edges.len())
+                .filter_map(|i| p.outline.edge_geom(i).nearest(n.at))
+                .map(|near| near.distance)
+                .min_by(f64::total_cmp)
+        };
+        let best = pieces
+            .iter()
+            .enumerate()
+            .filter_map(|(pi, p)| nearest(p).map(|d| (pi, d)))
+            .filter(|(_, d)| *d <= NOTCH_REACH)
+            .min_by(|a, b| a.1.total_cmp(&b.1));
+        let placed = best.and_then(|(pi, _)| {
+            notch_at(&pieces[pi], n.at, NOTCH_REACH, n.kind, ids("n")).map(|notch| (pi, notch))
+        });
+        match placed {
+            Some((pi, notch)) => pieces[pi].notches.push(notch),
+            None => ignored += 1,
+        }
+    }
+
     if ignored > 0 {
         notes.push(ImportNote::SmallShapesIgnored { count: ignored });
     }
     if loose > 0 {
         notes.push(ImportNote::LooseLinesIgnored { count: loose });
+    }
+    if copies > 0 {
+        notes.push(ImportNote::LinesOnOutlineIgnored { count: copies });
     }
     if pieces.is_empty() && !raw.is_empty() {
         notes.push(ImportNote::NoClosedShapes);
@@ -589,6 +877,111 @@ mod tests {
         assert!(chained[0].1);
         assert_eq!(chained[0].0.len(), 4);
         assert!(!chained[1].1);
+    }
+
+    fn raw(segs: Vec<PathSeg>, closed: bool) -> RawPath {
+        RawPath {
+            segs,
+            closed,
+            filled: false,
+            hint: String::new(),
+            name: None,
+            reference: None,
+            cut: None,
+        }
+    }
+
+    fn lines(points: &[(f64, f64)]) -> Vec<PathSeg> {
+        points
+            .windows(2)
+            .map(|w| PathSeg::Line(kurbo::Line::new(w[0], w[1])))
+            .collect()
+    }
+
+    #[test]
+    fn cutting_lines_left_open_are_closed() {
+        // A stitching line 100 × 200 with its fold at x = 0.
+        let stitch = || {
+            raw(
+                lines(&[
+                    (0.0, 0.0),
+                    (100.0, 0.0),
+                    (100.0, 200.0),
+                    (0.0, 200.0),
+                    (0.0, 0.0),
+                ]),
+                true,
+            )
+        };
+        // Open along the fold: both ends on the line x = 0, beyond the
+        // stitching line's corners (the hem allowance is deeper).
+        let fold = raw(
+            lines(&[(0.0, -10.0), (110.0, -10.0), (110.0, 230.0), (0.0, 230.0)]),
+            false,
+        );
+        let mut paths = vec![stitch(), fold];
+        let closings = close_open_outlines(&mut paths);
+        assert!(paths[1].closed);
+        assert!(
+            matches!(closings[1], Some(Closing::Fold(a, b)) if a.x.abs() < 1e-9 && b.x.abs() < 1e-9)
+        );
+
+        // Open at a corner: the ends 14 mm apart.
+        let gap = raw(
+            lines(&[
+                (-10.0, 0.0),
+                (-10.0, -10.0),
+                (110.0, -10.0),
+                (110.0, 210.0),
+                (-10.0, 210.0),
+                (-10.0, 14.0),
+            ]),
+            false,
+        );
+        let mut paths = vec![stitch(), gap];
+        let closings = close_open_outlines(&mut paths);
+        assert!(paths[1].closed);
+        assert!(matches!(closings[1], Some(Closing::Gap)));
+
+        // An open line that goes around nothing stays open.
+        let stray = raw(lines(&[(300.0, 0.0), (400.0, 0.0), (400.0, 100.0)]), false);
+        let mut paths = vec![stitch(), stray];
+        assert!(close_open_outlines(&mut paths)[1].is_none());
+        assert!(!paths[1].closed);
+    }
+
+    #[test]
+    fn copies_of_outlines_are_left_out_and_shared_lines_go_to_the_smaller_piece() {
+        let scale = ScaleInfo {
+            chosen: crate::import::ScaleOption {
+                mm_per_unit: 1.0,
+                basis: drapewright_pattern_core::ScaleBasis::DeclaredUnits,
+            },
+            certain: true,
+            reason: crate::import::ScaleReason::DeclaredUnits,
+            alternatives: Vec::new(),
+        };
+        let square = |x0: f64, y0: f64, x1: f64, y1: f64| {
+            raw(
+                lines(&[(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)]),
+                true,
+            )
+        };
+        let paths = vec![
+            // Two pieces that overlap where 150 < x < 200.
+            square(0.0, 0.0, 200.0, 200.0),
+            square(150.0, 50.0, 300.0, 150.0),
+            // Drawn over the big piece's left edge: a copy.
+            raw(lines(&[(0.0, 20.0), (0.0, 180.0)]), false),
+            // Where they overlap.
+            raw(lines(&[(160.0, 90.0), (190.0, 110.0)]), false),
+            // Inside the big piece only.
+            raw(lines(&[(20.0, 20.0), (80.0, 80.0)]), false),
+        ];
+        let (pieces, notes) = assemble(paths, &[], SourceFormat::Svg, &scale, None, "");
+        assert_eq!(pieces.len(), 2);
+        assert_eq!((pieces[0].lines.len(), pieces[1].lines.len()), (1, 1));
+        assert!(notes.contains(&ImportNote::LinesOnOutlineIgnored { count: 1 }));
     }
 
     #[test]
