@@ -220,3 +220,169 @@ impl Draping {
         &self.drape.cloth.triangles
     }
 }
+
+/// What the cloth on the avatar is shown as: its fabric, or a heatmap.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum ClothShows {
+    /// In the fabric's colour.
+    #[default]
+    Fabric,
+    /// Where it pulls: none to `PULL_SCALE` N/m.
+    Pull,
+    /// The room between it and the body: touching to `ROOM_SCALE` mm.
+    Room,
+}
+
+/// Pull shown at its strongest, N/m (as in the app's legend).
+pub const PULL_SCALE: f32 = 100.0;
+/// Room shown up to, mm (as in the app's legend).
+pub const ROOM_SCALE: f32 = 40.0;
+
+const fn rgb(hex: u32) -> [f32; 3] {
+    [
+        ((hex >> 16) & 0xff) as f32 / 255.0,
+        ((hex >> 8) & 0xff) as f32 / 255.0,
+        (hex & 0xff) as f32 / 255.0,
+    ]
+}
+
+/// Pale where it hardly pulls, through yellow and orange to red (as in the
+/// app's legend).
+const PULL_COLOURS: [(f32, [f32; 3]); 4] = [
+    (0.0, rgb(0xe9eef4)),
+    (0.25, rgb(0xffe08a)),
+    (0.6, rgb(0xff9f43)),
+    (1.0, rgb(0xd63031)),
+];
+/// Deep blue where it touches, paler as it stands away (as in the app's
+/// legend).
+const ROOM_COLOURS: [(f32, [f32; 3]); 3] = [
+    (0.0, rgb(0x1c64d1)),
+    (0.35, rgb(0x7cc4fa)),
+    (1.0, rgb(0xf1f3f5)),
+];
+
+/// The colour `t` (0 to 1) along a scale of colours.
+fn along(scale: &[(f32, [f32; 3])], t: f32) -> [f32; 3] {
+    let t = t.clamp(0.0, 1.0);
+    for pair in scale.windows(2) {
+        let ((t0, c0), (t1, c1)) = (pair[0], pair[1]);
+        if t <= t1 {
+            let f = (t - t0) / (t1 - t0);
+            return [0, 1, 2].map(|k| c0[k] + (c1[k] - c0[k]) * f);
+        }
+    }
+    scale[scale.len() - 1].1
+}
+
+/// The cloth at a point.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ClothReading {
+    /// How hard it pulls, N/m.
+    pub pull: f64,
+    /// How far it is stretched beyond its cut size (0.03: 3%).
+    pub stretch: f64,
+    /// The room between it and the body, mm.
+    pub room: f64,
+}
+
+/// The cloth as last seen: where its points are (mm), its triangles, and
+/// how it is at each point.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ClothState {
+    pub points: Vec<[f32; 3]>,
+    pub triangles: Vec<[u32; 3]>,
+    /// N/m.
+    pull: Vec<f32>,
+    stretch: Vec<f32>,
+    /// mm.
+    room: Vec<f32>,
+}
+
+impl Draping {
+    /// The cloth as it is now.
+    pub fn state(&self) -> ClothState {
+        let strain = self.drape.strain();
+        ClothState {
+            points: self.points(),
+            triangles: self.triangles().to_vec(),
+            pull: strain.pull,
+            stretch: strain.stretch,
+            room: self.drape.room().iter().map(|r| r * 1000.0).collect(),
+        }
+    }
+}
+
+impl ClothState {
+    /// Each point's colour, shown as `shows`, the fabric being `fabric`
+    /// (sRGB, 0 to 1).
+    pub fn colours(&self, shows: ClothShows, fabric: [f32; 3]) -> Vec<[f32; 3]> {
+        match shows {
+            ClothShows::Fabric => vec![fabric; self.points.len()],
+            ClothShows::Pull => self
+                .pull
+                .iter()
+                .map(|&p| along(&PULL_COLOURS, p / PULL_SCALE))
+                .collect(),
+            ClothShows::Room => self
+                .room
+                .iter()
+                .map(|&r| along(&ROOM_COLOURS, r / ROOM_SCALE))
+                .collect(),
+        }
+    }
+
+    /// The cloth where the line of sight from `eye` going `way` (a unit
+    /// vector) first meets it, if it does.
+    pub fn pick(&self, eye: [f32; 3], way: [f32; 3]) -> Option<ClothReading> {
+        let sub = |a: [f32; 3], b: [f32; 3]| [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+        let dot = |a: [f32; 3], b: [f32; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        let cross = |a: [f32; 3], b: [f32; 3]| {
+            [
+                a[1] * b[2] - a[2] * b[1],
+                a[2] * b[0] - a[0] * b[2],
+                a[0] * b[1] - a[1] * b[0],
+            ]
+        };
+        // The nearest triangle crossed (Möller and Trumbore), and where in
+        // it.
+        let mut nearest: Option<(f32, [u32; 3], f32, f32)> = None;
+        for &t in &self.triangles {
+            let [a, b, c] = t.map(|i| self.points[i as usize]);
+            let (e1, e2) = (sub(b, a), sub(c, a));
+            let p = cross(way, e2);
+            let det = dot(e1, p);
+            if det.abs() < 1e-9 {
+                continue;
+            }
+            let s = sub(eye, a);
+            let u = dot(s, p) / det;
+            if !(0.0..=1.0).contains(&u) {
+                continue;
+            }
+            let q = cross(s, e1);
+            let v = dot(way, q) / det;
+            if v < 0.0 || u + v > 1.0 {
+                continue;
+            }
+            let distance = dot(e2, q) / det;
+            if distance > 0.0 && nearest.is_none_or(|n| distance < n.0) {
+                nearest = Some((distance, t, u, v));
+            }
+        }
+        let (_, t, u, v) = nearest?;
+        let at = |values: &[f32]| {
+            let [a, b, c] = t.map(|i| values[i as usize]);
+            f64::from((1.0 - u - v) * a + u * b + v * c)
+        };
+        Some(ClothReading {
+            pull: at(&self.pull),
+            stretch: at(&self.stretch),
+            room: at(&self.room),
+        })
+    }
+}

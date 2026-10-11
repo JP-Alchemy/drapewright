@@ -4,7 +4,7 @@ use drapewright_body::{BodyModel, Shape};
 use drapewright_project::{Engine, container};
 use drapewright_sim::fabric::PRESETS;
 use drapewright_wasm_3d::drape::{DrapeError, Draping};
-use drapewright_wasm_3d::{DrapeRequest, DrapeStage, FabricPreset};
+use drapewright_wasm_3d::{ClothShows, DrapeRequest, DrapeStage, FabricPreset};
 
 fn model() -> BodyModel {
     let path = concat!(
@@ -115,5 +115,42 @@ fn every_fabric_preset_is_the_simulators() {
             serde_json::to_string(&f).unwrap(),
             format!("\"{}\"", f.name())
         );
+    }
+}
+
+#[test]
+fn the_cloth_is_read_where_it_is_looked_at() {
+    let state = drape_until_done(&garment("skirt")).state();
+    // Looking straight at the front of the skirt, below the waist.
+    let front = state
+        .pick([0.0, 1000.0, 3000.0], [0.0, 0.0, -1.0])
+        .expect("the skirt's front");
+    assert!((0.0..40.0).contains(&front.room), "{front:?}");
+    assert!(front.pull >= 0.0 && front.stretch >= 0.0, "{front:?}");
+    // From behind, the back.
+    assert!(
+        state
+            .pick([0.0, 1000.0, -3000.0], [0.0, 0.0, 1.0])
+            .is_some()
+    );
+    // Above it, at the chest: no cloth there.
+    assert!(
+        state
+            .pick([0.0, 1300.0, 3000.0], [0.0, 0.0, -1.0])
+            .is_none()
+    );
+    // Shown as fabric, all alike; as heatmaps, varying.
+    let alike = |a: [f32; 3], b: [f32; 3]| (0..3).all(|k| (a[k] - b[k]).abs() < 1e-6);
+    let fabric = [0.3, 0.4, 0.5];
+    assert!(
+        state
+            .colours(ClothShows::Fabric, fabric)
+            .iter()
+            .all(|&c| alike(c, fabric))
+    );
+    for shows in [ClothShows::Pull, ClothShows::Room] {
+        let colours = state.colours(shows, fabric);
+        assert_eq!(colours.len(), state.points.len());
+        assert!(colours.iter().any(|&c| !alike(c, colours[0])), "{shows:?}");
     }
 }

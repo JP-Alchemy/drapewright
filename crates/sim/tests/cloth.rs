@@ -173,3 +173,90 @@ fn two_panels_sewn_at_their_sides_close_round_a_post() {
         .fold(f32::MAX, f32::min);
     assert!(nearest > -0.002, "{nearest}");
 }
+
+/// Where a point of cloth goes, from where it was cut (m).
+type Shape = Box<dyn Fn([f32; 2]) -> V3>;
+
+/// A square of poplin 40 cm across, as cut, its points moved by `shape`
+/// (m to m): how it is pulled.
+fn stretched(shape: impl Fn([f32; 2]) -> V3) -> drapewright_sim::cloth::Strain {
+    let m = rectangle(0.4, 0.4, 0.04);
+    let rest = flat(&m);
+    let start: Vec<V3> = rest.iter().map(|&p| shape(p)).collect();
+    let mut builder = ClothBuilder::new(preset("poplin").unwrap());
+    builder.panel(&rest, &start, &m.triangles);
+    builder.build().strain()
+}
+
+#[test]
+fn a_cloth_stretched_evenly_reads_its_stretch_and_pull_everywhere() {
+    let poplin = preset("poplin").unwrap();
+    let close = |a: f32, b: f32| (a - b).abs() <= 1e-3 * b.abs().max(1e-3);
+    // Across the grain by 10% (the grain runs along v), along it by 5%,
+    // and on the bias by 8%.
+    let diagonal = std::f32::consts::FRAC_1_SQRT_2;
+    let cases: [(Shape, f32, f32); 3] = [
+        (Box::new(|p| [p[0] * 1.1, p[1], 0.0]), 0.10, poplin.weft),
+        (Box::new(|p| [p[0], p[1] * 1.05, 0.0]), 0.05, poplin.warp),
+        (
+            Box::new(move |p| {
+                let along = (p[0] + p[1]) * diagonal * 0.08;
+                [p[0] + along * diagonal, p[1] + along * diagonal, 0.0]
+            }),
+            0.08,
+            poplin.stiffness_at(std::f32::consts::FRAC_PI_4),
+        ),
+    ];
+    for (shape, stretch, stiffness) in cases {
+        let strain = stretched(shape);
+        for (&s, &p) in strain.stretch.iter().zip(&strain.pull) {
+            assert!(close(s, stretch), "stretched {s}, not {stretch}");
+            assert!(
+                close(p, stiffness * stretch),
+                "pulls {p}, not {}",
+                stiffness * stretch
+            );
+        }
+    }
+    // Firm along the grain, giving on the bias: the same stretch pulls
+    // harder along it.
+    assert!(poplin.warp > 10.0 * poplin.stiffness_at(std::f32::consts::FRAC_PI_4));
+}
+
+#[test]
+fn cloth_as_cut_or_moved_whole_is_not_pulled() {
+    // Turned and lifted, not stretched.
+    let (s, c) = 0.6f32.sin_cos();
+    let strain = stretched(|p| [c * p[0], 0.3 + s * p[0], p[1]]);
+    assert!(strain.stretch.iter().all(|&s| s < 1e-4));
+    assert!(strain.pull.iter().all(|&p| p < 1.0));
+    // Squeezed: shorter, not stretched (it would wrinkle, not pull).
+    let strain = stretched(|p| [p[0] * 0.9, p[1] * 0.95, 0.0]);
+    assert!(strain.stretch.iter().all(|&s| s == 0.0));
+}
+
+#[test]
+fn room_is_the_space_between_cloth_and_body() {
+    let ball = Ball {
+        centre: [0.0, 0.0, 0.0],
+        radius: 0.1,
+    };
+    let m = rectangle(0.2, 0.2, 0.04);
+    let rest = flat(&m);
+    // Flat, 5 cm above the ball's top.
+    let start: Vec<V3> = rest
+        .iter()
+        .map(|p| [p[0] - 0.1, 0.15, p[1] - 0.1])
+        .collect();
+    let fabric = preset("poplin").unwrap();
+    let mut builder = ClothBuilder::new(fabric);
+    builder.panel(&rest, &start, &m.triangles);
+    let cloth = builder.build();
+    let room = cloth.room(&ball);
+    for (p, r) in start.iter().zip(&room) {
+        let distance = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt() - 0.1;
+        // Less the cloth's thickness and the air kept under it.
+        let expected = distance - fabric.thickness - 0.003;
+        assert!((r - expected).abs() < 1e-5, "{r} for {expected}");
+    }
+}

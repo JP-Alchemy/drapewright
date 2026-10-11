@@ -40,7 +40,9 @@ async function openTheAvatar(page: Page): Promise<boolean> {
   return drawnWith.isVisible()
 }
 
-test('the skirt is draped on the avatar, in another fabric, and taken off', async ({ page }) => {
+test('the skirt is draped, read where it pulls, draped in another fabric, and taken off', async ({
+  page,
+}) => {
   test.setTimeout(240_000)
   await page.goto('/')
   // A backup of the test skirt: a front and a back, their seams sewn.
@@ -70,6 +72,22 @@ test('the skirt is draped on the avatar, in another fabric, and taken off', asyn
   await expect
     .poll(async () => differing(page, bare, await view.screenshot()), { timeout: 10_000 })
     .toBeGreaterThan(0.02)
+
+  // Where it pulls, and the room it has: heatmaps, read where tapped.
+  const inFabric = await view.screenshot()
+  await drape.getByText('Pulling', { exact: true }).click()
+  await expect(drape.getByRole('img', { name: 'Pulling: from None to Hard' })).toBeVisible()
+  await expect
+    .poll(async () => differing(page, inFabric, await view.screenshot()), { timeout: 10_000 })
+    .toBeGreaterThan(0.02)
+  // The middle of the view is the middle of the figure: the skirt's front.
+  const box = (await view.boundingBox())!
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  await expect(status).toHaveText(
+    /^Here it is (hardly pulled|pulled lightly|pulled firmly|pulled hard) \(\d+ N\/m\), stretched \d+\.\d%, and (resting on the body|[\d.]+ cm from the body)\.$/,
+  )
+  await drape.getByText('Room', { exact: true }).click()
+  await expect(drape.getByRole('img', { name: 'Room: from Touching to 4.0 cm away' })).toBeVisible()
 
   // Another fabric: draped again in it.
   await drape.getByRole('button', { name: /Fabric/ }).click()

@@ -12,6 +12,50 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 22 — Where it pulls, and the room it has (Phase 3, part 9)
+
+Heatmaps on the draped garment, and numbers where you tap.
+
+**Try it:**
+
+1. Drape something (the test skirt: **Open pattern**,
+   `fixtures/drapewright/skirt.drapewright`, **Avatar**, **Drape**).
+2. Under the figure, **Show the cloth as**: **Fabric**, **Pulling** or
+   **Room**.
+   * **Pulling**: pale where the cloth hangs freely, yellow, orange and
+     red where it is pulled hard. On the test skirt, which is cut a
+     little small for this figure at the hip, there is a band of red at
+     the waist and the hips, easing to pale towards the hem.
+   * **Room**: deep blue where the cloth rests on the body, paler where
+     it stands away, white from 4 cm.
+   A legend beside it says what the colours run from and to.
+3. Tap the cloth: the line under it says what it is like there, for
+   example "Here it is pulled firmly (48 N/m), stretched 1.6%, and resting
+   on the body."
+4. Try the same skirt in jersey: much the same stretch, but far less pull.
+   A knit gives where a woven pulls.
+
+**How it reads the cloth:** each triangle of cloth is compared with its
+shape as cut. Its greatest stretch, and the fabric's stiffness that way
+(firm along the grain, giving on the bias), say how hard it pulls, in
+newtons per metre of cloth. Each point takes its triangles' mean, evened
+out a little with its neighbours'. Room is the body's distance field at
+each point, less the cloth's thickness. A tap casts the line of sight
+from the eye through the cloth and reads where it first meets it. The
+view keeps the cloth as last seen, so it can be shown another way after
+the drape has finished.
+
+**Tests:** cloth stretched evenly across the grain, along it and on the
+bias reads exactly its stretch and pull; cloth turned or squeezed reads
+none. Room over a ball is its distance less the cloth. A line of sight
+finds the skirt from in front and from behind, and nothing above it. In
+the browser the heatmaps change the view and a tap reads the skirt.
+
+**Not yet:** where the cloth bunches (squeezed: wrinkles); the drape
+following each change to the pattern (step 28).
+
+---
+
 ## Step 21c — A blouse, its sleeves round the arms (Phase 3, part 8)
 
 The drape now takes a garment hung from the shoulders, with set-in sleeves.

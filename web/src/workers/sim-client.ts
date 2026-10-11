@@ -1,4 +1,10 @@
-import type { AvatarFit, AvatarRequest, AvatarSettings, DrapeRequest } from '@drapewright/engine'
+import type {
+  AvatarFit,
+  AvatarRequest,
+  AvatarSettings,
+  ClothReading,
+  DrapeRequest,
+} from '@drapewright/engine'
 import type { ViewColours } from '@drapewright/engine/avatar'
 import {
   type DrapeUpdate,
@@ -114,6 +120,11 @@ class SimClient {
   undrape(): Promise<null> {
     this.#drape = null
     return this.#call('undrape', [])
+  }
+
+  /** The cloth seen at `x`, `y` CSS pixels from the view's top left, if any. */
+  pick(x: number, y: number, pixelRatio: number): Promise<ClothReading | null> {
+    return this.#call('pick', [x, y, pixelRatio])
   }
 
   /** A change to the view that needs no answer. */

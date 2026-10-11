@@ -15,7 +15,7 @@ mod view;
 
 use std::collections::BTreeMap;
 
-pub use drape::{DrapeProgress, DrapeRequest, DrapeStage, FabricPreset};
+pub use drape::{ClothReading, ClothShows, DrapeProgress, DrapeRequest, DrapeStage, FabricPreset};
 use drapewright_body::shape::{OLD, YOUNG};
 use drapewright_body::{BodyModel, Shape, fit};
 use serde::{Deserialize, Serialize};

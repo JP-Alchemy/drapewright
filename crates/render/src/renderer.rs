@@ -13,7 +13,6 @@ use crate::mesh::Mesh;
 pub struct Look {
     pub background: [f32; 3],
     pub figure: [f32; 3],
-    pub cloth: [f32; 3],
 }
 
 impl Default for Look {
@@ -21,7 +20,6 @@ impl Default for Look {
         Look {
             background: [0.937, 0.914, 0.875],
             figure: [0.80, 0.74, 0.68],
-            cloth: [0.33, 0.45, 0.58],
         }
     }
 }
@@ -42,6 +40,15 @@ struct Vertex {
     normal: [f32; 3],
 }
 
+/// The cloth's points are coloured one by one (a heatmap), in linear light.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Pod, Zeroable)]
+struct ClothVertex {
+    position: [f32; 3],
+    normal: [f32; 3],
+    colour: [f32; 3],
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
 struct Uniforms {
@@ -49,7 +56,6 @@ struct Uniforms {
     eye: [f32; 4],
     light: [f32; 4],
     figure: [f32; 4],
-    cloth: [f32; 4],
     sky: [f32; 4],
     ground: [f32; 4],
     floor: [f32; 4],
@@ -153,22 +159,24 @@ impl Renderer {
             count: sample_count,
             ..Default::default()
         };
-        // The figure and the cloth: lit surfaces of points and normals. The
-        // figure's back faces are inside it; either side of the cloth may
-        // be seen.
-        let lit = |label: &str, fragment: &str, cull_mode: Option<wgpu::Face>| {
+        // The figure and the cloth: lit surfaces of points and normals (the
+        // cloth's coloured point by point). The figure's back faces are
+        // inside it; either side of the cloth may be seen.
+        let figure_attributes = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
+        let cloth_attributes =
+            wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x3];
+        let lit = |label: &str,
+                   (vertex, fragment): (&str, &str),
+                   layout: wgpu::VertexBufferLayout,
+                   cull_mode: Option<wgpu::Face>| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(label),
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
-                    entry_point: Some("figure_vertex"),
+                    entry_point: Some(vertex),
                     compilation_options: Default::default(),
-                    buffers: &[Some(wgpu::VertexBufferLayout {
-                        array_stride: std::mem::size_of::<Vertex>() as u64,
-                        step_mode: wgpu::VertexStepMode::Vertex,
-                        attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3],
-                    })],
+                    buffers: &[Some(layout)],
                 },
                 primitive: wgpu::PrimitiveState {
                     cull_mode,
@@ -192,8 +200,26 @@ impl Renderer {
                 cache: None,
             })
         };
-        let figure_pipeline = lit("figure", "figure_fragment", Some(wgpu::Face::Back));
-        let cloth_pipeline = lit("cloth", "cloth_fragment", None);
+        let figure_pipeline = lit(
+            "figure",
+            ("figure_vertex", "figure_fragment"),
+            wgpu::VertexBufferLayout {
+                array_stride: std::mem::size_of::<Vertex>() as u64,
+                step_mode: wgpu::VertexStepMode::Vertex,
+                attributes: &figure_attributes,
+            },
+            Some(wgpu::Face::Back),
+        );
+        let cloth_pipeline = lit(
+            "cloth",
+            ("cloth_vertex", "cloth_fragment"),
+            wgpu::VertexBufferLayout {
+                array_stride: std::mem::size_of::<ClothVertex>() as u64,
+                step_mode: wgpu::VertexStepMode::Vertex,
+                attributes: &cloth_attributes,
+            },
+            None,
+        );
         let floor_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("floor"),
             layout: Some(&pipeline_layout),
@@ -277,11 +303,28 @@ impl Renderer {
         });
     }
 
-    /// The cloth to draw from now on, draped on the figure. Cloth of as
-    /// many points and triangles as the last is written into its buffers:
-    /// a drape moves its cloth every frame.
-    pub fn set_cloth(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, mesh: &Mesh) {
-        let vertices = vertices(mesh);
+    /// The cloth to draw from now on, draped on the figure, each point in
+    /// its colour (sRGB, 0 to 1). Cloth of as many points and triangles as
+    /// the last is written into its buffers: a drape moves its cloth every
+    /// frame.
+    pub fn set_cloth(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        mesh: &Mesh,
+        colours: &[[f32; 3]],
+    ) {
+        let vertices: Vec<ClothVertex> = mesh
+            .positions
+            .iter()
+            .zip(&mesh.normals)
+            .zip(colours.iter().chain(std::iter::repeat(&[0.5; 3])))
+            .map(|((&position, &normal), colour)| ClothVertex {
+                position,
+                normal,
+                colour: colour.map(linear),
+            })
+            .collect();
         let count = mesh.indices.len() as u32;
         if let Some(cloth) = &self.cloth
             && cloth.points == vertices.len()
@@ -355,7 +398,6 @@ impl Renderer {
         let aspect = size.0.max(1) as f32 / size.1.max(1) as f32;
         let colour = |c: [f32; 3]| [linear(c[0]), linear(c[1]), linear(c[2]), 1.0];
         let figure = colour(look.figure);
-        let cloth = colour(look.cloth);
         let uniforms = Uniforms {
             view_projection: orbit.view_projection(aspect),
             eye: {
@@ -365,7 +407,6 @@ impl Renderer {
             // From above, in front and a little to the figure's right.
             light: [-0.35, 0.8, 0.5, 0.0],
             figure,
-            cloth,
             sky: [0.42, 0.42, 0.44, 1.0],
             ground: [0.16, 0.15, 0.15, 1.0],
             floor: [
@@ -462,6 +503,7 @@ mod tests {
         for (stage, entry) in [
             (naga::ShaderStage::Vertex, "figure_vertex"),
             (naga::ShaderStage::Fragment, "figure_fragment"),
+            (naga::ShaderStage::Vertex, "cloth_vertex"),
             (naga::ShaderStage::Fragment, "cloth_fragment"),
             (naga::ShaderStage::Vertex, "floor_vertex"),
             (naga::ShaderStage::Fragment, "floor_fragment"),

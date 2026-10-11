@@ -152,6 +152,23 @@ impl Orbit {
         ];
         multiply(&projection, &view)
     }
+
+    /// The line of sight through a point of a view `width` by `height`
+    /// (pixels from its top left): from the eye, and which way (a unit
+    /// vector).
+    pub fn ray(&self, x: f32, y: f32, width: f32, height: f32) -> ([f32; 3], [f32; 3]) {
+        let eye = self.eye();
+        let f = unit(sub(self.target, eye));
+        let s = unit(cross(f, [0.0, 1.0, 0.0]));
+        let u = cross(s, f);
+        let half = (self.fov_y / 2.0).tan();
+        let across = (2.0 * x / width.max(1.0) - 1.0) * half * width / height.max(1.0);
+        let up = (1.0 - 2.0 * y / height.max(1.0)) * half;
+        (
+            eye,
+            unit([0, 1, 2].map(|k| f[k] + across * s[k] + up * u[k])),
+        )
+    }
 }
 
 #[cfg(test)]
@@ -200,6 +217,28 @@ mod tests {
         assert!((orbit.distance - NEAREST).abs() < 1e-3);
         orbit.zoom(0.0);
         assert!((orbit.distance - NEAREST).abs() < 1e-3);
+    }
+
+    #[test]
+    fn a_point_seen_in_the_view_is_on_the_line_of_sight_through_it() {
+        let mut orbit = Orbit::framing([-250.0, 0.0, -150.0], [250.0, 1700.0, 150.0], 1.5);
+        orbit.turn(0.7, 0.3);
+        let (width, height) = (900.0, 600.0);
+        let m = orbit.view_projection(width / height);
+        for p in [[100.0, 1200.0, 80.0], [-200.0, 300.0, -50.0], orbit.target] {
+            let seen = project(&m, p);
+            let (x, y) = (
+                (seen[0] + 1.0) / 2.0 * width,
+                (1.0 - seen[1]) / 2.0 * height,
+            );
+            let (eye, way) = orbit.ray(x, y, width, height);
+            // How far the point is from the line.
+            let to = sub(p, eye);
+            let along = dot(to, way);
+            let off = sub(to, [way[0] * along, way[1] * along, way[2] * along]);
+            assert!(dot(off, off).sqrt() < 0.5, "{p:?} is {off:?} off the line");
+            assert!(along > 0.0);
+        }
     }
 
     #[test]

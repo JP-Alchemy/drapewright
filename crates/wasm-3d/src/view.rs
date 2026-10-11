@@ -3,10 +3,11 @@
 
 use drapewright_body::Shape;
 use drapewright_render::{Look, Mesh, Orbit, Renderer};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
-use crate::{Avatar, AvatarSettings, Draping};
+use crate::drape::ClothState;
+use crate::{Avatar, AvatarSettings, ClothShows, Draping};
 
 fn error(e: impl std::fmt::Display) -> JsError {
     JsError::new(&e.to_string())
@@ -37,6 +38,11 @@ pub struct View {
     orbit: Option<Orbit>,
     bounds: Option<([f32; 3], [f32; 3])>,
     look: Look,
+    /// The fabric's colour on the page (sRGB, 0 to 1).
+    fabric: [f32; 3],
+    /// The cloth shown, as last seen, and what it is shown as.
+    cloth: Option<ClothState>,
+    shows: ClothShows,
     backend: String,
 }
 
@@ -102,6 +108,9 @@ impl View {
             orbit: None,
             bounds: None,
             look: Look::default(),
+            fabric: [0.36, 0.47, 0.59],
+            cloth: None,
+            shows: ClothShows::default(),
             backend: backend.into(),
         })
     }
@@ -134,8 +143,9 @@ impl View {
         self.look = Look {
             background: c.background,
             figure: c.figure,
-            cloth: c.cloth,
         };
+        self.fabric = c.cloth;
+        self.colour_cloth();
         Ok(())
     }
 
@@ -167,14 +177,50 @@ impl View {
     /// Shows the cloth of a drape as it is now.
     #[wasm_bindgen(js_name = showCloth)]
     pub fn show_cloth(&mut self, draping: &Draping) {
-        let mesh = Mesh::new(draping.0.points(), draping.0.triangles());
-        self.renderer.set_cloth(&self.device, &self.queue, &mesh);
+        self.cloth = Some(draping.0.state());
+        self.colour_cloth();
+    }
+
+    /// The cloth, shown as it is to be shown.
+    fn colour_cloth(&mut self) {
+        if let Some(cloth) = &self.cloth {
+            let mesh = Mesh::new(cloth.points.clone(), &cloth.triangles);
+            let colours = cloth.colours(self.shows, self.fabric);
+            self.renderer
+                .set_cloth(&self.device, &self.queue, &mesh, &colours);
+        }
     }
 
     /// Takes the cloth off.
     #[wasm_bindgen(js_name = hideCloth)]
     pub fn hide_cloth(&mut self) {
+        self.cloth = None;
         self.renderer.clear_cloth();
+    }
+
+    /// Shows the cloth as a `ClothShows`: its fabric, or a heatmap.
+    #[wasm_bindgen(js_name = setShows)]
+    pub fn set_shows(&mut self, shows: JsValue) -> Result<(), JsError> {
+        self.shows = serde_wasm_bindgen::from_value(shows).map_err(error)?;
+        self.colour_cloth();
+        Ok(())
+    }
+
+    /// The cloth seen at `x`, `y` CSS pixels from the view's top left
+    /// (each `pixel_ratio` device pixels): a `ClothReading`, or null where
+    /// there is none.
+    pub fn pick(&self, x: f32, y: f32, pixel_ratio: f32) -> Result<JsValue, JsError> {
+        let (Some(cloth), Some(orbit)) = (&self.cloth, &self.orbit) else {
+            return Ok(JsValue::NULL);
+        };
+        let (width, height) = (self.config.width as f32, self.config.height as f32);
+        let (eye, way) = orbit.ray(x * pixel_ratio, y * pixel_ratio, width, height);
+        match cloth.pick(eye, way) {
+            Some(reading) => reading
+                .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+                .map_err(error),
+            None => Ok(JsValue::NULL),
+        }
     }
 
     /// Turns round the figure for a drag of `dx`, `dy` CSS pixels.

@@ -1,14 +1,14 @@
 // The avatar, lit softly from above and a little to one side, with a
 // faint rim so its outline reads against the background; the cloth draped
-// on it, lit alike but matt, on whichever side is seen. The floor is a
-// soft shadow under the feet.
+// on it, lit alike but matt, on whichever side is seen, each point in its
+// own colour (a heatmap, or the fabric's). The floor is a soft shadow
+// under the feet.
 
 struct Uniforms {
     view_projection: mat4x4<f32>,
     eye: vec4<f32>,
     light: vec4<f32>,
     figure: vec4<f32>,
-    cloth: vec4<f32>,
     sky: vec4<f32>,
     ground: vec4<f32>,
     // x: the shadow's radius, mm; y: how dark at its middle.
@@ -46,8 +46,29 @@ fn figure_fragment(in: Lit) -> @location(0) vec4<f32> {
     return vec4<f32>(colour, 1.0);
 }
 
+struct Cloth {
+    @builtin(position) clip: vec4<f32>,
+    @location(0) normal: vec3<f32>,
+    @location(1) world: vec3<f32>,
+    @location(2) colour: vec3<f32>,
+};
+
+@vertex
+fn cloth_vertex(
+    @location(0) position: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) colour: vec3<f32>,
+) -> Cloth {
+    var out: Cloth;
+    out.clip = u.view_projection * vec4<f32>(position, 1.0);
+    out.normal = normal;
+    out.world = position;
+    out.colour = colour;
+    return out;
+}
+
 @fragment
-fn cloth_fragment(in: Lit) -> @location(0) vec4<f32> {
+fn cloth_fragment(in: Cloth) -> @location(0) vec4<f32> {
     let v = normalize(u.eye.xyz - in.world);
     // The side facing the eye: a panel's triangles may wind either way.
     var n = normalize(in.normal);
@@ -58,7 +79,7 @@ fn cloth_fragment(in: Lit) -> @location(0) vec4<f32> {
     let hemisphere = mix(u.ground.rgb, u.sky.rgb, 0.5 + 0.5 * n.y);
     let diffuse = max(dot(n, l), 0.0);
     let rim = pow(1.0 - max(dot(n, v), 0.0), 2.0) * 0.06;
-    let colour = u.cloth.rgb * (hemisphere + 0.85 * diffuse) + vec3<f32>(rim);
+    let colour = in.colour * (hemisphere + 0.85 * diffuse) + vec3<f32>(rim);
     return vec4<f32>(colour, 1.0);
 }
 

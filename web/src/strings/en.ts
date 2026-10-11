@@ -5,6 +5,7 @@ import type {
   AllowanceNote,
   CornerStyle,
   DisplayUnits,
+  ClothShows,
   EdgeKind,
   FabricPreset,
   ImportNote,
@@ -707,6 +708,26 @@ export const t = {
         '# pieces aren’t sewn to anything, so they’re left off.',
       ),
     cannotDrape: (why: string) => `This can’t be draped yet: ${why}.`,
+    shows: 'Show the cloth as',
+    showsAs: { fabric: 'Fabric', pull: 'Pulling', room: 'Room' } satisfies Record<
+      ClothShows,
+      string
+    >,
+    pullLegend: ['None', 'Hard'],
+    roomLegend: (far: string) => ['Touching', `${far} away`],
+    legend: (shows: string, from: string, to: string) => `${shows}: from ${from} to ${to}`,
+    pulled: (newtons: number) =>
+      newtons < 5
+        ? 'hardly pulled'
+        : newtons < 30
+          ? 'pulled lightly'
+          : newtons < 80
+            ? 'pulled firmly'
+            : 'pulled hard',
+    reading: (pulled: string, newtons: number, stretch: string, room: string | null) =>
+      `Here it is ${pulled} (${newtons} N/m), stretched ${stretch}, and ${
+        room === null ? 'resting on the body' : `${room} from the body`
+      }.`,
   },
 
   crash: {

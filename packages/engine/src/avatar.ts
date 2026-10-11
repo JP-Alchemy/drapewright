@@ -7,12 +7,22 @@ import init, {
   Draping as DrapingHandle,
   View as ViewHandle,
 } from '../pkg-3d/drapewright_wasm_3d.js'
-import type { AvatarFit, AvatarRequest, AvatarSettings, DrapeProgress, DrapeRequest } from './types'
+import type {
+  AvatarFit,
+  AvatarRequest,
+  AvatarSettings,
+  ClothReading,
+  ClothShows,
+  DrapeProgress,
+  DrapeRequest,
+} from './types'
 
 export type {
   AvatarFit,
   AvatarRequest,
   AvatarSettings,
+  ClothReading,
+  ClothShows,
   DrapeProgress,
   DrapeRequest,
   DrapeStage,
@@ -124,6 +134,16 @@ export class AvatarView {
   /** Takes the cloth off. */
   hideCloth(): void {
     this.#handle.hideCloth()
+  }
+
+  /** Shows the cloth in its fabric's colour, or as a heatmap. */
+  setShows(shows: ClothShows): void {
+    this.#handle.setShows(shows)
+  }
+
+  /** The cloth seen at `x`, `y` CSS pixels from the view's top left, if any. */
+  pick(x: number, y: number, pixelRatio: number): ClothReading | null {
+    return this.#handle.pick(x, y, pixelRatio) as ClothReading | null
   }
 
   /** Turns round the figure for a drag of `dx`, `dy` CSS pixels. */

@@ -116,6 +116,16 @@ impl Drape {
         self.time > sewn + 1.0 && self.cloth.mean_speed() < STILL
     }
 
+    /// How the cloth is pulled, point by point.
+    pub fn strain(&self) -> crate::cloth::Strain {
+        self.cloth.strain()
+    }
+
+    /// The room between each point of the cloth and the body, m.
+    pub fn room(&self) -> Vec<f32> {
+        self.cloth.room(&self.body)
+    }
+
     /// The body's distance at a point (m): for checking.
     pub fn clearance(&self, p: V3) -> f32 {
         crate::cloth::Collider::distance(&self.body, p).0

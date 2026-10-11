@@ -1,4 +1,11 @@
-import type { AvatarSettings, DrapeRequest, FabricPreset } from '@drapewright/engine'
+import type {
+  AvatarSettings,
+  ClothReading,
+  ClothShows,
+  DisplayUnits,
+  DrapeRequest,
+  FabricPreset,
+} from '@drapewright/engine'
 import type { ViewColours } from '@drapewright/engine/avatar'
 import { ChevronDown, RotateCcw, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -8,6 +15,8 @@ import {
   ListBox,
   ListBoxItem,
   Popover,
+  Radio,
+  RadioGroup,
   Select,
   SelectValue,
 } from 'react-aria-components'
@@ -15,7 +24,7 @@ import { attachOrbitInput } from '../canvas/orbit-input.ts'
 import { useEngineState } from '../state/hooks.ts'
 import type { Session } from '../state/session.ts'
 import { useStore } from '../state/store.ts'
-import { t } from '../strings/en.ts'
+import { formatLength, t } from '../strings/en.ts'
 import { sim } from '../workers/sim-client.ts'
 import { type DrapeUpdate, SimError } from '../workers/sim-protocol.ts'
 import { CLOSE_MM, STANDARD_FIGURE, avatarRequest } from './avatar.ts'
@@ -39,6 +48,20 @@ function colours(el: HTMLElement): ViewColours {
 
 /** The fabrics, in the order offered. */
 const FABRICS = Object.keys(t.avatar.fabrics) as FabricPreset[]
+
+/** What the cloth can be shown as, in the order offered. */
+const SHOWS = Object.keys(t.avatar.showsAs) as ClothShows[]
+/** The heatmaps' scales, as the view draws them (crates/wasm-3d/src/drape.rs). */
+const PULL_SCALE = 100
+const ROOM_SCALE = 40
+
+/** What the cloth is like where it was tapped. */
+function readingText(reading: ClothReading, units: DisplayUnits): string {
+  const text = t.avatar
+  const stretch = `${(reading.stretch * 100).toFixed(1)}%`
+  const room = reading.room < 1 ? null : formatLength(reading.room, units)
+  return text.reading(text.pulled(reading.pull), Math.round(reading.pull), stretch, room)
+}
 
 type Status =
   | { kind: 'starting' }
@@ -105,6 +128,10 @@ export function AvatarPane({ session }: { session: Session }) {
   const [drape, setDrape] = useState<Drape>({ kind: 'off' })
   // Counts drapes asked for: an answer for one overtaken is dropped.
   const drapes = useRef(0)
+  const [shows, setShows] = useState<ClothShows>('fabric')
+  // The cloth where it was last tapped.
+  const [reading, setReading] = useState<ClothReading | null>(null)
+  const units = session.engine.document().settings.displayUnits
 
   // The canvas, handed to the sim worker to draw on. Made here rather than
   // by React: a canvas can be handed over only once, and effects may run
@@ -143,6 +170,12 @@ export function AvatarPane({ session }: { session: Session }) {
       slide: (dx, dy) =>
         sim.note({ note: 'slide', dx, dy, pixelRatio: window.devicePixelRatio || 1 }),
       reset: () => sim.note({ note: 'reset' }),
+      tap: (x, y) => {
+        sim.pick(x, y, window.devicePixelRatio || 1).then(
+          (found) => live && setReading(found),
+          () => live && setReading(null),
+        )
+      },
     })
     return () => {
       live = false
@@ -168,6 +201,7 @@ export function AvatarPane({ session }: { session: Session }) {
       drapes.current++
       shown.current = null
       setDrape({ kind: 'off' })
+      setReading(null)
       if (!measured) {
         if (drawing) await sim.showAvatar(STANDARD_FIGURE)
         if (live) {
@@ -204,6 +238,7 @@ export function AvatarPane({ session }: { session: Session }) {
     }
     const request: DrapeRequest = { pieces: doc.pieces, seams: doc.seams, fabric, settings }
     setDrape({ kind: 'draping', fabric, update: null })
+    setReading(null)
     sim
       .drape(request, (update) => {
         if (mine === drapes.current) setDrape({ kind: 'draping', fabric, update })
@@ -221,8 +256,21 @@ export function AvatarPane({ session }: { session: Session }) {
   const takeOff = () => {
     drapes.current++
     setDrape({ kind: 'off' })
+    setReading(null)
     void sim.undrape()
   }
+  const show = (as: ClothShows) => {
+    setShows(as)
+    setReading(null)
+    sim.note({ note: 'shows', shows: as })
+  }
+  const on = drape.kind === 'draping' || drape.kind === 'draped'
+  const legend =
+    shows === 'pull'
+      ? t.avatar.pullLegend
+      : shows === 'room'
+        ? t.avatar.roomLegend(formatLength(ROOM_SCALE, units))
+        : null
   const chooseFabric = (fabric: FabricPreset) => {
     session.chooseDrapeFabric(fabric)
     // On the avatar already: draped again in the new fabric.
@@ -341,11 +389,42 @@ export function AvatarPane({ session }: { session: Session }) {
               {text.takeOff}
             </Button>
           )}
+          {on && (
+            <RadioGroup
+              className="segmented avatar-shows"
+              orientation="horizontal"
+              aria-label={text.shows}
+              value={shows}
+              onChange={(as) => show(as as ClothShows)}
+            >
+              <div className="segments">
+                {SHOWS.map((as) => (
+                  <Radio key={as} value={as} className="segment">
+                    {text.showsAs[as]}
+                  </Radio>
+                ))}
+              </div>
+            </RadioGroup>
+          )}
+          {on && legend && (
+            <div
+              className="avatar-legend small"
+              role="img"
+              aria-label={text.legend(text.showsAs[shows], legend[0]!, legend[1]!)}
+            >
+              <span>{legend[0]}</span>
+              <span
+                className={`avatar-legend-bar ${shows}`}
+                title={`0–${shows === 'pull' ? `${PULL_SCALE} N/m` : formatLength(ROOM_SCALE, units)}`}
+              />
+              <span>{legend[1]}</span>
+            </div>
+          )}
           <span
             className={drape.kind === 'failed' ? 'measure-warning small' : 'muted small'}
             role="status"
           >
-            {drapeText(drape)}
+            {on && reading ? readingText(reading, units) : drapeText(drape)}
           </span>
         </div>
       )}

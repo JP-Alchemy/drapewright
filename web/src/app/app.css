@@ -403,6 +403,39 @@ h2 {
   flex: 1 1 14em;
 }
 
+.avatar-shows {
+  margin: 0;
+}
+
+.avatar-shows .segment {
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+/* A heatmap's legend; its colours as the view draws them
+   (crates/wasm-3d/src/drape.rs). */
+.avatar-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-muted);
+}
+
+.avatar-legend-bar {
+  width: 96px;
+  height: 10px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+}
+
+.avatar-legend-bar.pull {
+  background: linear-gradient(to right, #e9eef4 0%, #ffe08a 25%, #ff9f43 60%, #d63031 100%);
+}
+
+.avatar-legend-bar.room {
+  background: linear-gradient(to right, #1c64d1 0%, #7cc4fa 35%, #f1f3f5 100%);
+}
+
 /* Floating things on the table */
 
 .empty-state {

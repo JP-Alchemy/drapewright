@@ -2,6 +2,8 @@ import type {
   AvatarFit,
   AvatarRequest,
   AvatarSettings,
+  ClothReading,
+  ClothShows,
   DrapeProgress,
   DrapeRequest,
 } from '@drapewright/engine'
@@ -31,6 +33,8 @@ export interface SimMethods {
   drape(request: DrapeRequest): DrapeUpdate | null
   /** Takes the garment off. */
   undrape(): null
+  /** The cloth seen at `x`, `y` CSS pixels from the view's top left, if any. */
+  pick(x: number, y: number, pixelRatio: number): ClothReading | null
 }
 
 export type SimMethod = keyof SimMethods
@@ -49,6 +53,7 @@ export type SimNote =
   | { note: 'zoom'; factor: number }
   | { note: 'slide'; dx: number; dy: number; pixelRatio: number }
   | { note: 'reset' }
+  | { note: 'shows'; shows: ClothShows }
 
 /** What the worker tells the page unasked: how the drape asked for by request `drape` is going. */
 export interface SimUpdate {

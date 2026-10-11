@@ -167,6 +167,7 @@ const handlers: { [M in keyof SimMethods]: (...args: Parameters<SimMethods[M]>) 
     redraw()
     return null
   },
+  pick: (x, y, pixelRatio) => view?.pick(x, y, pixelRatio) ?? null,
 }
 
 function apply(note: SimNote) {
@@ -189,6 +190,9 @@ function apply(note: SimNote) {
       break
     case 'reset':
       view.reset()
+      break
+    case 'shows':
+      view.setShows(note.shows)
       break
   }
   redraw()

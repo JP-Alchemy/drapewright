@@ -1,7 +1,8 @@
 // Turning, zooming and sliding the 3D view, through the same input router
 // as the cutting table: one finger, the Pencil or the mouse turns the
 // figure; two fingers slide it and pinch to zoom; the wheel zooms; a
-// double tap, or 0, shows it whole again; the arrow keys turn it.
+// double tap, or 0, shows it whole again; the arrow keys turn it. A tap
+// that doesn't move points at what is there.
 
 import { InputRouter, type RawPointer, type ToolPointer } from '@drapewright/input'
 import { isTyping } from '../app/shortcuts.ts'
@@ -14,6 +15,8 @@ export interface Orbiting {
   /** Slide for a drag of `dx`, `dy` CSS pixels. */
   slide(dx: number, dy: number): void
   reset(): void
+  /** A tap at `x`, `y` CSS pixels from the view's top left. */
+  tap?(x: number, y: number): void
 }
 
 interface SafariGestureEvent extends UIEvent {
@@ -22,22 +25,37 @@ interface SafariGestureEvent extends UIEvent {
 
 /** A key's step, CSS pixels of drag. */
 const KEY_STEP = 24
+/** A press moving less than this, CSS pixels, is a tap. */
+const TAP_SLOP = 6
 
 export function attachOrbitInput(el: HTMLElement, view: Orbiting): () => void {
   let last: ToolPointer | null = null
+  // Where a press began, and whether it has moved off it: a tap if not.
+  let pressed: { x: number; y: number; moved: boolean } | null = null
   const router = new InputRouter(
     {
       pan: (dx, dy) => view.slide(dx, dy),
       zoom: (_x, _y, factor) => view.zoom(factor),
       undo: () => {},
       redo: () => {},
-      toolDown: (p) => (last = p),
+      toolDown: (p) => {
+        last = p
+        pressed = { x: p.x, y: p.y, moved: false }
+      },
       toolMove: (p) => {
         if (last) view.turn(p.x - last.x, p.y - last.y)
         last = p
+        if (pressed && Math.hypot(p.x - pressed.x, p.y - pressed.y) > TAP_SLOP) pressed.moved = true
       },
-      toolUp: () => (last = null),
-      toolCancel: () => (last = null),
+      toolUp: () => {
+        if (pressed && !pressed.moved) view.tap?.(pressed.x, pressed.y)
+        last = null
+        pressed = null
+      },
+      toolCancel: () => {
+        last = null
+        pressed = null
+      },
       hover: () => {},
       contextMenu: () => {},
       hold: () => {},

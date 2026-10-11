@@ -226,6 +226,19 @@ fn scramble(points: &[u32]) -> u64 {
     })
 }
 
+/// How the cloth is pulled, point by point: each point's value the mean of
+/// its triangles', by their area, then evened out a little with its
+/// neighbours' (one triangle's worth of cloth reads unevenly).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Strain {
+    /// How far the cloth is stretched beyond its cut size, the most it is
+    /// any way (0.03: 3%).
+    pub stretch: Vec<f32>,
+    /// How hard it pulls, N/m: the fabric's stiffness the way it is most
+    /// stretched, times that stretch.
+    pub pull: Vec<f32>,
+}
+
 /// The cloth as it moves.
 #[derive(Debug)]
 pub struct Cloth {
@@ -295,6 +308,96 @@ impl Cloth {
             .map(|e| length(sub(self.x[e.i as usize], self.x[e.j as usize])) / e.rest)
             .sum();
         total / self.edges.len().max(1) as f32
+    }
+
+    /// A triangle's greatest stretch (1: as cut), and the fabric's
+    /// stiffness that way, N/m.
+    fn triangle_strain(&self, t: [u32; 3]) -> (f32, f32) {
+        let [r0, r1, r2] = t.map(|i| self.rest[i as usize]);
+        let [x0, x1, x2] = t.map(|i| self.x[i as usize]);
+        // Flat, its edges from its first corner, and the inverse of the
+        // matrix they make: the triangle as it was cut.
+        let (a, b) = (
+            [r1[0] - r0[0], r1[1] - r0[1]],
+            [r2[0] - r0[0], r2[1] - r0[1]],
+        );
+        let det = a[0] * b[1] - b[0] * a[1];
+        if det.abs() < 1e-12 {
+            return (1.0, 0.0);
+        }
+        let inv = [[b[1] / det, -b[0] / det], [-a[1] / det, a[0] / det]];
+        // How it is shaped now: the deformation from flat (3 by 2), by
+        // its columns.
+        let (d1, d2) = (sub(x1, x0), sub(x2, x0));
+        let column = |j: usize| -> V3 { [0, 1, 2].map(|k| d1[k] * inv[0][j] + d2[k] * inv[1][j]) };
+        let (f0, f1) = (column(0), column(1));
+        // Its greatest stretch squared, and which way flat (from the u
+        // axis), from the deformation's square.
+        let (c00, c01, c11) = (dot(f0, f0), dot(f0, f1), dot(f1, f1));
+        let mean = (c00 + c11) / 2.0;
+        let r = (((c00 - c11) / 2.0).powi(2) + c01 * c01).sqrt();
+        let most = (mean + r).max(0.0).sqrt();
+        let way = 0.5 * (2.0 * c01).atan2(c00 - c11);
+        // From the grain (along v).
+        (most, self.fabric.stiffness_at(way.cos().atan2(way.sin())))
+    }
+
+    /// How the cloth is pulled, point by point.
+    pub fn strain(&self) -> Strain {
+        let n = self.x.len();
+        let (mut stretch, mut pull, mut weight) = (vec![0.0; n], vec![0.0; n], vec![0.0; n]);
+        for &t in &self.triangles {
+            let (most, stiffness) = self.triangle_strain(t);
+            let beyond = (most - 1.0).max(0.0);
+            let a = area(t.map(|i| self.rest[i as usize]));
+            for i in t {
+                let i = i as usize;
+                stretch[i] += a * beyond;
+                pull[i] += a * beyond * stiffness;
+                weight[i] += a;
+            }
+        }
+        for i in 0..n {
+            if weight[i] > 0.0 {
+                stretch[i] /= weight[i];
+                pull[i] /= weight[i];
+            }
+        }
+        for _ in 0..2 {
+            stretch = self.evened(&stretch);
+            pull = self.evened(&pull);
+        }
+        Strain { stretch, pull }
+    }
+
+    /// Values at the points, each halfway to its neighbours' mean.
+    fn evened(&self, values: &[f32]) -> Vec<f32> {
+        let mut sum = vec![0.0f32; values.len()];
+        let mut count = vec![0u32; values.len()];
+        for t in &self.triangles {
+            for k in 0..3 {
+                let (i, j) = (t[k] as usize, t[(k + 1) % 3] as usize);
+                sum[i] += values[j];
+                sum[j] += values[i];
+                count[i] += 1;
+                count[j] += 1;
+            }
+        }
+        values
+            .iter()
+            .zip(sum.iter().zip(&count))
+            .map(|(&v, (&s, &c))| if c > 0 { (v + s / c as f32) / 2.0 } else { v })
+            .collect()
+    }
+
+    /// The room between each point and the body, m: none where the cloth
+    /// rests on it.
+    pub fn room(&self, body: &dyn Collider) -> Vec<f32> {
+        let gap = self.fabric.thickness + AIR;
+        self.x
+            .iter()
+            .map(|&p| (body.distance(p).0 - gap).max(0.0))
+            .collect()
     }
 
     /// Pushes any point inside the body, or too near it, out: where the
