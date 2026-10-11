@@ -36,6 +36,9 @@ import type {
   PieceView,
   PrintPlan,
   ScaleOption,
+  SeamReport,
+  SeamSide,
+  Suggestion,
   ViewState,
 } from './types'
 
@@ -66,6 +69,7 @@ export class Engine {
   readonly #listeners = new Set<(changes: ChangeSet) => void>()
   #state: EngineState
   #document: { revision: number; value: Document } | null = null
+  #seamReports: { revision: number; value: SeamReport[] } | null = null
 
   private constructor(handle: EngineHandle) {
     this.#handle = handle
@@ -136,6 +140,26 @@ export class Engine {
   /** Derived lines and measurements; the same object until the piece changes. */
   pieceView(id: string): PieceView | null {
     return this.#handle.pieceView(id) as PieceView | null
+  }
+
+  /** Each seam's two lengths and how its notches meet; once per revision. */
+  seamReports(): SeamReport[] {
+    let cached = this.#seamReports
+    if (cached?.revision !== this.#state.revision) {
+      cached = { revision: this.#state.revision, value: this.#handle.seamReports() as SeamReport[] }
+      this.#seamReports = cached
+    }
+    return cached.value
+  }
+
+  /** Seams likely among the edges not sewn yet, most likely first. */
+  suggestSeams(): Suggestion[] {
+    return this.#handle.suggestSeams() as Suggestion[]
+  }
+
+  /** Whether two edges chosen to be sewn together go the other way round. */
+  sewnReversed(a: SeamSide, b: SeamSide): boolean {
+    return this.#handle.sewnReversed(a, b)
   }
 
   hitTest(x: number, y: number, tolerance: number): Hit | null {

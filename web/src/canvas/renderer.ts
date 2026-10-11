@@ -1,7 +1,7 @@
 // Draws the work table: a cutting mat with a true-size centimetre grid and
 // the pieces laid on it like pattern paper.
 
-import type { Hit, Piece, PieceView } from '@drapewright/engine'
+import type { Hit, Piece, PieceView, Seam } from '@drapewright/engine'
 import type { DisplayUnits } from '@drapewright/engine'
 import type { GrainPreview, MovePreview, PartRef } from '../state/session.ts'
 import { cutSummary } from '../app/PieceDetails.tsx'
@@ -23,6 +23,39 @@ export interface Scene {
   hover?: Hit | null
   preview?: MovePreview | null
   grainPreview?: GrainPreview | null
+  seams?: SeamMark[]
+}
+
+/** One side of a seam, as drawn: its number, beside its edge. */
+export interface SeamMark {
+  number: number
+  piece: string
+  edge: string
+  /** The piece's other half (drawn on the piece itself, marked ′). */
+  mirror: boolean
+  /** The picked seam, or an edge waiting to be sewn. */
+  strong: boolean
+}
+
+/** Marks for every seam side, numbered as the seam list numbers them. */
+export function seamMarks(
+  seams: Seam[],
+  picked: string | null,
+  sewing: { piece: string; edge: string } | null,
+): SeamMark[] {
+  const marks = seams.flatMap((seam, i) => {
+    // Sewn to its own other half: one edge, one mark.
+    const self = seam.a.piece === seam.b.piece && seam.a.edge === seam.b.edge
+    return (self ? [seam.a] : [seam.a, seam.b]).map((side) => ({
+      number: i + 1,
+      piece: side.piece,
+      edge: side.edge,
+      mirror: side.mirror,
+      strong: seam.id === picked,
+    }))
+  })
+  if (sewing) marks.push({ number: 0, ...sewing, mirror: false, strong: true })
+  return marks
 }
 
 export interface Theme {
@@ -33,6 +66,7 @@ export interface Theme {
   ink: string
   stitch: string
   select: string
+  seam: string
   label: string
   labelHalo: string
 }
@@ -49,6 +83,7 @@ export function readTheme(el: Element): Theme {
     ink: v('--ink-on-paper', '#1f2a2e'),
     stitch: v('--accent', '#b4532a'),
     select: v('--select', '#2563eb'),
+    seam: v('--seam', '#7c3aed'),
     label: v('--ink-on-paper', '#1f2a2e'),
     labelHalo: v('--paper', '#fbf7f0'),
   }
@@ -223,6 +258,21 @@ export function draw(
     ctx.setLineDash([])
   }
 
+  // Sewn edges: a band along the edge and the seam's number inside it.
+  const marks = scene.seams ?? []
+  for (const mark of marks) {
+    const sp = scene.pieces.find((p) => p.piece.id === mark.piece)
+    const path = sp && edgePath(sp.piece, mark.edge)
+    if (!sp || !path) continue
+    ctx.setTransform(world.multiply(placement(sp.piece, scene.preview)))
+    ctx.strokeStyle = mark.strong ? theme.select : theme.seam
+    ctx.globalAlpha = mark.strong ? 0.9 : 0.6
+    ctx.lineWidth = (mark.strong ? 5 : 3.5) / s
+    ctx.lineCap = 'round'
+    ctx.stroke(path)
+    ctx.globalAlpha = 1
+  }
+
   // Hovered and selected edges and corners, over everything else.
   const highlight = (pieceId: string, edgeId: string, corner: boolean, strong: boolean) => {
     const sp = scene.pieces.find((p) => p.piece.id === pieceId)
@@ -290,6 +340,23 @@ export function draw(
     drawPill(ctx, formatLength(ev.length, scene.units ?? 'cm'), at.x, at.y, theme)
   }
 
+  // Seam numbers, just inside each sewn edge.
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  for (const mark of marks) {
+    if (mark.number === 0) continue
+    const sp = scene.pieces.find((p) => p.piece.id === mark.piece)
+    const ev = sp?.view.edges.find((e) => e.id === mark.edge)
+    if (!sp || !ev) continue
+    const inward = 16 / s
+    const local = new DOMPoint(
+      ev.middle[0] - ev.middleNormal[0] * inward,
+      ev.middle[1] - ev.middleNormal[1] * inward,
+    )
+    const m = placement(sp.piece, scene.preview).transformPoint(local)
+    const at = toScreen(v, { x: m.x, y: m.y })
+    drawBadge(ctx, `${mark.number}${mark.mirror ? '′' : ''}`, at.x, at.y, mark.strong, theme)
+  }
+
   // Names in screen space, so they stay readable at any zoom.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.font = '600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -316,6 +383,27 @@ export function draw(
       ctx.fillText(summary, p.x, p.y + 17, widthPx - 8)
     }
   }
+}
+
+/** A seam's number in a round badge. */
+function drawBadge(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  strong: boolean,
+  theme: Theme,
+) {
+  ctx.font = '700 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  const w = Math.max(20, ctx.measureText(text).width + 10)
+  ctx.beginPath()
+  ctx.roundRect(x - w / 2, y - 10, w, 20, 10)
+  ctx.fillStyle = strong ? theme.select : theme.seam
+  ctx.fill()
+  ctx.fillStyle = '#fff'
+  ctx.fillText(text, x, y + 0.5)
 }
 
 function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, theme: Theme) {

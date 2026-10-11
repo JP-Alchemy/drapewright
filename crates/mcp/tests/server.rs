@@ -494,3 +494,47 @@ fn an_assistant_keeps_a_persons_measurements() {
     );
     assert!(gone.contains("get_measurements"), "{gone}");
 }
+
+#[test]
+fn an_assistant_sews_and_unpicks_seams() {
+    let mut s = server();
+    ok(&mut s, "new_project", json!({ "name": "Cushion" }));
+    for name in ["Front", "Back"] {
+        ok(
+            &mut s,
+            "create_piece",
+            json!({ "name": name, "rectangle": { "width_mm": 400, "height_mm": 400 } }),
+        );
+    }
+    let got = ok_json(&mut s, "get_seams", json!({}));
+    assert_eq!(got["seams"], json!([]));
+    let first = got["suggested"][0].clone();
+    assert!(first["confidence"].as_f64().unwrap() > 0.3, "{first}");
+    assert!(first["a"]["label"].as_str().unwrap().contains(" · "));
+
+    // The assistant sews the first suggestion, as the user agreed.
+    let side = |v: &Value| json!({ "piece": v["piece"], "edge": v["edge"] });
+    let sewed = ok(
+        &mut s,
+        "sew_edges",
+        json!({ "seams": [{ "a": side(&first["a"]), "b": side(&first["b"]),
+                            "reversed": first["reversed"], "name": "Side" }] }),
+    );
+    assert!(sewed.contains("Sewed 1 seam"), "{sewed}");
+    let got = ok_json(&mut s, "get_seams", json!({}));
+    let seam = &got["seams"][0];
+    assert_eq!(seam["aLengthMm"], 400.0);
+    assert_eq!(seam["differenceMm"], 0.0);
+    assert_eq!(seam["name"], "Side");
+
+    let bad = fails(
+        &mut s,
+        "sew_edges",
+        json!({ "seams": [{ "a": side(&first["a"]), "b": { "piece": "nope", "edge": "e1" } }] }),
+    );
+    assert!(bad.contains("not on these pieces"), "{bad}");
+
+    let id = seam["id"].as_str().unwrap().to_string();
+    ok(&mut s, "unpick_seams", json!({ "seams": [id] }));
+    assert_eq!(ok_json(&mut s, "get_seams", json!({}))["seams"], json!([]));
+}

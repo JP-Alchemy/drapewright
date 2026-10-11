@@ -40,6 +40,7 @@ export function attachShortcuts(session: Session, onOpen: () => void): () => voi
         break
       case 'escape':
         if (session.ui.get().menu) session.openMenu(null)
+        else if (session.ui.get().sewing) session.cancelSewing()
         else session.select([])
         break
       case 'open':

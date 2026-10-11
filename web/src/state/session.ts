@@ -115,6 +115,10 @@ export interface UiState {
   toast: string | null
   /** Whether this screen's true size has been measured (see `setScreenScale`). */
   screenMeasured: boolean
+  /** The seam picked in the seam list, drawn stronger. */
+  seam: string | null
+  /** An edge waiting for the edge it is to be sewn to: the next edge tapped. */
+  sewing: { piece: string; edge: string } | null
 }
 
 /** Space left between imported pieces and what is already on the table, mm. */
@@ -149,6 +153,8 @@ export class Session {
       tip: null,
       toast: null,
       screenMeasured: screenScale !== null,
+      seam: null,
+      sewing: null,
     })
     // Back where the project was left; a project saved without a view
     // (the engine's default) shows all its pieces instead.
@@ -190,6 +196,13 @@ export class Session {
         selection: new Set(selection),
         part: partAlive ? s.part : null,
       }))
+    }
+    if (ui.seam && !doc.seams.some((s) => s.id === ui.seam)) {
+      this.ui.set((s) => ({ ...s, seam: null }))
+    }
+    const sewing = ui.sewing
+    if (sewing && !doc.pieces.some((p) => p.id === sewing.piece)) {
+      this.ui.set((s) => ({ ...s, sewing: null }))
     }
   }
 
@@ -246,7 +259,48 @@ export class Session {
   }
 
   select(ids: Iterable<string>, part: PartRef | null = null): void {
+    if (this.ui.get().sewing && part?.kind === 'edge') this.#sewTo(part.piece, part.edge)
     this.ui.set((s) => ({ ...s, selection: new Set(ids), part }))
+  }
+
+  selectSeam(seam: string | null): void {
+    this.ui.set((s) => ({ ...s, seam }))
+  }
+
+  /** Waits for the edge to sew this one to: the next edge tapped. */
+  startSewing(piece: string, edge: string): void {
+    this.ui.set((s) => ({ ...s, sewing: { piece, edge } }))
+  }
+
+  cancelSewing(): void {
+    this.ui.set((s) => ({ ...s, sewing: null }))
+  }
+
+  /**
+   * Sews the waiting edge to this one, the right way round. The same edge
+   * again, on a piece cut as a pair, is sewn to its other half.
+   */
+  #sewTo(piece: string, edge: string): void {
+    const from = this.ui.get().sewing
+    if (!from) return
+    this.cancelSewing()
+    const doc = this.engine.document()
+    const same = from.piece === piece && from.edge === edge
+    const pair = doc.pieces
+      .find((p) => p.id === piece)
+      ?.cut.some((c) => c.quantity >= 2 && c.mirrored !== false)
+    if (same && !pair) return
+    const a = { piece: from.piece, edge: from.edge, from: null, to: null, mirror: false }
+    const b = { piece, edge, from: null, to: null, mirror: same }
+    const reversed = !same && this.engine.sewnReversed(a, b)
+    const sewn = this.dispatch({
+      type: 'addSeams',
+      seams: [{ id: '', name: '', a, b, reversed, ease: 'even', confirmed: true }],
+    })
+    if (sewn) {
+      this.selectSeam(this.engine.document().seams.at(-1)?.id ?? null)
+      this.toast(t.seams.sewn)
+    }
   }
 
   setHover(hover: Hit | null): void {

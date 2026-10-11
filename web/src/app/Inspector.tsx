@@ -8,6 +8,7 @@ import { formatLength, t } from '../strings/en.ts'
 import { CornerChooser } from './CornerChooser.tsx'
 import { LengthField } from './LengthField.tsx'
 import { CutSection, GrainSection, NotchSection } from './PieceDetails.tsx'
+import { edgeLabel, sideLabel } from './labels.ts'
 
 /**
  * A text field that reports its value when editing ends, not per keystroke.
@@ -41,16 +42,6 @@ export function CommitTextField({
       <Input className="text-input" placeholder={placeholder} />
     </TextField>
   )
-}
-
-/** "Side seam"; "the hem" or "the fold" when unnamed; else "edge 3". */
-function edgeLabel(piece: Piece, edgeId: string): string {
-  const i = piece.outline.edges.findIndex((e) => e.id === edgeId)
-  const edge = piece.outline.edges[i]
-  if (edge?.name) return edge.name
-  if (edge?.kind === 'hem') return t.inspector.theHem
-  if (edge?.kind === 'fold') return t.inspector.theFold
-  return t.inspector.edgeNumber(i + 1)
 }
 
 function PieceSection({
@@ -139,9 +130,24 @@ function EdgeSection({
   const ev = view.edges.find((e) => e.id === edgeId)
   if (!edge || !ev) return null
   const ref = { piece: piece.id, edge: edgeId }
+  const doc = session.engine.document()
+  const here = (side: { piece: string; edge: string }) =>
+    side.piece === piece.id && side.edge === edgeId
+  const sewn = doc.seams
+    .map((seam, i) => ({ seam, i }))
+    .filter(({ seam }) => here(seam.a) || here(seam.b))
   return (
     <section className="panel-section inspector" aria-labelledby="edge-heading">
       <h2 id="edge-heading">{t.inspector.edge}</h2>
+      {sewn.map(({ seam, i }) => (
+        <Button key={seam.id} className="link-button" onPress={() => session.selectSeam(seam.id)}>
+          {t.seams.sewnTo(sideLabel(doc, here(seam.a) && !seam.a.mirror ? seam.b : seam.a))} (
+          {t.seams.seam(i + 1, seam.name)})
+        </Button>
+      ))}
+      <Button className="button" onPress={() => session.startSewing(piece.id, edgeId)}>
+        {t.seams.sewTo}
+      </Button>
       <CommitTextField
         key={`${edgeId}:${edge.name}`}
         label={t.inspector.edgeName}

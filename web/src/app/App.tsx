@@ -25,6 +25,8 @@ import { Inspector } from './Inspector.tsx'
 import { MeasurementsDialog } from './MeasurementsDialog.tsx'
 import { PieceList } from './PieceList.tsx'
 import { PrintDialog } from './PrintDialog.tsx'
+import { SeamList } from './SeamList.tsx'
+import { sideLabel } from './labels.ts'
 import { type ProjectActions, ProjectsDialog } from './ProjectsDialog.tsx'
 import { ScreenDialog } from './ScreenDialog.tsx'
 import { Toolbar } from './Toolbar.tsx'
@@ -171,7 +173,7 @@ function Workspace({
   actions: ProjectActions
 }) {
   const fileInput = useRef<HTMLInputElement>(null)
-  const { busy, notice, toast, tip } = useStore(session.ui)
+  const { busy, notice, toast, tip, sewing } = useStore(session.ui)
   useEngineState(session)
   const empty = session.engine.document().pieces.length === 0
   const open = () => fileInput.current?.click()
@@ -226,6 +228,23 @@ function Workspace({
               {busy}
             </div>
           )}
+          {sewing && (
+            <div className="status-bar" role="status">
+              <span>
+                {t.seams.sewingHint(
+                  sideLabel(session.engine.document(), {
+                    ...sewing,
+                    from: null,
+                    to: null,
+                    mirror: false,
+                  }),
+                )}
+              </span>
+              <Button className="link-button" onPress={() => session.cancelSewing()}>
+                {t.seams.cancel}
+              </Button>
+            </div>
+          )}
           {notice && (
             <div
               className={`status-bar ${notice.kind}`}
@@ -240,6 +259,7 @@ function Workspace({
         </main>
         <aside className="side-panel">
           <PieceList session={session} />
+          <SeamList session={session} />
           <Inspector session={session} />
         </aside>
       </div>

@@ -28,7 +28,7 @@ const EARLIER_FORMAT: &str = "soom-project";
 type Migration = fn(&mut Value) -> Result<(), String>;
 
 /// `MIGRATIONS[i]` upgrades version `i + 1` to `i + 2`.
-const MIGRATIONS: &[Migration] = &[v1_to_v2];
+const MIGRATIONS: &[Migration] = &[v1_to_v2, v2_to_v3];
 
 /// Version 2 adds people's measurements: none yet.
 fn v1_to_v2(value: &mut Value) -> Result<(), String> {
@@ -37,6 +37,17 @@ fn v1_to_v2(value: &mut Value) -> Result<(), String> {
         .ok_or("the project is not an object")?;
     object
         .entry("measurementSets")
+        .or_insert_with(|| Value::Array(Vec::new()));
+    Ok(())
+}
+
+/// Version 3 adds seams: none yet.
+fn v2_to_v3(value: &mut Value) -> Result<(), String> {
+    let object = value
+        .as_object_mut()
+        .ok_or("the project is not an object")?;
+    object
+        .entry("seams")
         .or_insert_with(|| Value::Array(Vec::new()));
     Ok(())
 }

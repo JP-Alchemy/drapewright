@@ -6,7 +6,7 @@
 //!
 //! Folders are searched for .svg, .dxf and .pdf files. `-v` also lists each piece:
 //! its edges (folds marked), allowance, notches, internal lines, grainline
-//! and cutting. Nothing is written.
+//! and cutting; `-s` the seams Drapewright would suggest. Nothing is written.
 
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -74,9 +74,12 @@ fn summarise(r: &ImportResult) -> String {
 fn main() {
     let mut files = Vec::new();
     let mut verbose = false;
+    let mut seams = false;
     for arg in std::env::args().skip(1) {
         if arg == "-v" {
             verbose = true;
+        } else if arg == "-s" {
+            seams = true;
         } else {
             collect(Path::new(&arg), &mut files);
         }
@@ -150,6 +153,33 @@ fn main() {
                     },
                     summarise(&r),
                 );
+                if seams {
+                    let edge = |piece: &str, edge: &str| {
+                        let p = r.pieces.iter().find(|p| p.id == piece);
+                        let name = p.map_or("?", |p| p.name.as_str());
+                        let index = p.and_then(|p| p.outline.edge_index(edge));
+                        let label = p
+                            .zip(index)
+                            .map(|(p, i)| p.outline.edges[i].name.clone())
+                            .filter(|n| !n.is_empty())
+                            .unwrap_or_else(|| format!("edge {}", index.map_or(0, |i| i + 1)));
+                        format!("{name} {label}")
+                    };
+                    for s in drapewright_seams::suggest(&r.pieces, &[]) {
+                        let report = drapewright_seams::measure(&s.seam, &r.pieces);
+                        println!(
+                            "         ~ {:.0}% {} ↔ {}{}{} ({:.0} / {:.0} mm) {:?}",
+                            s.confidence * 100.0,
+                            edge(&s.seam.a.piece, &s.seam.a.edge),
+                            edge(&s.seam.b.piece, &s.seam.b.edge),
+                            if s.seam.b.mirror { " (other half)" } else { "" },
+                            if s.seam.reversed { ", reversed" } else { "" },
+                            report.a_length,
+                            report.b_length,
+                            s.reasons,
+                        );
+                    }
+                }
                 if verbose {
                     for p in &r.pieces {
                         let folds = p

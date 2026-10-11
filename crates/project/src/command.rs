@@ -19,6 +19,7 @@ use ts_rs::TS;
 use crate::document::{DisplayUnits, Document, PrintSettings};
 use crate::ids::IdAllocator;
 use crate::measurements::{EarlierMeasurements, MeasurementSet};
+use drapewright_seams::Seam;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(
@@ -137,6 +138,19 @@ pub enum Command {
     DeleteMeasurementSet {
         id: Id,
     },
+    /// Sews edges together: suggestions accepted, or a pair chosen by hand.
+    /// Each seam gets a fresh id.
+    AddSeams {
+        seams: Vec<Seam>,
+    },
+    /// Replaces the seam with the same id (its direction, name, parts of
+    /// edges, or confirming it).
+    SetSeam {
+        seam: Seam,
+    },
+    DeleteSeams {
+        ids: Vec<Id>,
+    },
 }
 
 impl Command {
@@ -167,6 +181,9 @@ impl Command {
             Command::SetMeasurementSet { .. } => "measurements",
             Command::RemeasureSet { .. } => "measure again",
             Command::DeleteMeasurementSet { .. } => "delete measurements",
+            Command::AddSeams { .. } => "sew edges",
+            Command::SetSeam { .. } => "change seam",
+            Command::DeleteSeams { .. } => "unpick seam",
         }
     }
 }
@@ -187,6 +204,8 @@ pub enum CommandError {
     UnknownNotch { piece: Id, notch: Id },
     #[error("Those measurements no longer exist.")]
     UnknownMeasurementSet { id: Id },
+    #[error("That seam no longer exists.")]
+    UnknownSeam { id: Id },
     #[error("{message}")]
     Rejected { message: String },
 }
@@ -207,7 +226,8 @@ pub struct ChangeSet {
     pub added: Vec<Id>,
     pub changed: Vec<Id>,
     pub removed: Vec<Id>,
-    /// Project name, settings, print settings or measurements changed.
+    /// Project name, settings, print settings, measurements or seams
+    /// changed.
     pub document: bool,
 }
 
@@ -238,7 +258,8 @@ impl ChangeSet {
         set.document = before.meta != after.meta
             || before.settings != after.settings
             || before.print != after.print
-            || before.measurement_sets != after.measurement_sets;
+            || before.measurement_sets != after.measurement_sets
+            || before.seams != after.seams;
         set
     }
 }
@@ -327,8 +348,12 @@ fn apply_inner(
                     .ok_or_else(|| CommandError::UnknownPiece { piece: id.clone() })?;
             }
             doc.pieces.retain(|p| !gone.contains(&p.id));
+            // Seams sewing a piece that is gone go with it.
+            let seams = doc.seams.len();
+            doc.seams.retain(|s| !gone.iter().any(|id| s.touches(id)));
             Ok(ChangeSet {
                 removed: gone,
+                document: doc.seams.len() != seams,
                 ..Default::default()
             })
         }
@@ -404,11 +429,20 @@ fn apply_inner(
             Ok(ChangeSet::changed(&piece))
         }
         Command::SplitEdge { piece, edge, at } => {
+            unsewn(doc, &piece, &[&edge])?;
             let new_id = ids.next("e");
             ops::split_edge(piece_mut(doc, &piece)?, &edge, at, new_id)?;
             Ok(ChangeSet::changed(&piece))
         }
         Command::JoinEdges { piece, edge } => {
+            let p = doc
+                .piece(&piece)
+                .ok_or_else(|| CommandError::UnknownPiece {
+                    piece: piece.clone(),
+                })?;
+            let i = edge_index(p, &edge)?;
+            let next = p.outline.edges[(i + 1) % p.outline.edges.len()].id.clone();
+            unsewn(doc, &piece, &[&edge, &next])?;
             ops::join_with_next(piece_mut(doc, &piece)?, &edge)?;
             Ok(ChangeSet::changed(&piece))
         }
@@ -527,6 +561,76 @@ fn apply_inner(
                 ..Default::default()
             })
         }
+        Command::AddSeams { seams } => {
+            for mut seam in seams {
+                seam.id = ids.next("s");
+                checked_seam(doc, &seam)?;
+                doc.seams.push(seam);
+            }
+            Ok(ChangeSet {
+                document: true,
+                ..Default::default()
+            })
+        }
+        Command::SetSeam { seam } => {
+            checked_seam(doc, &seam)?;
+            let slot = doc
+                .seams
+                .iter_mut()
+                .find(|s| s.id == seam.id)
+                .ok_or_else(|| CommandError::UnknownSeam {
+                    id: seam.id.clone(),
+                })?;
+            *slot = seam;
+            Ok(ChangeSet {
+                document: true,
+                ..Default::default()
+            })
+        }
+        Command::DeleteSeams { ids: gone } => {
+            for id in &gone {
+                doc.seam(id)
+                    .ok_or_else(|| CommandError::UnknownSeam { id: id.clone() })?;
+            }
+            doc.seams.retain(|s| !gone.contains(&s.id));
+            Ok(ChangeSet {
+                document: true,
+                ..Default::default()
+            })
+        }
+    }
+}
+
+/// Adding or removing a corner on a sewn edge would change what is sewn to
+/// what; the seam is unpicked first.
+fn unsewn(doc: &Document, piece: &Id, edges: &[&Id]) -> Result<(), CommandError> {
+    let sewn = doc.seams.iter().any(|s| {
+        [&s.a, &s.b]
+            .iter()
+            .any(|side| side.piece == *piece && edges.contains(&&side.edge))
+    });
+    if sewn {
+        return Err(CommandError::Rejected {
+            message: "This edge is sewn to another. Unpick its seam first, then add or remove the corner."
+                .into(),
+        });
+    }
+    Ok(())
+}
+
+/// A seam that can be kept: both sides measurable, and not one side sewn to
+/// itself.
+fn checked_seam(doc: &Document, seam: &Seam) -> Result<(), CommandError> {
+    if seam.a == seam.b {
+        return Err(CommandError::Rejected {
+            message: "An edge can't be sewn to itself; choose its partner.".into(),
+        });
+    }
+    match drapewright_seams::measure(seam, &doc.pieces).problem {
+        Some(_) => Err(CommandError::Rejected {
+            message: "That seam's edges are not on these pieces.".into(),
+        }),
+        None => Ok(()),
     }
 }
 
@@ -553,4 +657,5 @@ pub fn all_ids(doc: &Document) -> impl Iterator<Item = &Id> {
         .iter()
         .flat_map(|p| piece_ids(p))
         .chain(doc.measurement_sets.iter().map(|m| &m.id))
+        .chain(doc.seams.iter().map(|s| &s.id))
 }

@@ -279,6 +279,7 @@ dependencies = [
  "drapewright-pattern-core",
  "drapewright-pdf-import",
  "drapewright-project",
+ "drapewright-seams",
  "flate2",
  "insta",
  "kurbo",
@@ -301,6 +302,7 @@ dependencies = [
  "drapewright-io",
  "drapewright-pattern-core",
  "drapewright-project",
+ "drapewright-seams",
  "kurbo",
  "schemars",
  "serde",
@@ -342,6 +344,7 @@ name = "drapewright-project"
 version = "0.1.0"
 dependencies = [
  "drapewright-pattern-core",
+ "drapewright-seams",
  "flate2",
  "insta",
  "kurbo",
@@ -352,6 +355,18 @@ dependencies = [
  "thiserror",
  "ts-rs",
  "zip",
+]
+
+[[package]]
+name = "drapewright-seams"
+version = "0.1.0"
+dependencies = [
+ "drapewright-pattern-core",
+ "kurbo",
+ "schemars",
+ "serde",
+ "serde_json",
+ "ts-rs",
 ]
 
 [[package]]

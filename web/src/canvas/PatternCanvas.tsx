@@ -4,7 +4,7 @@ import { grainlineTool } from '../tools/grainline.ts'
 import { notchTool } from '../tools/notch.ts'
 import { selectTool } from '../tools/select.ts'
 import { attachInput } from './input.ts'
-import { draw, readTheme } from './renderer.ts'
+import { draw, readTheme, seamMarks } from './renderer.ts'
 
 /**
  * The work table. Draws on demand (once per animation frame at most) when
@@ -43,6 +43,7 @@ export function PatternCanvas({ session }: { session: Session }) {
           hover: ui.hover,
           preview: ui.preview,
           grainPreview: ui.grainPreview,
+          seams: seamMarks(session.engine.document().seams, ui.seam, ui.sewing),
         },
         theme,
       )

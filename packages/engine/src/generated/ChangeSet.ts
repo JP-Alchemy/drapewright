@@ -5,6 +5,7 @@
  */
 export type ChangeSet = { added: Array<string>, changed: Array<string>, removed: Array<string>, 
 /**
- * Project name, settings, print settings or measurements changed.
+ * Project name, settings, print settings, measurements or seams
+ * changed.
  */
 document: boolean, };

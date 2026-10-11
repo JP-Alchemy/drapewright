@@ -1,0 +1,21 @@
+[package]
+name = "drapewright-seams"
+description = "Seams for Drapewright: which edges are sewn together, their lengths and notches, and suggestions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+drapewright-pattern-core.workspace = true
+kurbo.workspace = true
+serde.workspace = true
+ts-rs.workspace = true
+schemars.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

@@ -16,6 +16,7 @@ drapewright-pattern-core = { path = "crates/pattern-core" }
 drapewright-io = { path = "crates/io" }
 drapewright-project = { path = "crates/project" }
 drapewright-pdf-import = { path = "crates/pdf-import" }
+drapewright-seams = { path = "crates/seams" }
 
 # Geometry
 kurbo = "0.13.1"

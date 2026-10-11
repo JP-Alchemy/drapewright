@@ -49,7 +49,7 @@ single exception of sidecars it references explicitly.
 ```json
 {
   "format": "drapewright-project",
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "generator": "Drapewright 0.1.0",
   "meta": {
     "id": "7f3c9a2e5b1d4e8f",
@@ -62,6 +62,7 @@ single exception of sidecars it references explicitly.
   "pieces": [ /* Piece */ ],
   "print": { /* PrintSettings */ },
   "measurementSets": [ /* MeasurementSet, §10.2 */ ],
+  "seams": [ /* Seam, §10.4 */ ],
   "view": { /* ViewState */ },
   "extensions": {}
 }
@@ -70,7 +71,7 @@ single exception of sidecars it references explicitly.
 | Field | Type | Notes |
 |---|---|---|
 | `format` | `"drapewright-project"` | Identifies the file type. |
-| `schemaVersion` | integer | `2` for this document. See §8. |
+| `schemaVersion` | integer | `3` for this document. See §8. |
 | `generator` | string | Free text naming the program that wrote the file. |
 | `meta.id` | string | Stable project identifier. |
 | `meta.name` | string | Shown to the user. |
@@ -80,6 +81,7 @@ single exception of sidecars it references explicitly.
 | `pieces` | array of Piece | Order is the order shown in piece lists. |
 | `print` | PrintSettings | Optional; defaults in §6. |
 | `measurementSets` | array of MeasurementSet | People's measurements (§10.2). Default `[]`. Added in version 2. |
+| `seams` | array of Seam | Edges sewn together (§10.4). Default `[]`. Added in version 3. |
 | `view` | ViewState | Optional; non-semantic (§7). |
 | `extensions` | object | Data owned by other programs, keyed by a reverse-DNS or URL namespace (e.g. `"org.example.cutter"`). Readers must preserve it unchanged. |
 
@@ -370,6 +372,7 @@ Non-semantic: readers may ignore it.
 |---|---|
 | 1 | The first. |
 | 2 | `measurementSets` (§10.2). Version 1 files have none. |
+| 3 | `seams` (§10.4). Earlier files have none. |
 
 ## 9. Validation
 
@@ -494,20 +497,40 @@ Applied in order on top of the sized outline. The piece then also carries
 `lengthenShorten`, `fullBust`, `smallBust`, `swayback`, `broadShoulder`,
 `narrowShoulder`, `waist`, `hip`, `slashSpread`, `pivot`, `ease`, `trueSeam`.
 
-### 10.4 Seams (Phase 3)
+### 10.4 Seams (version 3)
+
+No longer a draft: written since schema version 3.
 
 ```json
 "seams": [{
-  "id": "s1", "name": "Side seam",
-  "a": { "piece": "p1", "edge": "e2" },
-  "b": { "piece": "p2", "edge": "e6", "reversed": true },
+  "id": "s12", "name": "Side seam",
+  "a": { "piece": "p1", "edge": "e2", "from": null, "to": null, "mirror": false },
+  "b": { "piece": "p2", "edge": "e6", "from": null, "to": null, "mirror": false },
+  "reversed": false,
   "ease": "even",
   "confirmed": true
 }]
 ```
 
-Either side may be a range of an edge (`"from": mm, "to": mm`). Lengths and
-mismatches are always derived.
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | Unique in the project. |
+| `name` | string | Default `""`. |
+| `a`, `b` | SeamSide | The two sides sewn together. |
+| `a.piece`, `a.edge` | string | A piece and one of its edges. |
+| `a.from`, `a.to` | number \| null | The part of the edge sewn, mm along its stitching line from its start. `null`: from its start, to its end. |
+| `a.mirror` | boolean | The piece's mirror copy, its other half (a back cut as a pair, sewn to itself at the centre back). Default `false`. |
+| `reversed` | boolean | `a`'s start is sewn to `b`'s end, not its start. Default `false`. |
+| `ease` | `"even"` | How a difference in length is spread: evenly. Default `"even"`. |
+| `confirmed` | boolean | Confirmed by the user. Default `true`. |
+
+Lengths, the difference between the sides and how their notches meet are
+always derived, on the stitching line: where an outline is the cutting line
+(allowance included), each edge is first moved in by its allowance.
+
+A seam must not sew a side to itself, and every side must lie on its edge.
+The reference implementation removes a piece's seams with the piece, and
+refuses to add or remove a corner on a sewn edge until its seam is unpicked.
 
 ### 10.5 Fabrics (Phase 3)
 

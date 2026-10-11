@@ -83,6 +83,7 @@ fn document(pieces: Vec<Piece>) -> Document {
         pieces: pieces.into_iter().map(Arc::new).collect(),
         print: PrintSettings::default(),
         measurement_sets: Vec::new(),
+        seams: Vec::new(),
         extensions: Default::default(),
     }
 }

@@ -3,6 +3,7 @@ import type { MeasurementSet } from "./MeasurementSet";
 import type { Meta } from "./Meta";
 import type { Piece } from "./Piece";
 import type { PrintSettings } from "./PrintSettings";
+import type { Seam } from "./Seam";
 import type { Settings } from "./Settings";
 import type { JsonValue } from "./serde_json/JsonValue";
 
@@ -14,6 +15,10 @@ export type Document = { meta: Meta, settings: Settings, pieces: Array<Piece>, p
  * People's measurements (schema version 2).
  */
 measurementSets: Array<MeasurementSet>, 
+/**
+ * Edges sewn together (schema version 3).
+ */
+seams: Array<Seam>, 
 /**
  * Data owned by other programs; preserved untouched.
  */

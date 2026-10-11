@@ -145,6 +145,25 @@ impl EngineHandle {
 
     /// What is under the point `(x, y)` on the work table (mm), within
     /// `tolerance` mm, or `null`.
+    /// Each seam's two lengths and how its notches meet.
+    #[wasm_bindgen(js_name = seamReports)]
+    pub fn seam_reports(&self) -> Result<JsValue, JsError> {
+        to_js(&self.engine.seam_reports())
+    }
+
+    /// Whether two edges chosen to be sewn together go the other way round
+    /// (`a`'s start to `b`'s end).
+    #[wasm_bindgen(js_name = sewnReversed)]
+    pub fn sewn_reversed(&self, a: JsValue, b: JsValue) -> Result<bool, JsError> {
+        Ok(self.engine.sewn_reversed(&from_js(a)?, &from_js(b)?))
+    }
+
+    /// Seams likely among the edges not sewn yet.
+    #[wasm_bindgen(js_name = suggestSeams)]
+    pub fn suggest_seams(&self) -> Result<JsValue, JsError> {
+        to_js(&self.engine.suggest_seams())
+    }
+
     #[wasm_bindgen(js_name = hitTest)]
     pub fn hit_test(&mut self, x: f64, y: f64, tolerance: f64) -> Result<JsValue, JsError> {
         to_js(&self.engine.hit_test(Pt::new(x, y), tolerance))

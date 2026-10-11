@@ -73,6 +73,7 @@ impl Engine {
             pieces: Vec::new(),
             print: Default::default(),
             measurement_sets: Vec::new(),
+            seams: Vec::new(),
             extensions: Default::default(),
         };
         Engine::from_document(doc, ViewState::default(), generator)
@@ -236,6 +237,31 @@ impl Engine {
             },
         );
         Some(view)
+    }
+
+    /// Each seam measured: both sides' lengths on the stitching line, and
+    /// how their notches meet.
+    pub fn seam_reports(&self) -> Vec<drapewright_seams::SeamReport> {
+        let doc = self.document();
+        doc.seams
+            .iter()
+            .map(|s| drapewright_seams::measure(s, &doc.pieces))
+            .collect()
+    }
+
+    /// Whether two edges chosen to be sewn together go the other way round.
+    pub fn sewn_reversed(
+        &self,
+        a: &drapewright_seams::SeamSide,
+        b: &drapewright_seams::SeamSide,
+    ) -> bool {
+        drapewright_seams::sewn_reversed(a, b, &self.document().pieces)
+    }
+
+    /// Seams likely among the edges not sewn yet, most likely first.
+    pub fn suggest_seams(&self) -> Vec<drapewright_seams::Suggestion> {
+        let doc = self.document();
+        drapewright_seams::suggest(&doc.pieces, &doc.seams)
     }
 
     /// The point of an edge nearest to `world` (work-table mm): its distance

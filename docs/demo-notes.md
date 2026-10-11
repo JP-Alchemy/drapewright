@@ -12,6 +12,71 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 18 — Seams (Phase 3, part 2)
+
+Which edges are sewn together. Seams are useful already in 2D, for walking
+a pattern's seams: both sides' lengths on the stitching line, the
+difference, and whether the notches meet. The drape (step 21) needs them
+to know what to stitch.
+
+**Try it:**
+
+1. Open a pattern with several pieces, such as
+   `fixtures/pdf/freesewing-sasha-a0.pdf`, and add its pieces.
+2. In the side panel, under **Seams**, press **Find seams**. Drapewright
+   lists the edges that look sewn together, how likely each pair is and why
+   ("same length · notches match · hems meet"). **Sew** one, **Sew all**, or
+   **Not this** to hide one.
+3. Each seam gets a number, shown in a badge inside both of its edges on
+   the table, with a band along them. In the list: both sides' names, and
+   "Same length, 50.5 cm" or "9.8 cm and 10.0 cm: the second side 0.2 cm
+   longer", and how the notches meet.
+4. Tap a seam in the list to pick it (its edges are drawn stronger), then
+   **Turn round** (start to end instead of start to start) or **Unpick**.
+5. By hand: tap an edge, press **Sew to another edge…** in the panel, then
+   tap its partner. Drapewright turns it the right way (hems meet hems,
+   notches meet notches). Tap the same edge again to sew it to its other
+   half, for a back cut as a pair with a centre back seam. Escape cancels.
+6. The edge's panel says what it is sewn to. Undo takes back anything.
+
+**How suggestions are made:** pairs of edges are scored on how close their
+lengths are (pattern CAD trues seams to the millimetre), whether they curve
+alike, whether their notches match in kind and place, their names, whether
+hems (or folds) meet at the same end, and whether one is a front and the
+other a back. Then:
+* edges that only run alongside seams already found (a front's and a
+  back's armholes, each sewn to the sleeve) are left out;
+* a piece's own left and right edges are never paired (they match
+  perfectly but are not sewn together), except on a sleeve or a leg, which
+  are tubes;
+* left and right versions of a piece need notches or names to pair;
+* a piece cut as a pair sewn to one drawn whole (a yoke to the back) is
+  sewn to both of its shoulders, one by each half.
+
+On the two real bought patterns: the blouse's side seams, shoulders,
+sleeve underarm, neck facing and front facings are found (11 seams); the
+trousers' three leg seams.
+
+**What changed in the file:** schema version 3, with `seams`. Lengths are
+never stored. Adding or removing a corner on a sewn edge is refused until
+its seam is unpicked, so what is sewn to what never changes silently.
+
+**What's under the hood:** `crates/seams` (the model, measuring, and
+suggesting), `crates/pattern-core/src/stitching.rs` (each edge's own part
+of the stitching line, moved in by its allowance where the outline is the
+cutting line), three commands in `crates/project`, and in the app
+`SeamList.tsx`, the badges in `renderer.ts` and sewing by hand in
+`session.ts`. AI assistants get `get_seams`, `sew_edges` and
+`unpick_seams`. `import_report -s` lists suggested seams for a folder of
+patterns.
+
+**Not yet:** a sleeve cap sewn to the front and back armholes together
+(one edge to two) is not suggested; sew each part by hand with parts of
+edges once the panel offers ranges. Seams are not yet drawn as lines
+between the pieces.
+
+---
+
 ## Step 17 — Measurements (Phase 3, part 1)
 
 The first step of Phase 3 ([plan](plan-phase-3-4.md)): people's

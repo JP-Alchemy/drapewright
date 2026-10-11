@@ -307,6 +307,27 @@ pub fn all() -> Vec<Tool> {
             "Adds a person's measurements, or changes one person's: name, figure (\"woman\" or \"man\"), the date taken, and values in mm by key (see get_measurements; custom keys start with \"x-\"). With measure_again the current values are kept as an earlier measurement first. Values outside the usual range are reported, as they are often in the wrong units.",
             set_measurements,
         ),
+        tool(
+            "get_seams",
+            "Get seams",
+            Reads,
+            "The seams: which edges are sewn together, each side's length on the stitching line, the difference, and how the notches meet. Also the seams Drapewright suggests for edges not sewn yet, with how likely each is and why; ask the user before sewing them with sew_edges.",
+            get_seams,
+        ),
+        tool(
+            "sew_edges",
+            "Sew edges",
+            Edits,
+            "Sews pairs of edges together (adds seams). Each side is a piece id and edge id, optionally a part of the edge (from_mm, to_mm along its stitching line) or the piece's mirror copy (mirror: true, for a piece cut as a pair sewn to itself at the centre back). reversed: true when one side's start meets the other's end.",
+            sew_edges,
+        ),
+        tool(
+            "unpick_seams",
+            "Unpick seams",
+            Edits,
+            "Removes seams (the edges are no longer sewn together).",
+            unpick_seams,
+        ),
         tool("undo", "Undo", Edits, "Undoes the last change.", undo),
         tool(
             "redo",
@@ -1879,6 +1900,164 @@ fn arrange_pieces(session: &mut Session, a: ArrangeArgs) -> Result<Output, ToolE
         if rows == 1 { "" } else { "s" },
         text::length(widest),
         text::length(y + row_height)
+    )))
+}
+
+// ------------------------------------------------------------------ seams
+
+/// "Front · side seam" for a seam side.
+fn side_label(doc: &Document, side: &drapewright_seams::SeamSide) -> String {
+    let piece = doc.piece(&side.piece);
+    let edge = piece.and_then(|p| {
+        let i = p.outline.edge_index(&side.edge)?;
+        let name = &p.outline.edges[i].name;
+        Some(if name.is_empty() {
+            format!("edge {}", i + 1)
+        } else {
+            name.clone()
+        })
+    });
+    format!(
+        "{}{} · {}",
+        piece.map_or("?", |p| p.name.as_str()),
+        if side.mirror { " (other half)" } else { "" },
+        edge.unwrap_or_else(|| "?".into())
+    )
+}
+
+fn side_json(doc: &Document, side: &drapewright_seams::SeamSide) -> Value {
+    json!({
+        "piece": side.piece,
+        "edge": side.edge,
+        "label": side_label(doc, side),
+        "fromMm": side.from.map(r1),
+        "toMm": side.to.map(r1),
+        "mirror": side.mirror,
+    })
+}
+
+fn get_seams(session: &mut Session, _: NoArgs) -> Result<Output, ToolError> {
+    let engine = &session.project()?.engine;
+    let doc = engine.document();
+    let reports = engine.seam_reports();
+    let seams: Vec<Value> = doc
+        .seams
+        .iter()
+        .zip(&reports)
+        .map(|(s, r)| {
+            json!({
+                "id": s.id,
+                "name": s.name,
+                "a": side_json(doc, &s.a),
+                "b": side_json(doc, &s.b),
+                "reversed": s.reversed,
+                "confirmed": s.confirmed,
+                "aLengthMm": r1(r.a_length),
+                "bLengthMm": r1(r.b_length),
+                "differenceMm": r1(r.difference),
+                "notchesApartMm": r.notches.iter().map(|n| n.apart.map(r1)).collect::<Vec<_>>(),
+                "problem": r.problem,
+            })
+        })
+        .collect();
+    let suggested: Vec<Value> = engine
+        .suggest_seams()
+        .iter()
+        .map(|s| {
+            json!({
+                "a": side_json(doc, &s.seam.a),
+                "b": side_json(doc, &s.seam.b),
+                "reversed": s.seam.reversed,
+                "name": s.seam.name,
+                "confidence": (s.confidence * 100.0).round() / 100.0,
+                "reasons": s.reasons,
+            })
+        })
+        .collect();
+    Ok(Output::json(
+        &json!({ "seams": seams, "suggested": suggested }),
+    ))
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct SideArgs {
+    /// Piece id.
+    piece: String,
+    /// Edge id (render_preview with labels "edges" shows them).
+    edge: String,
+    /// Sewn from this far along the edge's stitching line, mm.
+    from_mm: Option<f64>,
+    /// Sewn up to this far along, mm.
+    to_mm: Option<f64>,
+    /// The piece's mirror copy (its other half).
+    #[serde(default)]
+    mirror: bool,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct SeamArgs {
+    a: SideArgs,
+    b: SideArgs,
+    /// a's start meets b's end.
+    #[serde(default)]
+    reversed: bool,
+    /// "Side seam".
+    name: Option<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct SewArgs {
+    seams: Vec<SeamArgs>,
+}
+
+fn sew_edges(session: &mut Session, a: SewArgs) -> Result<Output, ToolError> {
+    if a.seams.is_empty() {
+        return Err(ToolError::new("Give at least one pair of edges to sew."));
+    }
+    let side = |s: SideArgs| drapewright_seams::SeamSide {
+        piece: s.piece,
+        edge: s.edge,
+        from: s.from_mm,
+        to: s.to_mm,
+        mirror: s.mirror,
+    };
+    let seams: Vec<drapewright_seams::Seam> = a
+        .seams
+        .into_iter()
+        .map(|s| drapewright_seams::Seam {
+            id: String::new(),
+            name: s.name.unwrap_or_default(),
+            a: side(s.a),
+            b: side(s.b),
+            reversed: s.reversed,
+            ease: Default::default(),
+            confirmed: true,
+        })
+        .collect();
+    let count = seams.len();
+    session.dispatch(vec![Command::AddSeams { seams }])?;
+    Ok(Output::text(format!(
+        "Sewed {count} seam{}. get_seams shows their lengths.",
+        if count == 1 { "" } else { "s" }
+    )))
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct UnpickArgs {
+    /// Seam ids, from get_seams.
+    seams: Vec<String>,
+}
+
+fn unpick_seams(session: &mut Session, a: UnpickArgs) -> Result<Output, ToolError> {
+    let count = a.seams.len();
+    session.dispatch(vec![Command::DeleteSeams { ids: a.seams }])?;
+    Ok(Output::text(format!(
+        "Unpicked {count} seam{}.",
+        if count == 1 { "" } else { "s" }
     )))
 }
 
