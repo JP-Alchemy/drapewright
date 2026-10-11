@@ -137,13 +137,24 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
                 selectedKeys={chosenSizes}
                 onSelectionChange={(keys) => setChosenSizes(sizes.names.filter((n) => keys.has(n)))}
               >
-                {sizes.names.map((n) => (
+                {sizes.names.map((n, i) => (
                   <ToggleButton
                     key={n}
                     id={n}
                     className="size-chip"
                     aria-label={n === sizes.sample ? t.importing.sampleSizeLabel(n) : undefined}
                   >
+                    {sizes.swatches[i] && (
+                      // The size's line, as printed: sizes told apart by colour.
+                      <span
+                        className="size-swatch"
+                        aria-hidden="true"
+                        style={{
+                          borderTopColor: sizes.swatches[i].colour,
+                          borderTopStyle: sizes.swatches[i].dashed ? 'dashed' : 'solid',
+                        }}
+                      />
+                    )}
                     {n}
                     {n === sizes.sample && (
                       <span className="size-sample" aria-hidden="true">

@@ -33,6 +33,14 @@ const plural = (n: number, one: string, many: string) =>
 const namesList = (names: string[]) =>
   new Intl.ListFormat('en', { type: 'conjunction' }).format(names.map((n) => `“${n}”`))
 
+/** A test square's side as printed on it: whole centimetres, or whole inches. */
+const squareSize = (mm: number) => {
+  const inches = mm / 25.4
+  return mm % 10 !== 0 && Math.abs(inches - Math.round(inches)) < 0.01
+    ? `${Math.round(inches)} in`
+    : `${Math.round(mm / 10)} cm`
+}
+
 /** Who a note is about: “Front”, “Front and Back”, or “All 7 pieces”. */
 const piecesLabel = (names: string[], total: number) => {
   if (names.length > 1 && names.length === total) {
@@ -214,7 +222,7 @@ export const t = {
       `${plural(pieces, 'Found 1 piece', 'Found # pieces')} in ${sizes} sizes`,
     sizeQuestion: 'Which size?',
     sizeHint:
-      'The file has every size of this pattern. Pick yours, or more than one to compare them.',
+      'The file has several sizes of this pattern. Pick yours, or more than one to compare them.',
     sampleSize: 'sample',
     sampleSizeLabel: (size: string) => `${size}, the size the pattern was made in`,
     nothingFound: 'No pieces were found in this file.',
@@ -335,7 +343,7 @@ export const t = {
             'Left out # pages that are not part of the pattern sheet (covers or instructions).',
           )
         case 'testSquareFound':
-          return `Found the ${formatLength(n.size, n.size < 50 ? 'mm' : 'cm')} test square and left it out of the pieces. Measure it on your print before cutting.`
+          return `Found the ${squareSize(n.size)} test square and left it out of the pieces. Measure it on your print before cutting.`
         case 'outlineCrossesItself':
           return one
             ? `${who}: the outline crosses itself. Check that piece after adding.`

@@ -1259,6 +1259,12 @@ h2 {
   outline-offset: 2px;
 }
 
+.size-swatch {
+  display: inline-block;
+  width: 18px;
+  border-top-width: 3px;
+}
+
 .size-sample {
   font-size: 11px;
   font-weight: 500;

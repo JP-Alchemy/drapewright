@@ -1,5 +1,6 @@
 ---
 source: crates/io/tests/dxf_import.rs
+assertion_line: 97
 expression: r
 ---
 {
@@ -295,7 +296,8 @@ expression: r
         "piece": "p5",
         "size": "38"
       }
-    ]
+    ],
+    "swatches": []
   },
   "notes": [
     {

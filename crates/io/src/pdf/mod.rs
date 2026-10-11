@@ -6,6 +6,7 @@
 mod import;
 mod marks;
 mod plan;
+mod sizes;
 mod text;
 mod tiles;
 mod write;

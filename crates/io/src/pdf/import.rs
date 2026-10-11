@@ -11,15 +11,16 @@ use drapewright_pattern_core::{CutInstruction, Piece, ScaleBasis, SourceFormat};
 use drapewright_pdf_import::{Document, Page, Shape, TextRun};
 use kurbo::{Affine, BezPath, CubicBez, Line, ParamCurve, PathEl, PathSeg, Point, Rect, Vec2};
 
-use super::marks::{find_fold_brackets, find_grainlines, find_notches, remove_test_squares};
+use super::marks::{find_fold_brackets, find_grainlines, find_notches, test_square};
+use super::sizes::find_sizes;
 use super::tiles::{Print, arrange};
 use crate::assemble::{
     CLOSE_TOLERANCE, RawPath, assemble, bounds, chain, is_straight, mark_folds, meaningful_name,
     sentence_case,
 };
 use crate::import::{
-    AllowanceQuestion, ImportError, ImportNote, ImportResult, ScaleInfo, ScaleOption, ScaleReason,
-    sha256_hex,
+    AllowanceQuestion, ImportError, ImportNote, ImportResult, ImportSizes, PieceSize, ScaleInfo,
+    ScaleOption, ScaleReason, SizeSwatch, sha256_hex,
 };
 
 const MM_PER_POINT: f64 = 25.4 / 72.0;
@@ -121,11 +122,12 @@ fn subpaths(path: &BezPath, to_mm: Affine) -> Vec<(Vec<PathSeg>, bool)> {
 
 /// How a shape is drawn, to keep lines of one kind together.
 #[derive(Clone, Debug, PartialEq)]
-struct Style {
-    stroke: Option<[u8; 3]>,
-    width: i64,
-    dashed: bool,
-    layers: Vec<u32>,
+pub(crate) struct Style {
+    pub stroke: Option<[u8; 3]>,
+    /// Line width in twentieths of a millimetre.
+    pub width: i64,
+    pub dashed: bool,
+    pub layers: Vec<u32>,
 }
 
 fn rgb8(c: [f32; 3]) -> [u8; 3] {
@@ -665,7 +667,7 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
 
     // Outlines drawn as separate segments: join those drawn alike.
     let (closed, open): (Vec<_>, Vec<_>) = styled.into_iter().partition(|(r, _)| r.closed);
-    let mut raw: Vec<RawPath> = closed.into_iter().map(|(r, _)| r).collect();
+    let mut raw: Vec<(RawPath, Style)> = closed;
     let mut groups: Vec<(Style, RawPath, Vec<Vec<PathSeg>>)> = Vec::new();
     for (r, style) in open {
         match groups.iter_mut().find(|(s, _, _)| *s == style) {
@@ -676,27 +678,51 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
             }
         }
     }
-    for (_, template, paths) in groups {
+    for (style, template, paths) in groups {
         for (segs, closed) in chain(paths, JOIN) {
-            raw.push(RawPath {
-                segs,
-                closed,
-                filled: template.filled,
-                hint: template.hint.clone(),
-                name: None,
-                reference: None,
-                cut: None,
-            });
+            raw.push((
+                RawPath {
+                    segs,
+                    closed,
+                    filled: template.filled,
+                    hint: template.hint.clone(),
+                    name: None,
+                    reference: None,
+                    cut: None,
+                },
+                style.clone(),
+            ));
         }
     }
 
-    // The pattern's marks.
-    if let Some(side) = remove_test_squares(&mut raw, &labels) {
-        notes.push(ImportNote::TestSquareFound { size: side });
-    }
-    let bracket_ends = find_fold_brackets(&mut raw);
-    let notches = find_notches(&mut raw, &bracket_ends);
-    find_grainlines(&mut raw);
+    // The test square checks the print; it is not a piece (nor a size).
+    let mut square = None;
+    raw.retain(|(r, _)| match test_square(r, &labels) {
+        Some(side) => {
+            square.get_or_insert(side);
+            false
+        }
+        None => true,
+    });
+
+    // A pattern in several sizes is assembled one size at a time, with what
+    // the sizes share.
+    let order: Vec<u32> = doc.layers().iter().map(|l| l.id).collect();
+    let sizes = find_sizes(&raw, &layer_name, &order, &labels);
+    let subsets: Vec<(Option<usize>, Vec<RawPath>)> = match &sizes {
+        Some(sizes) => (0..sizes.names.len())
+            .map(|k| {
+                let paths = raw
+                    .iter()
+                    .zip(&sizes.of_path)
+                    .filter(|(_, of)| of.is_none_or(|s| s == k))
+                    .map(|((r, _), _)| r.clone())
+                    .collect();
+                (Some(k), paths)
+            })
+            .collect(),
+        None => vec![(None, raw.into_iter().map(|(r, _)| r).collect())],
+    };
 
     let scale = ScaleInfo {
         chosen: ScaleOption {
@@ -708,18 +734,86 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         alternatives: Vec::new(),
     };
     let sha256 = sha256_hex(data);
-    let (mut pieces, assembled) =
-        assemble(raw, &notches, SourceFormat::Pdf, &scale, file_name, &sha256);
-    notes.extend(assembled);
-    read_labels(&mut pieces, &labels);
+    let mut pieces: Vec<Piece> = Vec::new();
+    let mut piece_sizes = Vec::new();
+    // Notes counting what was left out are the same for every size; keep
+    // the largest count of each.
+    let mut counted: Vec<ImportNote> = Vec::new();
+    for (size, mut raw) in subsets {
+        // The pattern's marks.
+        let bracket_ends = find_fold_brackets(&mut raw);
+        let notches = find_notches(&mut raw, &bracket_ends);
+        find_grainlines(&mut raw);
+        let (mut found, assembled) =
+            assemble(raw, &notches, SourceFormat::Pdf, &scale, file_name, &sha256);
+        read_labels(&mut found, &labels);
+        // Piece ids stay unique across sizes.
+        let suffix = size.map(|k| format!("-{k}")).unwrap_or_default();
+        for piece in &mut found {
+            piece.id.push_str(&suffix);
+            if let (Some(k), Some(sizes)) = (size, &sizes) {
+                piece_sizes.push(PieceSize {
+                    piece: piece.id.clone(),
+                    size: sizes.names[k].clone(),
+                });
+            }
+        }
+        for mut note in assembled {
+            match &mut note {
+                ImportNote::SeamLineFound { piece, .. }
+                | ImportNote::CuttingLineDiffers { piece, .. }
+                | ImportNote::OutlineCrossesItself { piece } => {
+                    piece.push_str(&suffix);
+                    notes.push(note);
+                }
+                _ => match counted
+                    .iter_mut()
+                    .find(|n| std::mem::discriminant(*n) == std::mem::discriminant(&note))
+                {
+                    Some(existing) if count(existing) < count(&note) => *existing = note,
+                    Some(_) => {}
+                    None => counted.push(note),
+                },
+            }
+        }
+        pieces.extend(found);
+    }
+    if let Some(side) = square {
+        notes.push(ImportNote::TestSquareFound { size: side });
+    }
+    notes.extend(counted);
+    let sizes = sizes
+        .map(|s| ImportSizes {
+            names: s.names,
+            sample: None,
+            pieces: piece_sizes,
+            swatches: s
+                .swatches
+                .into_iter()
+                .map(|(colour, dashed)| SizeSwatch { colour, dashed })
+                .collect(),
+        })
+        .unwrap_or_default();
     Ok(ImportResult {
         allowance: AllowanceQuestion::for_unmeasured(&pieces, &notes, None),
         pieces,
         scale,
-        sizes: Default::default(),
+        sizes,
         notes,
         sha256,
     })
+}
+
+/// How many things a "left out" note counts.
+fn count(note: &ImportNote) -> u32 {
+    match note {
+        ImportNote::SmallShapesIgnored { count }
+        | ImportNote::LooseLinesIgnored { count }
+        | ImportNote::LinesOnOutlineIgnored { count }
+        | ImportNote::UnsupportedEntities { count }
+        | ImportNote::CurvesTraced { count } => *count,
+        _ => 0,
+    }
 }
 
 #[cfg(test)]

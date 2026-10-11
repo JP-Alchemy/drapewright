@@ -133,6 +133,20 @@ pub struct ImportSizes {
     pub sample: Option<String>,
     /// The size of each piece that has one.
     pub pieces: Vec<PieceSize>,
+    /// How each size's lines look, in the order of `names`, when sizes are
+    /// told apart by colour or dashes; empty otherwise.
+    #[serde(default)]
+    pub swatches: Vec<SizeSwatch>,
+}
+
+/// A size's line on the pattern.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SizeSwatch {
+    /// CSS colour, `#rrggbb`.
+    pub colour: String,
+    pub dashed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -254,6 +268,14 @@ impl ImportResult {
             self.allowance.suggested = None;
         }
         self.sizes.pieces.retain(|ps| !dropped.contains(&ps.piece));
+        if self.sizes.swatches.len() == self.sizes.names.len() {
+            let names = &self.sizes.names;
+            let mut i = 0;
+            self.sizes.swatches.retain(|_| {
+                i += 1;
+                chosen.contains(&names[i - 1])
+            });
+        }
         self.sizes.names.retain(|n| chosen.contains(n));
     }
 

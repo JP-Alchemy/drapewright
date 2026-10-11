@@ -507,6 +507,7 @@ fn sizes_of(d: &Drawing, pieces: Vec<PieceSize>) -> ImportSizes {
         names,
         sample: annotation(&header, "Sample Size").map(str::to_string),
         pieces,
+        swatches: Vec::new(),
     }
 }
 

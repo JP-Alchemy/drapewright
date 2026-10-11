@@ -12,6 +12,42 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 14 — PDF patterns in several sizes (Phase 2, part 2)
+
+**Try it:**
+
+1. Open `fixtures/pdf/sizes-colours.pdf`, a front bodice and a sleeve in
+   sizes 8, 10 and 12, nested as printed patterns are, each size in its
+   own colour. The import says **Found 2 pieces in 3 sizes** and asks
+   **Which size?**. Each choice shows its line as printed (red 8, green
+   10, blue 12), named from the pattern's legend, with the middle size
+   offered first. Only the chosen size's pieces are added, each with its
+   name, grainline, cutting and fold.
+2. Open `fixtures/pdf/sizes-layers.pdf`: the same pattern with each size
+   on a layer ("Size 8"…), as layered indie patterns are. The sizes come
+   from the layer names.
+3. Choose two sizes to compare them: each piece says its size, *Front
+   bodice (10)*.
+
+**Why it matters:** without this, nested size lines look like a cutting
+line with its stitching line inside, and the grade between sizes would
+have been "measured" as seam allowance. Now each size is assembled on its
+own, with what the sizes share (grainlines, names, cutting, notches).
+
+**How sizes are told apart:**
+* Layers named as sizes: "Size 10", "XS", "38", "UK 12", "Taille 38",
+  "10/12"…
+* Otherwise, line styles (colour, dash, width) that each draw outlines.
+  This needs three or more styles, or a legend naming them, because a
+  solid line and a dashed one are usually a cutting line and its
+  stitching line. The styles' outlines must also nest, so pieces merely
+  drawn in different colours stay one size.
+
+**Not yet:** sizes whose lines share a stretch (a common centre front
+drawn once for all sizes). Each size's line must go all the way round.
+
+---
+
 ## Step 13 — PDF patterns (Phase 2, part 1)
 
 **Try it:** *Open pattern* now takes `.pdf`.
@@ -44,8 +80,6 @@ labels need guessing. Furniture that stays put on every page (frames,
 footers, page letters) is ignored.
 
 **Not yet:**
-* Sizes on layers or in different colours (most multi-size patterns):
-  next step.
 * PDFs whose tiles each contain only their own piece of the drawing,
   with no shapes in common. These need the page grid; they come after
   sizes.

@@ -202,3 +202,112 @@ fn not_a_pdf_says_so() {
     let e = import_pdf(b"<svg/>", Some("x.pdf")).unwrap_err();
     assert!(e.to_string().contains("not a PDF"), "{e}");
 }
+
+/// Front bodice and sleeve in sizes 8, 10 and 12 (fixtures/pdf/make_fixtures.py).
+fn check_sizes(result: &ImportResult) {
+    assert_eq!(result.sizes.names, ["8", "10", "12"]);
+    assert_eq!(result.pieces.len(), 6, "a bodice and a sleeve in each size");
+    // Only the cutting lines are printed, so allowance is asked about.
+    assert_eq!(result.allowance.pieces.len(), 6);
+    assert!(
+        result
+            .notes
+            .contains(&ImportNote::TestSquareFound { size: 100.0 })
+    );
+    let width = |size: &str, name: &str| {
+        let id = &result
+            .sizes
+            .pieces
+            .iter()
+            .find(|ps| {
+                ps.size == size
+                    && result
+                        .pieces
+                        .iter()
+                        .any(|p| p.id == ps.piece && p.name == name)
+            })
+            .unwrap_or_else(|| panic!("no {name} in size {size}"))
+            .piece;
+        result
+            .pieces
+            .iter()
+            .find(|p| &p.id == id)
+            .unwrap()
+            .outline
+            .bounds()
+            .width()
+    };
+    // Each size a little bigger than the one before.
+    for name in ["Front bodice", "Sleeve"] {
+        assert!(width("8", name) < width("10", name) && width("10", name) < width("12", name));
+    }
+    let mut ten = result.clone();
+    ten.choose_sizes(&["10".to_string()]);
+    let names: Vec<&str> = ten.pieces.iter().map(|p| p.name.as_str()).collect();
+    assert_eq!(names, ["Front bodice", "Sleeve"]);
+    let bodice = &ten.pieces[0];
+    assert_eq!(
+        bodice
+            .outline
+            .edges
+            .iter()
+            .filter(|e| e.kind == EdgeKind::Fold)
+            .count(),
+        1,
+        "PLACE ON FOLD along the centre front"
+    );
+    assert_eq!(bodice.cut[0].on_fold, Some(true));
+    assert!(ten.pieces.iter().all(|p| p.grainline.is_some()));
+    assert_eq!(ten.pieces[1].cut[0].quantity, 2);
+}
+
+#[test]
+fn sizes_on_layers_and_in_colours() {
+    let layers = import_pdf(&fixture("pdf/sizes-layers.pdf"), None).unwrap();
+    check_sizes(&layers);
+    assert!(layers.sizes.swatches.is_empty());
+
+    let colours = import_pdf(&fixture("pdf/sizes-colours.pdf"), None).unwrap();
+    check_sizes(&colours);
+    let swatches: Vec<&str> = colours
+        .sizes
+        .swatches
+        .iter()
+        .map(|s| s.colour.as_str())
+        .collect();
+    assert_eq!(swatches, ["#d91a1a", "#1a8c26", "#1a40d9"]);
+    // The legend's sample lines are not pieces.
+    assert!(
+        colours
+            .notes
+            .contains(&ImportNote::LooseLinesIgnored { count: 3 })
+    );
+}
+
+#[test]
+fn pieces_in_different_colours_are_not_sizes() {
+    use pdf_writer::{Content, Finish, Pdf, Rect, Ref};
+    let mut pdf = Pdf::new();
+    pdf.catalog(Ref::new(1)).pages(Ref::new(2));
+    pdf.pages(Ref::new(2)).kids([Ref::new(3)]).count(1);
+    let mut page = pdf.page(Ref::new(3));
+    page.media_box(Rect::new(0.0, 0.0, 1200.0, 800.0))
+        .parent(Ref::new(2))
+        .contents(Ref::new(4));
+    page.finish();
+    let mut c = Content::new();
+    // Three different pieces side by side, each in its own colour.
+    for (i, (r, g, b)) in [(1.0, 0.0, 0.0), (0.0, 0.6, 0.0), (0.0, 0.0, 1.0)]
+        .into_iter()
+        .enumerate()
+    {
+        let x = 50.0 + 380.0 * i as f32;
+        c.set_stroke_rgb(r, g, b)
+            .rect(x, 100.0, 200.0 + 50.0 * i as f32, 500.0 - 100.0 * i as f32)
+            .stroke();
+    }
+    pdf.stream(Ref::new(4), &c.finish());
+    let result = import_pdf(&pdf.finish(), None).unwrap();
+    assert!(result.sizes.names.is_empty());
+    assert_eq!(result.pieces.len(), 3);
+}

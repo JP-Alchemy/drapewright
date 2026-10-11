@@ -1,5 +1,6 @@
 ---
 source: crates/io/tests/svg_import.rs
+assertion_line: 167
 expression: r
 ---
 {
@@ -128,7 +129,8 @@ expression: r
   "sizes": {
     "names": [],
     "sample": null,
-    "pieces": []
+    "pieces": [],
+    "swatches": []
   },
   "notes": [
     {

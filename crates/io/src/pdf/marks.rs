@@ -296,39 +296,29 @@ pub(crate) fn find_notches(raw: &mut Vec<RawPath>, avoid: &[Point]) -> Vec<RawNo
     notches
 }
 
-/// Test squares (a square of 1–4 in or 5–10 cm with its size printed
-/// inside) are removed; returns the side of the first one found, mm.
-pub(crate) fn remove_test_squares(raw: &mut Vec<RawPath>, labels: &[Label]) -> Option<f64> {
-    let mut found = None;
-    raw.retain(|r| {
-        if !r.closed || !r.segs.iter().all(|s| matches!(s, PathSeg::Line(_))) || r.segs.len() != 4 {
-            return true;
-        }
-        let pts = flatten_segs(&r.segs, 0.05);
-        let b = bounds(&pts);
-        let side = (b.width() + b.height()) / 2.0;
-        let square = (b.width() - b.height()).abs() <= 0.5
-            && (polygon_area(&pts).abs() - b.area()).abs() <= 0.02 * b.area();
-        let standard = TEST_SQUARES.iter().find(|s| (side - **s).abs() <= 0.4);
-        let says_size = labels.iter().any(|l| {
-            let t = l.text.to_lowercase();
-            b.contains(l.at)
-                && (t.contains("cm")
-                    || t.contains("in")
-                    || t.contains('"')
-                    || t.contains("test")
-                    || t.contains("square")
-                    || t.contains("mm"))
-        });
-        match standard {
-            Some(s) if square && says_size => {
-                found.get_or_insert(*s);
-                false
-            }
-            _ => true,
-        }
+/// The side of a test square (a square of 1–4 in or 5–10 cm with its
+/// size printed inside), if `r` is one, mm.
+pub(crate) fn test_square(r: &RawPath, labels: &[Label]) -> Option<f64> {
+    if !r.closed || !r.segs.iter().all(|s| matches!(s, PathSeg::Line(_))) || r.segs.len() != 4 {
+        return None;
+    }
+    let pts = flatten_segs(&r.segs, 0.05);
+    let b = bounds(&pts);
+    let side = (b.width() + b.height()) / 2.0;
+    let square = (b.width() - b.height()).abs() <= 0.5
+        && (polygon_area(&pts).abs() - b.area()).abs() <= 0.02 * b.area();
+    let standard = TEST_SQUARES.iter().find(|s| (side - **s).abs() <= 0.4)?;
+    let says_size = labels.iter().any(|l| {
+        let t = l.text.to_lowercase();
+        b.contains(l.at)
+            && (t.contains("cm")
+                || t.contains("in")
+                || t.contains('"')
+                || t.contains("test")
+                || t.contains("square")
+                || t.contains("mm"))
     });
-    found
+    (square && says_size).then_some(*standard)
 }
 
 #[cfg(test)]

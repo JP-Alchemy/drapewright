@@ -192,3 +192,35 @@ test('opens a PDF pattern, putting its pages back together', async ({ page }) =>
     source: 'pdf',
   })
 })
+
+test('a PDF in several colours asks which size, showing each size’s line', async ({ page }) => {
+  await page.goto('/?debug')
+  await page.getByTestId('pattern-file').setInputFiles(fixture('sizes-colours.pdf'))
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: 'Found 2 pieces in 3 sizes' })).toBeVisible()
+  // The sizes are named from the pattern's legend; the middle one is offered.
+  const chips = dialog.locator('.size-chip')
+  await expect(chips).toHaveText(['8', '10', '12'])
+  await expect(dialog.getByRole('button', { name: '10', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await expect(chips.nth(0).locator('.size-swatch')).toHaveCSS(
+    'border-top-color',
+    'rgb(217, 26, 26)',
+  )
+  await expect(dialog.locator('.found-list li')).toHaveText(['Front bodice', 'Sleeve'])
+  await expect(dialog).toContainText('Found the 10 cm test square')
+
+  await dialog.getByRole('button', { name: '12', exact: true }).click()
+  await dialog.getByRole('button', { name: '10', exact: true }).click()
+  await dialog
+    .getByRole('radiogroup', { name: /seam allowance included/ })
+    .getByText('Already included', { exact: true })
+    .click()
+  await dialog.getByRole('button', { name: 'Add 2 pieces' }).click()
+  await expect(dialog).toBeHidden()
+  const list = page.getByRole('listbox', { name: 'Pieces' })
+  await expect(list.getByRole('option')).toHaveCount(2)
+  await expect(list.getByRole('option', { name: /Front bodice/ })).toBeVisible()
+})
