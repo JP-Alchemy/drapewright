@@ -892,10 +892,16 @@ pub(crate) fn bridge(paths: Vec<(Vec<PathSeg>, bool)>, reach: f64) -> Vec<(Vec<P
     out
 }
 
-/// "SKIRT FRONT" → "Skirt front"; other text as it is.
+/// "SKIRT FRONT" → "Skirt front", "BELT LOOPS (5pc)" → "Belt loops (5pc)":
+/// words in capitals, perhaps with a note in small letters. Other text
+/// ("Back yoke", codes such as "x1-BL-S1M") as it is.
 pub(crate) fn sentence_case(s: &str) -> String {
     let s = s.trim();
-    if s.chars().any(char::is_lowercase) {
+    let count = |w: &str, f: fn(char) -> bool| w.chars().filter(|&c| f(c)).count();
+    let mixed = |w: &str| count(w, char::is_uppercase) > 0 && count(w, char::is_lowercase) > 0;
+    if s.split_whitespace().any(mixed)
+        || count(s, char::is_uppercase) <= 2 * count(s, char::is_lowercase)
+    {
         return s.to_string();
     }
     let lower = s.to_lowercase();

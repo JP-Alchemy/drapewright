@@ -1004,5 +1004,7 @@ mod tests {
     fn sentence_case_only_changes_shouting() {
         assert_eq!(sentence_case("SKIRT FRONT"), "Skirt front");
         assert_eq!(sentence_case("Back yoke"), "Back yoke");
+        assert_eq!(sentence_case("BELT LOOPS (5pc)"), "Belt loops (5pc)");
+        assert_eq!(sentence_case("x1-BL-S1M"), "x1-BL-S1M");
     }
 }

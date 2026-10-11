@@ -12,6 +12,79 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 16 — Reading lettering drawn as strokes (Phase 2, part 4)
+
+PDFs printed through a plotter driver (step 15) draw their words as pen
+strokes, so their pieces came in as *Piece 1*, *Piece 2*… The import now
+reads that lettering: each piece gets its name and how many to cut from
+the label the pattern program printed on it.
+
+**Try it:**
+
+1. The made-up plotter drawing now has names, drawn in a plain hand of its
+   own (not the one the importer knows):
+
+   ```bash
+   PLOTTED_PDF=plotted.pdf cargo test -p drapewright-io --test pdf_plotter
+   ```
+
+   The front comes in as **Left**, cut 4, and the back as **Fly**, cut 2,
+   read from lettering turned on its side. The strip, with only a logo on
+   it, stays *Piece 3*. The A4 tiles (`PLOTTED_TILES=tiles.pdf`) give the
+   same names.
+2. On the two real bought patterns (kept out of the repo), every piece is
+   named, in the A0 and the A4 files alike:
+   * the blouse: Front yoke (cut 4), Sleeve (cut 2), Back, Back neck
+     facing, Rouleau button loops (cut 2), Right front, Left front, Cuff
+     (cut 4), Right front facing, Left front facing;
+   * the trousers: Back leg and Front leg (cut 2 each), Belt loops (5pc),
+     Fly shield (cut 1 on the fold, its fold edge marked from the word
+     "fold" printed along it), Fly extension (cut 1 in interfacing),
+     Waistband, Pocket bag (cut 2).
+
+**How it reads:**
+* Letters are strokes that touch, and lines are letters side by side. The
+  block is turned whichever of the four ways reads best, and each line
+  gets its own baseline, so lettering a hair off straight still reads.
+* Each letter is compared with a stroke font of technical lettering, both
+  ways round: how far the drawn strokes are from the font's, and the
+  font's from the drawn ones. A missing stroke (the side of an O, which a
+  C lacks) counts for more than a slightly different hand.
+* Lettering in small letters only ("seam") is read at its own size.
+* Letters drawn alike but for size (c and C, o and O) take the case of
+  their word; O and 0, l and 1 are letters in words and digits in numbers.
+  A word one letter off a word patterns use ("RCULEAU") is set right.
+* The name is the line above "cut …" in the label, or else a line of
+  capitals read closely. No other lettering names a piece: strokes read as
+  letters can be anything (a logo, hatching, a page's footer).
+* A "fold line" (folded in sewing, as on a cut-on fly) no longer marks the
+  edge near it to go on the fabric fold. "Fold" and "on fold" still do.
+
+**Found by testing:**
+* Notch cuts beside lettering were taken into it and lost. A stroke from
+  one line to another, or straight and long from one, is now a notch cut,
+  so the blouse's buttonhole ticks all come in. But a stroke lying along a
+  line (an asterisk's, at a dart's point) or a dot sitting on one (an i's)
+  stays lettering.
+* A single stroke too long to be a letter, scaled up for matching, ran out
+  of memory. Strokes are now capped in length for matching.
+* The word "foldline" beside the trousers' cut-on fly marked the front
+  leg's edge as a fold.
+
+**Not yet:**
+* A word crossed by a line drawn dash by dash ("seam" under a centre line)
+  reads as nonsense, because the dashes are taken for letters. It names
+  nothing. Joining dashed lines is a later step.
+* Measurements printed on the pattern (the finished sizes table) are read
+  but not used.
+
+**What's under the hood:** `crates/io/src/pdf/strokefont.rs` (the font),
+`reading.rs` (letters, lines, which way round, matching, words) and
+`drawn_labels` in `import.rs` (which line is the name). Tests are in
+`reading.rs` and `crates/io/tests/pdf_plotter.rs`.
+
+---
+
 ## Step 15 — PDFs printed from pattern CAD through a plotter driver (Phase 2, part 3)
 
 Some pattern companies draw in pattern CAD (Grafis, for example) and make
@@ -85,9 +158,8 @@ every logo is strokes. These now import.
   is its longest arrow. Shorter ones show which way to press a dart.
 
 **Not yet:**
-* **Piece names and cutting counts:** they are drawn as strokes too, so
-  pieces are named *Piece 1*, *Piece 2*… The import says so. Reading
-  plotter lettering is a later step.
+* **Piece names and cutting counts** (step 16): they are drawn as strokes
+  too, so pieces are named *Piece 1*, *Piece 2*… The import says so.
 * An allowance that curves from one width into another (the end of the
   real trousers' fly) becomes a square step, and the import gives the
   largest difference from the drawn cutting line (9 mm there).

@@ -19,6 +19,7 @@ use super::lettering::{
 };
 use super::loops::find_loops;
 use super::marks::{arrowheads, find_fold_brackets, find_grainlines, find_notches, test_square};
+use super::reading::{FAIR, ReadLine, SURE, read_block};
 use super::sizes::find_sizes;
 use super::tiles::{Print, arrange};
 use crate::assemble::{
@@ -48,6 +49,21 @@ pub(crate) struct Label {
     pub size: f64,
     /// Reading direction (unit).
     pub dir: Vec2,
+    /// Whether, and how surely, it names its piece.
+    pub naming: Naming,
+}
+
+/// How surely a label is its piece's name, least first.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Naming {
+    /// Lettering read from strokes, not set out as a name.
+    Never,
+    /// Text: any line may be the name, the biggest first.
+    Maybe,
+    /// Lettering in capitals, read closely.
+    Capitals,
+    /// Lettering above the piece's cutting.
+    AboveCutting,
 }
 
 /// Maps a page's user space to millimetres from the top-left corner of the
@@ -270,6 +286,7 @@ pub(crate) fn text_lines(runs: &[TextRun], to_mm: Affine) -> Vec<Label> {
                 at: start.midpoint(end) + up * (size * 0.35),
                 size,
                 dir,
+                naming: Naming::Maybe,
             })
         })
         .collect()
@@ -282,7 +299,7 @@ fn is_instruction(text: &str) -> bool {
         "cut", "place", "fold", "grain", "lengthen", "shorten", "size", "sizes", "notch", "seam",
         "stitch", "pleat", "dart", "button", "line", "cf", "cb", "selvage", "selvedge", "bias",
         "x ", "page", "©", "www", "http", "print", "test", "this", "scale", "match", "join",
-        "gather", "hem", "inch", "cm", "mm",
+        "gather", "hem", "inch", "cm", "mm", "height",
     ];
     let words = t.split_whitespace().count();
     let letters = t.chars().filter(|c| c.is_alphabetic()).count();
@@ -292,6 +309,8 @@ fn is_instruction(text: &str) -> bool {
         || t.contains("cut ")
         || t.contains("on fold")
         || t.contains("grainline")
+        // The fabric's right side ("FACE!").
+        || t.trim_end_matches('!') == "face"
         // Page labels such as "A1", "B12".
         || (t.len() <= 4 && t.chars().next().is_some_and(char::is_alphabetic) && t[1..].chars().all(|c| c.is_ascii_digit()))
 }
@@ -387,8 +406,8 @@ pub(crate) fn read_labels(pieces: &mut [Piece], labels: &[Label]) {
         if piece.name.starts_with("Piece ")
             && let Some(name) = inside
                 .iter()
-                .filter(|l| !is_instruction(&l.text))
-                .max_by(|a, b| a.size.total_cmp(&b.size))
+                .filter(|l| l.naming != Naming::Never && !is_instruction(&l.text))
+                .max_by(|a, b| a.naming.cmp(&b.naming).then(a.size.total_cmp(&b.size)))
                 .and_then(|l| meaningful_name(&l.text))
         {
             piece.name = sentence_case(&name);
@@ -400,10 +419,12 @@ pub(crate) fn read_labels(pieces: &mut [Piece], labels: &[Label]) {
         if !cuts.is_empty() && piece.cut.iter().all(|c| *c == CutInstruction::default()) {
             piece.cut = cuts;
         }
-        // "Place on fold" printed along a straight edge, near it.
+        // "Place on fold" printed along a straight edge, near it; not a fold
+        // line, folded in making up (a cut-on facing's, a waistband's).
         for label in labels {
             let t = label.text.to_lowercase();
-            if !t.contains("fold") || t.split_whitespace().count() > 6 {
+            let fold_line = t.contains("foldline") || t.contains("fold line");
+            if !t.contains("fold") || fold_line || t.split_whitespace().count() > 6 {
                 continue;
             }
             let near = (0..piece.outline.edges.len())
@@ -546,6 +567,41 @@ fn despike(segs: &mut Vec<PathSeg>, closed: bool) {
         segs.remove(k);
         k = k.saturating_sub(1);
     }
+}
+
+/// A block's lines read from strokes, as labels. A pattern CAD's label
+/// block (model, size, the piece's name, its cutting) gives the piece its
+/// name in the line above "cut …", read fairly well, or else in a line of
+/// capitals read closely. Other lettering names nothing: strokes read as
+/// letters may be anything.
+fn drawn_labels(lines: Vec<ReadLine>) -> Vec<Label> {
+    let letters = |t: &str| t.chars().filter(|c| c.is_alphabetic()).count();
+    let nameable = |l: &ReadLine| letters(&l.text) >= 3 && !is_instruction(&l.text);
+    let above_cut = lines
+        .iter()
+        .position(|l| l.text.to_lowercase().starts_with("cut"))
+        .and_then(|cut| (0..cut).rev().find(|&k| nameable(&lines[k])))
+        .filter(|&k| lines[k].fit <= FAIR);
+    let capitals = lines
+        .iter()
+        .position(|l| nameable(l) && !l.text.chars().any(char::is_lowercase) && l.fit <= SURE);
+    lines
+        .into_iter()
+        .enumerate()
+        .map(|(k, l)| Label {
+            text: l.text,
+            at: l.at,
+            size: l.size,
+            dir: l.dir,
+            naming: if Some(k) == above_cut {
+                Naming::AboveCutting
+            } else if Some(k) == capitals {
+                Naming::Capitals
+            } else {
+                Naming::Never
+            },
+        })
+        .collect()
 }
 
 /// A line drawn along a side of `frame`.
@@ -929,7 +985,19 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
     let plain: Vec<RawPath> = raw.iter().map(|(r, _)| r.clone()).collect();
     // Arrowheads are left for the grainlines they belong to.
     let heads = arrowheads(&plain);
-    let (lettering, letter_boxes) = find_lettering(&plain, &heads);
+    let blocks = find_lettering(&plain, &heads);
+    let mut lettering: Vec<usize> = blocks.iter().flat_map(|b| b.paths.clone()).collect();
+    lettering.sort_unstable();
+    let letter_boxes: Vec<Rect> = blocks.iter().map(|b| b.bounds).collect();
+    // Lettering drawn as strokes, read: the pieces' names and cutting.
+    for block in &blocks {
+        let strokes: Vec<Vec<Point>> = block
+            .paths
+            .iter()
+            .map(|&i| flatten_segs(&plain[i].segs, 0.05))
+            .collect();
+        labels.extend(drawn_labels(read_block(&strokes)));
+    }
     let (mut crosses, mut cross_paths) = find_crosses(&plain, &lettering);
     let (outlined, outlined_paths) = find_outlined_crosses(&plain);
     crosses.extend(outlined);
@@ -1158,6 +1226,46 @@ mod tests {
         assert!(is_instruction("Size 12"));
         assert!(!is_instruction("FRONT BODICE"));
         assert!(!is_instruction("Sleeve"));
+        assert!(is_instruction("FACE!"));
+        assert!(!is_instruction("Face mask"));
+        assert!(!is_instruction("Back neck facing"));
+    }
+
+    #[test]
+    fn drawn_names_above_their_cutting() {
+        let line = |text: &str, fit: f64| ReadLine {
+            text: text.to_string(),
+            at: Point::ZERO,
+            size: 3.0,
+            dir: Vec2::new(1.0, 0.0),
+            fit,
+        };
+        let naming = |lines: Vec<ReadLine>| -> Vec<Naming> {
+            drawn_labels(lines).iter().map(|l| l.naming).collect()
+        };
+        use Naming::*;
+        // The model and size come first; the name is above the cutting,
+        // though read in another hand than the font's.
+        assert_eq!(
+            naming(vec![
+                line("ODILE blouse", 0.3),
+                line("size 40", 0.3),
+                line("SLEEVE", 1.1),
+                line("cut 2", 0.3)
+            ]),
+            [Never, Never, AboveCutting, Never]
+        );
+        // Without cutting, a line of capitals read closely may be one; not
+        // one read far off the font, as strokes that only look like letters
+        // are, nor other lettering.
+        assert_eq!(
+            naming(vec![
+                line("LLLLLLLL", 1.2),
+                line("BELT LOOPS", 0.4),
+                line("seam", 0.3)
+            ]),
+            [Never, Capitals, Never]
+        );
     }
 
     #[test]

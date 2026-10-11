@@ -20,17 +20,51 @@ const MIN_STROKES: usize = 4;
 const WORD_GAP: f64 = 10.0;
 /// Strokes this close touch, mm.
 const TOUCHING: f64 = 0.5;
+/// Lines at least this long are the pattern's, not lettering's, mm.
+const LONG_LINE: f64 = 20.0;
 
-/// Clusters of tiny strokes: lettering. Returns the indices of their paths
-/// and each cluster's bounds. Paths in `keep` are never lettering.
-pub(crate) fn find_lettering(raw: &[RawPath], keep: &[usize]) -> (Vec<usize>, Vec<Rect>) {
+/// A block of lettering: its paths, and its bounds.
+pub(crate) struct Block {
+    pub paths: Vec<usize>,
+    pub bounds: Rect,
+}
+
+/// Clusters of tiny strokes: lettering, block by block. Paths in `keep`
+/// are never lettering, nor are the cuts of notches (strokes from a long
+/// line).
+pub(crate) fn find_lettering(raw: &[RawPath], keep: &[usize]) -> Vec<Block> {
+    let long: Vec<(Vec<Point>, Rect)> = raw
+        .iter()
+        .map(|r| flatten_segs(&r.segs, 0.1))
+        .filter(|pts| pts.windows(2).map(|w| w[0].distance(w[1])).sum::<f64>() >= LONG_LINE)
+        .map(|pts| {
+            let b = bounds(&pts).inflate(TOUCHING, TOUCHING);
+            (pts, b)
+        })
+        .collect();
+    let on_a_line = |p: Point| {
+        long.iter()
+            .any(|(pts, b)| b.contains(p) && distance_to_polyline(p, pts, false) <= 0.3)
+    };
     let tiny: Vec<(usize, Rect)> = raw
         .iter()
         .enumerate()
         .filter(|(i, _)| !keep.contains(i))
         .filter_map(|(i, r)| {
-            let b = bounds(&flatten_segs(&r.segs, 0.1));
-            (b.width().hypot(b.height()) <= GLYPH).then_some((i, b))
+            let pts = flatten_segs(&r.segs, 0.1);
+            let (&start, &end) = (pts.first()?, pts.last()?);
+            let b = bounds(&pts);
+            // A notch's cut runs from a line (to another); lettering can
+            // touch a line it is written across, lie along one (a mark's
+            // stroke), or sit on one (an i's dot).
+            let (first, last) = (on_a_line(start), on_a_line(end));
+            let length = start.distance(end);
+            let along = on_a_line(start.midpoint(end));
+            let dot = b.width().hypot(b.height()) < 1.0;
+            let cut = !dot
+                && !along
+                && ((first && last) || ((first || last) && is_straight(&pts) && length >= 4.5));
+            (b.width().hypot(b.height()) <= GLYPH && !cut).then_some((i, b))
         })
         .collect();
     // Strokes link when the gap between them is under a letter's height
@@ -87,12 +121,15 @@ pub(crate) fn find_lettering(raw: &[RawPath], keep: &[usize]) -> (Vec<usize>, Ve
             .reduce(|a, b| a.union(b))
             .unwrap_or_default()
     };
-    let mut paths = Vec::new();
-    let mut boxes = Vec::new();
-    for members in clusters.iter().filter(|m| m.len() >= MIN_STROKES) {
-        paths.extend(members.iter().map(|&k| tiny[k].0));
-        boxes.push(bounds_of(members));
-    }
+    let mut blocks: Vec<Block> = clusters
+        .iter()
+        .filter(|m| m.len() >= MIN_STROKES)
+        .map(|members| Block {
+            paths: members.iter().map(|&k| tiny[k].0).collect(),
+            bounds: bounds_of(members),
+        })
+        .collect();
+    let boxes: Vec<Rect> = blocks.iter().map(|b| b.bounds).collect();
     // A short word a space away from the rest ("to" in "gather to"), unless
     // it is all parallel straight strokes, as double and triple notches are.
     let notch_like = |members: &[usize]| {
@@ -137,7 +174,6 @@ pub(crate) fn find_lettering(raw: &[RawPath], keep: &[usize]) -> (Vec<usize>, Ve
                     .any(|p| distance_to_polyline(*p, other, raw[j].closed) <= TOUCHING)
         })
     };
-    let mut words = Vec::new();
     for members in clusters.iter().filter(|m| m.len() < MIN_STROKES) {
         let b = bounds_of(members);
         if !beside(b) {
@@ -148,13 +184,13 @@ pub(crate) fn find_lettering(raw: &[RawPath], keep: &[usize]) -> (Vec<usize>, Ve
             _ => !notch_like(members),
         };
         if word {
-            paths.extend(members.iter().map(|&k| tiny[k].0));
-            words.push(b);
+            blocks.push(Block {
+                paths: members.iter().map(|&k| tiny[k].0).collect(),
+                bounds: b,
+            });
         }
     }
-    boxes.extend(words);
-    paths.sort_unstable();
-    (paths, boxes)
+    blocks
 }
 
 /// Logos signing each piece: the same intricate closed shape (a letter of
@@ -400,7 +436,10 @@ mod tests {
         // A notch far away, and a long pattern line.
         raw.push(line((100.0, 0.0), (106.0, 0.0)));
         raw.push(line((0.0, 50.0), (200.0, 50.0)));
-        let (paths, boxes) = find_lettering(&raw, &[]);
+        let blocks = find_lettering(&raw, &[]);
+        let mut paths: Vec<usize> = blocks.iter().flat_map(|b| b.paths.clone()).collect();
+        paths.sort_unstable();
+        let boxes: Vec<Rect> = blocks.iter().map(|b| b.bounds).collect();
         assert_eq!(paths, [0, 1, 2, 3, 4]);
         assert_eq!(boxes.len(), 1);
     }

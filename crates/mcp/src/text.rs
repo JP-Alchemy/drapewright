@@ -159,8 +159,8 @@ pub fn note(n: &ImportNote, name: &dyn Fn(&str) -> String) -> String {
         ),
         ImportNote::LetteringIgnored { count: c } => count(
             *c,
-            "Left out 1 block of lettering drawn as lines (it can't be read as text), so the pieces need names.",
-            "Left out # blocks of lettering and logos drawn as lines (they can't be read as text), so the pieces need names.",
+            "Read 1 block of lettering drawn as lines (not text) for the pieces' names and cutting, as well as strokes can be read, and left it out; check them. Pieces it didn't name are called Piece and a number.",
+            "Read # blocks of lettering and logos drawn as lines (not text) for the pieces' names and cutting, as well as strokes can be read, and left them out; check them. Pieces they didn't name are called Piece and a number.",
         ),
         ImportNote::TestSquareFound { size } => format!(
             "Found the {} test square; it was left out of the pieces.",

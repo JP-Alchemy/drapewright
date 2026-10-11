@@ -107,8 +107,8 @@ pub enum ImportNote {
     /// its side, mm.
     TestSquareFound { size: f64 },
     /// Words and logos drawn as lines rather than written as text (as
-    /// pattern programs print through plotter drivers): left out, so the
-    /// pieces need naming by hand.
+    /// pattern programs print through plotter drivers): read for the
+    /// pieces' names and cutting as well as strokes can be, and left out.
     LetteringIgnored { count: u32 },
 }
 

@@ -68,6 +68,27 @@ impl Plotter {
         }
     }
 
+    /// `text` in a plain technical hand of its own (not the importer's):
+    /// `size` mm capitals, its baseline from `at` along `dir`.
+    fn lettering(&mut self, text: &str, at: P, size: f64, dir: P) {
+        let up = (dir.1, -dir.0);
+        for (k, c) in text.chars().enumerate() {
+            for stroke in letter(c) {
+                let points: Vec<P> = stroke
+                    .iter()
+                    .map(|&(x, y)| {
+                        let (along, over) = ((9.0 * k as f64 + x) * size / 10.0, y * size / 10.0);
+                        (
+                            at.0 + dir.0 * along + up.0 * over,
+                            at.1 + dir.1 * along + up.1 * over,
+                        )
+                    })
+                    .collect();
+                self.strokes.push((points, false));
+            }
+        }
+    }
+
     /// A brand's logo: two letters of different shapes and a dot, `scale`
     /// times the usual size.
     fn logo(&mut self, at: P, scale: f64) {
@@ -147,6 +168,55 @@ impl Plotter {
     }
 }
 
+/// A letter's strokes, in tenths of the capital height from its left foot.
+fn letter(c: char) -> &'static [&'static [P]] {
+    match c {
+        'L' => &[&[(0.0, 10.0), (0.0, 0.0), (6.0, 0.0)]],
+        'E' => &[
+            &[(6.0, 10.0), (0.0, 10.0), (0.0, 0.0), (6.0, 0.0)],
+            &[(0.0, 5.0), (4.5, 5.0)],
+        ],
+        'F' => &[
+            &[(6.0, 10.0), (0.0, 10.0), (0.0, 0.0)],
+            &[(0.0, 5.0), (4.5, 5.0)],
+        ],
+        'T' => &[&[(0.0, 10.0), (7.0, 10.0)], &[(3.5, 10.0), (3.5, 0.0)]],
+        'Y' => &[
+            &[(0.0, 10.0), (3.5, 5.0), (7.0, 10.0)],
+            &[(3.5, 5.0), (3.5, 0.0)],
+        ],
+        'c' => &[&[
+            (6.0, 5.5),
+            (4.5, 7.0),
+            (1.5, 7.0),
+            (0.0, 5.5),
+            (0.0, 1.5),
+            (1.5, 0.0),
+            (4.5, 0.0),
+            (6.0, 1.5),
+        ]],
+        'u' => &[
+            &[(0.0, 7.0), (0.0, 1.5), (1.5, 0.0), (4.5, 0.0), (6.0, 1.5)],
+            &[(6.0, 7.0), (6.0, 0.0)],
+        ],
+        't' => &[
+            &[(1.5, 10.0), (1.5, 1.0), (2.5, 0.0), (4.0, 0.0)],
+            &[(0.0, 7.0), (4.0, 7.0)],
+        ],
+        '2' => &[&[
+            (0.0, 8.0),
+            (1.5, 10.0),
+            (5.5, 10.0),
+            (7.0, 8.0),
+            (7.0, 6.5),
+            (0.0, 0.0),
+            (7.0, 0.0),
+        ]],
+        '4' => &[&[(5.0, 0.0), (5.0, 10.0), (0.0, 3.5), (7.0, 3.5)]],
+        _ => &[],
+    }
+}
+
 /// The made-up pattern, as a plotter draws it.
 fn drawing() -> Vec<Stroke> {
     let mut p = Plotter::default();
@@ -189,6 +259,9 @@ fn drawing() -> Vec<Stroke> {
     for y in [100.0, 140.0, 180.0] {
         p.cross((200.0, y));
     }
+    // Its name, above its cutting.
+    p.lettering("LEFT", (70.0, 125.0), 4.0, (1.0, 0.0));
+    p.lettering("cut 4", (70.0, 132.0), 4.0, (1.0, 0.0));
 
     // Piece B: its stitching line forks above the hem, round an extension
     // of the piece; the seam carries on straight down to the hem.
@@ -230,6 +303,9 @@ fn drawing() -> Vec<Stroke> {
     p.shape(&[(470.0, 90.0), (475.0, 95.0), (465.0, 95.0)]);
     p.words((350.0, 300.0), 8);
     p.logo((440.0, 120.0), 0.6);
+    // Its name and cutting, reading up the page.
+    p.lettering("FLY", (395.0, 200.0), 4.0, (0.0, -1.0));
+    p.lettering("cut 2", (402.0, 200.0), 4.0, (0.0, -1.0));
 
     // Piece C: a strip whose stitching line is drawn on three sides; along
     // the fourth the cutting line is the stitching line. Cut on the bias.
@@ -471,6 +547,13 @@ fn plotter_drawn_pieces() {
     assert!(((grain.to.x - grain.from.x).abs() - (grain.to.y - grain.from.y).abs()).abs() < 0.5);
     assert!(c.lines.is_empty(), "{:#?}", c.lines);
 
+    // Names and cutting read from the lettering, whichever way round;
+    // strokes that only look like letters (logos, the words of short
+    // strokes) name nothing.
+    assert_eq!((a.name.as_str(), a.cut[0].quantity), ("Left", 4));
+    assert_eq!((b.name.as_str(), b.cut[0].quantity), ("Fly", 2));
+    assert!(c.name.starts_with("Piece"), "{}", c.name);
+
     // Three logos and the lettering were left out, and said so.
     assert!(
         result
@@ -488,8 +571,8 @@ fn plotter_drawn_pieces() {
     );
 }
 
-/// What a piece came in as, to compare two imports by: size, allowances,
-/// grainline, marks, notches, lines.
+/// What a piece came in as, to compare two imports by: name, size,
+/// allowances, grainline, marks, notches, lines.
 fn summary(result: &drapewright_io::ImportResult) -> Vec<String> {
     let mut pieces: Vec<&Piece> = result.pieces.iter().collect();
     pieces.sort_by(|a, b| a.outline.bounds().x0.total_cmp(&b.outline.bounds().x0));
@@ -502,7 +585,8 @@ fn summary(result: &drapewright_io::ImportResult) -> Vec<String> {
                 .collect();
             widths.sort();
             format!(
-                "{:.0} × {:.0} mm, allowance {} {widths:?}, grain {}, {} marks, {} notches, {} lines",
+                "{}: {:.0} × {:.0} mm, allowance {} {widths:?}, grain {}, {} marks, {} notches, {} lines",
+                p.name,
                 b.width(),
                 b.height(),
                 p.allowance.seam,
