@@ -106,6 +106,10 @@ pub enum ImportNote {
     /// A test square printed to check the scale, left out of the pieces;
     /// its side, mm.
     TestSquareFound { size: f64 },
+    /// Words and logos drawn as lines rather than written as text (as
+    /// pattern programs print through plotter drivers): left out, so the
+    /// pieces need naming by hand.
+    LetteringIgnored { count: u32 },
 }
 
 impl ImportNote {

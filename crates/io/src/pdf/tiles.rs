@@ -6,7 +6,7 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use kurbo::{ParamCurve, PathSeg, Point, Vec2};
+use kurbo::{ParamCurve, PathSeg, Point, Rect, Vec2};
 
 /// Shapes shorter than this say too little to match pages by, mm.
 const MIN_LENGTH: f64 = 20.0;
@@ -28,6 +28,8 @@ pub(crate) struct Print {
     length: f64,
     /// Where it starts on its page.
     first: Point,
+    /// Its extent on its page.
+    bounds: Rect,
     /// Some of its points, relative to the first.
     samples: Vec<Vec2>,
 }
@@ -41,11 +43,15 @@ impl Print {
         }
         let step = segs.len().div_ceil(SAMPLES).max(1);
         let samples = segs.iter().step_by(step).map(|s| s.end() - first).collect();
+        let bounds = segs.iter().fold(Rect::from_points(first, first), |r, s| {
+            r.union_pt(s.start()).union_pt(s.end())
+        });
         Some(Print {
             closed,
             segments: segs.len(),
             length,
             first,
+            bounds,
             samples,
         })
     }
@@ -98,8 +104,8 @@ impl<'a> Index<'a> {
 
 /// Groups of pages that are tiles of one sheet, each page with its offset
 /// on the sheet (mm). Pages that share no shapes are groups of one.
-/// `prints[i]` are page i's shapes.
-pub(crate) fn arrange(prints: &[Vec<Print>]) -> Vec<Vec<(usize, Vec2)>> {
+/// `prints[i]` are page i's shapes; `sizes[i]` its width and height, mm.
+pub(crate) fn arrange(prints: &[Vec<Print>], sizes: &[Vec2]) -> Vec<Vec<(usize, Vec2)>> {
     let n = prints.len();
     let indexes: Vec<Index> = prints.iter().map(Index::new).collect();
     // Page furniture (a frame, a footer rule) sits at the same place on
@@ -125,6 +131,39 @@ pub(crate) fn arrange(prints: &[Vec<Print>]) -> Vec<Vec<(usize, Vec2)>> {
         .map(|p| Index::new(p.iter().copied()))
         .collect();
 
+    // Where two pages overlap at an offset, they show the same drawing:
+    // most shapes wholly inside the overlap on either page are on the
+    // other too. (Without this, two sheets that merely share a piece end
+    // of the same length would be laid on top of each other.)
+    let agree_where_they_overlap = |i: usize, j: usize, d: Vec2| {
+        let (pi, pj) = (sizes[i], sizes[j]);
+        let overlap = Rect::new(0.0, 0.0, pi.x, pi.y)
+            .intersect(Rect::new(d.x, d.y, d.x + pj.x, d.y + pj.y))
+            .inset(-2.0);
+        if overlap.width() <= 0.0 || overlap.height() <= 0.0 {
+            return true;
+        }
+        let side = |from: usize, to: usize, area: Rect, shift: Vec2| {
+            let inside: Vec<&&Print> = useful[from]
+                .iter()
+                .filter(|p| {
+                    area.contains(p.bounds.origin())
+                        && area.contains(Point::new(p.bounds.x1, p.bounds.y1))
+                })
+                .collect();
+            let agree = inside
+                .iter()
+                .filter(|a| {
+                    useful_indexes[to]
+                        .matches(a)
+                        .any(|b| (a.first - b.first - shift).hypot() <= 1.0)
+                })
+                .count();
+            inside.len() < 3 || agree * 2 >= inside.len()
+        };
+        side(i, j, overlap, d) && side(j, i, overlap - d, -d)
+    };
+
     // Links between pages: page j sits at page i's offset plus d.
     let mut links: Vec<Vec<(usize, Vec2)>> = vec![Vec::new(); n];
     for i in 0..n {
@@ -137,8 +176,13 @@ pub(crate) fn arrange(prints: &[Vec<Print>]) -> Vec<Vec<(usize, Vec2)>> {
                 }
                 for b in same {
                     let d = a.first - b.first;
-                    // Two tiles are never in the same place.
-                    if d.hypot() < 1.0 {
+                    // Two tiles are never in the same place, and neighbours
+                    // touch or overlap: they are less than a page apart.
+                    let page = sizes
+                        .get(i)
+                        .copied()
+                        .unwrap_or(Vec2::new(f64::MAX, f64::MAX));
+                    if d.hypot() < 1.0 || d.x.abs() > page.x + 1.0 || d.y.abs() > page.y + 1.0 {
                         continue;
                     }
                     let key = ((d.x / GRID).round() as i64, (d.y / GRID).round() as i64);
@@ -154,8 +198,10 @@ pub(crate) fn arrange(prints: &[Vec<Print>]) -> Vec<Vec<(usize, Vec2)>> {
                 && count >= 2
             {
                 let d = sum / count as f64;
-                links[i].push((j, d));
-                links[j].push((i, -d));
+                if agree_where_they_overlap(i, j, d) {
+                    links[i].push((j, d));
+                    links[j].push((i, -d));
+                }
             }
         }
     }
@@ -220,12 +266,16 @@ mod tests {
             shapes
         };
         let cover = vec![Print::of(&square(30.0, 30.0, 100.0), true).unwrap()];
-        let groups = arrange(&[
-            cover,
-            page(0.0, 0.0),
-            page(180.0, 0.0001),
-            page(360.0, -0.0001),
-        ]);
+        let a4 = Vec2::new(210.0, 297.0);
+        let groups = arrange(
+            &[
+                cover,
+                page(0.0, 0.0),
+                page(180.0, 0.0001),
+                page(360.0, -0.0001),
+            ],
+            &[a4; 4],
+        );
         assert_eq!(groups.len(), 2);
         assert_eq!(groups[0], vec![(0, Vec2::ZERO)]);
         let sheet = &groups[1];

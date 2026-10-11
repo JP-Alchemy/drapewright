@@ -344,6 +344,8 @@ export const t = {
             'Left out 1 page that is not part of the pattern sheet (a cover or instructions).',
             'Left out # pages that are not part of the pattern sheet (covers or instructions).',
           )
+        case 'letteringIgnored':
+          return 'The words on this pattern are drawn as lines, not written as text, so Drapewright can’t read the pieces’ names yet. Name the pieces after adding them.'
         case 'testSquareFound':
           return `Found the ${squareSize(n.size)} test square and left it out of the pieces. Measure it on your print before cutting.`
         case 'outlineCrossesItself':

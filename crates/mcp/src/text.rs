@@ -157,6 +157,11 @@ pub fn note(n: &ImportNote, name: &dyn Fn(&str) -> String) -> String {
             "Left out 1 page that is not part of the pattern sheet (a cover or instructions).",
             "Left out # pages that are not part of the pattern sheet (covers or instructions).",
         ),
+        ImportNote::LetteringIgnored { count: c } => count(
+            *c,
+            "Left out 1 block of lettering drawn as lines (it can't be read as text), so the pieces need names.",
+            "Left out # blocks of lettering and logos drawn as lines (they can't be read as text), so the pieces need names.",
+        ),
         ImportNote::TestSquareFound { size } => format!(
             "Found the {} test square; it was left out of the pieces.",
             length(*size)

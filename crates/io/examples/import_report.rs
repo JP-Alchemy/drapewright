@@ -50,6 +50,7 @@ fn note(n: &ImportNote) -> String {
         ImportNote::PagesJoined { count } => format!("{count} pages joined"),
         ImportNote::PagesLeftOut { count } => format!("{count} pages left out"),
         ImportNote::TestSquareFound { size } => format!("test square {size} mm"),
+        ImportNote::LetteringIgnored { count } => format!("{count} lettering left out"),
     }
 }
 
@@ -187,6 +188,33 @@ fn main() {
                             p.lines.len(),
                             if p.grainline.is_some() { "yes" } else { "no" },
                         );
+                        // Lines too short to mean much: leftovers of lettering?
+                        let tiny: Vec<String> = p
+                            .lines
+                            .iter()
+                            .filter_map(|l| {
+                                let segs =
+                                    drapewright_pattern_core::geom::segs_of(l.start, &l.segments);
+                                let length: f64 = segs
+                                    .iter()
+                                    .map(|s| kurbo::ParamCurveArclen::arclen(s, 0.01))
+                                    .sum();
+                                (length < 5.0).then(|| {
+                                    format!("@{:.0},{:.0} {length:.1} mm", l.start.x, l.start.y)
+                                })
+                            })
+                            .collect();
+                        if !tiny.is_empty() {
+                            println!("             short lines: {}", tiny.join("; "));
+                        }
+                        if !p.marks.is_empty() {
+                            let marks: Vec<String> = p
+                                .marks
+                                .iter()
+                                .map(|m| format!("{:?} @{:.0},{:.0}", m.kind, m.at.x, m.at.y))
+                                .collect();
+                            println!("             marks: {}", marks.join("; "));
+                        }
                     }
                 }
             }

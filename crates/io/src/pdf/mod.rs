@@ -4,6 +4,8 @@
 //! at a copy shop. And reading PDF patterns back in (`import_pdf`).
 
 mod import;
+mod lettering;
+mod loops;
 mod marks;
 mod plan;
 mod sizes;

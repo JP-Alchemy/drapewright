@@ -10,17 +10,19 @@
 use std::collections::HashMap;
 
 use drapewright_pattern_core::allowance::allowance_lines;
-use drapewright_pattern_core::build::{DEFAULT_CORNER_ANGLE, counter, outline_from_path};
+use drapewright_pattern_core::build::{
+    DEFAULT_CORNER_ANGLE, counter, outline_from_path, outline_from_path_at,
+};
 use drapewright_pattern_core::geom::{
-    distance_to_polyline, flatten_segs, point_in_polygon, polygon_area, ray_hit,
+    distance_to_polyline, flatten_segs, point_in_polygon, polygon_area, ray_hit, unit_tangent,
 };
 use drapewright_pattern_core::ops::normalize_orientation;
 use drapewright_pattern_core::validate::self_intersects;
 use drapewright_pattern_core::{
-    CutInstruction, EdgeGeom, EdgeKind, Grainline, InternalLine, LineKind, Mark, MarkKind, Notch,
-    NotchFrom, NotchKind, Piece, Pt, Segment, Source, SourceFormat, SourceScale,
+    CutInstruction, EdgeGeom, EdgeKind, Grainline, Id, InternalLine, LineKind, Mark, MarkKind,
+    Notch, NotchFrom, NotchKind, Outline, Piece, Pt, Segment, Source, SourceFormat, SourceScale,
 };
-use kurbo::{ParamCurve, PathSeg, Point, Rect};
+use kurbo::{Line, ParamCurve, ParamCurveArclen, ParamCurveNearest, PathSeg, Point, Rect, Vec2};
 
 use crate::import::{ImportNote, ScaleInfo};
 
@@ -234,22 +236,59 @@ pub(crate) fn median(mut v: Vec<f64>) -> f64 {
 /// corner where a 40 mm hem meets a fold, the fold's cutting line is closer
 /// than the hem's.
 pub(crate) fn measure_allowances(piece: &Piece, outer: &[Point]) -> Option<Vec<f64>> {
+    measure_allowances_avoiding(piece, outer, &[])
+}
+
+/// Distance from stitching line `inner` at `along` on one of its edges
+/// straight out to cutting line `outer`. None where that way slips past a
+/// corner of `outer` into the next edge's allowance (beside an inside
+/// corner) and runs on alongside the stitching line instead of away from it.
+fn allowance_at(geom: &EdgeGeom, along: f64, inner: &[Point], outer: &[Point]) -> Option<f64> {
+    let p = geom.point_at(along);
+    let normal = geom.normal_at(along);
+    match ray_hit(p, normal, outer) {
+        Some(hit) => {
+            let d = hit.distance(p);
+            let halfway = p + normal * (d / 2.0);
+            (distance_to_polyline(halfway, inner, true) >= 0.4 * d).then_some(d)
+        }
+        None => Some(distance_to_polyline(p, outer, true)),
+    }
+}
+
+/// Like [`measure_allowances`], leaving out what lies within reach of the
+/// given points: where one allowance turns into another.
+fn measure_allowances_avoiding(
+    piece: &Piece,
+    outer: &[Point],
+    avoid: &[(Point, f64)],
+) -> Option<Vec<f64>> {
+    let inner = flatten_segs(&piece.outline.path_segs(), 0.05);
     let mut widths = Vec::new();
     for i in 0..piece.outline.edges.len() {
         let geom: EdgeGeom = piece.outline.edge_geom(i);
         let len = geom.length();
         // Stay clear of the corners, where corner shapes change the distance.
-        let samples: Vec<f64> = (1..10)
-            .map(|k| {
-                let along = len * f64::from(k) / 10.0;
+        let tenths = if avoid.is_empty() { 10 } else { 40 };
+        let samples: Vec<f64> = (1..tenths)
+            .map(|k| len * f64::from(k) / f64::from(tenths))
+            .filter(|&along| {
                 let p = geom.point_at(along);
-                ray_hit(p, geom.normal_at(along), outer).map_or_else(
-                    || distance_to_polyline(p, outer, true),
-                    |hit| hit.distance(p),
-                )
+                avoid.iter().all(|(at, reach)| at.distance(p) > reach + 2.0)
             })
+            .filter_map(|along| allowance_at(&geom, along, &inner, outer))
             .collect();
-        let (lo, hi) = samples
+        if samples.len() < 3 {
+            return None;
+        }
+        // The samples nearest the corners may be pulled by them on a short
+        // edge; the rest must agree.
+        let core = if samples.len() >= 5 {
+            &samples[1..samples.len() - 1]
+        } else {
+            &samples[..]
+        };
+        let (lo, hi) = core
             .iter()
             .fold((f64::MAX, f64::MIN), |(lo, hi), d| (lo.min(*d), hi.max(*d)));
         let mid = median(samples);
@@ -259,6 +298,173 @@ pub(crate) fn measure_allowances(piece: &Piece, outer: &[Point]) -> Option<Vec<f
         widths.push(snap_allowance(mid));
     }
     Some(widths)
+}
+
+/// Where an allowance changes partway along an edge (a cut-on fly or
+/// facing that ends before its edge does): the points to break edges at,
+/// each with how far the change spreads either side of it, mm.
+fn allowance_steps(piece: &Piece, outer: &[Point]) -> Option<Vec<(Point, f64)>> {
+    let tolerance = |w: f64| 0.5 + 0.05 * w;
+    let inner = flatten_segs(&piece.outline.path_segs(), 0.05);
+    let mut steps = Vec::new();
+    for i in 0..piece.outline.edges.len() {
+        let geom = piece.outline.edge_geom(i);
+        let len = geom.length();
+        let count = ((len / 2.0) as usize).clamp(10, 400);
+        let spacing = 0.8 * len / (count - 1) as f64;
+        let along: Vec<f64> = (0..count).map(|k| 0.1 * len + spacing * k as f64).collect();
+        let d: Vec<f64> = along
+            .iter()
+            .map(|&s| allowance_at(&geom, s, &inner, outer).unwrap_or(f64::NAN))
+            .collect();
+        // Runs of samples that agree: (first, last, width).
+        let mut runs: Vec<(usize, usize, f64)> = Vec::new();
+        let mut k = 0;
+        while k < count {
+            let mut j = k;
+            while j + 1 < count && (d[j + 1] - d[k]).abs() <= tolerance(d[k]) {
+                j += 1;
+            }
+            runs.push((k, j, median(d[k..=j].to_vec())));
+            k = j + 1;
+        }
+        let long: Vec<(usize, usize, f64)> = runs
+            .into_iter()
+            .filter(|&(a, b, _)| b - a >= 4 && (b - a) as f64 * spacing >= 10.0)
+            .collect();
+        let covered: usize = long.iter().map(|(a, b, _)| b - a + 1).sum();
+        if long.is_empty()
+            || covered * 10 < count * 7
+            || long.iter().any(|r| r.2 > MAX_DETECTED_ALLOWANCE)
+        {
+            return None;
+        }
+        for pair in long.windows(2) {
+            let (a, b) = (pair[0], pair[1]);
+            if (a.2 - b.2).abs() <= tolerance(a.2.max(b.2)) {
+                continue;
+            }
+            // Where the allowance is halfway from one width to the other.
+            let half = (a.2 + b.2) / 2.0;
+            let wider_first = a.2 > b.2;
+            let (mut lo, mut hi) = (along[a.1], along[b.0]);
+            for _ in 0..30 {
+                let m = (lo + hi) / 2.0;
+                let d = allowance_at(&geom, m, &inner, outer).unwrap_or(half);
+                if (d > half) == wider_first {
+                    lo = m;
+                } else {
+                    hi = m;
+                }
+            }
+            let at = (lo + hi) / 2.0;
+            let spread = (at - along[a.1]).max(along[b.0] - at);
+            steps.push((geom.point_at(at), spread));
+        }
+    }
+    (!steps.is_empty()).then_some(steps)
+}
+
+/// The piece's stitching line, with its edges broken at `steps` as well as
+/// at its corners.
+fn break_edges(
+    piece: &Piece,
+    steps: &[(Point, f64)],
+    ids: &mut dyn FnMut(&str) -> Id,
+) -> Option<Outline> {
+    let outline = &piece.outline;
+    let mut segs = outline.path_segs();
+    let mut corners: Vec<Point> = (0..outline.edges.len())
+        .map(|i| Point::from(outline.edge_start(i)))
+        .collect();
+    for &(p, _) in steps {
+        let (k, near) = segs
+            .iter()
+            .enumerate()
+            .map(|(k, s)| (k, s.nearest(p, 1e-6)))
+            .min_by(|a, b| a.1.distance_sq.total_cmp(&b.1.distance_sq))?;
+        let seg = segs[k];
+        if near.t > 1e-6 && near.t < 1.0 - 1e-6 {
+            segs.splice(
+                k..=k,
+                [seg.subsegment(0.0..near.t), seg.subsegment(near.t..1.0)],
+            );
+        }
+        corners.push(seg.eval(near.t));
+    }
+    outline_from_path_at(&segs, &corners, 1e-6, DEFAULT_CORNER_ANGLE, ids)
+}
+
+/// Length of a polyline, mm; `closed` counts the way back to the start.
+fn polyline_length(points: &[Point], closed: bool) -> f64 {
+    let open: f64 = points.windows(2).map(|w| w[0].distance(w[1])).sum();
+    match (closed, points.first(), points.last()) {
+        (true, Some(a), Some(b)) => open + a.distance(*b),
+        _ => open,
+    }
+}
+
+/// Where on closed path `ring` is nearest `p`: segment and parameter.
+fn locate_on(ring: &[PathSeg], p: Point) -> Option<(usize, f64)> {
+    ring.iter()
+        .enumerate()
+        .map(|(k, s)| (k, s.nearest(p, 1e-6)))
+        .min_by(|a, b| a.1.distance_sq.total_cmp(&b.1.distance_sq))
+        .map(|(k, n)| (k, n.t))
+}
+
+/// Closed path `ring` from one place on it forward to another.
+fn arc_of(ring: &[PathSeg], from: (usize, f64), to: (usize, f64)) -> Vec<PathSeg> {
+    let n = ring.len();
+    let keep = |s: PathSeg| (s.start().distance(s.end()) > 1e-9).then_some(s);
+    if from.0 == to.0 && from.1 <= to.1 {
+        return keep(ring[from.0].subsegment(from.1..to.1))
+            .into_iter()
+            .collect();
+    }
+    let mut out: Vec<PathSeg> = keep(ring[from.0].subsegment(from.1..1.0))
+        .into_iter()
+        .collect();
+    let mut k = (from.0 + 1) % n;
+    while k != to.0 {
+        out.push(ring[k]);
+        k = (k + 1) % n;
+    }
+    out.extend(keep(ring[to.0].subsegment(0.0..to.1)));
+    out
+}
+
+/// Open path `path`, whose ends lie on closed path `ring`, closed along
+/// `ring` the way that encloses more: the closed path, and how long the
+/// part along `ring` is.
+fn close_along(path: &[PathSeg], ring: &[PathSeg]) -> Option<(Vec<PathSeg>, f64)> {
+    let (start, end) = (path.first()?.start(), path.last()?.end());
+    let (at_start, at_end) = (locate_on(ring, start)?, locate_on(ring, end)?);
+    let forward = arc_of(ring, at_end, at_start);
+    let backward: Vec<PathSeg> = arc_of(ring, at_start, at_end)
+        .iter()
+        .rev()
+        .map(PathSeg::reverse)
+        .collect();
+    let close = |arc: Vec<PathSeg>| {
+        let mut segs = path.to_vec();
+        if let Some(first) = arc.first()
+            && first.start().distance(end) > 1e-9
+        {
+            segs.push(PathSeg::Line(Line::new(end, first.start())));
+        }
+        let along: f64 = arc.iter().map(|s| s.arclen(0.01)).sum();
+        let last = arc.last().map_or(end, |s| s.end());
+        segs.extend(arc);
+        if last.distance(start) > 1e-9 {
+            segs.push(PathSeg::Line(Line::new(last, start)));
+        }
+        let area = polygon_area(&flatten_segs(&segs, 0.5)).abs();
+        (segs, along, area)
+    };
+    let (a, b) = (close(forward), close(backward));
+    let (segs, along, _) = if a.2 >= b.2 { a } else { b };
+    Some((segs, along))
 }
 
 /// Largest distance between two closed polylines, in either direction.
@@ -453,6 +659,10 @@ fn grain_segment(segs: &[PathSeg]) -> Option<(Point, Point)> {
         .filter(|(a, b)| a.distance(*b) >= 0.6 * total)
 }
 
+/// A path goes on across a line it meets if it turns at most 60° (the
+/// cosine).
+const JUNCTION_STRAIGHT: f64 = 0.5;
+
 /// Joins open paths that meet end to end (within `tolerance` mm) into
 /// longer ones, reversing pieces as needed, and reports which came back to
 /// their start. CAD drawings often build an outline from separate lines and
@@ -500,18 +710,59 @@ pub(crate) fn chain(paths: Vec<Vec<PathSeg>>, tolerance: f64) -> Vec<(Vec<PathSe
             if path.len() > 1 && close(start, end) {
                 break;
             }
-            // The first remaining path (in file order) that touches either end.
-            let mut candidates = near(&grid, end);
-            candidates.extend(near(&grid, start));
-            let next = candidates
-                .into_iter()
-                .filter(|&j| {
-                    pool[j].as_ref().is_some_and(|q| {
-                        let (qs, qe) = (q[0].start(), q[q.len() - 1].end());
-                        close(end, qs) || close(end, qe) || close(start, qe) || close(start, qs)
-                    })
-                })
-                .min();
+            // Where several lines meet (an outline with a notch cut at one of
+            // its corners), go on along the one that turns least, as a pencil
+            // tracing the outline would; on a tie, the first in file order.
+            // The path's end is extended first, then its start.
+            let heading = |seg: &PathSeg, t: f64| unit_tangent(seg, t);
+            let ahead = heading(&path[path.len() - 1], 1.0);
+            let behind = -heading(&path[0], 0.0);
+            let turn = |j: usize, at_end: bool| -> Option<(f64, Vec2)> {
+                let q = pool[j].as_ref()?;
+                let (qs, qe) = (q[0].start(), q[q.len() - 1].end());
+                let (first, last) = (heading(&q[0], 0.0), heading(&q[q.len() - 1], 1.0));
+                let (way, along) = if at_end {
+                    (end, ahead)
+                } else {
+                    (start, behind)
+                };
+                let goes = if at_end {
+                    if close(way, qs) {
+                        first
+                    } else if close(way, qe) {
+                        -last
+                    } else {
+                        return None;
+                    }
+                } else if close(way, qe) {
+                    -last
+                } else if close(way, qs) {
+                    first
+                } else {
+                    return None;
+                };
+                Some((along.dot(goes), goes))
+            };
+            // A path meeting a line that runs on through the meeting point
+            // both ways, with none of it straight ahead (a notch cut meeting
+            // the outline it marks), stops there.
+            let pick = |at: Point, at_end: bool| {
+                let mut ways: Vec<(usize, f64, Vec2)> = near(&grid, at)
+                    .into_iter()
+                    .filter_map(|j| turn(j, at_end).map(|(straight, goes)| (j, straight, goes)))
+                    .collect();
+                ways.sort_unstable_by_key(|w| w.0);
+                ways.dedup_by_key(|w| w.0);
+                let best = ways
+                    .iter()
+                    .copied()
+                    .max_by(|a, b| a.1.total_cmp(&b.1).then(b.0.cmp(&a.0)))?;
+                let through = ways
+                    .iter()
+                    .any(|a| ways.iter().any(|b| a.2.dot(b.2) < -0.9));
+                (best.1 >= JUNCTION_STRAIGHT || !through).then_some(best.0)
+            };
+            let next = pick(end, true).or_else(|| pick(start, false));
             let Some(j) = next else { break };
             let q = pool[j].take().expect("found above");
             let (qs, qe) = (q[0].start(), q[q.len() - 1].end());
@@ -530,7 +781,112 @@ pub(crate) fn chain(paths: Vec<Vec<PathSeg>>, tolerance: f64) -> Vec<(Vec<PathSe
                 path = joined;
             }
         }
-        let closed = close(path[0].start(), path[path.len() - 1].end());
+        // A speck of a stroke has its ends together but goes round nothing.
+        let length: f64 = path.iter().map(|s| s.arclen(0.01)).sum();
+        let closed = close(path[0].start(), path[path.len() - 1].end()) && length > 4.0 * tolerance;
+        out.push((path, closed));
+    }
+    out
+}
+
+/// Plotter drivers can leave hairline gaps where one stroke ends and the
+/// next begins (round a logo's letters, say). Ends of open paths up to
+/// `reach` apart are joined across the gap with a short line, nearest pairs
+/// first, each end once; a path whose own ends are that close is closed.
+pub(crate) fn bridge(paths: Vec<(Vec<PathSeg>, bool)>, reach: f64) -> Vec<(Vec<PathSeg>, bool)> {
+    let (mut out, open): (Vec<_>, Vec<_>) = paths.into_iter().partition(|(_, closed)| *closed);
+    let open: Vec<Vec<PathSeg>> = open.into_iter().map(|(segs, _)| segs).collect();
+    // End 2k is path k's start, 2k + 1 its end.
+    let point = |e: usize| {
+        let p = &open[e / 2];
+        if e.is_multiple_of(2) {
+            p[0].start()
+        } else {
+            p[p.len() - 1].end()
+        }
+    };
+    let cell = reach.max(1e-6);
+    let key = |p: Point| ((p.x / cell).floor() as i64, (p.y / cell).floor() as i64);
+    let mut grid: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
+    for e in 0..2 * open.len() {
+        grid.entry(key(point(e))).or_default().push(e);
+    }
+    let length = |segs: &[PathSeg]| segs.iter().map(|s| s.arclen(0.01)).sum::<f64>();
+    let mut pairs: Vec<(f64, usize, usize)> = Vec::new();
+    for e in 0..2 * open.len() {
+        let (kx, ky) = key(point(e));
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                for &f in grid.get(&(kx + dx, ky + dy)).map_or(&[][..], Vec::as_slice) {
+                    let gap = point(e).distance(point(f));
+                    // A path's own ends close it only when it is no mere
+                    // speck of a stroke.
+                    let fits = if e / 2 == f / 2 {
+                        length(&open[e / 2]) > 10.0 * reach
+                    } else {
+                        true
+                    };
+                    if f > e && gap <= reach && fits {
+                        pairs.push((gap, e, f));
+                    }
+                }
+            }
+        }
+    }
+    pairs.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)).then(a.2.cmp(&b.2)));
+    let mut partner: Vec<Option<usize>> = vec![None; 2 * open.len()];
+    for (_, e, f) in pairs {
+        if partner[e].is_none() && partner[f].is_none() {
+            partner[e] = Some(f);
+            partner[f] = Some(e);
+        }
+    }
+    // Follow each run of partnered paths from a free end (or anywhere round
+    // a loop), joining them in order.
+    let mut used = vec![false; open.len()];
+    let oriented = |k: usize, from: usize| -> Vec<PathSeg> {
+        if from.is_multiple_of(2) {
+            open[k].clone()
+        } else {
+            open[k].iter().rev().map(PathSeg::reverse).collect()
+        }
+    };
+    for k0 in 0..open.len() {
+        if used[k0] {
+            continue;
+        }
+        // Back to where the run begins.
+        let mut begin = 2 * k0;
+        for _ in 0..open.len() {
+            match partner[begin] {
+                Some(p) if p / 2 != k0 => begin = p ^ 1,
+                _ => break,
+            }
+        }
+        let first = begin / 2;
+        let mut path = oriented(first, begin);
+        used[first] = true;
+        let mut exit = begin ^ 1;
+        let mut closed = false;
+        while let Some(next) = partner[exit] {
+            let (from, to) = (point(exit), point(next));
+            if next / 2 == first && next == begin {
+                if from.distance(to) > 1e-9 {
+                    path.push(PathSeg::Line(Line::new(from, to)));
+                }
+                closed = true;
+                break;
+            }
+            if used[next / 2] {
+                break;
+            }
+            if from.distance(to) > 1e-9 {
+                path.push(PathSeg::Line(Line::new(from, to)));
+            }
+            path.extend(oriented(next / 2, next));
+            used[next / 2] = true;
+            exit = next ^ 1;
+        }
         out.push((path, closed));
     }
     out
@@ -631,6 +987,8 @@ pub(crate) fn assemble(
         }),
     };
 
+    // Open paths that became stitching lines.
+    let mut used_open: Vec<usize> = Vec::new();
     for c in (0..candidates.len()).filter(|&c| candidates[c].parent.is_none()) {
         let outer = &raw[candidates[c].raw];
         let children: Vec<usize> = (0..candidates.len())
@@ -653,14 +1011,72 @@ pub(crate) fn assemble(
             };
             let mut piece = Piece::new(ids("p"), name.clone(), outline);
             normalize_orientation(&mut piece);
-            if let Some(widths) = measure_allowances(&piece, &candidates[c].polyline) {
-                paired = Some((k, piece, widths));
+            let cutting = &candidates[c].polyline;
+            if let Some(widths) = measure_allowances(&piece, cutting) {
+                paired = Some((candidates[k].raw, Some(k), piece, widths));
                 break;
+            }
+            // An allowance that changes partway along an edge: the edge is
+            // broken where it changes, each part with its own allowance.
+            if let Some(steps) = allowance_steps(&piece, cutting)
+                && let Some(outline) = break_edges(&piece, &steps, &mut ids)
+            {
+                let mut piece = Piece::new(ids("p"), name.clone(), outline);
+                normalize_orientation(&mut piece);
+                if let Some(widths) = measure_allowances_avoiding(&piece, cutting, &steps) {
+                    paired = Some((candidates[k].raw, Some(k), piece, widths));
+                    break;
+                }
+            }
+        }
+        // A stitching line drawn only where there is an allowance: open, its
+        // ends on the cutting line, which is the stitching line along the
+        // rest (an edge cut without allowance).
+        if paired.is_none() {
+            let cutting = &candidates[c].polyline;
+            let perimeter = polyline_length(cutting, true);
+            let mut ends_on: Vec<(f64, usize)> = open
+                .iter()
+                .filter(|i| !used_open.contains(i))
+                .filter_map(|&i| {
+                    let pts = raw[i].polyline();
+                    let (first, last) = (*pts.first()?, *pts.last()?);
+                    let length = polyline_length(&pts, false);
+                    let touches = |p: Point| distance_to_polyline(p, cutting, true) <= 0.5;
+                    (length >= 0.25 * perimeter
+                        && touches(first)
+                        && touches(last)
+                        && point_in_polygon(pts[pts.len() / 2], cutting))
+                    .then_some((length, i))
+                })
+                .collect();
+            ends_on.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
+            for (length, i) in ends_on {
+                let Some((ring, along_cut)) = close_along(&raw[i].segs, &outer.segs) else {
+                    continue;
+                };
+                // Mostly drawn: a line across the piece (a fold line down a
+                // strip) is not a stitching line.
+                if along_cut > length {
+                    continue;
+                }
+                let Some(outline) = outline_from_path(&ring, DEFAULT_CORNER_ANGLE, &mut ids) else {
+                    continue;
+                };
+                let mut piece = Piece::new(ids("p"), name.clone(), outline);
+                normalize_orientation(&mut piece);
+                if let Some(widths) = measure_allowances(&piece, cutting)
+                    && widths.iter().any(|w| *w > 0.0)
+                {
+                    used_open.push(i);
+                    paired = Some((i, None, piece, widths));
+                    break;
+                }
             }
         }
 
         let piece = match paired {
-            Some((k, mut piece, widths)) => {
+            Some((stitched, child, mut piece, widths)) => {
                 let seam = median(widths.clone());
                 piece.allowance.seam = seam;
                 for (edge, w) in piece.outline.edges.iter_mut().zip(&widths) {
@@ -672,11 +1088,7 @@ pub(crate) fn assemble(
                 if let Some(Closing::Fold(a, b)) = closings[candidates[c].raw] {
                     mark_folds(&mut piece, a, b);
                 }
-                if let Some(cut) = outer
-                    .cut
-                    .clone()
-                    .or_else(|| raw[candidates[k].raw].cut.clone())
-                {
+                if let Some(cut) = outer.cut.clone().or_else(|| raw[stitched].cut.clone()) {
                     piece.cut = vec![cut];
                 }
                 piece.source = Some(source(outer));
@@ -704,7 +1116,7 @@ pub(crate) fn assemble(
                     });
                 }
                 // Other children are internal shapes.
-                for &other in children.iter().filter(|&&o| o != k) {
+                for &other in children.iter().filter(|&&o| Some(o) != child) {
                     piece
                         .lines
                         .push(closed_line(&raw[candidates[other].raw], &mut ids));
@@ -785,8 +1197,27 @@ pub(crate) fn assemble(
         })
     };
 
+    // A piece's grainline is the longest line marked as one: shorter arrows
+    // show which way to press a dart or a pleat.
+    let mut longest_grain: HashMap<usize, (f64, usize)> = HashMap::new();
+    for &i in open.iter().filter(|i| !used_open.contains(i)) {
+        let r = &raw[i];
+        if !r.hint.contains("grain") {
+            continue;
+        }
+        let pts = flatten_segs(&r.segs, 0.05);
+        if let (Some(mid), Some((from, to))) = (pts.get(pts.len() / 2), grain_segment(&r.segs))
+            && let Some(pi) = find_piece(*mid)
+        {
+            let length = from.distance(to);
+            let best = longest_grain.entry(pi).or_insert((length, i));
+            if length > best.0 {
+                *best = (length, i);
+            }
+        }
+    }
     let (mut loose, mut copies) = (0u32, 0u32);
-    for &i in &open {
+    for &i in open.iter().filter(|i| !used_open.contains(i)) {
         let r = &raw[i];
         let pts = flatten_segs(&r.segs, 0.05);
         let Some(mid) = pts.get(pts.len() / 2).copied() else {
@@ -806,9 +1237,11 @@ pub(crate) fn assemble(
             // FreeSewing's cut-on-fold bracket: its ends point at the fold.
             mark_folds(piece, pts[0], pts[pts.len() - 1]);
         }
-        let grain = (r.hint.contains("grain") && piece.grainline.is_none())
-            .then(|| grain_segment(&r.segs))
-            .flatten();
+        let grain = (r.hint.contains("grain")
+            && piece.grainline.is_none()
+            && longest_grain.get(&pi).is_none_or(|&(_, best)| best == i))
+        .then(|| grain_segment(&r.segs))
+        .flatten();
         if let Some((from, to)) = grain {
             piece.grainline = Some(Grainline {
                 from: Pt::from(from),
@@ -838,7 +1271,7 @@ pub(crate) fn assemble(
         let pts = r.polyline();
         let b = bounds(&pts);
         let round = (b.width() - b.height()).abs() <= 0.1 * b.width().max(b.height())
-            && b.width() <= MAX_MARK_SIZE
+            && (0.5..=MAX_MARK_SIZE).contains(&b.width())
             && (polygon_area(&pts).abs() - std::f64::consts::PI * b.width() * b.height() / 4.0)
                 .abs()
                 <= 0.1 * b.width() * b.height();

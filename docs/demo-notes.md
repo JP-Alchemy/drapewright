@@ -12,6 +12,80 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 15 — PDFs printed from pattern CAD through a plotter driver (Phase 2, part 3)
+
+Some pattern companies draw in pattern CAD (Grafis, for example) and make
+their PDFs by "printing" to a plotter driver. Such a PDF has no text and no
+shapes, only thousands of short pen strokes: every line, every word and
+every logo is strokes. These now import.
+
+**Try it:**
+
+1. Write the made-up plotter drawing the tests use, then open it:
+
+   ```bash
+   PLOTTED_PDF=plotted.pdf cargo test -p drapewright-io --test pdf_plotter
+   ```
+
+   It has three pieces, each drawn the way such files draw things:
+   * **A front with a cut-on fly.** The allowance is 4 cm along the top of
+     the fly edge and 1 cm below. The import breaks that edge where the
+     allowance changes, so each part keeps its own allowance, and the
+     cutting line comes out exactly as drawn.
+   * **A back whose stitching line forks** round an extension above the
+     hem. The outer way round becomes the stitching line, and the seam's
+     way on to the hem stays as a line. Its dart ends in a circle: the
+     circle is a mark, and the dart is not mistaken for the grainline.
+   * **A bias strip** whose stitching line is drawn on three sides only. The
+     fourth edge gets no allowance, as drawn, and the grainline is at 45°.
+   * The words and the brand logo on each piece are left out, and the
+     import says so. The logo is drawn at three sizes. The round "+"
+     outlines become button marks.
+2. On two real bought patterns (A0 copy-shop files, kept out of the repo):
+   * the blouse gives 10 pieces, 9 with their stitching lines (the 10th has
+     none drawn), all with grainlines, and the 12 buttons;
+   * the trousers give 7 pieces, 5 with stitching lines (the other two have
+     none), all with grainlines, the fly's end, the dart's point and the
+     waistband button.
+
+**How the strokes become outlines:**
+* Strokes join end to end. Where several lines meet, the outline goes on
+  the way that turns least, as a pencil would. A notch cut stops where it
+  meets the outline it marks.
+* Hairline gaps a plotter leaves between strokes (under half a millimetre)
+  are bridged.
+* Lines that meet end to middle are seen as a network: a seam line running
+  on past a corner into the allowance, a fork, notches joining the cutting
+  line to the stitching line. Loose ends are trimmed. The outline is the
+  network's outer edge, peeled off one after another: the cutting line,
+  then the stitching line inside it.
+* Lettering is clusters of tiny strokes, including short words a space
+  apart ("to") and a dash between words. Logos are the same intricate
+  letter shapes repeated on the pieces at any size, with the dots beside
+  them.
+* Arrowheads drawn as triangle outlines (as big as 3 cm) make grainlines,
+  even when "grainline" is written right beside them. A piece's grainline
+  is its longest arrow. Shorter ones show which way to press a dart.
+
+**Not yet:**
+* **Piece names and cutting counts:** they are drawn as strokes too, so
+  pieces are named *Piece 1*, *Piece 2*… The import says so. Reading
+  plotter lettering is a later step.
+* **The A4 versions of these files:** each page holds only its own part of
+  the drawing (with a 2.5 cm overlap), so pages share few whole shapes.
+  These come next: matching the pages by their strokes in the overlaps.
+* An allowance that curves from one width into another (the fly above)
+  becomes a square step, and the import gives the largest difference
+  from the drawn cutting line (9 mm there).
+
+**What's under the hood:** `crates/io/src/pdf/loops.rs` (the network of
+lines and its outer edges), `lettering.rs` (words, logos, round "+"
+marks), the stepped allowances and three-sided stitching lines in
+`assemble.rs`, and triangle arrowheads in `marks.rs`. The test
+`crates/io/tests/pdf_plotter.rs` draws each case as a plotter would.
+
+---
+
 ## Step 14 — PDF patterns in several sizes (Phase 2, part 2)
 
 **Try it:**

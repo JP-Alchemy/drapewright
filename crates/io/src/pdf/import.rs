@@ -7,16 +7,22 @@
 use std::collections::HashMap;
 
 use drapewright_pattern_core::geom::{distance_to_polyline, flatten_segs, point_in_polygon};
-use drapewright_pattern_core::{CutInstruction, Piece, ScaleBasis, SourceFormat};
+use drapewright_pattern_core::{
+    CutInstruction, Mark, MarkKind, Piece, Pt, ScaleBasis, SourceFormat,
+};
 use drapewright_pdf_import::{Document, Page, Shape, TextRun};
 use kurbo::{Affine, BezPath, CubicBez, Line, ParamCurve, PathEl, PathSeg, Point, Rect, Vec2};
 
-use super::marks::{find_fold_brackets, find_grainlines, find_notches, test_square};
+use super::lettering::{
+    find_crosses, find_lettering, find_outlined_crosses, find_repeated_decorations,
+};
+use super::loops::find_loops;
+use super::marks::{arrowheads, find_fold_brackets, find_grainlines, find_notches, test_square};
 use super::sizes::find_sizes;
 use super::tiles::{Print, arrange};
 use crate::assemble::{
-    CLOSE_TOLERANCE, RawPath, assemble, bounds, chain, is_straight, mark_folds, meaningful_name,
-    sentence_case,
+    CLOSE_TOLERANCE, RawPath, assemble, bounds, bridge, chain, is_straight, mark_folds,
+    meaningful_name, sentence_case,
 };
 use crate::import::{
     AllowanceQuestion, ImportError, ImportNote, ImportResult, ImportSizes, PieceSize, ScaleInfo,
@@ -28,6 +34,8 @@ const MM_PER_POINT: f64 = 25.4 / 72.0;
 const PAGE_GAP: f64 = 100.0;
 /// Segments drawn separately are joined when their ends are this close, mm.
 const JOIN: f64 = 0.1;
+/// Hairline gaps a plotter driver leaves between strokes, mm.
+const BRIDGE: f64 = 0.5;
 
 /// A line of text printed on the pattern, in millimetres.
 #[derive(Clone, Debug)]
@@ -561,7 +569,8 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
                 .collect()
         })
         .collect();
-    let groups = arrange(&prints);
+    let page_sizes: Vec<Vec2> = pages.iter().map(|p| Vec2::new(p.width, p.height)).collect();
+    let groups = arrange(&prints, &page_sizes);
     let tiled = groups.iter().any(|g| g.len() > 1);
     let mut notes = Vec::new();
     let mut styled: Vec<PagePath> = Vec::new();
@@ -572,6 +581,8 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
     let (mut left_out, mut joined) = (0u32, 0u32);
     // Where tiles meet, across all sheets: (x of vertical joins, y of horizontal ones).
     let mut sheet_joins: (Vec<f64>, Vec<f64>) = (Vec::new(), Vec::new());
+    // Where each page lies on the sheets.
+    let mut page_areas: Vec<Rect> = Vec::new();
     let mut x = 0.0;
     for group in &groups {
         if tiled && group.len() == 1 {
@@ -607,6 +618,12 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         );
         for (i, at) in group {
             let to_sheet = Affine::translate(*at + Vec2::new(x - sheet.x0, -sheet.y0));
+            page_areas.push(to_sheet.transform_rect_bbox(Rect::new(
+                0.0,
+                0.0,
+                pages[*i].width,
+                pages[*i].height,
+            )));
             if group.len() > 1
                 && let Some(f) = pages[*i].frame
             {
@@ -679,7 +696,12 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         }
     }
     for (style, template, paths) in groups {
-        for (segs, closed) in chain(paths, JOIN) {
+        // Lines left open may make loops together, meeting end to middle.
+        let (joined, open): (Vec<_>, Vec<_>) = bridge(chain(paths, JOIN), BRIDGE)
+            .into_iter()
+            .partition(|(_, closed)| *closed);
+        let looped = find_loops(open.into_iter().map(|(segs, _)| segs).collect(), JOIN);
+        for (segs, closed) in joined.into_iter().chain(looped) {
             raw.push((
                 RawPath {
                     segs,
@@ -695,9 +717,61 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         }
     }
 
+    // Drawings printed through plotter drivers draw everything as strokes:
+    // page frames come together only now, and lettering and logos are
+    // lines too.
+    raw.retain(|(r, _)| !(r.closed && page_areas.iter().any(|p| is_page_frame(&r.segs, *p))));
+    let plain: Vec<RawPath> = raw.iter().map(|(r, _)| r.clone()).collect();
+    // Arrowheads are left for the grainlines they belong to.
+    let heads = arrowheads(&plain);
+    let (lettering, letter_boxes) = find_lettering(&plain, &heads);
+    let (mut crosses, mut cross_paths) = find_crosses(&plain, &lettering);
+    let (outlined, outlined_paths) = find_outlined_crosses(&plain);
+    crosses.extend(outlined);
+    cross_paths.extend(outlined_paths);
+    let (decorations, logos) = find_repeated_decorations(&plain, &cross_paths);
+    let drawn_words = letter_boxes.len() + logos;
+    if drawn_words > 0 {
+        notes.push(ImportNote::LetteringIgnored {
+            count: u32::try_from(drawn_words).unwrap_or(u32::MAX),
+        });
+    }
+    let mut gone = vec![false; raw.len()];
+    for i in lettering.iter().chain(&decorations).chain(&cross_paths) {
+        gone[*i] = true;
+    }
+    let mut i = 0;
+    raw.retain(|_| {
+        i += 1;
+        !gone[i - 1]
+    });
+
+    // For working on the importer: the joined drawing as an SVG, open
+    // paths red and closed ones blue.
+    if let Some(out) = std::env::var_os("DRAPEWRIGHT_DEBUG_SVG") {
+        let mut svg = String::from(
+            "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 3000 2500' width='3000mm' height='2500mm'>",
+        );
+        for (r, _) in &raw {
+            let mut d = String::new();
+            for (k, seg) in r.segs.iter().enumerate() {
+                if k == 0 {
+                    d.push_str(&format!("M{:.2},{:.2} ", seg.start().x, seg.start().y));
+                }
+                d.push_str(&format!("L{:.2},{:.2} ", seg.end().x, seg.end().y));
+            }
+            let colour = if r.closed { "blue" } else { "red" };
+            svg.push_str(&format!(
+                "<path d='{d}' fill='none' stroke='{colour}' stroke-width='0.3'/>"
+            ));
+        }
+        svg.push_str("</svg>");
+        let _ = std::fs::write(out, svg);
+    }
+
     // The test square checks the print; it is not a piece (nor a size).
     let mut square = None;
-    raw.retain(|(r, _)| match test_square(r, &labels) {
+    raw.retain(|(r, _)| match test_square(r, &labels, &letter_boxes) {
         Some(side) => {
             square.get_or_insert(side);
             false
@@ -742,11 +816,13 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
     for (size, mut raw) in subsets {
         // The pattern's marks.
         let bracket_ends = find_fold_brackets(&mut raw);
-        let notches = find_notches(&mut raw, &bracket_ends);
+        // Before notches: a grainline's head can touch an outline.
         find_grainlines(&mut raw);
+        let notches = find_notches(&mut raw, &bracket_ends);
         let (mut found, assembled) =
             assemble(raw, &notches, SourceFormat::Pdf, &scale, file_name, &sha256);
         read_labels(&mut found, &labels);
+        add_crosses(&mut found, &crosses);
         // Piece ids stay unique across sizes.
         let suffix = size.map(|k| format!("-{k}")).unwrap_or_default();
         for piece in &mut found {
@@ -802,6 +878,27 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         notes,
         sha256,
     })
+}
+
+/// "+" marks on the pieces they sit inside.
+fn add_crosses(pieces: &mut [Piece], crosses: &[(Point, f64)]) {
+    for (k, (at, size)) in crosses.iter().enumerate() {
+        let inside = pieces.iter_mut().find(|p| {
+            let poly = flatten_segs(&p.outline.path_segs(), 0.5);
+            point_in_polygon(*at, &poly) || distance_to_polyline(*at, &poly, true) <= 20.0
+        });
+        if let Some(piece) = inside {
+            piece.marks.push(Mark {
+                id: format!("x{k}"),
+                kind: MarkKind::Cross,
+                at: Pt::from(*at),
+                size: Some(*size),
+                length: None,
+                angle: 0.0,
+                label: None,
+            });
+        }
+    }
 }
 
 /// How many things a "left out" note counts.

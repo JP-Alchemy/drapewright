@@ -15,6 +15,8 @@ use crate::assemble::{MIN_PIECE_AREA, RawNotch, RawPath, bounds, is_straight};
 /// Grainlines are at least this long, mm; arrowheads at most this big.
 const MIN_GRAINLINE: f64 = 30.0;
 const MAX_ARROWHEAD: f64 = 15.0;
+/// Arrowheads drawn round (a triangle outline) can be this big, mm.
+const MAX_OUTLINED_HEAD: f64 = 30.0;
 /// Notch cuts are between these lengths, mm.
 const NOTCH_LENGTHS: (f64, f64) = (1.5, 15.0);
 /// Marks this close to a line are on it, mm.
@@ -60,38 +62,110 @@ fn nearest_on(poly: &[Point], p: Point) -> Option<(Point, Vec2)> {
         .map(|(q, dir, _)| (q, dir))
 }
 
-/// Arrowhead-sized paths: (index, bounds, points, closed).
-fn small_heads(raw: &[RawPath]) -> Vec<(usize, Rect, Vec<Point>, bool)> {
+/// A path that may be an arrowhead.
+struct Head {
+    index: usize,
+    bounds: Rect,
+    points: Vec<Point>,
+    /// A closed head's corners (a triangle's three).
+    corners: Vec<Point>,
+    closed: bool,
+}
+
+/// Where closed shape `pts` turns by more than 35°. Sides shorter than
+/// a quarter of a millimetre (a plotter's closing stroke) don't count.
+pub(crate) fn sharp_corners(pts: &[Point]) -> Vec<Point> {
+    let mut p: Vec<Point> = Vec::new();
+    for &q in pts {
+        if p.last().is_none_or(|l: &Point| l.distance(q) >= 0.25) {
+            p.push(q);
+        }
+    }
+    while p.len() > 1 && p[0].distance(p[p.len() - 1]) < 0.25 {
+        p.pop();
+    }
+    let n = p.len();
+    if n < 3 {
+        return Vec::new();
+    }
+    let threshold = 35f64.to_radians().cos();
+    (0..n)
+        .filter(|&i| {
+            let (u, v) = (p[i] - p[(i + n - 1) % n], p[(i + 1) % n] - p[i]);
+            u.normalize().dot(v.normalize()) < threshold
+        })
+        .map(|i| p[i])
+        .collect()
+}
+
+/// Paths that may be arrowheads: small open ones (a "V"), and triangles,
+/// filled or drawn round.
+fn small_heads(raw: &[RawPath]) -> Vec<Head> {
     raw.iter()
         .enumerate()
         .filter_map(|(i, r)| {
             let pts = flatten_segs(&r.segs, 0.1);
             let b = bounds(&pts);
-            let length: f64 = pts.windows(2).map(|w| w[0].distance(w[1])).sum();
-            (b.width().hypot(b.height()) <= MAX_ARROWHEAD && length <= 3.0 * MAX_ARROWHEAD)
-                .then_some((i, b, pts, r.closed))
+            let size = b.width().hypot(b.height());
+            if !r.closed {
+                let length: f64 = pts.windows(2).map(|w| w[0].distance(w[1])).sum();
+                return (size <= MAX_ARROWHEAD && length <= 3.0 * MAX_ARROWHEAD).then_some(Head {
+                    index: i,
+                    bounds: b,
+                    points: pts,
+                    corners: Vec::new(),
+                    closed: false,
+                });
+            }
+            // Round shapes (a dart's point, a button) are not arrowheads.
+            let corners = sharp_corners(&pts);
+            (size <= MAX_OUTLINED_HEAD && (3..=4).contains(&corners.len())).then_some(Head {
+                index: i,
+                bounds: b,
+                points: pts,
+                corners,
+                closed: true,
+            })
         })
         .collect()
 }
 
-/// The arrowheads pointing at `end`: small shapes containing it or with a
-/// corner on it, or a "V" whose point is it.
-fn heads_at(heads: &[(usize, Rect, Vec<Point>, bool)], end: Point) -> Vec<usize> {
+/// The arrowheads at the `end` of a line arriving along `dir` (unit): a
+/// triangle around or against the end, astride the line, with its point on
+/// the line ahead; or a "V" whose point is the end.
+fn heads_at(heads: &[Head], end: Point, dir: Vec2) -> Vec<usize> {
     heads
         .iter()
-        .filter(|(_, b, pts, closed)| {
-            b.inflate(TOUCH, TOUCH).contains(end)
-                && ((*closed
-                    && (point_in_polygon(end, pts)
-                        || pts.iter().any(|p| p.distance(end) <= TOUCH)))
-                    || (!*closed
-                        && pts
-                            .iter()
-                            .skip(1)
-                            .take(pts.len().saturating_sub(2))
-                            .any(|p| p.distance(end) <= TOUCH)))
+        .filter(|h| h.bounds.inflate(TOUCH, TOUCH).contains(end))
+        .filter(|h| {
+            if !h.closed {
+                return h
+                    .points
+                    .iter()
+                    .skip(1)
+                    .take(h.points.len().saturating_sub(2))
+                    .any(|p| p.distance(end) <= TOUCH);
+            }
+            let touches = point_in_polygon(end, &h.points)
+                || distance_to_polyline(end, &h.points, true) <= TOUCH;
+            let ahead = |c: &Point| (*c - end).dot(dir);
+            let Some(tip) = h
+                .corners
+                .iter()
+                .copied()
+                .max_by(|a, b| ahead(a).total_cmp(&ahead(b)))
+            else {
+                return false;
+            };
+            let size = h.bounds.width().hypot(h.bounds.height());
+            let side = |c: &Point| (*c - end).cross(dir);
+            touches
+                && ahead(&tip) >= -TOUCH
+                && side(&tip).abs() <= TOUCH.max(0.15 * size)
+                && h.corners.iter().any(|c| side(c) > TOUCH)
+                && h.corners.iter().any(|c| side(c) < -TOUCH)
         })
-        .map(|(i, _, _, _)| *i)
+        .map(|h| h.index)
         .collect()
 }
 
@@ -107,9 +181,20 @@ fn remove(raw: &mut Vec<RawPath>, gone: &[usize]) {
 /// Straight lines with an arrowhead at either end get the hint "grain";
 /// their arrowheads are removed.
 pub(crate) fn find_grainlines(raw: &mut Vec<RawPath>) {
-    let heads = small_heads(raw);
     let mut gone = Vec::new();
-    for r in raw.iter_mut().filter(|r| !r.closed) {
+    for (i, found) in arrows(raw) {
+        raw[i].hint.push_str(" grain");
+        gone.extend(found);
+    }
+    remove(raw, &gone);
+}
+
+/// Straight lines long enough to be grainlines with arrowheads at either
+/// end: each line, and its heads.
+fn arrows(raw: &[RawPath]) -> Vec<(usize, Vec<usize>)> {
+    let heads = small_heads(raw);
+    let mut out = Vec::new();
+    for (i, r) in raw.iter().enumerate().filter(|(_, r)| !r.closed) {
         let pts = flatten_segs(&r.segs, 0.1);
         if pts.len() < 2 || !is_straight(&pts) {
             continue;
@@ -118,13 +203,23 @@ pub(crate) fn find_grainlines(raw: &mut Vec<RawPath>) {
         if a.distance(b) < MIN_GRAINLINE {
             continue;
         }
-        let found: Vec<usize> = [a, b].iter().flat_map(|e| heads_at(&heads, *e)).collect();
+        let along = (b - a).normalize();
+        let mut found = heads_at(&heads, a, -along);
+        found.extend(heads_at(&heads, b, along));
         if !found.is_empty() {
-            r.hint.push_str(" grain");
-            gone.extend(found);
+            out.push((i, found));
         }
     }
-    remove(raw, &gone);
+    out
+}
+
+/// The arrowheads of lines that may be grainlines: not to be taken for
+/// lettering, though plotter output often writes "grainline" beside them.
+pub(crate) fn arrowheads(raw: &[RawPath]) -> Vec<usize> {
+    let mut heads: Vec<usize> = arrows(raw).into_iter().flat_map(|(_, h)| h).collect();
+    heads.sort_unstable();
+    heads.dedup();
+    heads
 }
 
 /// "Place on fold" brackets: a ⊐ of three straight lines whose ends point
@@ -171,8 +266,8 @@ pub(crate) fn find_fold_brackets(raw: &mut Vec<RawPath>) -> Vec<Point> {
         }
         r.hint.push_str(" cutonfold");
         // The bracket's arrowheads go with it.
-        gone.extend(heads_at(&heads, corners[0]));
-        gone.extend(heads_at(&heads, corners[3]));
+        gone.extend(heads_at(&heads, corners[0], unit(corners[0] - corners[1])));
+        gone.extend(heads_at(&heads, corners[3], unit(corners[3] - corners[2])));
         ends.extend([a, b]);
     }
     remove(raw, &gone);
@@ -297,8 +392,8 @@ pub(crate) fn find_notches(raw: &mut Vec<RawPath>, avoid: &[Point]) -> Vec<RawNo
 }
 
 /// The side of a test square (a square of 1–4 in or 5–10 cm with its
-/// size printed inside), if `r` is one, mm.
-pub(crate) fn test_square(r: &RawPath, labels: &[Label]) -> Option<f64> {
+/// size printed inside, as text or drawn as lettering), if `r` is one, mm.
+pub(crate) fn test_square(r: &RawPath, labels: &[Label], lettering: &[Rect]) -> Option<f64> {
     if !r.closed || !r.segs.iter().all(|s| matches!(s, PathSeg::Line(_))) || r.segs.len() != 4 {
         return None;
     }
@@ -318,7 +413,9 @@ pub(crate) fn test_square(r: &RawPath, labels: &[Label]) -> Option<f64> {
                 || t.contains("square")
                 || t.contains("mm"))
     });
-    (square && says_size).then_some(*standard)
+    // Its size printed inside, as text or drawn as lettering.
+    let lettered = lettering.iter().any(|l| b.contains(l.center()));
+    (square && (says_size || lettered)).then_some(*standard)
 }
 
 #[cfg(test)]
