@@ -325,6 +325,34 @@ fn collect(
     }
 }
 
+/// The file's text: UTF-8 (with or without a byte order mark), or UTF-16
+/// with one, as some Windows programs save SVG.
+fn decode(data: &[u8]) -> Result<std::borrow::Cow<'_, str>, String> {
+    let utf16 = |bytes: &[u8], little: bool| {
+        let units: Vec<u16> = bytes
+            .chunks_exact(2)
+            .map(|c| {
+                if little {
+                    u16::from_le_bytes([c[0], c[1]])
+                } else {
+                    u16::from_be_bytes([c[0], c[1]])
+                }
+            })
+            .collect();
+        String::from_utf16(&units).map_err(|e| e.to_string())
+    };
+    if let Some(rest) = data.strip_prefix(&[0xff, 0xfe]) {
+        return utf16(rest, true).map(Into::into);
+    }
+    if let Some(rest) = data.strip_prefix(&[0xfe, 0xff]) {
+        return utf16(rest, false).map(Into::into);
+    }
+    let data = data.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(data);
+    std::str::from_utf8(data)
+        .map(Into::into)
+        .map_err(|e| e.to_string())
+}
+
 pub fn import_svg(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, ImportError> {
     if data.starts_with(&[0x1f, 0x8b]) {
         return Err(ImportError::CompressedSvg);
@@ -333,7 +361,8 @@ pub fn import_svg(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         format: "SVG",
         detail,
     };
-    let text = std::str::from_utf8(data).map_err(|e| unreadable(e.to_string()))?;
+    let text = decode(data).map_err(unreadable)?;
+    let text = text.as_ref();
     let options = roxmltree::ParsingOptions {
         allow_dtd: true,
         ..Default::default()

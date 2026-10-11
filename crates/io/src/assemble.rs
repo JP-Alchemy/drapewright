@@ -94,8 +94,29 @@ pub(crate) fn meaningful_name(raw: &str) -> Option<String> {
     }
     let lower = s.to_ascii_lowercase();
     let generated = [
-        "path", "rect", "circle", "ellipse", "polygon", "polyline", "line", "g", "use", "layer",
-        "svg", "text", "tspan", "group", "xmlid_", "calque", "ebene", "capa",
+        "path",
+        "rect",
+        "circle",
+        "ellipse",
+        "polygon",
+        "polyline",
+        "line",
+        "g",
+        "use",
+        "layer",
+        "svg",
+        "text",
+        "tspan",
+        "group",
+        "xmlid_",
+        "calque",
+        "ebene",
+        "capa",
+        "selection",
+        "shape",
+        "object",
+        "clip",
+        "mask",
     ]
     .iter()
     .any(|p| {
@@ -914,6 +935,7 @@ mod tests {
         assert_eq!(meaningful_name("path1234"), None);
         assert_eq!(meaningful_name("Layer 1"), None);
         assert_eq!(meaningful_name("XMLID_12_"), None);
+        assert_eq!(meaningful_name("Selection34"), None);
         assert_eq!(meaningful_name("back_yoke"), Some("Back yoke".into()));
         assert_eq!(meaningful_name("facing-cut"), Some("Facing".into()));
         assert_eq!(meaningful_name("Front seam line"), Some("Front".into()));

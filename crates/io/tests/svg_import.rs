@@ -391,3 +391,28 @@ fn export_then_import_gives_back_the_pieces() {
     let skirt = piece(&back, "Skirt back");
     assert!(skirt.grainline.is_some());
 }
+
+#[test]
+fn utf16_files_read_like_utf8() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/svg/inkscape-mm.svg");
+    let text = std::fs::read_to_string(path).unwrap();
+    let plain = import_svg(text.as_bytes(), None).unwrap();
+    // As some Windows programs save SVG: UTF-16, little-endian, with a byte
+    // order mark (the declaration says so too).
+    let mut wide = vec![0xff, 0xfe];
+    wide.extend(
+        text.replace("encoding=\"UTF-8\"", "encoding=\"UTF-16\"")
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes),
+    );
+    let read = import_svg(&wide, None).unwrap();
+    assert_eq!(read.pieces.len(), plain.pieces.len());
+    assert_eq!(read.pieces[0].outline, plain.pieces[0].outline);
+    // And UTF-8 with a byte order mark.
+    let mut marked = vec![0xef, 0xbb, 0xbf];
+    marked.extend(text.as_bytes());
+    assert_eq!(
+        import_svg(&marked, None).unwrap().pieces.len(),
+        plain.pieces.len()
+    );
+}
