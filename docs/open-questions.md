@@ -116,3 +116,22 @@ matters.
     Browzwear, kept privately outside the repository. Real exports vary
     between vendors, so a few of her own files would still show what needs
     adjusting.
+
+### Fitting (Phases 3 and 4)
+18. ☐ **Which measurements are taken**, and over light clothing or on the
+    skin? *Provisional: the step 17 list (height,
+    bust, high bust, underbust, waist, high hip, hip, neck, shoulder
+    width, shoulder length, across front, across back, back and front
+    waist length, bust span, shoulder to bust point, waist to hip, arm
+    length, upper arm, wrist, inseam, outseam, crotch depth, thigh, knee,
+    calf, ankle), over light clothing.*
+19. ☐ **Which alterations come up most?** This sets their order in
+    Phase 4. *Provisional: lengthen and shorten, full bust, swayback, waist
+    and hip, then the rest.*
+20. ☐ **Which fabrics are sewn most?** The drape starts from presets.
+    *Provisional: cotton lawn, poplin, linen, chambray, denim, twill,
+    crepe, satin, jersey, rib knit, wool suiting, fleece.*
+21. ☐ **Ease expected** between a fitted blouse and the body at bust,
+    waist and hip, so the ease map's colours mean something. *Provisional:
+    the map shows millimetres, with colours changing at 0 (tight), 20 and
+    50 mm.*

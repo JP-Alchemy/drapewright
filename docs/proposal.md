@@ -4,7 +4,8 @@ Version 0.1 · 2026-10-10 · status: **for review**
 
 This answers the four things asked for before code: the repository layout,
 the project file schema, the input-layer design, and a two-week plan for
-Phase 1. Sewing questions I could not settle are collected in
+Phase 1. The plan for Phases 3 and 4 is in
+[plan-phase-3-4.md](plan-phase-3-4.md). Sewing questions I could not settle are collected in
 [open-questions.md](open-questions.md) with the provisional default I use
 until they are answered. Items marked **[you]** need a decision from you.
 
