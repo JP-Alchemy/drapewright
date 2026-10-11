@@ -41,9 +41,11 @@ export interface PendingImport {
   bytes: Uint8Array
 }
 
+type Importer = 'importSvg' | 'importDxf' | 'importPdf'
+
 /** The pattern files Drapewright reads, by file extension and media type. */
 const PATTERN_FORMATS: {
-  importer: 'importSvg' | 'importDxf'
+  importer: Importer
   extensions: string[]
   types: string[]
 }[] = [
@@ -53,6 +55,7 @@ const PATTERN_FORMATS: {
     extensions: ['.dxf'],
     types: ['image/vnd.dxf', 'image/x-dxf', 'application/dxf'],
   },
+  { importer: 'importPdf', extensions: ['.pdf'], types: ['application/pdf'] },
 ]
 
 /** For a file input's `accept`. */
@@ -61,7 +64,7 @@ export const PATTERN_FILE_TYPES = PATTERN_FORMATS.flatMap((f) => [
   ...f.types,
 ]).join(',')
 
-function importerFor(file: File): 'importSvg' | 'importDxf' | null {
+function importerFor(file: File): Importer | null {
   const name = file.name.toLowerCase()
   const format = PATTERN_FORMATS.find(
     (f) => f.extensions.some((e) => name.endsWith(e)) || f.types.includes(file.type),

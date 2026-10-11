@@ -12,6 +12,65 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 13 — PDF patterns (Phase 2, part 1)
+
+**Try it:** *Open pattern* now takes `.pdf`.
+
+1. Open `fixtures/pdf/freesewing-sasha-a0-protected.pdf`. It is the
+   FreeSewing dress printed by Drapewright for a copy shop: a cover page
+   and the sheet split over two A0 pages. It is also "protected" the way
+   many bought patterns are: it opens without a password but says "no
+   copying". The import:
+   * Puts the 2 pages back together into one sheet, and leaves out the
+     cover (test squares and page map).
+   * Knows the size exactly: PDF measures in points.
+   * Finds the 7 pieces and names them from the words printed on them. It
+     reads the cutting from "Cut 2 · Main fabric" and "Cut 1 on the fold",
+     and finds the fold edge from the "Place on fold" bracket.
+   * Measures the 1 cm allowance from the printed stitching line, so
+     nothing needs asking.
+   * Turns the notches cut into the cutting line into notches (3 on the
+     front, 5 on the front side panel…) and the arrows into grainlines.
+     Their arrowheads, and the marks for joining pages, are left out.
+2. Print the dress yourself from Drapewright (A4, trim and butt: 31
+   pages), then open that PDF. The 31 pages are put back together into
+   the same 7 pieces. Letter pages that overlap work too.
+
+**How pages are put back together:** most tiling tools, Drapewright's
+included, draw each page as the whole sheet's drawing, moved and clipped
+to that page. A shape that appears on two pages, identical but moved,
+says exactly where those pages sit on the sheet. So no page grid or
+labels need guessing. Furniture that stays put on every page (frames,
+footers, page letters) is ignored.
+
+**Not yet:**
+* Sizes on layers or in different colours (most multi-size patterns):
+  next step.
+* PDFs whose tiles each contain only their own piece of the drawing,
+  with no shapes in common. These need the page grid; they come after
+  sizes.
+* A list to untick pieces you don't want (instruction pages can still add
+  a diagram or two).
+
+**Found by testing:**
+* The printed piece names sat at the middle of each piece's bounding box,
+  which can be outside a curved piece (and printed over another one). The
+  PDF now prints names where the piece is widest, as the AI previews do.
+* Pages that share no visible shape (a blank band between pattern rows)
+  are still joined, through the shapes they draw beyond their edges.
+
+**What's under the hood:** a new crate, `crates/pdf-import`, reads PDFs.
+It covers the file structure (damaged files included), streams, fonts and
+text, colours, layers, and the standard encryption with an empty user
+password. It is pure Rust with no randomness, so it runs in the browser.
+`crates/io/src/pdf/import.rs` turns its drawing into pieces, with
+`tiles.rs` (putting pages back together) and `marks.rs` (grainlines,
+notches, fold brackets, test squares). Round-trip tests print the dress
+in each layout and check that importing the PDF gives back the same
+pieces.
+
+---
+
 ## Step 12 — Working with an AI assistant (MCP server)
 
 **Try it** with Claude Code (Claude Desktop works too; see

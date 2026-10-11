@@ -12,6 +12,7 @@ import init, {
   exportSvg as exportSvgRaw,
   finishImport as finishImportRaw,
   importDxf as importDxfRaw,
+  importPdf as importPdfRaw,
   importSvg as importSvgRaw,
   planPrint as planPrintRaw,
   previewAllowance as previewAllowanceRaw,
@@ -175,6 +176,9 @@ export const jobs = {
   },
   importDxf(bytes: Uint8Array, fileName: string | null): ImportResult {
     return importDxfRaw(bytes, fileName ?? undefined) as ImportResult
+  },
+  importPdf(bytes: Uint8Array, fileName: string | null): ImportResult {
+    return importPdfRaw(bytes, fileName ?? undefined) as ImportResult
   },
   /**
    * Applies the user's answers: the sizes to keep (null for all), the

@@ -26,11 +26,16 @@ cargo run --release -p drapewright-io --example import_report -- ~/Source/drapew
 | `dxf/generic-mm.dxf` | Ordinary CAD drawing in millimetres (`$INSUNITS` 4): a pocket with rounded corners from polyline bulges, a flap drawn as four separate lines (one reversed) named by a text inside it, a grainline layer, a drill circle and an unsupported hatch |
 | `dxf/inches.dxf` | `$INSUNITS` 1 (inches): a 4″ × 2″ cuff |
 | `dxf/unitless.dxf` | No header at all: the scale must be confirmed |
+| `pdf/freesewing-sasha-a0.pdf` | The FreeSewing dress above, printed by Drapewright on A0 for a copy shop: a cover page (test squares, page map) and the sheet on two pages, each drawing every piece it touches, clipped. Stitching lines dashed, notches cut into the cutting lines, grainlines and fold brackets with arrowheads, names and cutting printed on each piece |
+| `pdf/freesewing-sasha-a0-protected.pdf` | The same, rewritten by Ghostscript 10 as a PDF 1.7 with object streams and a cross-reference stream, and "protected" (RC4 128-bit, owner password only: it opens without one; printing allowed, copying not), as many bought patterns are |
 
 The DXF files are written by `dxf/make_fixtures.py` (run it from the
 repository root after changing it).
 
-The two `freesewing-*` files were made with FreeSewing 4.10.2
-(`@freesewing/sasha`, `sa: 10` and `sa: 0`). FreeSewing is MIT licensed,
+The `freesewing-*` files were made with FreeSewing 4.10.2
+(`@freesewing/sasha`, `sa: 10` and `sa: 0`); the PDFs are Drapewright's
+prints of the SVG with 10 mm allowance (the protected one by `gs -sDEVICE=pdfwrite
+-dCompatibilityLevel=1.7 -sOwnerPassword=… -sUserPassword= -dEncryptionR=3
+-dKeyLength=128 -dPermissions=-3900`). FreeSewing is MIT licensed,
 copyright (c) 2022 Joost De Cock. Its licence is in
 `svg/LICENSE-freesewing`, copied from codeberg.org/freesewing/freesewing.

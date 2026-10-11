@@ -277,6 +277,7 @@ name = "drapewright-io"
 version = "0.1.0"
 dependencies = [
  "drapewright-pattern-core",
+ "drapewright-pdf-import",
  "drapewright-project",
  "flate2",
  "insta",
@@ -321,6 +322,19 @@ dependencies = [
  "serde_json",
  "thiserror",
  "ts-rs",
+]
+
+[[package]]
+name = "drapewright-pdf-import"
+version = "0.1.0"
+dependencies = [
+ "aes",
+ "flate2",
+ "kurbo",
+ "md-5",
+ "pdf-writer",
+ "sha2",
+ "thiserror",
 ]
 
 [[package]]

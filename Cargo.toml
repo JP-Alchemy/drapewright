@@ -15,6 +15,7 @@ publish = false
 drapewright-pattern-core = { path = "crates/pattern-core" }
 drapewright-io = { path = "crates/io" }
 drapewright-project = { path = "crates/project" }
+drapewright-pdf-import = { path = "crates/pdf-import" }
 
 # Geometry
 kurbo = "0.13.1"
@@ -27,6 +28,9 @@ thiserror = "2.0.21"
 ts-rs = { version = "12.0.1", features = ["serde-json-impl"] }
 schemars = "1.2.2"
 sha2 = "0.11.0"
+# Opening "protected" PDF patterns (empty user password)
+md-5 = "0.11.0"
+aes = "0.9.3"
 
 # Formats
 usvg = { version = "0.48.1", default-features = false }

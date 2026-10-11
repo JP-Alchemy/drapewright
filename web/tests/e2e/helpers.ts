@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import type { Page } from '@playwright/test'
 
-/** A file in `fixtures/svg` or `fixtures/dxf`, by its extension. */
+/** A file in `fixtures/svg`, `fixtures/dxf` or `fixtures/pdf`, by its extension. */
 export const fixture = (name: string) =>
   fileURLToPath(new URL(`../../../fixtures/${name.split('.').pop()}/${name}`, import.meta.url))
 

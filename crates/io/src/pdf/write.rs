@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 use std::io::Write as _;
 
-use drapewright_pattern_core::geom::segs_of;
+use drapewright_pattern_core::geom::{label_point, segs_of};
 use drapewright_pattern_core::notches::notch_marks;
 use drapewright_pattern_core::{AllowanceMode, EdgeKind, Id, LineKind, MarkKind};
 use drapewright_project::Document;
@@ -383,9 +383,10 @@ fn draw_piece(c: &mut Canvas, p: &Prepared, tf: Affine, doc: &Document, texts: &
         );
     }
 
-    // Name and cutting instructions, in the middle of the piece.
-    let b = piece.outline.bounds();
-    let centre = tf * b.center();
+    // Name and cutting instructions where the piece is widest, so they sit
+    // inside it even when it is curved or narrow.
+    let (inside, _) = label_point(&p.cutting);
+    let centre = tf * inside;
     let lines = texts
         .piece_lines
         .get(&piece.id)

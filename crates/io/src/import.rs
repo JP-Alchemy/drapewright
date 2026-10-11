@@ -99,6 +99,13 @@ pub enum ImportNote {
     CurvesTraced { count: u32 },
     /// A piece outline crosses itself.
     OutlineCrossesItself { piece: Id },
+    /// Pages of a PDF that were tiles of one sheet, put back together.
+    PagesJoined { count: u32 },
+    /// Pages of a PDF outside the pattern sheet (a cover, instructions).
+    PagesLeftOut { count: u32 },
+    /// A test square printed to check the scale, left out of the pieces;
+    /// its side, mm.
+    TestSquareFound { size: f64 },
 }
 
 impl ImportNote {

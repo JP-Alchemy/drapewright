@@ -28,7 +28,7 @@ use kurbo::{
 use super::reader::{Drawing, Entity, Shape, decode, parse};
 use crate::assemble::{
     CLOSE_TOLERANCE, RawPath, assemble, chain, is_straight, meaningful_name, measure_allowances,
-    median, notch_at, to_segments,
+    median, notch_at, sentence_case, to_segments,
 };
 use crate::import::{
     AllowanceQuestion, ImportError, ImportNote, ImportResult, ImportSizes, PieceSize, ScaleInfo,
@@ -420,20 +420,6 @@ fn flatten(
             out.push((e.clone(), tf));
         }
     }
-}
-
-/// "SKIRT FRONT" → "Skirt front"; other text as it is.
-fn sentence_case(s: &str) -> String {
-    let s = s.trim();
-    if s.chars().any(char::is_lowercase) {
-        return s.to_string();
-    }
-    let lower = s.to_lowercase();
-    let mut chars = lower.chars();
-    chars
-        .next()
-        .map(|c| c.to_uppercase().chain(chars).collect())
-        .unwrap_or_default()
 }
 
 pub fn import_dxf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, ImportError> {

@@ -182,14 +182,14 @@ pub fn all() -> Vec<Tool> {
             "inspect_pattern_file",
             "Inspect pattern file",
             Reads,
-            "Reads an SVG or DXF sewing pattern without adding it: the pieces found, the sizes the file holds, how sure its scale is (with what each reading would make the pieces measure), whether seam allowance must be asked about, and what was left out. Use it before import_pattern to know which questions to ask the user.",
+            "Reads an SVG, DXF or PDF sewing pattern without adding it: the pieces found, the sizes the file holds, how sure its scale is (with what each reading would make the pieces measure), whether seam allowance must be asked about, and what was left out. Use it before import_pattern to know which questions to ask the user.",
             inspect_pattern_file,
         ),
         tool(
             "import_pattern",
             "Import pattern",
             Edits,
-            "Adds the pieces of an SVG or DXF pattern to the open project (starting a project if none is open), beside any pieces already there. When the file holds several sizes, doesn't say how big it is, or has pieces drawn with one outline, the matching argument is required: ask the user, never guess. The original file is kept in the project.",
+            "Adds the pieces of an SVG, DXF or PDF pattern to the open project (starting a project if none is open), beside any pieces already there. When the file holds several sizes, doesn't say how big it is, or has pieces drawn with one outline, the matching argument is required: ask the user, never guess. The original file is kept in the project.",
             import_pattern,
         ),
         tool(
@@ -546,13 +546,15 @@ fn read_pattern(path: &str) -> Result<Read, ToolError> {
         .map(|e| e.to_string_lossy().to_ascii_lowercase())
         .unwrap_or_default();
     let head = String::from_utf8_lossy(&data[..data.len().min(4096)]).to_string();
-    let result = if extension == "svg" || (extension != "dxf" && head.contains("<svg")) {
+    let result = if extension == "pdf" || data.starts_with(b"%PDF") {
+        drapewright_io::pdf::import_pdf(&data, Some(&file_name))
+    } else if extension == "svg" || (extension != "dxf" && head.contains("<svg")) {
         drapewright_io::svg::import_svg(&data, Some(&file_name))
     } else if extension == "dxf" || head.contains("SECTION") {
         drapewright_io::dxf::import_dxf(&data, Some(&file_name))
     } else {
         return Err(ToolError::new(
-            "Drapewright reads SVG and DXF pattern files. This one is neither.",
+            "Drapewright reads SVG, DXF and PDF pattern files. This one is none of these.",
         ));
     }
     .map_err(|e| ToolError::new(e.to_string()))?;
@@ -730,7 +732,7 @@ fn describe_file(read: &Read) -> FileReport {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct FileArgs {
-    /// Path of an SVG or DXF pattern file. `~/` means the home folder.
+    /// Path of an SVG, DXF or PDF pattern file. `~/` means the home folder.
     path: String,
 }
 
@@ -752,7 +754,7 @@ struct AllowanceArg {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ImportArgs {
-    /// Path of an SVG or DXF pattern file. `~/` means the home folder.
+    /// Path of an SVG, DXF or PDF pattern file. `~/` means the home folder.
     path: String,
     /// The sizes to add, for a file that holds several (inspect_pattern_file
     /// lists them). Ask the user. With more than one, each piece's name says

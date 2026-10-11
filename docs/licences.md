@@ -33,6 +33,7 @@ Project licence: **not yet chosen** (see
 | ts-rs | MIT | TypeScript types generated from Rust | project, wasm-core |
 | wasm-bindgen | MIT OR Apache-2.0 | JS bindings (facade crate only) | wasm-core |
 | tiny-skia (with png) | BSD-3-Clause | Pictures of pieces for AI assistants | mcp |
+| md-5, aes, sha2 | MIT OR Apache-2.0 | Opening "protected" PDF patterns (encrypted with an empty user password), as viewers do | pdf-import |
 | serde-wasm-bindgen | MIT | Passing data across the boundary | wasm-core |
 | proptest *(dev)* | MIT OR Apache-2.0 | Property-based tests | tests |
 | insta *(dev)* | Apache-2.0 | Golden-file snapshot tests | tests |

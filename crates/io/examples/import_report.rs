@@ -4,7 +4,7 @@
 //!
 //!     cargo run -p drapewright-io --example import_report -- [-v] <files or folders>…
 //!
-//! Folders are searched for .svg and .dxf files. `-v` also lists each piece:
+//! Folders are searched for .svg, .dxf and .pdf files. `-v` also lists each piece:
 //! its edges (folds marked), allowance, notches, internal lines, grainline
 //! and cutting. Nothing is written.
 
@@ -22,7 +22,7 @@ fn collect(path: &Path, out: &mut Vec<PathBuf>) {
         for entry in entries {
             collect(&entry, out);
         }
-    } else if matches!(extension(path).as_str(), "svg" | "dxf") {
+    } else if matches!(extension(path).as_str(), "svg" | "dxf" | "pdf") {
         out.push(path.to_path_buf());
     }
 }
@@ -47,6 +47,9 @@ fn note(n: &ImportNote) -> String {
         ImportNote::UnsupportedEntities { count } => format!("{count} unsupported entities"),
         ImportNote::CurvesTraced { count } => format!("{count} curves traced"),
         ImportNote::OutlineCrossesItself { .. } => "an outline crosses itself".into(),
+        ImportNote::PagesJoined { count } => format!("{count} pages joined"),
+        ImportNote::PagesLeftOut { count } => format!("{count} pages left out"),
+        ImportNote::TestSquareFound { size } => format!("test square {size} mm"),
     }
 }
 
@@ -93,10 +96,10 @@ fn main() {
             }
         };
         let start = Instant::now();
-        let result = if extension(path) == "svg" {
-            drapewright_io::svg::import_svg(&data, Some(name))
-        } else {
-            drapewright_io::dxf::import_dxf(&data, Some(name))
+        let result = match extension(path).as_str() {
+            "svg" => drapewright_io::svg::import_svg(&data, Some(name)),
+            "pdf" => drapewright_io::pdf::import_pdf(&data, Some(name)),
+            _ => drapewright_io::dxf::import_dxf(&data, Some(name)),
         };
         let ms = start.elapsed().as_secs_f64() * 1000.0;
         match result {
@@ -171,9 +174,12 @@ fn main() {
                                 c.material
                             )
                         });
+                        let b = p.outline.bounds();
                         println!(
-                            "         - {}: {} edges ({folds} fold), {:?} {} mm, {} notches, {} lines, grain {}, {cut}",
+                            "         - {} @{:.0},{:.0}: {} edges ({folds} fold), {:?} {} mm, {} notches, {} lines, grain {}, {cut}",
                             p.name,
+                            b.x0,
+                            b.y0,
                             p.outline.edges.len(),
                             p.allowance.mode,
                             p.allowance.seam,

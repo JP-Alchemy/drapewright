@@ -9,6 +9,9 @@ the right size.
 SVG and DXF patterns, view them at true size, set seam allowance edge by
 edge, mark notches and grainlines, and print a tiled PDF at exactly 100 %.
 Projects are saved on the device and can be backed up as `.drapewright` files.
+Phase 2 has started: PDF patterns open too, copy-shop sheets and home-print
+pages alike (tiles are put back together), and AI assistants can work on
+projects through an MCP server.
 
 ## Documents
 

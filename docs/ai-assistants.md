@@ -79,7 +79,7 @@ assistant that file.
 |---|---|
 | `project_summary` | The open project and each piece's id, size, allowance, cutting and problems |
 | `new_project`, `open_project`, `save_project` | Start, open and save `.drapewright` projects |
-| `inspect_pattern_file` | What an SVG or DXF holds, and the questions importing it needs answered |
+| `inspect_pattern_file` | What an SVG, DXF or PDF holds, and the questions importing it needs answered |
 | `import_pattern` | Adds a file's pieces, with the answers to those questions |
 | `get_piece` | One piece in full: edges, notches, grainline, marks, lines, position |
 | `render_preview` | A picture of the pieces (PNG) with a legend |
@@ -100,4 +100,3 @@ assistant that file.
 * It works on project files, not on the project open in the app. A live
   link, so the app shows the assistant's changes as they happen, comes
   next.
-* PDF patterns can't be imported yet (Phase 2, in progress).

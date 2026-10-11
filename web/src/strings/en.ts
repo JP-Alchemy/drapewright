@@ -63,7 +63,7 @@ export const t = {
   table: {
     empty: 'Open a sewing pattern to lay it out here.',
     emptyHint:
-      'SVG files from Inkscape, Illustrator, FreeSewing and most pattern apps work, and DXF files from CAD and garment pattern systems. PDF comes next.',
+      'PDF patterns work, both copy-shop sheets and home-print pages (the pages are put back together for you), as do SVG files from Inkscape, Illustrator, FreeSewing and most pattern apps, and DXF files from CAD and garment pattern systems.',
     zoomLabel: (zoom: number) => `${Math.round(zoom * 100)}%`,
     notCalibrated: 'Screen not measured yet: 100% is approximate.',
   },
@@ -207,7 +207,7 @@ export const t = {
   importing: {
     reading: (name: string) => `Reading ${name}…`,
     unsupported: (name: string) =>
-      `Drapewright can open SVG and DXF files for now; “${name}” is neither. PDF is coming.`,
+      `Drapewright opens SVG, DXF and PDF patterns; “${name}” is none of these.`,
     failed: (message: string) => `This file could not be opened. ${message}`,
     found: (n: number) => plural(n, 'Found 1 piece', 'Found # pieces'),
     foundSized: (pieces: number, sizes: number) =>
@@ -326,6 +326,16 @@ export const t = {
             '1 curve was stored only as the points it passes through, so Drapewright joined them with straight lines. Check its shape after adding.',
             '# curves were stored only as the points they pass through, so Drapewright joined them with straight lines. Check their shape after adding.',
           )
+        case 'pagesJoined':
+          return `Put ${n.count} pages back together into one sheet, leaving out the marks for joining them.`
+        case 'pagesLeftOut':
+          return plural(
+            n.count,
+            'Left out 1 page that is not part of the pattern sheet (a cover or instructions).',
+            'Left out # pages that are not part of the pattern sheet (covers or instructions).',
+          )
+        case 'testSquareFound':
+          return `Found the ${formatLength(n.size, n.size < 50 ? 'mm' : 'cm')} test square and left it out of the pieces. Measure it on your print before cutting.`
         case 'outlineCrossesItself':
           return one
             ? `${who}: the outline crosses itself. Check that piece after adding.`

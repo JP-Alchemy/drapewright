@@ -149,6 +149,18 @@ pub fn note(n: &ImportNote, name: &dyn Fn(&str) -> String) -> String {
         ImportNote::OutlineCrossesItself { piece } => {
             format!("{}: the outline crosses itself.", name(piece))
         }
+        ImportNote::PagesJoined { count: c } => format!(
+            "Put {c} pages back together into one sheet, leaving out the marks for joining them."
+        ),
+        ImportNote::PagesLeftOut { count: c } => count(
+            *c,
+            "Left out 1 page that is not part of the pattern sheet (a cover or instructions).",
+            "Left out # pages that are not part of the pattern sheet (covers or instructions).",
+        ),
+        ImportNote::TestSquareFound { size } => format!(
+            "Found the {} test square; it was left out of the pieces.",
+            length(*size)
+        ),
     }
 }
 

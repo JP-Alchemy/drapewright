@@ -142,3 +142,53 @@ test('opens a FreeSewing pattern with its names, fold, notches and cutting', asy
   })
   expect(front).toEqual({ folds: 1, notches: 3, seam: 10, cut: [1, true], grainline: true })
 })
+
+test('opens a PDF pattern, putting its pages back together', async ({ page }) => {
+  await page.goto('/?debug')
+  // A copy-shop print of the FreeSewing dress, "protected" as many bought
+  // patterns are: it opens without a password, as in any PDF viewer.
+  await page.getByTestId('pattern-file').setInputFiles(fixture('freesewing-sasha-a0-protected.pdf'))
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: 'Found 7 pieces' })).toBeVisible()
+  await expect(dialog.locator('.found-list li')).toContainText([
+    'Front inside',
+    'Front outside above',
+    'Back inside',
+    'Back outside',
+    'Sleeve',
+    'Pocket',
+    'Front outside below',
+  ])
+  await expect(dialog).toContainText('The file says how big it is')
+  await expect(dialog).toContainText('Put 2 pages back together into one sheet')
+  await expect(dialog).toContainText('Left out 1 page that is not part of the pattern sheet')
+  // The stitching lines are printed too, so the allowance is measured.
+  await expect(dialog).toContainText('All 7 pieces: found both the cutting and the stitching lines')
+  await expect(dialog.getByRole('radiogroup', { name: /seam allowance included/ })).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Add 7 pieces' }).click()
+  await expect(dialog).toBeHidden()
+
+  const front = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const doc = (window as any).drapewright.engine.document()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const p = doc.pieces.find((x: any) => x.name === 'Front inside')
+    return {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      folds: p.outline.edges.filter((e: any) => e.kind === 'fold').length,
+      notches: p.notches.length,
+      seam: p.allowance.seam,
+      cut: [p.cut[0].quantity, p.cut[0].onFold],
+      grainline: p.grainline !== null,
+      source: p.source.format,
+    }
+  })
+  expect(front).toEqual({
+    folds: 1,
+    notches: 3,
+    seam: 10,
+    cut: [1, true],
+    grainline: true,
+    source: 'pdf',
+  })
+})

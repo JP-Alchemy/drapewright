@@ -44,6 +44,7 @@ const COMMON_ALLOWANCES: [f64; 20] = [
 ];
 
 /// A path from the file, in millimetres.
+#[derive(Clone, Debug)]
 pub(crate) struct RawPath {
     pub segs: Vec<PathSeg>,
     pub closed: bool,
@@ -64,6 +65,8 @@ pub(crate) struct RawNotch {
 
 /// Notches drawn as symbols sit on the stitching line; this far off still counts, mm.
 const NOTCH_REACH: f64 = 2.0;
+/// A notch cut into the cutting line finds the stitching line this far in, mm.
+const CUT_NOTCH_REACH: f64 = 60.0;
 
 /// A line no further than this from an outline along its whole length is
 /// drawn over it, mm.
@@ -398,7 +401,7 @@ fn close_open_outlines(raw: &mut [RawPath]) -> Vec<Option<Closing>> {
 
 /// Marks the piece's straight edges that lie along the line through `a` and
 /// `b` as folds.
-fn mark_folds(piece: &mut Piece, a: Point, b: Point) {
+pub(crate) fn mark_folds(piece: &mut Piece, a: Point, b: Point) {
     for i in 0..piece.outline.edges.len() {
         let (s, e) = (
             Point::from(piece.outline.edge_start(i)),
@@ -440,6 +443,32 @@ pub(crate) fn chain(paths: Vec<Vec<PathSeg>>, tolerance: f64) -> Vec<(Vec<PathSe
         .filter(|p| !p.is_empty())
         .map(Some)
         .collect();
+    // Each path's two ends, by grid cell, so neighbours are found without
+    // comparing every pair (PDFs can have tens of thousands of segments).
+    let cell = (tolerance * 4.0).max(1e-6);
+    let key = |p: Point| ((p.x / cell).floor() as i64, (p.y / cell).floor() as i64);
+    let mut grid: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
+    for (i, p) in pool.iter().enumerate() {
+        let p = p.as_ref().expect("all present");
+        for end in [p[0].start(), p[p.len() - 1].end()] {
+            let cell = grid.entry(key(end)).or_default();
+            if cell.last() != Some(&i) {
+                cell.push(i);
+            }
+        }
+    }
+    let near = |grid: &HashMap<(i64, i64), Vec<usize>>, p: Point| {
+        let (kx, ky) = key(p);
+        let mut found: Vec<usize> = Vec::new();
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                if let Some(c) = grid.get(&(kx + dx, ky + dy)) {
+                    found.extend(c);
+                }
+            }
+        }
+        found
+    };
     let mut out = Vec::new();
     for i in 0..pool.len() {
         let Some(mut path) = pool[i].take() else {
@@ -450,12 +479,18 @@ pub(crate) fn chain(paths: Vec<Vec<PathSeg>>, tolerance: f64) -> Vec<(Vec<PathSe
             if path.len() > 1 && close(start, end) {
                 break;
             }
-            let next = pool.iter().position(|q| {
-                q.as_ref().is_some_and(|q| {
-                    let (qs, qe) = (q[0].start(), q[q.len() - 1].end());
-                    close(end, qs) || close(end, qe) || close(start, qe) || close(start, qs)
+            // The first remaining path (in file order) that touches either end.
+            let mut candidates = near(&grid, end);
+            candidates.extend(near(&grid, start));
+            let next = candidates
+                .into_iter()
+                .filter(|&j| {
+                    pool[j].as_ref().is_some_and(|q| {
+                        let (qs, qe) = (q[0].start(), q[q.len() - 1].end());
+                        close(end, qs) || close(end, qe) || close(start, qe) || close(start, qs)
+                    })
                 })
-            });
+                .min();
             let Some(j) = next else { break };
             let q = pool[j].take().expect("found above");
             let (qs, qe) = (q[0].start(), q[q.len() - 1].end());
@@ -478,6 +513,20 @@ pub(crate) fn chain(paths: Vec<Vec<PathSeg>>, tolerance: f64) -> Vec<(Vec<PathSe
         out.push((path, closed));
     }
     out
+}
+
+/// "SKIRT FRONT" → "Skirt front"; other text as it is.
+pub(crate) fn sentence_case(s: &str) -> String {
+    let s = s.trim();
+    if s.chars().any(char::is_lowercase) {
+        return s.to_string();
+    }
+    let lower = s.to_lowercase();
+    let mut chars = lower.chars();
+    chars
+        .next()
+        .map(|c| c.to_uppercase().chain(chars).collect())
+        .unwrap_or_default()
 }
 
 /// A closed shape big enough to be a piece.
@@ -793,8 +842,20 @@ pub(crate) fn assemble(
         }
     }
 
-    // Notches drawn as symbols go on the outline they sit on.
+    // Notches drawn as symbols go on the outline they sit on. One cut into
+    // a piece's cutting line goes on its outline straight in from there
+    // (on the stitching line, when the piece has one).
     for n in notches {
+        let cut_into = regions
+            .iter()
+            .find(|(_, poly, _)| distance_to_polyline(n.at, poly, true) <= 0.5)
+            .map(|(pi, _, _)| *pi);
+        if let Some(pi) = cut_into
+            && let Some(notch) = notch_at(&pieces[pi], n.at, CUT_NOTCH_REACH, n.kind, ids("n"))
+        {
+            pieces[pi].notches.push(notch);
+            continue;
+        }
         let nearest = |p: &Piece| {
             (0..p.outline.edges.len())
                 .filter_map(|i| p.outline.edge_geom(i).nearest(n.at))

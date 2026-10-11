@@ -237,6 +237,51 @@ pub fn point_in_polygon(p: Point, points: &[Point]) -> bool {
     winding != 0
 }
 
+/// The point inside `polygon` farthest from its edges, and that distance:
+/// where a label reads best, even in a curved or narrow shape. A grid
+/// search, refined around the best cell.
+pub fn label_point(polygon: &[Point]) -> (Point, f64) {
+    let (x0, y0, x1, y1) = polygon.iter().fold(
+        (f64::MAX, f64::MAX, f64::MIN, f64::MIN),
+        |(x0, y0, x1, y1), p| (x0.min(p.x), y0.min(p.y), x1.max(p.x), y1.max(p.y)),
+    );
+    if x0 > x1 {
+        return (Point::ZERO, 0.0);
+    }
+    let consider = |best: &mut (Point, f64), p: Point| {
+        if point_in_polygon(p, polygon) {
+            let d = distance_to_polyline(p, polygon, true);
+            if d > best.1 {
+                *best = (p, d);
+            }
+        }
+    };
+    let mut best = (Point::new((x0 + x1) / 2.0, (y0 + y1) / 2.0), 0.0);
+    const N: i32 = 24;
+    let (cw, ch) = ((x1 - x0) / f64::from(N), (y1 - y0) / f64::from(N));
+    for i in 0..=N {
+        for j in 0..=N {
+            consider(
+                &mut best,
+                Point::new(x0 + cw * f64::from(i), y0 + ch * f64::from(j)),
+            );
+        }
+    }
+    let coarse = best.0;
+    for i in -6..=6 {
+        for j in -6..=6 {
+            consider(
+                &mut best,
+                Point::new(
+                    coarse.x + cw * f64::from(i) / 6.0,
+                    coarse.y + ch * f64::from(j) / 6.0,
+                ),
+            );
+        }
+    }
+    best
+}
+
 /// Distance from `p` to a polyline; `closed` joins the last point to the first.
 pub fn distance_to_polyline(p: Point, points: &[Point], closed: bool) -> f64 {
     let n = points.len();

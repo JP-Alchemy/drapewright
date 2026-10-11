@@ -216,6 +216,16 @@ pub fn import_dxf(data: &[u8], file_name: Option<String>) -> Result<JsValue, JsE
     to_js(&result)
 }
 
+/// Reads pattern pieces from a PDF: one page or many (copy-shop sheets,
+/// or home-print tiles put back together), named from the words printed
+/// on them.
+#[wasm_bindgen(js_name = importPdf)]
+pub fn import_pdf(data: &[u8], file_name: Option<String>) -> Result<JsValue, JsError> {
+    let result = drapewright_io::pdf::import_pdf(data, file_name.as_deref())
+        .map_err(|e| JsError::new(&e.to_string()))?;
+    to_js(&result)
+}
+
 /// Settles an import with the user's answers: the sizes she wants (null for
 /// all), the scale she confirmed and, when the file did not say, whether its
 /// outlines include seam allowance (`allowance` is null when nothing was

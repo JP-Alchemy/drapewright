@@ -3,9 +3,7 @@
 //! orange, notches, grainline, internal lines and marks, numbered, and
 //! optionally with each edge's id beside it.
 
-use drapewright_pattern_core::geom::{
-    distance_to_polyline, flatten_segs, point_in_polygon, segs_of,
-};
+use drapewright_pattern_core::geom::{flatten_segs, label_point, segs_of};
 use drapewright_pattern_core::{EdgeKind, Piece};
 use drapewright_project::PieceView;
 use drapewright_project::hit::placement_affine;
@@ -248,7 +246,7 @@ pub fn draw(
             }
             let _ = piece;
             // The number goes where the piece is widest, clear of its edges.
-            let (at, room) = inner_point(cut);
+            let (at, room) = label_point(cut);
             let (cx, cy) = frame.px(at);
             let size = ((room * scale * 0.9) as f32).clamp(12.0, 44.0);
             label(&mut pixmap, &(i + 1).to_string(), cx, cy, size, INK);
@@ -262,47 +260,6 @@ pub fn draw(
         height,
         mm_per_px: 1.0 / scale,
     })
-}
-
-/// The point inside `polygon` farthest from its edges, and that distance:
-/// where a label sits best. A grid search, refined around the best cell.
-fn inner_point(polygon: &[Point]) -> (Point, f64) {
-    let (x0, y0, x1, y1) = polygon.iter().fold(
-        (f64::MAX, f64::MAX, f64::MIN, f64::MIN),
-        |(x0, y0, x1, y1), p| (x0.min(p.x), y0.min(p.y), x1.max(p.x), y1.max(p.y)),
-    );
-    let consider = |best: &mut (Point, f64), p: Point| {
-        if point_in_polygon(p, polygon) {
-            let d = distance_to_polyline(p, polygon, true);
-            if d > best.1 {
-                *best = (p, d);
-            }
-        }
-    };
-    let mut best = (Point::new((x0 + x1) / 2.0, (y0 + y1) / 2.0), 0.0);
-    const N: i32 = 24;
-    let (cw, ch) = ((x1 - x0) / f64::from(N), (y1 - y0) / f64::from(N));
-    for i in 0..=N {
-        for j in 0..=N {
-            consider(
-                &mut best,
-                Point::new(x0 + cw * f64::from(i), y0 + ch * f64::from(j)),
-            );
-        }
-    }
-    let coarse = best.0;
-    for i in -6..=6 {
-        for j in -6..=6 {
-            consider(
-                &mut best,
-                Point::new(
-                    coarse.x + cw * f64::from(i) / 6.0,
-                    coarse.y + ch * f64::from(j) / 6.0,
-                ),
-            );
-        }
-    }
-    best
 }
 
 /// Two short strokes at `tip`, pointing away from `tail`.

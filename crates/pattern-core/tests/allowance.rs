@@ -1,7 +1,7 @@
 //! Seam allowance: exact cases, sewing corner constructions, and
 //! properties over random pieces.
 
-use drapewright_pattern_core::allowance::{AllowanceNote, allowance_lines};
+use drapewright_pattern_core::allowance::{AllowanceNote, FLATTEN_TOLERANCE, allowance_lines};
 use drapewright_pattern_core::geom::flatten_segs;
 use drapewright_pattern_core::testing::{arb_gentle_piece, arb_piece};
 use drapewright_pattern_core::validate::self_intersects;
@@ -49,8 +49,12 @@ fn winding(p: Point, pts: &[Point]) -> i32 {
     w
 }
 
+/// Inside, or on the line. With no allowance the cutting line is the curve
+/// itself, and a point on the curve can lie just outside the polyline
+/// standing for it: the offset curve's fit and the flattening each allow
+/// `FLATTEN_TOLERANCE`. 0.01 mm is far below anything a printer shows.
 fn inside_or_on(p: Point, pts: &[Point]) -> bool {
-    winding(p, pts) != 0 || distance_to_polyline(p, pts) < 1e-6
+    winding(p, pts) != 0 || distance_to_polyline(p, pts) <= 5.0 * FLATTEN_TOLERANCE
 }
 
 fn has_vertex_near(pts: &[Point], q: Point, tol: f64) -> bool {

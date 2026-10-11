@@ -27,6 +27,12 @@ the product principles and nothing we need is GPL.
 ☐ **Acceptance garments** — the `[FILL IN]` in the brief. Which 3–4 garments,
 and can I have her pattern files (or the names of the patterns) as private
 test fixtures?
+☐ **"Protected" PDF patterns.** Many bought patterns are PDFs encrypted
+with only an owner password: they open in any viewer without a password,
+but say "no copying" or "no changes". Drapewright reads their drawing as
+viewers do, keeps it on the device, and refuses PDFs that need a password
+to open. *Provisional: open them, for the buyer's own use.* Is that the
+policy you want, or should the import warn first (or refuse)?
 ☑ **Hosting**: our own server (Hetzner, nginx) at https://drapewright.com,
 deployed from the `production` branch (README → Hosting).
 ☑ **Name**: Drapewright.
