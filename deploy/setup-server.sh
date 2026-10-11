@@ -33,8 +33,18 @@ RECEIVE=/usr/local/bin/drapewright-receive
 
 this_ip() { ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | head -1; }
 this_ip6() { ip -6 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | head -1; }
-dns_of() { getent ahostsv4 "$1" | awk '{print $1}' | sort -u | xargs; }
-dns6_of() { getent ahostsv6 "$1" | awk '{print $1}' | grep -v '^::ffff:' | sort -u | xargs; }
+# What the domain's own nameservers say, which is what Let's Encrypt sees: other
+# resolvers may still have old records cached for a while after a change. The
+# local resolver if dig isn't there.
+NS=$(dig +short NS "$DOMAIN" 2>/dev/null | head -1 || true)
+dns_of() {
+  if [ -n "$NS" ]; then dig +short A "$1" "@$NS" | grep -E '^[0-9.]+$' | sort -u | xargs
+  else getent ahostsv4 "$1" | awk '{print $1}' | sort -u | xargs; fi
+}
+dns6_of() {
+  if [ -n "$NS" ]; then dig +short AAAA "$1" "@$NS" | grep ':' | sort -u | xargs
+  else getent ahostsv6 "$1" | awk '{print $1}' | grep -v '^::ffff:' | sort -u | xargs; fi
+}
 # A record here, and AAAA (optional) here too: Let's Encrypt checks over IPv6
 # when there is one.
 points_here() {
