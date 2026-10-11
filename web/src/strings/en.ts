@@ -202,8 +202,15 @@ export const t = {
       `Drapewright can open SVG and DXF files for now; “${name}” is neither. PDF is coming.`,
     failed: (message: string) => `This file could not be opened. ${message}`,
     found: (n: number) => plural(n, 'Found 1 piece', 'Found # pieces'),
+    foundSized: (pieces: number, sizes: number) =>
+      `${plural(pieces, 'Found 1 piece', 'Found # pieces')} in ${sizes} sizes`,
+    sizeQuestion: 'Which size?',
+    sizeHint:
+      'The file has every size of this pattern. Pick yours, or more than one to compare them.',
+    sampleSize: 'sample',
+    sampleSizeLabel: (size: string) => `${size}, the size the pattern was made in`,
     nothingFound: 'No pieces were found in this file.',
-    sizeQuestion: 'How big is this pattern?',
+    scaleQuestion: 'How big is this pattern?',
     sizeCertain: 'The file says how big it is, so the size is exact.',
     reason: (r: ScaleReason): string =>
       ({

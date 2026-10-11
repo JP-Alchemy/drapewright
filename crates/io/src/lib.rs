@@ -12,6 +12,6 @@ pub mod pdf;
 pub mod svg;
 
 pub use import::{
-    AllowanceAnswer, AllowanceQuestion, ImportError, ImportNote, ImportResult, ScaleInfo,
-    ScaleOption, ScaleReason,
+    AllowanceAnswer, AllowanceQuestion, ImportError, ImportNote, ImportResult, ImportSizes,
+    PieceSize, ScaleInfo, ScaleOption, ScaleReason,
 };

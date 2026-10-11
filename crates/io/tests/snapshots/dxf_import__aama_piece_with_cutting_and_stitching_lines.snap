@@ -285,6 +285,18 @@ expression: r
     ],
     "suggested": "included"
   },
+  "sizes": {
+    "names": [
+      "38"
+    ],
+    "sample": null,
+    "pieces": [
+      {
+        "piece": "p5",
+        "size": "38"
+      }
+    ]
+  },
   "notes": [
     {
       "kind": "seamLineFound",

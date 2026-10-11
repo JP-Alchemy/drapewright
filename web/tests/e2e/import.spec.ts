@@ -84,3 +84,25 @@ test('opens a garment CAD (AAMA) DXF file', async ({ page }) => {
     ['Waistband', { mode: 'included', seam: 10, hem: null }],
   ])
 })
+
+test('a file with every size asks which, and adds only those', async ({ page }) => {
+  await page.goto('/?debug')
+  await page.getByTestId('pattern-file').setInputFiles(fixture('aama-graded.dxf'))
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: 'Found 2 pieces in 3 sizes' })).toBeVisible()
+  // The size the pattern was made in comes first.
+  const sample = dialog.getByRole('button', { name: 'M, the size the pattern was made in' })
+  await expect(sample).toHaveAttribute('aria-pressed', 'true')
+  const found = dialog.locator('.found-list li')
+  await expect(found).toHaveText(['Front', 'Back'])
+
+  // Comparing two sizes: each piece says which it is.
+  await dialog.getByRole('button', { name: 'L', exact: true }).click()
+  await expect(found).toHaveText(['Front (M)', 'Back (M)', 'Front (L)', 'Back (L)'])
+  await dialog.getByRole('button', { name: 'Add 4 pieces' }).click()
+  await expect(dialog).toBeHidden()
+
+  const list = page.getByRole('listbox', { name: 'Pieces' })
+  await expect(list.getByRole('option')).toHaveCount(4)
+  await expect(list.getByRole('option', { name: /Front \(L\)/ })).toContainText('25.0 cm × 61.0 cm')
+})

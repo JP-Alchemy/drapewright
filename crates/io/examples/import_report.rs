@@ -105,6 +105,19 @@ fn main() {
                     r.scale.chosen.basis,
                     if r.scale.certain { "" } else { "?" }
                 );
+                let sizes = match r.sizes.names.len() {
+                    0 | 1 => String::new(),
+                    n => format!(
+                        ", {n} sizes {}–{}{}",
+                        r.sizes.names[0],
+                        r.sizes.names[n - 1],
+                        r.sizes
+                            .sample
+                            .as_deref()
+                            .map(|s| format!(" (sample {s})"))
+                            .unwrap_or_default()
+                    ),
+                };
                 let asked = if r.allowance.pieces.is_empty() {
                     String::new()
                 } else {
@@ -113,7 +126,7 @@ fn main() {
                 let names: Vec<&str> = r.pieces.iter().take(4).map(|p| p.name.as_str()).collect();
                 let more = r.pieces.len().saturating_sub(4);
                 println!(
-                    "{:>3} pcs  {name} [{scale}{asked}, {ms:.0} ms] {}{} | {}",
+                    "{:>3} pcs  {name} [{scale}{sizes}{asked}, {ms:.0} ms] {}{} | {}",
                     r.pieces.len(),
                     names.join(", "),
                     if more > 0 {

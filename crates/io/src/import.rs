@@ -98,6 +98,50 @@ pub enum ImportNote {
     OutlineCrossesItself { piece: Id },
 }
 
+impl ImportNote {
+    /// The piece the note is about, if it is about one.
+    pub fn piece(&self) -> Option<&Id> {
+        match self {
+            ImportNote::SeamLineFound { piece, .. }
+            | ImportNote::CuttingLineDiffers { piece, .. }
+            | ImportNote::OutlineCrossesItself { piece } => Some(piece),
+            _ => None,
+        }
+    }
+}
+
+/// The sizes a pattern file holds, when it says. Garment CAD files carry
+/// every size of a style, each piece once per size.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ImportSizes {
+    /// In the file's order, usually smallest to largest.
+    pub names: Vec<String>,
+    /// The size the pattern was made in (its sample size), when the file
+    /// says.
+    pub sample: Option<String>,
+    /// The size of each piece that has one.
+    pub pieces: Vec<PieceSize>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct PieceSize {
+    pub piece: Id,
+    pub size: String,
+}
+
+impl ImportSizes {
+    fn of(&self, piece: &Id) -> Option<&str> {
+        self.pieces
+            .iter()
+            .find(|ps| &ps.piece == piece)
+            .map(|ps| ps.size.as_str())
+    }
+}
+
 /// Seam allowance the file does not settle. A piece drawn with one outline
 /// could have been drawn on either line, and the two differ by the
 /// allowance all round, so the user says which rather than Drapewright guessing.
@@ -161,12 +205,47 @@ pub struct ImportResult {
     pub pieces: Vec<Piece>,
     pub scale: ScaleInfo,
     pub allowance: AllowanceQuestion,
+    /// Empty when the file doesn't say which size each piece is.
+    #[serde(default)]
+    pub sizes: ImportSizes,
     pub notes: Vec<ImportNote>,
     /// SHA-256 of the imported file, hex.
     pub sha256: String,
 }
 
 impl ImportResult {
+    /// Keeps the pieces of the chosen sizes, and any piece without a size.
+    /// With more than one size kept, each piece's name says its size, as in
+    /// "Front (M)". Choosing nothing keeps everything.
+    pub fn choose_sizes(&mut self, chosen: &[String]) {
+        if chosen.is_empty() || self.sizes.names.is_empty() {
+            return;
+        }
+        let kept = |size: Option<&str>| size.is_none_or(|s| chosen.iter().any(|c| c == s));
+        let dropped: Vec<Id> = self
+            .pieces
+            .iter()
+            .filter(|p| !kept(self.sizes.of(&p.id)))
+            .map(|p| p.id.clone())
+            .collect();
+        self.pieces.retain(|p| !dropped.contains(&p.id));
+        if chosen.len() > 1 {
+            for piece in &mut self.pieces {
+                if let Some(size) = self.sizes.of(&piece.id) {
+                    piece.name = format!("{} ({size})", piece.name);
+                }
+            }
+        }
+        self.notes
+            .retain(|n| n.piece().is_none_or(|id| !dropped.contains(id)));
+        self.allowance.pieces.retain(|id| !dropped.contains(id));
+        if self.allowance.pieces.is_empty() {
+            self.allowance.suggested = None;
+        }
+        self.sizes.pieces.retain(|ps| !dropped.contains(&ps.piece));
+        self.sizes.names.retain(|n| chosen.contains(n));
+    }
+
     /// Applies the user's answer to the pieces drawn with one outline, which
     /// settles the question. Pieces whose allowance was measured keep it.
     pub fn answer_allowance(&mut self, answer: AllowanceAnswer) {

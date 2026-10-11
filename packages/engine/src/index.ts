@@ -176,13 +176,17 @@ export const jobs = {
   importDxf(bytes: Uint8Array, fileName: string | null): ImportResult {
     return importDxfRaw(bytes, fileName ?? undefined) as ImportResult
   },
-  /** Applies the user's answers: the confirmed scale and, if asked, the seam allowance. */
+  /**
+   * Applies the user's answers: the sizes to keep (null for all), the
+   * confirmed scale and, if asked, the seam allowance.
+   */
   finishImport(
     result: ImportResult,
+    sizes: string[] | null,
     scale: ScaleOption,
     allowance: AllowanceAnswer | null,
   ): ImportResult {
-    return finishImportRaw(result, scale, allowance) as ImportResult
+    return finishImportRaw(result, sizes, scale, allowance) as ImportResult
   },
   exportSvg(pieces: Piece[]): string {
     return exportSvgRaw(pieces)

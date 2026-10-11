@@ -244,6 +244,7 @@ pub fn import_svg(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         allowance: AllowanceQuestion::for_unmeasured(&pieces, &notes, None),
         pieces,
         scale,
+        sizes: Default::default(),
         notes,
         sha256,
     })

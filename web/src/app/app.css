@@ -1213,3 +1213,54 @@ h2 {
   border-color: var(--danger);
   color: #ffffff;
 }
+
+/* Size chips in the import dialog, for files that hold every size. */
+.size-choice {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.size-choice p {
+  margin: 0;
+}
+
+.size-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.size-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  justify-content: center;
+}
+
+.size-chip[data-selected] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.size-chip[data-focus-visible] {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.size-sample {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.85;
+}

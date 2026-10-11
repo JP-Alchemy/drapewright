@@ -129,12 +129,35 @@ def inches():
     write("inches.dxf", header(1) + section("ENTITIES", lwpolyline("CUFF", [(0, 0), (4, 0), (4, 2), (0, 2)])))
 
 
+def aama_graded():
+    """A front and a back in three sizes. Like Gerber, CLO and Browzwear
+    exports, there is one block per piece per size, each with "SIZE:" text."""
+    block = ""
+    entities = text("0", (0, 900), "ANSI/AAMA VERSION: 1.0.0") + text("0", (0, 890), "UNITS: METRIC")
+    entities += text("0", (0, 880), "Sample Size: M")
+    x = 0
+    for size, grow in (("S", -10), ("M", 0), ("L", 10)):
+        for piece, (w, h) in (("FRONT", (240, 600)), ("BACK", (250, 620))):
+            name = f"{piece}_{size}"
+            cut = [(0, 0), (w + grow, 0), (w + grow, h + grow), (0, h + grow)]
+            block += pairs((0, "BLOCK"), (8, "0"), (2, name), (70, 0), (10, 0), (20, 0))
+            block += polyline("1", cut)
+            block += "".join(point("2", p) for p in cut)
+            block += text("1", (20, 40), f"Piece Name: {piece}")
+            block += text("1", (20, 30), f"SIZE: {size}")
+            block += pairs((0, "ENDBLK"), (8, "0"))
+            entities += pairs((0, "INSERT"), (8, "0"), (2, name), (10, x), (20, 0))
+            x += w + grow + 50
+    write("aama-graded.dxf", section("BLOCKS", block) + section("ENTITIES", entities))
+
+
 def unitless():
     write("unitless.dxf", section("ENTITIES", lwpolyline("COLLAR", [(0, 0), (100, 0), (100, 50), (0, 50)])))
 
 
 if __name__ == "__main__":
     aama_skirt()
+    aama_graded()
     generic_mm()
     inches()
     unitless()

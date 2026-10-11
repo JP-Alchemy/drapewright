@@ -108,6 +108,35 @@ fn aama_piece_with_cutting_and_stitching_lines() {
 }
 
 #[test]
+fn graded_files_offer_their_sizes() {
+    let r = fixture("aama-graded.dxf");
+    assert_eq!(r.pieces.len(), 6);
+    assert_eq!(r.sizes.names, ["S", "M", "L"]);
+    assert_eq!(r.sizes.sample.as_deref(), Some("M"));
+    assert_eq!(r.allowance.pieces.len(), 6);
+
+    // One size: its pieces, under their own names.
+    let mut one = r.clone();
+    one.choose_sizes(&["M".to_string()]);
+    let names: Vec<&str> = one.pieces.iter().map(|p| p.name.as_str()).collect();
+    assert_eq!(names, ["Front", "Back"]);
+    assert!((one.pieces[0].outline.bounds().width() - 240.0).abs() < 1e-6);
+    assert_eq!(one.allowance.pieces.len(), 2);
+    assert_eq!(one.sizes.names, ["M"]);
+
+    // Two sizes, to compare: each name says its size.
+    let mut two = r.clone();
+    two.choose_sizes(&["S".to_string(), "L".to_string()]);
+    let names: Vec<&str> = two.pieces.iter().map(|p| p.name.as_str()).collect();
+    assert_eq!(names, ["Front (S)", "Back (S)", "Front (L)", "Back (L)"]);
+
+    // Choosing nothing keeps everything.
+    let mut all = r.clone();
+    all.choose_sizes(&[]);
+    assert_eq!(all.pieces.len(), 6);
+}
+
+#[test]
 fn generic_drawing_in_millimetres() {
     let r = fixture("generic-mm.dxf");
     assert!(r.scale.certain);

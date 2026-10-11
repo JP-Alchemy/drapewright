@@ -216,18 +216,22 @@ pub fn import_dxf(data: &[u8], file_name: Option<String>) -> Result<JsValue, JsE
     to_js(&result)
 }
 
-/// Settles an import with the user's answers: the scale she confirmed and,
-/// when the file did not say, whether its outlines include seam allowance
-/// (`allowance` is null when nothing was asked).
+/// Settles an import with the user's answers: the sizes she wants (null for
+/// all), the scale she confirmed and, when the file did not say, whether its
+/// outlines include seam allowance (`allowance` is null when nothing was
+/// asked).
 #[wasm_bindgen(js_name = finishImport)]
 pub fn finish_import(
     result: JsValue,
+    sizes: JsValue,
     scale: JsValue,
     allowance: JsValue,
 ) -> Result<JsValue, JsError> {
     let mut result: ImportResult = from_js(result)?;
+    let sizes: Option<Vec<String>> = from_js(sizes)?;
     let scale: ScaleOption = from_js(scale)?;
     let allowance: Option<AllowanceAnswer> = from_js(allowance)?;
+    result.choose_sizes(&sizes.unwrap_or_default());
     result.rescale(&scale, true);
     if let Some(answer) = allowance {
         result.answer_allowance(answer);

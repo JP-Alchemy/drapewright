@@ -125,6 +125,11 @@ expression: r
     "pieces": [],
     "suggested": null
   },
+  "sizes": {
+    "names": [],
+    "sample": null,
+    "pieces": []
+  },
   "notes": [
     {
       "kind": "seamLineFound",

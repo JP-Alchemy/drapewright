@@ -274,6 +274,11 @@ expression: r
     ],
     "suggested": null
   },
+  "sizes": {
+    "names": [],
+    "sample": null,
+    "pieces": []
+  },
   "notes": [
     {
       "kind": "smallShapesIgnored",

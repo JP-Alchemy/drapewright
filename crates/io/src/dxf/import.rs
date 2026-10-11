@@ -31,8 +31,8 @@ use crate::assemble::{
     median, to_segments,
 };
 use crate::import::{
-    AllowanceQuestion, ImportError, ImportNote, ImportResult, ScaleInfo, ScaleOption, ScaleReason,
-    sha256_hex,
+    AllowanceQuestion, ImportError, ImportNote, ImportResult, ImportSizes, PieceSize, ScaleInfo,
+    ScaleOption, ScaleReason, sha256_hex,
 };
 
 /// Curves become Béziers within this, mm.
@@ -472,10 +472,11 @@ pub fn import_dxf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
     };
 
     let aama = is_aama(&drawing);
-    let (pieces, mut notes) = if aama {
+    let (pieces, mut notes, piece_sizes) = if aama {
         aama_pieces(&drawing, to_mm, &source)
     } else {
-        generic_pieces(&drawing, to_mm, &scale, file_name, &sha256)
+        let (pieces, notes) = generic_pieces(&drawing, to_mm, &scale, file_name, &sha256);
+        (pieces, notes, Vec::new())
     };
     if drawing.skipped > 0 {
         notes.push(ImportNote::UnsupportedEntities {
@@ -493,9 +494,34 @@ pub fn import_dxf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         pieces,
         scale,
         allowance,
+        sizes: sizes_of(&drawing, piece_sizes),
         notes,
         sha256,
     })
+}
+
+/// The sizes the pieces come in, in the file's order, and the sample size
+/// from the file's header ("Sample Size: 50").
+fn sizes_of(d: &Drawing, pieces: Vec<PieceSize>) -> ImportSizes {
+    let mut names: Vec<String> = Vec::new();
+    for ps in &pieces {
+        if !names.contains(&ps.size) {
+            names.push(ps.size.clone());
+        }
+    }
+    let header: Vec<String> = d
+        .entities
+        .iter()
+        .filter_map(|e| match &e.shape {
+            Shape::Text { text, .. } => Some(text.clone()),
+            _ => None,
+        })
+        .collect();
+    ImportSizes {
+        names,
+        sample: annotation(&header, "Sample Size").map(str::to_string),
+        pieces,
+    }
 }
 
 fn generic_pieces(
@@ -680,10 +706,11 @@ fn aama_pieces(
     d: &Drawing,
     to_mm: Affine,
     source: &dyn Fn(Option<String>) -> Source,
-) -> (Vec<Piece>, Vec<ImportNote>) {
+) -> (Vec<Piece>, Vec<ImportNote>, Vec<PieceSize>) {
     let mut ids = counter("");
     let mut pieces = Vec::new();
     let mut notes = Vec::new();
+    let mut sizes = Vec::new();
 
     // Each inserted block is a piece; with no inserts, each block is.
     let inserts: Vec<(String, Affine)> = d
@@ -888,8 +915,12 @@ fn aama_pieces(
             }
         }
         let mut info = Vec::new();
-        if let Some(size) = annotation(&parts.texts, "Size") {
+        if let Some(size) = annotation(&parts.texts, "Size").filter(|s| !s.is_empty()) {
             info.push(format!("Size {size}"));
+            sizes.push(PieceSize {
+                piece: piece.id.clone(),
+                size: size.to_string(),
+            });
         }
         if let Some(a) = annotation(&parts.texts, "Annotation") {
             info.push(a.to_string());
@@ -900,7 +931,7 @@ fn aama_pieces(
     if pieces.is_empty() {
         notes.push(ImportNote::NoClosedShapes);
     }
-    (pieces, notes)
+    (pieces, notes, sizes)
 }
 
 #[cfg(test)]

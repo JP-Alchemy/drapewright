@@ -345,16 +345,20 @@ export class Session {
   }
 
   /**
-   * Adds the pending import's pieces beside what is already there, at the
-   * scale she confirmed and, when she was asked, with her answer about seam
-   * allowance.
+   * Adds the pending import's pieces beside what is already there: the
+   * sizes she chose, at the scale she confirmed and, when she was asked,
+   * with her answer about seam allowance.
    */
-  async confirmImport(scale: ScaleOption, allowance: AllowanceAnswer | null): Promise<void> {
+  async confirmImport(
+    scale: ScaleOption,
+    allowance: AllowanceAnswer | null,
+    sizes: string[] | null = null,
+  ): Promise<void> {
     const pending = this.ui.get().pendingImport
     if (!pending) return
     let result: ImportResult
     try {
-      result = await this.io.call('finishImport', pending.result, scale, allowance)
+      result = await this.io.call('finishImport', pending.result, sizes, scale, allowance)
     } catch (error) {
       this.notify({
         kind: 'error',
