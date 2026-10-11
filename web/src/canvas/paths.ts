@@ -12,6 +12,9 @@ export interface PiecePaths {
   /** Marks: outlined (drill holes, circles, crosses, buttonholes) and filled (dots). */
   marks: Path2D
   dots: Path2D
+  /** Altered: the piece as drawn, and the lines its alterations work along. */
+  drawn: Path2D | null
+  alterLines: Path2D | null
 }
 
 function polyline(flat: number[]): Path2D {
@@ -24,15 +27,30 @@ function polyline(flat: number[]): Path2D {
   return path
 }
 
-function outlinePath(piece: Piece): Path2D {
+function outlinePath(outline: Piece['outline']): Path2D {
   const path = new Path2D()
-  const [sx, sy] = piece.outline.start
+  const [sx, sy] = outline.start
   path.moveTo(sx, sy)
-  for (const edge of piece.outline.edges) {
+  for (const edge of outline.edges) {
     for (const seg of edge.segments) addSegment(path, seg)
   }
   path.closePath()
   return path
+}
+
+/** An altered piece's outline as drawn, and its alterations' lines through two points (its own lines are drawn already). */
+function alteredPaths(piece: Piece): { drawn: Path2D | null; alterLines: Path2D | null } {
+  const on = piece.alterations.filter((a) => a.on)
+  if (!piece.drawn || on.length === 0) return { drawn: null, alterLines: null }
+  const alterLines = new Path2D()
+  for (const a of on) {
+    const { line } = a.change
+    if (line.type === 'through') {
+      alterLines.moveTo(line.from[0], line.from[1])
+      alterLines.lineTo(line.to[0], line.to[1])
+    }
+  }
+  return { drawn: outlinePath(piece.drawn.outline), alterLines }
 }
 
 export function addSegment(path: Path2D, seg: Segment): void {
@@ -103,7 +121,7 @@ function markPaths(piece: Piece): { marks: Path2D; dots: Path2D } {
  * polyline (within 0.002 mm of the true curve).
  */
 export function buildPaths(piece: Piece, view: PieceView): PiecePaths {
-  const exact = outlinePath(piece)
+  const exact = outlinePath(piece.outline)
   const lines = new Path2D()
   const dashedLines = new Path2D()
   for (const l of piece.lines) {
@@ -114,5 +132,5 @@ export function buildPaths(piece: Piece, view: PieceView): PiecePaths {
   const outlines = view.outlineIsCutting
     ? { cut: exact, stitch: polyline(view.stitching) }
     : { cut: polyline(view.cutting), stitch: exact }
-  return { ...outlines, lines, dashedLines, ...markPaths(piece) }
+  return { ...outlines, lines, dashedLines, ...markPaths(piece), ...alteredPaths(piece) }
 }

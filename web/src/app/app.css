@@ -163,6 +163,8 @@ h2 {
   display: flex;
   align-items: center;
   gap: 8px;
+  /* Never wider than the window: the project's name gives way. */
+  min-width: 0;
   min-height: 60px;
   padding: env(safe-area-inset-top) 12px 0 16px;
   background: var(--surface);
@@ -182,6 +184,12 @@ h2 {
 .brand img {
   flex: none;
   border-radius: 7px;
+}
+
+/* The buttons keep their labels on one line; the name shortens instead. */
+.topbar > .button {
+  flex: none;
+  white-space: nowrap;
 }
 
 .project-name {
@@ -246,6 +254,9 @@ h2 {
 }
 
 .side-panel {
+  /* Positioned, so that the hidden inputs inside switches and radios
+     scroll with it rather than lengthen the page. */
+  position: relative;
   overflow: auto;
   padding: 16px;
   background: var(--surface);
@@ -1003,6 +1014,28 @@ h2 {
 .segment[data-focus-visible] {
   outline: 3px solid var(--focus-ring);
   outline-offset: 1px;
+}
+
+/* An alteration in the inspector: switched on or off, and how. */
+.alter-step {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.alter-step-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.alter-step .segmented,
+.alter-step .field {
+  margin: 4px 0;
 }
 
 /* Corner chooser */

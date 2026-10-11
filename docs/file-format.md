@@ -1,6 +1,6 @@
 # The Drapewright project format
 
-Status: **schema version 4** (Phase 3). Sections marked *draft* describe
+Status: **schema version 5** (Phase 4). Sections marked *draft* describe
 how later phases will extend the format; they become normative, with a
 version bump and a migration, when they are implemented.
 
@@ -49,7 +49,7 @@ single exception of sidecars it references explicitly.
 ```json
 {
   "format": "drapewright-project",
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "generator": "Drapewright 0.1.0",
   "meta": {
     "id": "7f3c9a2e5b1d4e8f",
@@ -71,7 +71,7 @@ single exception of sidecars it references explicitly.
 | Field | Type | Notes |
 |---|---|---|
 | `format` | `"drapewright-project"` | Identifies the file type. |
-| `schemaVersion` | integer | `4` for this document. See §8. |
+| `schemaVersion` | integer | `5` for this document. See §8. |
 | `generator` | string | Free text naming the program that wrote the file. |
 | `meta.id` | string | Stable project identifier. |
 | `meta.name` | string | Shown to the user. |
@@ -101,7 +101,9 @@ single exception of sidecars it references explicitly.
   "lines": [ /* InternalLine */ ],
   "labels": [ /* Label */ ],
   "placement": { "x": 0, "y": 0, "rotation": 0 },
-  "source": { /* Source */ }
+  "source": { /* Source */ },
+  "alterations": [ /* Alteration */ ],
+  "drawn": null
 }
 ```
 
@@ -120,6 +122,8 @@ single exception of sidecars it references explicitly.
 | `labels` | array of Label | `[]` | §4.10. |
 | `placement` | Placement | `{ "x": 0, "y": 0, "rotation": 0 }` | §4.11. |
 | `source` | Source \| null | `null` | §4.12. |
+| `alterations` | array of Alteration | `[]` | §4.13 (version 5). |
+| `drawn` | Drawn \| null | `null` | The piece as drawn, before its alterations; §4.13. |
 
 All piece geometry (outline, notches, marks, lines, labels, grainline) is
 in the piece's own coordinate system. `placement` positions the piece on the
@@ -305,6 +309,58 @@ changes a piece's shape or its printed result.
 | `scale.basis` | How the scale was established: `declaredUnits` (file states physical units), `assumed96dpi`, `assumed72dpi`, `assumed90dpi` (drawings without units), `assumedMm`, `assumedCm`, `assumedInches` (CAD drawings without units), `measured` (the user measured a known length). |
 | `scale.confirmed` | Whether the user confirmed the scale. Imports never proceed with an unconfirmed guess. |
 
+### 4.13 Alterations (version 5)
+
+Changes to a piece's shape are kept as steps, with the piece as drawn
+kept beside them, so that nothing is changed for good.
+
+```json
+"alterations": [
+  {
+    "id": "a1",
+    "on": true,
+    "change": {
+      "type": "lengthen",
+      "line": { "type": "own", "line": "l3" },
+      "by": 25
+    }
+  }
+],
+"drawn": { "outline": { /* Outline */ }, "grainline": null, "notches": [], "marks": [], "lines": [], "labels": [] }
+```
+
+| Field | Type | Default | Notes |
+|---|---|---|---|
+| `id` | string | — | |
+| `on` | boolean | `true` | Switched off, the step is kept but not applied. |
+| `change` | Change | — | What it does (below). |
+
+`drawn` holds the piece's outline, grainline, notches, marks, internal
+lines and labels as drawn. A piece with any alterations must have it, and
+its own outline, grainline, notches, marks, lines and labels are then
+exactly `drawn` with the steps that are on applied in order. Readers may
+recompute them; writers must keep them so. With no alterations, `drawn` is
+`null` and the piece is as drawn. Ids of edges, notches, marks, lines and
+labels are the same in the piece and in `drawn`.
+
+**Change** `lengthen` — `{ "type": "lengthen", "line": AlterLine, "by":
+mm }`: longer by `by` across the line (shorter where `by` is less than
+0). The part of the piece beyond the line moves: below it, or right of an
+upright line, whichever way the line is given. Lengthened, the piece is
+spread apart along the line and an edge crossing it is bridged straight
+across the gap. Shortened, a tuck as deep as `|by|` is folded out beyond
+the line: what lay in the tuck lies along the line (a jog in a slanted
+edge), and what lay beyond it moves back. Notches stay where they were
+on their edges' cloth; marks, labels, internal lines and the grainline
+move with the part they are on.
+
+**AlterLine** — `{ "type": "own", "line": id }`: one of the piece's
+internal lines (normally its lengthen or shorten line), straight from its
+start to its end; or `{ "type": "through", "from": [x, y], "to": [x, y] }`:
+the line through two points in the piece's coordinates.
+
+More kinds of change follow in Phase 4 (§10.3).
+
 ## 5. Derived geometry (not stored)
 
 These are always computed by the reader and never stored, so they cannot go
@@ -374,6 +430,7 @@ Non-semantic: readers may ignore it.
 | 2 | `measurementSets` (§10.2). Version 1 files have none. |
 | 3 | `seams` (§10.4). Earlier files have none. |
 | 4 | A measurement set's `age` (§10.2). Earlier files leave it unknown. |
+| 5 | A piece's `alterations` and `drawn` (§4.13). Earlier pieces have none. |
 
 ## 9. Validation
 
@@ -485,19 +542,12 @@ FreeSewing column maps keys to FreeSewing's measurement names.
 
 How to take each one is shown in the app beside its box.
 
-### 10.3 Alteration stack (Phase 4)
+### 10.3 More alterations (Phase 4)
 
-```json
-"alterations": [
-  { "id": "a1", "kind": "lengthenShorten", "enabled": true, "pieces": ["p1", "p2"], "line": "l1", "amount": 25 },
-  { "id": "a2", "kind": "fullBust", "enabled": true, "piece": "p1", "amount": 15, "apex": [210, 260] }
-]
-```
-
-Applied in order on top of the sized outline. The piece then also carries
-`base` (the outline before alterations); `outline` is the result. Kinds:
-`lengthenShorten`, `fullBust`, `smallBust`, `swayback`, `broadShoulder`,
-`narrowShoulder`, `waist`, `hip`, `slashSpread`, `pivot`, `ease`, `trueSeam`.
+Alterations are kept on each piece (§4.13). The kinds still to come are
+full and small bust adjustments, slash and spread, pivot, swayback,
+broad and narrow shoulders, waist and hip, and truing seams: each a new
+`change` type, with the same rules.
 
 ### 10.4 Seams (version 3)
 

@@ -148,6 +148,24 @@ export const t = {
     oneWay: 'One way (napped or one-way fabric)',
   },
 
+  alter: {
+    heading: 'Alterations',
+    none: 'None yet. Each change is kept as a step that can be switched off: the piece as drawn is kept too.',
+    lengthen: 'Lengthen or shorten',
+    step: (longer: boolean, by: string) => `${longer ? 'Lengthened' : 'Shortened'} by ${by}`,
+    longer: 'Lengthen',
+    shorter: 'Shorten',
+    way: 'Lengthen or shorten',
+    by: 'By how much',
+    where: 'Where',
+    across: 'Straight across the piece',
+    ownLine: (n: number, of: number) =>
+      of === 1 ? 'Its lengthen or shorten line' : `Its lengthen or shorten line ${n}`,
+    fromTop: 'From the top',
+    remove: (step: string) => `Remove the step “${step}”`,
+    asDrawn: 'Dashed: the piece as drawn.',
+  },
+
   cut: {
     heading: 'Cutting',
     quantity: 'How many',

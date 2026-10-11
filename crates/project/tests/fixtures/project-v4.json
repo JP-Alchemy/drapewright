@@ -1,0 +1,332 @@
+{
+  "format": "drapewright-project",
+  "schemaVersion": 4,
+  "generator": "drapewright tests",
+  "meta": {
+    "id": "skirt",
+    "name": "Test skirt",
+    "created": "2026-10-11T00:00:00Z",
+    "modified": "2026-10-11T00:00:00Z",
+    "notes": ""
+  },
+  "settings": {
+    "displayUnits": "cm"
+  },
+  "pieces": [
+    {
+      "id": "p1",
+      "name": "Skirt front",
+      "notes": "",
+      "outline": {
+        "start": [
+          0.0,
+          0.0
+        ],
+        "edges": [
+          {
+            "id": "e2",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  185.0,
+                  8.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e3",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "c1": [
+                  215.0,
+                  80.0
+                ],
+                "c2": [
+                  255.0,
+                  200.0
+                ],
+                "to": [
+                  290.0,
+                  600.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e4",
+            "name": "",
+            "kind": "hem",
+            "segments": [
+              {
+                "c1": [
+                  190.0,
+                  608.0
+                ],
+                "c2": [
+                  95.0,
+                  612.0
+                ],
+                "to": [
+                  0.0,
+                  612.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e5",
+            "name": "",
+            "kind": "fold",
+            "segments": [
+              {
+                "to": [
+                  0.0,
+                  0.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          }
+        ]
+      },
+      "allowance": {
+        "mode": "add",
+        "seam": 15.0,
+        "hem": null
+      },
+      "cut": [
+        {
+          "material": "main",
+          "quantity": 1,
+          "mirrored": null,
+          "onFold": null
+        }
+      ],
+      "grainline": {
+        "from": [
+          100.0,
+          100.0
+        ],
+        "to": [
+          100.0,
+          400.0
+        ],
+        "oneWay": false
+      },
+      "notches": [],
+      "marks": [],
+      "lines": [],
+      "labels": [],
+      "placement": {
+        "x": 0.0,
+        "y": 0.0,
+        "rotation": 0.0
+      },
+      "source": null
+    },
+    {
+      "id": "p6",
+      "name": "Skirt back",
+      "notes": "",
+      "outline": {
+        "start": [
+          0.0,
+          0.0
+        ],
+        "edges": [
+          {
+            "id": "e7",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  185.0,
+                  12.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e8",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "c1": [
+                  215.0,
+                  84.0
+                ],
+                "c2": [
+                  255.0,
+                  204.0
+                ],
+                "to": [
+                  290.0,
+                  604.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e9",
+            "name": "",
+            "kind": "hem",
+            "segments": [
+              {
+                "c1": [
+                  190.0,
+                  612.0
+                ],
+                "c2": [
+                  95.0,
+                  616.0
+                ],
+                "to": [
+                  0.0,
+                  616.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e10",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  0.0,
+                  0.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          }
+        ]
+      },
+      "allowance": {
+        "mode": "add",
+        "seam": 15.0,
+        "hem": null
+      },
+      "cut": [
+        {
+          "material": "main",
+          "quantity": 2,
+          "mirrored": null,
+          "onFold": null
+        }
+      ],
+      "grainline": {
+        "from": [
+          100.0,
+          100.0
+        ],
+        "to": [
+          100.0,
+          400.0
+        ],
+        "oneWay": false
+      },
+      "notches": [],
+      "marks": [],
+      "lines": [],
+      "labels": [],
+      "placement": {
+        "x": 400.0,
+        "y": 0.0,
+        "rotation": 0.0
+      },
+      "source": null
+    }
+  ],
+  "print": {
+    "paper": "a4",
+    "orientation": "portrait",
+    "margin": 10.0,
+    "assembly": "trim",
+    "overlap": 15.0,
+    "stitchLine": true,
+    "notchStyle": "slit",
+    "notchSpacing": 6.0,
+    "testSquare": true,
+    "pageMap": true,
+    "skipEmptyPages": true,
+    "pieces": null,
+    "layout": null
+  },
+  "measurementSets": [],
+  "seams": [
+    {
+      "id": "s11",
+      "name": "",
+      "a": {
+        "piece": "p1",
+        "edge": "e3",
+        "from": null,
+        "to": null,
+        "mirror": false
+      },
+      "b": {
+        "piece": "p6",
+        "edge": "e8",
+        "from": null,
+        "to": null,
+        "mirror": false
+      },
+      "reversed": false,
+      "ease": "even",
+      "confirmed": true
+    },
+    {
+      "id": "s12",
+      "name": "",
+      "a": {
+        "piece": "p6",
+        "edge": "e10",
+        "from": null,
+        "to": null,
+        "mirror": false
+      },
+      "b": {
+        "piece": "p6",
+        "edge": "e10",
+        "from": null,
+        "to": null,
+        "mirror": true
+      },
+      "reversed": false,
+      "ease": "even",
+      "confirmed": true
+    }
+  ],
+  "extensions": {},
+  "view": {
+    "center": [
+      0.0,
+      0.0
+    ],
+    "zoom": 0.5,
+    "selection": []
+  }
+}

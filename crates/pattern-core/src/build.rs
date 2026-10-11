@@ -112,29 +112,55 @@ fn group_edges(
 }
 
 /// Gives the piece and everything in it new ids from `next_id(prefix)`,
-/// keeping references (notches to edges) intact.
+/// keeping references (notches to edges, alterations to lines) intact. The
+/// piece as drawn, kept with its alterations, has the same things: they
+/// get the same new ids.
 pub fn reassign_ids(piece: &mut Piece, next_id: &mut dyn FnMut(&str) -> Id) {
+    use std::collections::HashMap;
     piece.id = next_id("p");
-    let mut renamed: Vec<(Id, Id)> = Vec::new();
-    for edge in &mut piece.outline.edges {
-        let new = next_id("e");
-        renamed.push((std::mem::replace(&mut edge.id, new.clone()), new));
+    // Old id to new, by kind of thing.
+    let mut renamed: HashMap<(&str, Id), Id> = HashMap::new();
+    let mut rename = |kind: &'static str, id: &mut Id| {
+        let new = renamed
+            .entry((kind, id.clone()))
+            .or_insert_with(|| next_id(kind))
+            .clone();
+        *id = new;
+    };
+    let mut shapes: Vec<&mut crate::alter::Drawn> = Vec::new();
+    let mut current = crate::alter::Drawn::of(piece);
+    let mut drawn = piece.drawn.take();
+    shapes.push(&mut current);
+    if let Some(d) = drawn.as_mut() {
+        shapes.push(d);
     }
-    for notch in &mut piece.notches {
-        notch.id = next_id("n");
-        if let Some((_, new)) = renamed.iter().find(|(old, _)| *old == notch.edge) {
-            notch.edge = new.clone();
+    for shape in shapes {
+        for edge in &mut shape.outline.edges {
+            rename("e", &mut edge.id);
+        }
+        for notch in &mut shape.notches {
+            rename("n", &mut notch.id);
+            rename("e", &mut notch.edge);
+        }
+        for m in &mut shape.marks {
+            rename("m", &mut m.id);
+        }
+        for l in &mut shape.lines {
+            rename("l", &mut l.id);
+        }
+        for t in &mut shape.labels {
+            rename("t", &mut t.id);
         }
     }
-    for m in &mut piece.marks {
-        m.id = next_id("m");
+    for a in &mut piece.alterations {
+        rename("a", &mut a.id);
+        let crate::alter::Change::Lengthen { line, .. } = &mut a.change;
+        if let crate::alter::AlterLine::Own { line } = line {
+            rename("l", line);
+        }
     }
-    for l in &mut piece.lines {
-        l.id = next_id("l");
-    }
-    for t in &mut piece.labels {
-        t.id = next_id("t");
-    }
+    current.put(piece);
+    piece.drawn = drawn;
 }
 
 /// An id generator counting up from 1 per call: `"e1"`, `"e2"`, `"p3"`…

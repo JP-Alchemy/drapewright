@@ -149,7 +149,9 @@ expression: r
           "basis": "declaredUnits",
           "confirmed": true
         }
-      }
+      },
+      "alterations": [],
+      "drawn": null
     },
     {
       "id": "p10",
@@ -256,7 +258,9 @@ expression: r
           "basis": "declaredUnits",
           "confirmed": true
         }
-      }
+      },
+      "alterations": [],
+      "drawn": null
     }
   ],
   "scale": {

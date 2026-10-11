@@ -50,6 +50,7 @@ fn reverse_segments(start: Pt, segments: &[Segment]) -> Vec<Segment> {
 /// corner shapes are unchanged; only the order in which they are listed
 /// changes.
 pub fn reverse(piece: &mut Piece) {
+    also_drawn(piece, reverse);
     let outline = &mut piece.outline;
     let n = outline.edges.len();
     if n == 0 {
@@ -202,6 +203,15 @@ pub fn join_with_next(piece: &mut Piece, edge_id: &str) -> Result<(), OpError> {
 /// outline is reversed so it keeps running clockwise.
 pub fn transform(piece: &mut Piece, affine: Affine) {
     let f = |p: Pt| Pt::from(affine * kurbo::Point::from(p));
+    // The piece as drawn, and the lines its alterations work along, alike.
+    also_drawn(piece, |p| transform(p, affine));
+    for a in &mut piece.alterations {
+        let crate::alter::Change::Lengthen { line, .. } = &mut a.change;
+        if let crate::alter::AlterLine::Through { from, to } = line {
+            *from = f(*from);
+            *to = f(*to);
+        }
+    }
     let outline = &mut piece.outline;
     outline.start = f(outline.start);
     for edge in &mut outline.edges {
@@ -226,7 +236,20 @@ pub fn transform(piece: &mut Piece, affine: Affine) {
         l.at = f(l.at);
     }
     if affine.determinant() < 0.0 {
+        // The piece as drawn was turned round already.
+        let drawn = piece.drawn.take();
         reverse(piece);
+        piece.drawn = drawn;
+    }
+}
+
+/// Does `op` to the piece as drawn (before its alterations) too, if kept.
+fn also_drawn(piece: &mut Piece, op: impl Fn(&mut Piece)) {
+    if let Some(drawn) = piece.drawn.take() {
+        let mut as_drawn = Piece::new(piece.id.clone(), "", drawn.outline.clone());
+        (*drawn).put(&mut as_drawn);
+        op(&mut as_drawn);
+        piece.drawn = Some(Box::new(crate::alter::Drawn::of(&as_drawn)));
     }
 }
 

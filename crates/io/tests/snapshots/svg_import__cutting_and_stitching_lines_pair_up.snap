@@ -110,7 +110,9 @@ expression: r
           "basis": "declaredUnits",
           "confirmed": true
         }
-      }
+      },
+      "alterations": [],
+      "drawn": null
     }
   ],
   "scale": {

@@ -48,7 +48,7 @@ Each step is one or a few commits, with tests and a demo note in
 | 20 | **3D view.** `render` and `wasm-3d` in the sim worker; see the avatar and turn it. | Renderer smoke test (WebGL2 in CI); worker protocol | See the avatar |
 | 21 | **Drape.** Meshing, placing pieces round the body, stitching seams, the CPU cloth, fabric presets. | Sim invariants (no stretch beyond limits, seams closed, nothing inside the body); a drape that settles | Drape a skirt and a blouse on the avatar |
 | 22 | **Heatmaps.** Strain (pulling) and ease (room between cloth and body), with numbers where tapped. | Strain on known stretched cases; ease against the distance field | See where it pulls |
-| 23 | **WebGPU drape.** The same cloth in compute shaders, for speed. | CPU and GPU agree within tolerance | Drape in a second or two |
+| 23 | **WebGPU drape.** The same cloth in compute shaders, for speed. Moved to just before step 28: the CPU drape already takes a second or two for a skirt or a blouse in the browser, and it is live re-draping that will need more speed. | CPU and GPU agree within tolerance | Drape in a second or two |
 
 ### Phase 4
 
@@ -58,6 +58,7 @@ Each step is one or a few commits, with tests and a demo note in
 | 25 | Full and small bust adjustment; slash and spread; pivot |
 | 26 | Swayback; broad and narrow shoulders; waist and hip |
 | 27 | True up seams (walk and blend) |
+| (23) | WebGPU drape, if live re-draping needs the speed |
 | 28 | Live re-drape after each 2D edit |
 | 29 | Fabric calibration |
 | 30 | Projector mode |

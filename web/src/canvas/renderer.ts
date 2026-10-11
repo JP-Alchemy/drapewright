@@ -67,6 +67,8 @@ export interface Theme {
   stitch: string
   select: string
   seam: string
+  /** Alterations' lines. */
+  accent: string
   label: string
   labelHalo: string
 }
@@ -84,6 +86,7 @@ export function readTheme(el: Element): Theme {
     stitch: v('--accent', '#b4532a'),
     select: v('--select', '#2563eb'),
     seam: v('--seam', '#7c3aed'),
+    accent: v('--accent', '#b4532a'),
     label: v('--ink-on-paper', '#1f2a2e'),
     labelHalo: v('--paper', '#fbf7f0'),
   }
@@ -238,6 +241,20 @@ export function draw(
     ctx.fill(paths.dots)
     drawNotches(ctx, sp.view, s, theme)
     drawGrainline(ctx, piece, s, theme)
+    // Altered: as drawn, faintly, and where it was altered.
+    if (paths.drawn) {
+      ctx.setLineDash([2 / s, 3 / s])
+      ctx.strokeStyle = theme.stitch
+      ctx.lineWidth = 1 / s
+      ctx.stroke(paths.drawn)
+    }
+    if (paths.alterLines) {
+      ctx.setLineDash([10 / s, 4 / s])
+      ctx.strokeStyle = theme.accent
+      ctx.lineWidth = 1.5 / s
+      ctx.stroke(paths.alterLines)
+    }
+    ctx.setLineDash([])
   }
 
   // A grainline being drawn.

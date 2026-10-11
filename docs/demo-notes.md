@@ -12,6 +12,58 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 24 — Alterations, kept as steps: lengthen and shorten (Phase 4, part 1)
+
+Change a piece's length without losing it as drawn: each change is a
+step that can be switched off, changed or taken away, and undone.
+
+**Try it:**
+
+1. Open the test blouse (**Open pattern**,
+   `fixtures/drapewright/blouse.drapewright`) and tap **Blouse front** in
+   the pieces list.
+2. Under **Alterations**, press **Lengthen or shorten**. The front is
+   lengthened 1 cm straight across its middle: the part below moves down,
+   an orange dashed line shows where, and the outline as drawn stays
+   behind it, finely dashed. The pieces list says 61.0 cm; the seams list
+   says the side seam's front is now 1.0 cm longer than its back.
+3. In the step: **Lengthen** or **Shorten**, **By how much**, and **From
+   the top** (where the line is). A piece with its own lengthen or shorten
+   line (from an imported pattern) uses that line, with **Where** to
+   choose another.
+4. The switch on the step leaves it out (the piece is as drawn) or puts it
+   back; the bin takes it away. Undo works as for any change.
+5. Lengthen the back alike and the side seam matches again; drape it to see
+   the longer blouse.
+
+**How it works:** each piece keeps its alterations in order, and its shape
+as drawn beside them; what is shown, printed, sewn and draped is that shape
+with the steps that are on applied. Lengthened, the piece is cut along the
+line and spread apart, a side crossing the line bridged straight across the
+gap. Shortened, a tuck is folded out below the line, and a slanted side
+jogs along the line, to be trued up (step 27). Notches stay on their edges'
+cloth; marks, labels, internal lines and the grainline move with their
+part. Projects are now schema version 5; earlier ones open with no
+alterations.
+
+While a piece is altered, changes that say where (a notch's place, a
+grainline, splitting an edge) are refused with a plain message: switch the
+alterations off to make them on the piece as drawn. Changes that say which
+(an edge's kind, a corner, its allowance) are made as drawn and altered
+again.
+
+**Found on the way:** with a long project name, the top bar on a 1024-pixel
+screen was wider than the window, and the hidden inputs inside the side
+panel's switches made the page scroll. The name now gives way, and the
+panel keeps its hidden inputs to itself.
+
+**Not yet:** one step for the front and back together (each piece has its
+own for now); placing the line by dragging it; altering over the AI
+assistants' connection (MCP); full and small bust, swayback, shoulders,
+waist and hip (steps 25 and 26).
+
+---
+
 ## Step 22 — Where it pulls, and the room it has (Phase 3, part 9)
 
 Heatmaps on the draped garment, and numbers where you tap.

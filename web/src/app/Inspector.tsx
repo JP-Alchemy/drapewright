@@ -7,6 +7,7 @@ import { useStore } from '../state/store.ts'
 import { formatLength, t } from '../strings/en.ts'
 import { CornerChooser } from './CornerChooser.tsx'
 import { LengthField } from './LengthField.tsx'
+import { AlterSection } from './AlterSection.tsx'
 import { CutSection, GrainSection, NotchSection } from './PieceDetails.tsx'
 import { edgeLabel, sideLabel } from './labels.ts'
 
@@ -100,6 +101,7 @@ function PieceSection({
       />
       <GrainSection session={session} piece={piece} view={view} />
       <CutSection session={session} piece={piece} />
+      <AlterSection session={session} piece={piece} view={view} />
       {view.allowanceNotes.length + view.issues.length > 0 && (
         <ul className="notes">
           {view.allowanceNotes.map((n, i) => (

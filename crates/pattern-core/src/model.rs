@@ -470,6 +470,14 @@ pub struct Piece {
     pub placement: Placement,
     #[serde(default)]
     pub source: Option<Source>,
+    /// Changes to the piece kept as steps, applied in order to `drawn`
+    /// (see `alter`): the piece's outline, grainline, notches, marks, lines
+    /// and labels are then those of `drawn` altered.
+    #[serde(default)]
+    pub alterations: Vec<crate::alter::Alteration>,
+    /// The piece as drawn, before its alterations; none without any.
+    #[serde(default)]
+    pub drawn: Option<Box<crate::alter::Drawn>>,
 }
 
 fn default_cut() -> Vec<CutInstruction> {
@@ -493,7 +501,15 @@ impl Piece {
             labels: Vec::new(),
             placement: Placement::default(),
             source: None,
+            alterations: Vec::new(),
+            drawn: None,
         }
+    }
+
+    /// Whether any of the piece's alterations are applied: its shape is not
+    /// as drawn.
+    pub fn is_altered(&self) -> bool {
+        self.alterations.iter().any(|a| a.on)
     }
 
     /// Allowance that applies to edge `index`, in mm.

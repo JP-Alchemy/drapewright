@@ -8,8 +8,8 @@ use drapewright_pattern_core::build::reassign_ids;
 use drapewright_pattern_core::ops::{self, OpError};
 use drapewright_pattern_core::validate::{piece_ids, validate_piece};
 use drapewright_pattern_core::{
-    Allowance, CornerStyle, CutInstruction, EdgeKind, Grainline, Id, Notch, NotchFrom, NotchKind,
-    Piece, Severity,
+    Allowance, Alteration, Change, CornerStyle, CutInstruction, Drawn, EdgeKind, Grainline, Id,
+    Notch, NotchFrom, NotchKind, Piece, Severity, alter,
 };
 use kurbo::{Affine, Point};
 use serde::{Deserialize, Serialize};
@@ -148,6 +148,23 @@ pub enum Command {
     SetSeam {
         seam: Seam,
     },
+    /// Adds an alteration to a piece, last of its steps. It gets a fresh id.
+    AddAlteration {
+        piece: Id,
+        alteration: Alteration,
+    },
+    /// Changes one of a piece's alterations (by its id): switched on or
+    /// off, by how much, along which line.
+    SetAlteration {
+        piece: Id,
+        alteration: Alteration,
+    },
+    /// Takes one of a piece's alterations away. With none left, the piece
+    /// is as drawn again.
+    DeleteAlteration {
+        piece: Id,
+        alteration: Id,
+    },
     DeleteSeams {
         ids: Vec<Id>,
     },
@@ -184,6 +201,27 @@ impl Command {
             Command::AddSeams { .. } => "sew edges",
             Command::SetSeam { .. } => "change seam",
             Command::DeleteSeams { .. } => "unpick seam",
+            Command::AddAlteration { .. } => "alter piece",
+            Command::SetAlteration { .. } => "change alteration",
+            Command::DeleteAlteration { .. } => "remove alteration",
+        }
+    }
+
+    /// The piece whose shape this command changes, if one, and whether it
+    /// says where (along an edge, or a point) rather than which.
+    fn shapes(&self) -> Option<(&Id, bool)> {
+        match self {
+            Command::SetEdgeAllowance { piece, .. }
+            | Command::SetEdgeKind { piece, .. }
+            | Command::SetCornerStyle { piece, .. }
+            | Command::RenameEdge { piece, .. }
+            | Command::JoinEdges { piece, .. }
+            | Command::DeleteNotch { piece, .. } => Some((piece, false)),
+            Command::SplitEdge { piece, .. }
+            | Command::SetGrainline { piece, .. }
+            | Command::AddNotch { piece, .. }
+            | Command::SetNotch { piece, .. } => Some((piece, true)),
+            _ => None,
         }
     }
 }
@@ -326,12 +364,110 @@ pub fn apply(
     }
 }
 
+/// The piece's alterations applied to `drawn`, kept as the piece as drawn.
+fn realter(piece: &mut Piece, drawn: Drawn) -> Result<(), CommandError> {
+    let altered = alter(&drawn, &piece.alterations).map_err(|e| CommandError::Rejected {
+        message: e.to_string(),
+    })?;
+    altered.put(piece);
+    piece.drawn = Some(Box::new(drawn));
+    Ok(())
+}
+
+/// The longest an alteration may lengthen or shorten, mm.
+const MOST_ALTERED: f64 = 1000.0;
+
+fn checked_alteration(alteration: &Alteration) -> Result<(), CommandError> {
+    let Change::Lengthen { by, .. } = alteration.change;
+    if !by.is_finite() || by.abs() > MOST_ALTERED {
+        return Err(CommandError::Rejected {
+            message: "A piece can be lengthened or shortened by up to a metre.".into(),
+        });
+    }
+    Ok(())
+}
+
 fn apply_inner(
     doc: &mut Document,
     command: Command,
     ids: &mut IdAllocator,
 ) -> Result<ChangeSet, CommandError> {
+    // A piece kept as drawn under its alterations changes as drawn, and is
+    // altered again. Where a change says where (along an edge, a point), it
+    // says so of the piece as it is shown: only right while it is as drawn.
+    if let Some((piece, positional)) = command.shapes()
+        && let Some(p) = doc.piece(piece)
+        && let Some(drawn) = p.drawn.clone()
+    {
+        if positional && p.is_altered() {
+            return Err(CommandError::Rejected {
+                message: "This piece is altered: switch its alterations off to change where its \
+                          notches, grainline or edge ends are."
+                    .into(),
+            });
+        }
+        let piece = piece.clone();
+        (*drawn).put(piece_mut(doc, &piece)?);
+        let set = apply_unaltered(doc, command, ids)?;
+        let p = piece_mut(doc, &piece)?;
+        let drawn = Drawn::of(p);
+        realter(p, drawn)?;
+        return Ok(set);
+    }
+    apply_unaltered(doc, command, ids)
+}
+
+fn apply_unaltered(
+    doc: &mut Document,
+    command: Command,
+    ids: &mut IdAllocator,
+) -> Result<ChangeSet, CommandError> {
     match command {
+        Command::AddAlteration {
+            piece,
+            mut alteration,
+        } => {
+            checked_alteration(&alteration)?;
+            alteration.id = ids.next("a");
+            let p = piece_mut(doc, &piece)?;
+            let drawn = p.drawn.take().map_or_else(|| Drawn::of(p), |d| *d);
+            p.alterations.push(alteration);
+            realter(p, drawn)?;
+            Ok(ChangeSet::changed(&piece))
+        }
+        Command::SetAlteration { piece, alteration } => {
+            checked_alteration(&alteration)?;
+            let p = piece_mut(doc, &piece)?;
+            let slot = p
+                .alterations
+                .iter_mut()
+                .find(|a| a.id == alteration.id)
+                .ok_or_else(|| CommandError::Rejected {
+                    message: "That alteration no longer exists.".into(),
+                })?;
+            *slot = alteration;
+            let drawn = p.drawn.take().map_or_else(|| Drawn::of(p), |d| *d);
+            realter(p, drawn)?;
+            Ok(ChangeSet::changed(&piece))
+        }
+        Command::DeleteAlteration { piece, alteration } => {
+            let p = piece_mut(doc, &piece)?;
+            let before = p.alterations.len();
+            p.alterations.retain(|a| a.id != alteration);
+            if p.alterations.len() == before {
+                return Err(CommandError::Rejected {
+                    message: "That alteration no longer exists.".into(),
+                });
+            }
+            let drawn = p.drawn.take().map_or_else(|| Drawn::of(p), |d| *d);
+            if p.alterations.is_empty() {
+                // As drawn again, and no longer kept apart.
+                drawn.put(p);
+            } else {
+                realter(p, drawn)?;
+            }
+            Ok(ChangeSet::changed(&piece))
+        }
         Command::AddPieces { pieces } => {
             let mut set = ChangeSet::default();
             for mut piece in pieces {

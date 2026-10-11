@@ -142,7 +142,9 @@ expression: r
           "basis": "assumedMm",
           "confirmed": false
         }
-      }
+      },
+      "alterations": [],
+      "drawn": null
     },
     {
       "id": "p12",
@@ -259,7 +261,9 @@ expression: r
           "basis": "assumedMm",
           "confirmed": false
         }
-      }
+      },
+      "alterations": [],
+      "drawn": null
     }
   ],
   "scale": {

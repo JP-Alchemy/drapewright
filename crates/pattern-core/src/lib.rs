@@ -5,6 +5,7 @@
 //! `docs/file-format.md` for the data model this crate implements.
 
 pub mod allowance;
+pub mod alter;
 pub mod build;
 pub mod geom;
 pub mod model;
@@ -17,6 +18,7 @@ pub mod validate;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
+pub use alter::{AlterError, AlterLine, Alteration, Change, Drawn, alter};
 pub use geom::{EdgeGeom, EdgeNearest};
 pub use model::*;
 pub use point::Pt;
