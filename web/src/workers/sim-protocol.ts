@@ -28,9 +28,10 @@ export interface SimMethods {
   /**
    * Drapes the project's garment on the avatar in the view, telling the
    * page how it goes (`SimUpdate`s). Answers its last update once it is
-   * done, or null if it was taken off first.
+   * done, or null if it was taken off first. `quietly`, the cloth shown
+   * stays until the new one has settled.
    */
-  drape(request: DrapeRequest): DrapeUpdate | null
+  drape(request: DrapeRequest, quietly: boolean): DrapeUpdate | null
   /** Takes the garment off. */
   undrape(): null
   /** The cloth seen at `x`, `y` CSS pixels from the view's top left, if any. */

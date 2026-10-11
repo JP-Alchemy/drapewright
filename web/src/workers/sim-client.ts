@@ -105,15 +105,17 @@ class SimClient {
   /**
    * Drapes the project's garment on the avatar in the view; `onUpdate`
    * hears how it goes. Its last update once it is done, or null if it was
-   * taken off (or another drape asked for) first.
+   * taken off (or another drape asked for) first. `quietly`, the cloth
+   * shown stays until the new one has settled.
    */
   drape(
     request: DrapeRequest,
     onUpdate: (update: DrapeUpdate) => void,
+    quietly = false,
   ): Promise<DrapeUpdate | null> {
     const id = this.#nextId++
     this.#drape = { id, onUpdate }
-    return this.#call('drape', [request], [], id)
+    return this.#call('drape', [request, quietly], [], id)
   }
 
   /** Takes the garment off. */

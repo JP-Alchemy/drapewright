@@ -818,6 +818,7 @@ export const t = {
     takeOff: 'Take off',
     sewing: 'Sewing the seams…',
     settling: 'Letting it settle…',
+    following: 'Draping it again to follow the change…',
     draped: (fabric: string) => `Draped in ${fabric}.`,
     stillMoving: (fabric: string) => `Draped in ${fabric}; still moving a little.`,
     nothingSewn: 'Nothing is sewn yet: sew the pieces’ edges together first.',

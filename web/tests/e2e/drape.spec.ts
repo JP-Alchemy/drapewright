@@ -115,3 +115,39 @@ test('nothing is draped until something is sewn', async ({ page }) => {
     'Nothing is sewn yet: sew the pieces’ edges together first.',
   )
 })
+
+test('a draped garment follows changes to its pattern', async ({ page }) => {
+  test.setTimeout(240_000)
+  await page.goto('/')
+  await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
+  test.skip(!(await openTheAvatar(page)), 'Draping is seen in the 3D view')
+  const pane = page.getByRole('region', { name: 'Avatar' })
+  const view = pane.getByRole('img', { name: /standard figure/ })
+  const drape = pane.getByRole('group', { name: 'Drape the garment' })
+  const status = pane.getByRole('status').last()
+  await expect(pane.getByRole('status').first()).toHaveText(
+    'A standard figure: add measurements to see someone’s.',
+    { timeout: 60_000 },
+  )
+  await drape.getByRole('button', { name: 'Drape', exact: true }).click()
+  await expect(status).toHaveText('Draped in poplin.', { timeout: 120_000 })
+  const before = await view.screenshot()
+
+  // The front lengthened 8 cm: draped again by itself, the skirt shown
+  // till then.
+  await page
+    .getByRole('listbox', { name: 'Pieces' })
+    .getByRole('option', { name: /Skirt front/ })
+    .click()
+  await page.getByRole('button', { name: 'Add a step' }).click()
+  await page.getByRole('menuitem', { name: /^Lengthen or shorten/ }).click()
+  const by = page.getByRole('textbox', { name: 'By how much' })
+  await by.fill('8')
+  await by.press('Enter')
+  await expect(status).toHaveText('Draping it again to follow the change…')
+  await expect(drape.getByRole('button', { name: 'Take off' })).toBeEnabled()
+  await expect(status).toHaveText('Draped in poplin.', { timeout: 120_000 })
+  await expect
+    .poll(async () => differing(page, before, await view.screenshot()), { timeout: 10_000 })
+    .toBeGreaterThan(0.005)
+})

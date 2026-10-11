@@ -42,6 +42,12 @@ let attachment = 0
 
 /** Time spent draping each frame, ms: as much as leaves the view smooth. */
 const DRAPE_BUDGET = 12
+/**
+ * Time spent each frame on a drape not shown till it settles, ms: more, as
+ * the view does not change meanwhile (the page, on its own thread, stays
+ * smooth).
+ */
+const QUIET_BUDGET = 40
 /** How often the page hears how a drape is going, ms. */
 const UPDATE_EVERY = 200
 
@@ -49,6 +55,8 @@ const UPDATE_EVERY = 200
 interface Drape {
   id: number
   draping: Draping
+  /** Shown only once settled, the cloth shown before staying till then. */
+  quietly: boolean
   leftOut: string[]
   finish: (last: DrapeUpdate | null) => void
   told: { stage: string; at: number }
@@ -90,10 +98,11 @@ function redraw() {
 /** Moves the drape on for this frame and shows its cloth. */
 function moveDrape(d: Drape) {
   const start = performance.now()
+  const budget = d.quietly ? QUIET_BUDGET : DRAPE_BUDGET
   let progress: DrapeProgress
   do progress = d.draping.step()
-  while (!done(progress) && performance.now() - start < DRAPE_BUDGET)
-  view?.showCloth(d.draping)
+  while (!done(progress) && performance.now() - start < budget)
+  if (!d.quietly || done(progress)) view?.showCloth(d.draping)
   const update: DrapeUpdate = { ...progress, leftOut: d.leftOut }
   const now = performance.now()
   if (done(progress)) {
@@ -142,7 +151,7 @@ const handlers: { [M in keyof SimMethods]: (...args: Parameters<SimMethods[M]>) 
     view = null
     return null
   },
-  drape: async (request) => {
+  drape: async (request, quietly) => {
     const id = asking
     const mine = ++drapes
     const a = await loadAvatar()
@@ -156,7 +165,14 @@ const handlers: { [M in keyof SimMethods]: (...args: Parameters<SimMethods[M]>) 
       throw new SimError(error instanceof Error ? error.message : String(error), 'cannotDrape')
     }
     return new Promise<DrapeUpdate | null>((finish) => {
-      drape = { id, draping, leftOut: draping.leftOut, finish, told: { stage: '', at: 0 } }
+      drape = {
+        id,
+        draping,
+        quietly,
+        leftOut: draping.leftOut,
+        finish,
+        told: { stage: '', at: 0 },
+      }
       redraw()
     })
   },

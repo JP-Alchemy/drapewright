@@ -12,6 +12,39 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 28 — The drape follows the pattern (Phase 4, part 7)
+
+A garment on the avatar now follows edits to its pattern by itself.
+
+**Try it** (on the test blouse or skirt):
+
+1. Open the avatar and **Drape** the garment.
+2. Change the pattern: add an alteration (lengthen the front 10 cm, say),
+   change one, switch one off, or sew or unpick a seam. A moment after the
+   last change, the drape says **Draping it again to follow the change…**
+   while the garment shown stays put. Once the new drape has settled
+   (about two seconds for the blouse here), it takes the old one's place.
+   Lengthened, the front's extra length is eased into the back's shorter
+   side seams, and it shows.
+3. Changes that don't alter the garment, such as moving a piece on the
+   table or renaming the project, leave the drape alone. **Take off** stops
+   it following.
+
+**How it works:** the avatar pane keeps a key of what the garment is made
+of: each piece's outline, allowance, cutting, grainline and darts, and the
+confirmed seams. When the key changes, it drapes again 0.4 s after the
+last change. The worker settles the new drape without showing it, so it
+can spend more of each frame on it (40 ms rather than 12) while the view
+keeps showing the old drape.
+
+**Not yet:** each follow drapes from scratch, with the same sewing and
+settling as a first drape. Starting from the last drape would be quicker,
+but an altered piece no longer lines up with the one before, so it needs
+more care. The WebGPU drape (step 23) is the other way to speed it up, if
+the iPad needs it.
+
+---
+
 ## Step 27 — Truing up (Phase 4, part 6)
 
 Alterations leave jogs and corners in the edges they cut across.

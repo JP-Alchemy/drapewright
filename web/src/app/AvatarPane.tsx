@@ -3,6 +3,7 @@ import type {
   ClothReading,
   ClothShows,
   DisplayUnits,
+  Document,
   DrapeRequest,
   FabricPreset,
 } from '@drapewright/engine'
@@ -70,12 +71,27 @@ type Status =
   | { kind: 'fitted'; close: number; of: number }
   | { kind: 'failed'; text: string }
 
-/** The garment on the avatar: off, being draped, or draped (in `fabric`). */
+/**
+ * The garment on the avatar: off, being draped, draped (in `fabric`), or
+ * draped and being draped again out of sight to follow a change.
+ */
 type Drape =
   | { kind: 'off' }
   | { kind: 'draping'; fabric: FabricPreset; update: DrapeUpdate | null }
   | { kind: 'draped'; fabric: FabricPreset; update: DrapeUpdate }
+  | { kind: 'following'; fabric: FabricPreset; update: DrapeUpdate }
   | { kind: 'failed'; text: string }
+
+/** How long after the pattern last changed a garment on the avatar follows it, ms. */
+const FOLLOW_AFTER = 400
+
+/** What of a project the garment on the avatar is made of: its pieces' shapes and sewing. */
+function garmentKey(doc: Document): string {
+  return JSON.stringify([
+    doc.pieces.map((p) => [p.id, p.name, p.outline, p.allowance, p.cut, p.grainline, p.darts]),
+    doc.seams.filter((s) => s.confirmed),
+  ])
+}
 
 function failure(error: unknown): string {
   if (error instanceof SimError && error.failure === 'noBodyFile')
@@ -94,6 +110,8 @@ function drapeText(drape: Drape): string {
       return ''
     case 'failed':
       return drape.text
+    case 'following':
+      return text.following
     case 'draping':
     case 'draped': {
       const update = drape.update
@@ -114,7 +132,7 @@ function drapeText(drape: Drape): string {
 
 /** The avatar in 3D, fitted to someone's measurements, beside the table. */
 export function AvatarPane({ session }: { session: Session }) {
-  useEngineState(session)
+  const { revision } = useEngineState(session)
   const { avatarPerson, drapeFabric } = useStore(session.ui)
   const sets = session.engine.document().measurementSets
   const set = sets.find((s) => s.id === avatarPerson) ?? sets[0] ?? null
@@ -128,6 +146,8 @@ export function AvatarPane({ session }: { session: Session }) {
   const [drape, setDrape] = useState<Drape>({ kind: 'off' })
   // Counts drapes asked for: an answer for one overtaken is dropped.
   const drapes = useRef(0)
+  // The garment last draped, to follow changes to it.
+  const draped = useRef<string | null>(null)
   const [shows, setShows] = useState<ClothShows>('fabric')
   // The cloth where it was last tapped.
   const [reading, setReading] = useState<ClothReading | null>(null)
@@ -226,33 +246,61 @@ export function AvatarPane({ session }: { session: Session }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, backend, key])
 
-  /** Drapes the project's garment on the figure shown, in `fabric`. */
-  const startDrape = (fabric: FabricPreset) => {
+  /**
+   * Drapes the project's garment on the figure shown, in `fabric`. To
+   * follow a change, `quietly`: the cloth shown stays until the new one has
+   * settled.
+   */
+  const startDrape = (fabric: FabricPreset, quietly = false) => {
     const settings = shown.current
     if (!settings) return
     const doc = session.engine.document()
     const mine = ++drapes.current
+    draped.current = garmentKey(doc)
     if (!doc.seams.some((s) => s.confirmed)) {
+      if (quietly) void sim.undrape()
       setDrape({ kind: 'failed', text: t.avatar.nothingSewn })
       return
     }
     const request: DrapeRequest = { pieces: doc.pieces, seams: doc.seams, fabric, settings }
-    setDrape({ kind: 'draping', fabric, update: null })
+    setDrape((was) =>
+      quietly && (was.kind === 'draped' || was.kind === 'following')
+        ? { kind: 'following', fabric, update: was.update }
+        : { kind: 'draping', fabric, update: null },
+    )
     setReading(null)
     sim
-      .drape(request, (update) => {
-        if (mine === drapes.current) setDrape({ kind: 'draping', fabric, update })
-      })
+      .drape(
+        request,
+        (update) => {
+          if (mine === drapes.current && !quietly) setDrape({ kind: 'draping', fabric, update })
+        },
+        quietly,
+      )
       .then(
         (last) => {
           if (mine !== drapes.current) return
           setDrape(last ? { kind: 'draped', fabric, update: last } : { kind: 'off' })
         },
         (error: unknown) => {
-          if (mine === drapes.current) setDrape({ kind: 'failed', text: failure(error) })
+          if (mine !== drapes.current) return
+          // What was shown no longer fits the pattern: taken off.
+          if (quietly) void sim.undrape()
+          setDrape({ kind: 'failed', text: failure(error) })
         },
       )
   }
+  // A garment on the avatar follows the pattern: changed, it is draped
+  // again a moment after the last change.
+  useEffect(() => {
+    const following =
+      drape.kind === 'draped' || drape.kind === 'following' || drape.kind === 'draping'
+    if (!following || garmentKey(session.engine.document()) === draped.current) return
+    const timer = setTimeout(() => startDrape(drapeFabric, drape.kind !== 'draping'), FOLLOW_AFTER)
+    return () => clearTimeout(timer)
+    // Followed as the pattern changes; `startDrape` is the latest render's.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revision, drape.kind])
   const takeOff = () => {
     drapes.current++
     setDrape({ kind: 'off' })
@@ -264,7 +312,7 @@ export function AvatarPane({ session }: { session: Session }) {
     setReading(null)
     sim.note({ note: 'shows', shows: as })
   }
-  const on = drape.kind === 'draping' || drape.kind === 'draped'
+  const on = drape.kind === 'draping' || drape.kind === 'draped' || drape.kind === 'following'
   const legend =
     shows === 'pull'
       ? t.avatar.pullLegend
@@ -274,7 +322,7 @@ export function AvatarPane({ session }: { session: Session }) {
   const chooseFabric = (fabric: FabricPreset) => {
     session.chooseDrapeFabric(fabric)
     // On the avatar already: draped again in the new fabric.
-    if (drape.kind === 'draping' || drape.kind === 'draped') startDrape(fabric)
+    if (on) startDrape(fabric)
   }
   const canDrape = backend !== null && (status.kind === 'standard' || status.kind === 'fitted')
   // What the drape is doing, or what was read where tapped.
@@ -409,14 +457,14 @@ export function AvatarPane({ session }: { session: Session }) {
               </Button>
             ) : (
               <Button
-                className={drape.kind === 'draped' ? 'button' : 'button primary'}
+                className={on ? 'button' : 'button primary'}
                 isDisabled={!canDrape}
                 onPress={() => startDrape(drapeFabric)}
               >
-                {drape.kind === 'draped' ? text.drapeAgain : text.drape}
+                {on ? text.drapeAgain : text.drape}
               </Button>
             )}
-            {drape.kind === 'draped' && (
+            {(drape.kind === 'draped' || drape.kind === 'following') && (
               <Button className="button" onPress={takeOff}>
                 {text.takeOff}
               </Button>
