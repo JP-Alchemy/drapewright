@@ -12,6 +12,50 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 20 — The avatar in 3D (Phase 3, part 5)
+
+See the avatar, in someone's figure, beside the cutting table, and turn it
+round.
+
+**Try it:**
+
+1. Press **Avatar** in the top bar. A 3D view opens beside the table
+   (under it on an iPad held upright). With no measurements yet it shows
+   a standard figure.
+2. Add someone's measurements (**Measurements**): the avatar takes their
+   figure, and the view's heading says how close it comes ("All 4
+   measurements within 1 cm"). With several people, choose whose figure in
+   the heading.
+3. Turn it: drag with a finger, the Pencil or the mouse. Two fingers slide
+   it; pinch, or scroll, to zoom. Double-tap (or **Show the whole figure**,
+   or 0) to see it whole from the front again. With the keyboard: the arrow
+   keys turn it, + and − zoom.
+4. Close it with the cross, or **Avatar** again.
+5. In a corner: "Drawn with WebGPU", as on an iPad with iPadOS 26, or
+   "Drawn with WebGL2" where there is no WebGPU.
+
+**Found by testing:** with the new button the top bar was wider than a
+1024-pixel screen (an iPad held upright), so the page scrolled sideways.
+On narrower screens the buttons are tighter now, and below 900 pixels they
+show their icons alone.
+
+**What's under the hood:** a `render` crate draws with wgpu: the figure
+with smooth normals, lit softly from above with a faint rim, a shadow on
+the floor, four samples a pixel where the device allows. `wasm-3d` adds
+the view: the page hands its canvas to the sim worker
+(`transferControlToOffscreen`), which draws there, through WebGPU where
+there is one and WebGL2 where not, once a frame however many changes come.
+Turning and zooming go through the same input router as the cutting table
+(`orbit-input.ts`). The shader is checked in the tests without a GPU,
+translated for WebGL2 too (naga), and an end-to-end test sees the figure
+drawn and turned in Chromium and WebKit. The 3D module is now 2.5 MB
+(0.9 MB compressed), loaded only when the avatar is first wanted.
+
+**Not yet:** clothes. The drape (step 21) comes next: the pattern's pieces
+sewn on the avatar in a chosen fabric.
+
+---
+
 ## Step 19b — The avatar in the app (Phase 3, part 4)
 
 The avatar comes into the Measurements panel: fit it to a person's

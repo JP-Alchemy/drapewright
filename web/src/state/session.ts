@@ -119,6 +119,10 @@ export interface UiState {
   seam: string | null
   /** An edge waiting for the edge it is to be sewn to: the next edge tapped. */
   sewing: { piece: string; edge: string } | null
+  /** The 3D view of the avatar is open beside the table. */
+  avatar: boolean
+  /** Whose measurements the avatar is fitted to: a measurement set's id. */
+  avatarPerson: string | null
 }
 
 /** Space left between imported pieces and what is already on the table, mm. */
@@ -155,6 +159,8 @@ export class Session {
       screenMeasured: screenScale !== null,
       seam: null,
       sewing: null,
+      avatar: false,
+      avatarPerson: null,
     })
     // Back where the project was left; a project saved without a view
     // (the engine's default) shows all its pieces instead.
@@ -332,6 +338,16 @@ export class Session {
       viewport: { ...s.viewport, pxPerMm: pxPerMm ?? NOMINAL_PX_PER_MM },
       screenMeasured: pxPerMm !== null,
     }))
+  }
+
+  /** Opens or closes the 3D view of the avatar. */
+  showAvatar(open: boolean): void {
+    this.ui.set((s) => ({ ...s, avatar: open }))
+  }
+
+  /** Fits the avatar to this person's measurements. */
+  chooseAvatarPerson(id: string | null): void {
+    this.ui.set((s) => ({ ...s, avatarPerson: id }))
   }
 
   notify(notice: Notice | null): void {

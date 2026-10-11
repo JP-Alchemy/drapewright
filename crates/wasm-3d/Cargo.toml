@@ -18,6 +18,13 @@ serde-wasm-bindgen.workspace = true
 console_error_panic_hook.workspace = true
 ts-rs.workspace = true
 
+# The 3D view, drawn in the browser only.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+drapewright-render.workspace = true
+wgpu.workspace = true
+web-sys = { workspace = true, features = ["OffscreenCanvas"] }
+wasm-bindgen-futures.workspace = true
+
 [dev-dependencies]
 # The vocabulary of measurements the avatar should take.
 drapewright-project.workspace = true

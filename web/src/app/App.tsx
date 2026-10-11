@@ -1,7 +1,7 @@
 import { loadEngine } from '@drapewright/engine'
-import { Download, FolderOpen, Maximize2, Minus, Plus, Redo2, Undo2 } from 'lucide-react'
+import { Download, FolderOpen, Maximize2, Minus, Plus, Redo2, Rotate3d, Undo2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Button } from 'react-aria-components'
+import { Button, ToggleButton } from 'react-aria-components'
 import { PatternCanvas } from '../canvas/PatternCanvas.tsx'
 import { actualSize, zoomAt } from '../canvas/viewport.ts'
 import { useEngineState } from '../state/hooks.ts'
@@ -18,6 +18,7 @@ import {
 } from '../storage/projects.ts'
 import { t } from '../strings/en.ts'
 import { IoClient } from '../workers/io-client.ts'
+import { AvatarPane } from './AvatarPane.tsx'
 import { ContextMenu } from './ContextMenu.tsx'
 import { DeviceDialog } from './DeviceDialog.tsx'
 import { ImportDialog } from './ImportDialog.tsx'
@@ -67,6 +68,7 @@ function TopBar({
   onOpen: () => void
 }) {
   const state = useEngineState(session)
+  const { avatar } = useStore(session.ui)
   const backup = async () => {
     const name = session.engine.document().meta.name
     try {
@@ -92,13 +94,22 @@ function TopBar({
       </div>
       <Button className="button" onPress={onOpen}>
         <FolderOpen size={18} aria-hidden="true" />
-        {t.actions.open}
+        <span className="button-label">{t.actions.open}</span>
       </Button>
       <MeasurementsDialog session={session} />
+      <ToggleButton
+        className="button"
+        isSelected={avatar}
+        onChange={(open) => session.showAvatar(open)}
+        aria-description={t.avatar.openHint}
+      >
+        <Rotate3d size={18} aria-hidden="true" />
+        <span className="button-label">{t.avatar.open}</span>
+      </ToggleButton>
       <PrintDialog session={session} />
       <Button className="button" onPress={backup} aria-description={t.projects.backupHint}>
         <Download size={18} aria-hidden="true" />
-        {t.projects.backup}
+        <span className="button-label">{t.projects.backup}</span>
       </Button>
       <div className="spacer" />
       <Button
@@ -173,7 +184,7 @@ function Workspace({
   actions: ProjectActions
 }) {
   const fileInput = useRef<HTMLInputElement>(null)
-  const { busy, notice, toast, tip, sewing } = useStore(session.ui)
+  const { busy, notice, toast, tip, sewing, avatar } = useStore(session.ui)
   useEngineState(session)
   const empty = session.engine.document().pieces.length === 0
   const open = () => fileInput.current?.click()
@@ -197,7 +208,7 @@ function Workspace({
           else if (file) void session.openPatternFile(file)
         }}
       />
-      <div className="workspace">
+      <div className={avatar ? 'workspace with-avatar' : 'workspace'}>
         <main className="table" aria-label="Cutting table">
           <PatternCanvas session={session} />
           {empty && (
@@ -257,6 +268,7 @@ function Workspace({
             </div>
           )}
         </main>
+        {avatar && <AvatarPane session={session} />}
         <aside className="side-panel">
           <PieceList session={session} />
           <SeamList session={session} />

@@ -27,17 +27,21 @@ Project licence: **not yet chosen** (see
 | roxmltree | MIT OR Apache-2.0 | Reading SVG root attributes and text | io |
 | sha2 | MIT OR Apache-2.0 | Hashing imported files for provenance | io |
 | pdf-writer | MIT OR Apache-2.0 | Tiled PDF export | io |
-| flate2 (with miniz_oxide: MIT OR Zlib OR Apache-2.0) | MIT OR Apache-2.0 | Compressing PDF page content | io |
+| flate2 (with miniz_oxide: MIT OR Zlib OR Apache-2.0) | MIT OR Apache-2.0 | Compressing PDF page content; the body file | io, body |
 | zip | MIT | `.drapewright` container (deflate only, through flate2) | project |
 | schemars | MIT | JSON Schema generation for the public format | pattern-core, project |
 | ts-rs | MIT | TypeScript types generated from Rust | project, wasm-core |
 | wasm-bindgen | MIT OR Apache-2.0 | JS bindings (facade crate only) | wasm-core |
 | tiny-skia (with png) | BSD-3-Clause | Pictures of pieces for AI assistants | mcp |
 | md-5, aes, sha2 | MIT OR Apache-2.0 | Opening "protected" PDF patterns (encrypted with an empty user password), as viewers do | pdf-import |
-| serde-wasm-bindgen | MIT | Passing data across the boundary | wasm-core |
+| serde-wasm-bindgen | MIT | Passing data across the boundary | wasm-core, wasm-3d |
+| wgpu | MIT OR Apache-2.0 | Drawing the 3D view: WebGPU, or WebGL2 where there is none | render, wasm-3d |
+| bytemuck | Zlib OR Apache-2.0 OR MIT | The 3D view's vertices and settings as bytes | render |
+| web-sys, wasm-bindgen-futures | MIT OR Apache-2.0 | The canvas handed to the sim worker; waiting for the GPU | wasm-3d |
 | proptest *(dev)* | MIT OR Apache-2.0 | Property-based tests | tests |
 | insta *(dev)* | Apache-2.0 | Golden-file snapshot tests | tests |
 | lopdf *(dev)* | MIT | Reading generated PDFs back in tests | tests |
+| naga *(dev)* | MIT OR Apache-2.0 | Checking the 3D view's shader, and its WebGL2 translation, without a GPU | render |
 
 ## Direct npm dependencies
 

@@ -10,10 +10,8 @@ import { Button, Group, Input, Label, NumberField, Text } from 'react-aria-compo
 import { formatLength, t } from '../strings/en.ts'
 import { sim } from '../workers/sim-client.ts'
 import { SimError } from '../workers/sim-protocol.ts'
+import { CLOSE_MM as CLOSE, avatarRequest } from './avatar.ts'
 import { measurementText } from './labels.ts'
-
-/** Within this, mm, the avatar matches a measurement. */
-const CLOSE = 10
 
 /** “0.4 cm larger”, “1.2 cm shorter”, or “Same” when they read the same. */
 function difference(
@@ -51,26 +49,20 @@ export function AvatarFitter({
   onAge(age: number | null): void
 }) {
   const text = t.measure.avatar
-  // Unknown: the avatar is fitted at 35.
-  const age = set.age ?? 35
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const [fitted, setFitted] = useState<Fitted | null>(null)
 
-  // A man's figure leaves out the bust's shape, as the form does; the
-  // seamstress's own measurements go too, to be reported as not taken.
-  const taken = new Set<string>(vocabulary.map((m) => m.key))
-  const values = Object.fromEntries(
-    Object.entries(set.values).filter(([k]) => taken.has(k) || k.startsWith('x-')),
-  )
-  const key = JSON.stringify([set.figure, age, values])
+  const request = avatarRequest(set)
+  const { values } = request
+  const key = JSON.stringify(request)
   const empty = Object.keys(values).length === 0
 
   const fit = async () => {
     setBusy(true)
     setFailure(null)
     try {
-      const result = await sim.fitAvatar({ woman: set.figure === 'woman', age, values })
+      const result = await sim.fitAvatar(request)
       setFitted({ fit: result, key, values })
     } catch (error) {
       setFailure(

@@ -24,6 +24,26 @@ interface SafariGestureEvent extends UIEvent {
 const kindOf = (e: PointerEvent): PointerKind =>
   e.pointerType === 'pen' ? 'pen' : e.pointerType === 'touch' ? 'touch' : 'mouse'
 
+/** A DOM pointer event as the router takes it, relative to `box`. */
+export function rawPointer(phase: RawPointer['phase'], e: PointerEvent, box: DOMRect): RawPointer {
+  return {
+    phase,
+    id: e.pointerId,
+    kind: kindOf(e),
+    x: e.clientX - box.left,
+    y: e.clientY - box.top,
+    time: e.timeStamp,
+    button: e.button,
+    pressure: e.pressure,
+    width: e.width,
+    height: e.height,
+    shift: e.shiftKey,
+    alt: e.altKey,
+    meta: e.metaKey,
+    ctrl: e.ctrlKey,
+  }
+}
+
 /** Opens the context menu for whatever is at a screen point. */
 export function openMenuAt(session: Session, x: number, y: number, kind: PointerKind): void {
   const v = session.ui.get().viewport
@@ -73,21 +93,8 @@ export function attachInput(
     const r = canvas.getBoundingClientRect()
     return { x: e.clientX - r.left, y: e.clientY - r.top }
   }
-  const raw = (phase: RawPointer['phase'], e: PointerEvent): RawPointer => ({
-    phase,
-    id: e.pointerId,
-    kind: kindOf(e),
-    ...local(e),
-    time: e.timeStamp,
-    button: e.button,
-    pressure: e.pressure,
-    width: e.width,
-    height: e.height,
-    shift: e.shiftKey,
-    alt: e.altKey,
-    meta: e.metaKey,
-    ctrl: e.ctrlKey,
-  })
+  const raw = (phase: RawPointer['phase'], e: PointerEvent): RawPointer =>
+    rawPointer(phase, e, canvas.getBoundingClientRect())
 
   let touches = 0
   const onPointerDown = (e: PointerEvent) => {

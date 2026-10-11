@@ -654,6 +654,28 @@ export const t = {
     },
   },
 
+  avatar: {
+    open: 'Avatar',
+    openHint: 'The avatar in 3D, fitted to someone’s measurements.',
+    heading: 'Avatar',
+    person: 'Whose figure',
+    starting: 'Starting…',
+    fitting: 'Fitting…',
+    standard: 'A standard figure: add measurements to see someone’s.',
+    fitted: (close: number, of: number) =>
+      close === of
+        ? plural(of, 'The measurement within 1 cm', 'All # measurements within 1 cm')
+        : `${close} of ${of} measurements within 1 cm`,
+    noView: 'This browser can’t draw the avatar in 3D.',
+    reset: 'Show the whole figure',
+    close: 'Close the avatar',
+    viewLabel: (who: string | null) =>
+      who
+        ? `The avatar in ${who}’s figure. Drag to turn it; pinch or scroll to zoom.`
+        : 'A standard figure. Drag to turn it; pinch or scroll to zoom.',
+    drawnWith: (backend: string) => `Drawn with ${backend}`,
+  },
+
   crash: {
     heading: 'Something went wrong',
     body: 'Drapewright hit a problem showing this screen. Reloading usually fixes it.',

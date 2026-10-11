@@ -1,11 +1,14 @@
-//! WebAssembly facade for Drapewright's 3D side: the avatar now, the view
-//! and the drape to come. It runs in the sim worker, apart from the 2D
-//! engine, and is loaded only when the avatar is first wanted.
+//! WebAssembly facade for Drapewright's 3D side: the avatar and the view
+//! of it now, the drape to come. It runs in the sim worker, apart from the
+//! 2D engine, and is loaded only when the avatar is first wanted.
 //!
 //! Like the 2D facade it only converts between JavaScript and Rust types;
 //! shaping, measuring and fitting live in `drapewright-body`. Values cross
 //! the boundary as plain JavaScript objects shaped like the TypeScript
 //! types generated from the Rust ones (`packages/engine/src/generated`).
+
+#[cfg(target_arch = "wasm32")]
+mod view;
 
 use std::collections::BTreeMap;
 
@@ -49,6 +52,22 @@ pub struct AvatarSettings {
     pub cup: f64,
     pub firmness: f64,
     pub local: BTreeMap<String, f64>,
+}
+
+impl From<AvatarSettings> for Shape {
+    fn from(s: AvatarSettings) -> Self {
+        Shape {
+            woman: s.woman,
+            age: s.age,
+            muscle: s.muscle,
+            weight: s.weight,
+            height: s.height,
+            proportions: s.proportions,
+            cup: s.cup,
+            firmness: s.firmness,
+            local: s.local,
+        }
+    }
 }
 
 impl From<Shape> for AvatarSettings {

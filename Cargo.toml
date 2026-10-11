@@ -19,6 +19,7 @@ drapewright-pdf-import = { path = "crates/pdf-import" }
 drapewright-seams = { path = "crates/seams" }
 drapewright-body = { path = "crates/body" }
 drapewright-wasm-3d = { path = "crates/wasm-3d" }
+drapewright-render = { path = "crates/render" }
 
 # Geometry
 kurbo = "0.13.1"
@@ -46,9 +47,18 @@ zip = { version = "9.0.1", default-features = false, features = ["deflate-flate2
 # Pictures of a project for AI assistants (MCP server only)
 tiny-skia = "0.12.0"
 
+# The 3D view: WebGPU, with WebGL2 drawing where there is none (features for
+# the browser are chosen in crates/render).
+wgpu = { version = "30.0.1", default-features = false, features = ["std", "wgsl"] }
+bytemuck = { version = "1.24.0", features = ["derive"] }
+# Checking the 3D view's shader, and its WebGL2 translation, without a GPU.
+naga = { version = "30.0.1", features = ["wgsl-in", "glsl-out"] }
+
 # WebAssembly facade (the CLI used by wasm-pack must match this version exactly)
 wasm-bindgen = "=0.2.129"
 serde-wasm-bindgen = "0.6.5"
+web-sys = "0.3.106"
+wasm-bindgen-futures = "0.4.79"
 console_error_panic_hook = "0.1.7"
 
 # Tests

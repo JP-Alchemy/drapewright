@@ -48,7 +48,7 @@ export function MeasurementsDialog({ session }: { session: Session }) {
     <DialogTrigger>
       <Button className="button">
         <PersonStanding size={18} aria-hidden="true" />
-        {t.measure.open}
+        <span className="button-label">{t.measure.open}</span>
       </Button>
       <ModalOverlay isDismissable className="modal-overlay">
         <Modal className="modal wide">
