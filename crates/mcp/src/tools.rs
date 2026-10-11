@@ -677,14 +677,20 @@ fn describe_file(read: &Read) -> FileReport {
             })
             .collect()
     };
-    let asked: Vec<String> = r.allowance.pieces.iter().map(|id| name_of(id)).collect();
+    // Each name once, though a file with several sizes asks about each.
+    let mut asked: Vec<String> = Vec::new();
+    for name in r.allowance.pieces.iter().map(|id| name_of(id)) {
+        if !asked.contains(&name) {
+            asked.push(name);
+        }
+    }
     let seam_allowance_question = (!asked.is_empty()).then(|| AllowanceReport {
         question: format!(
             "Is seam allowance already included in {}, and how wide is it (or how wide should it be)?",
-            if asked.len() == r.pieces.len() {
+            if r.allowance.pieces.len() == r.pieces.len() {
                 "these pieces".to_string()
             } else {
-                format!("the {} pieces drawn with one outline", asked.len())
+                format!("the pieces drawn with one outline ({})", asked.join(", "))
             }
         ),
         pieces: asked,
@@ -713,7 +719,7 @@ fn describe_file(read: &Read) -> FileReport {
             sizes: r.sizes.names.clone(),
             made_in: r.sizes.sample.clone(),
             note: format!(
-                "The file holds every size; the pieces above are size {}.",
+                "The file holds several sizes; the pieces above are size {}.",
                 shown_size.clone().unwrap_or_default()
             ),
         }),
