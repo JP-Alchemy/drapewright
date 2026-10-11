@@ -27,9 +27,19 @@ const EARLIER_FORMAT: &str = "soom-project";
 /// One step: turns a document of version `n` into version `n + 1`.
 type Migration = fn(&mut Value) -> Result<(), String>;
 
-/// `MIGRATIONS[i]` upgrades version `i + 1` to `i + 2`. Version 1 is the
-/// first, so there are none yet.
-const MIGRATIONS: &[Migration] = &[];
+/// `MIGRATIONS[i]` upgrades version `i + 1` to `i + 2`.
+const MIGRATIONS: &[Migration] = &[v1_to_v2];
+
+/// Version 2 adds people's measurements: none yet.
+fn v1_to_v2(value: &mut Value) -> Result<(), String> {
+    let object = value
+        .as_object_mut()
+        .ok_or("the project is not an object")?;
+    object
+        .entry("measurementSets")
+        .or_insert_with(|| Value::Array(Vec::new()));
+    Ok(())
+}
 
 pub fn load(json: &str) -> Result<ProjectFile, LoadError> {
     let mut value: Value =

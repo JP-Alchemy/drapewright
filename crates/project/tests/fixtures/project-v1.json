@@ -1,0 +1,138 @@
+{
+  "format": "drapewright-project",
+  "schemaVersion": 1,
+  "generator": "Drapewright 0.1.0",
+  "meta": {
+    "id": "prj-v1",
+    "name": "Skirt",
+    "created": "2026-10-11T09:00:00Z",
+    "modified": "2026-10-11T09:30:00Z",
+    "notes": ""
+  },
+  "settings": {
+    "displayUnits": "cm"
+  },
+  "pieces": [
+    {
+      "id": "p1",
+      "name": "Skirt front",
+      "notes": "",
+      "outline": {
+        "start": [
+          0.0,
+          0.0
+        ],
+        "edges": [
+          {
+            "id": "e2",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  240.0,
+                  0.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e3",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  300.0,
+                  600.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e4",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  0.0,
+                  600.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          },
+          {
+            "id": "e5",
+            "name": "",
+            "kind": "seam",
+            "segments": [
+              {
+                "to": [
+                  0.0,
+                  0.0
+                ]
+              }
+            ],
+            "allowance": null,
+            "endCorner": "auto"
+          }
+        ]
+      },
+      "allowance": {
+        "mode": "add",
+        "seam": 15.0,
+        "hem": null
+      },
+      "cut": [
+        {
+          "material": "main",
+          "quantity": 1,
+          "mirrored": null,
+          "onFold": null
+        }
+      ],
+      "grainline": null,
+      "notches": [],
+      "marks": [],
+      "lines": [],
+      "labels": [],
+      "placement": {
+        "x": 0.0,
+        "y": 0.0,
+        "rotation": 0.0
+      },
+      "source": null
+    }
+  ],
+  "print": {
+    "paper": "a4",
+    "orientation": "portrait",
+    "margin": 10.0,
+    "assembly": "trim",
+    "overlap": 15.0,
+    "stitchLine": true,
+    "notchStyle": "slit",
+    "notchSpacing": 6.0,
+    "testSquare": true,
+    "pageMap": true,
+    "skipEmptyPages": true,
+    "pieces": null,
+    "layout": null
+  },
+  "extensions": {},
+  "view": {
+    "center": [
+      0.0,
+      0.0
+    ],
+    "zoom": 0.5,
+    "selection": []
+  }
+}

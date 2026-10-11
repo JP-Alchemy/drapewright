@@ -14,6 +14,7 @@ import init, {
   importDxf as importDxfRaw,
   importPdf as importPdfRaw,
   importSvg as importSvgRaw,
+  measurementVocabulary as measurementVocabularyRaw,
   planPrint as planPrintRaw,
   previewAllowance as previewAllowanceRaw,
 } from '../pkg/drapewright_wasm_core.js'
@@ -29,6 +30,7 @@ import type {
   Hit,
   ImportResult,
   Issue,
+  MeasurementInfo,
   PdfTexts,
   Piece,
   PieceView,
@@ -167,6 +169,14 @@ export interface AllowancePreview {
 /** The lines a piece would have, without touching any project. Fast enough for the main thread. */
 export function previewAllowance(piece: Piece): AllowancePreview {
   return previewAllowanceRaw(piece) as AllowancePreview
+}
+
+let vocabulary: MeasurementInfo[] | undefined
+
+/** The measurements Drapewright knows, in the order a form asks for them. */
+export function measurementVocabulary(): MeasurementInfo[] {
+  vocabulary ??= measurementVocabularyRaw() as MeasurementInfo[]
+  return vocabulary
 }
 
 /** Stateless jobs, usually run in the IO worker. */

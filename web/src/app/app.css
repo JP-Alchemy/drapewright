@@ -979,6 +979,75 @@ h2 {
   background: transparent;
 }
 
+/* Measurements */
+
+.measure-empty {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.measure-people {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.measure-people .segmented {
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.measure-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 16px;
+}
+
+@media (min-width: 720px) {
+  .measure-head {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+  }
+}
+
+.measure-revision,
+.measure-delete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 8px 0;
+}
+
+.measure-group {
+  margin-top: 16px;
+}
+
+.measure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+  gap: 0 16px;
+  align-items: start;
+}
+
+/* A plain number box: typed, not stepped. */
+.measure-grid .number-group {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.measure-grid .number-input {
+  text-align: start;
+}
+
+.measure-warning {
+  color: var(--danger);
+  font-weight: 600;
+}
+
 /* Print dialog: settings beside a preview of the pages on wide screens. */
 .modal.wide {
   width: min(880px, 100%);

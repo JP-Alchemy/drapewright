@@ -9,6 +9,7 @@ pub mod engine;
 pub mod history;
 pub mod hit;
 pub mod ids;
+pub mod measurements;
 pub mod migrate;
 pub mod view;
 
@@ -16,5 +17,6 @@ pub use command::{ChangeSet, Command, CommandError};
 pub use document::{Document, ProjectFile, SCHEMA_VERSION};
 pub use engine::{DispatchOptions, Engine, EngineState};
 pub use hit::Hit;
+pub use measurements::{Figure, MeasurementKey, MeasurementSet};
 pub use migrate::LoadError;
 pub use view::{EdgeView, PieceView};

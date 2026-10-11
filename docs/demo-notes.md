@@ -12,6 +12,48 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 17 — Measurements (Phase 3, part 1)
+
+The first step of Phase 3 ([plan](plan-phase-3-4.md)): people's
+measurements, kept with the project. The avatar, the ease checks and the
+alterations of the steps to come all start from them.
+
+**Try it:**
+
+1. Press **Measurements** in the top bar, then **Add my measurements**.
+2. Fill in what you have; only height, bust, waist and hip are needed to
+   start. Each box says how to take that measurement, and boxes are in the
+   project's units (cm, mm or inches).
+3. Type a waist of 780 while the project is in centimetres: the form says
+   it is unusual for a waist and to check the units. Make it 78.
+4. Switch the figure to **Man's**: bust becomes chest, and the bust's own
+   measurements (high bust, underbust, bust span, shoulder to bust point)
+   go away. Values already typed are kept.
+5. **Measure again** starts a new measurement dated today; the earlier one
+   is kept with the person (shown as "1 earlier measurement kept").
+6. **Add a person** for each client. Undo takes back any change. Reload:
+   it is all still there, saved with the project.
+
+AI assistants (step 12) get two tools: `get_measurements` and
+`set_measurements`.
+
+**What changed in the file:** projects are now schema version 2, with
+`measurementSets`. Projects saved before open as before (they have no
+measurements); a cached older app refuses version 2 files rather than
+dropping the measurements when it saves.
+
+**What's under the hood:** `crates/project/src/measurements.rs` (the 27
+measurements, their usual ranges and FreeSewing names, and the sets),
+four commands in `command.rs`, the migration in `migrate.rs` with a golden
+version 1 file (`crates/project/tests/fixtures/project-v1.json`), and
+`web/src/app/MeasurementsDialog.tsx`. The file format is in
+[file-format.md §10.2](file-format.md).
+
+**Not yet:** pictures beside the how-to text; importing a FreeSewing or
+Seamly2D measurements file.
+
+---
+
 ## Step 16 — Reading lettering drawn as strokes (Phase 2, part 4)
 
 PDFs printed through a plotter driver (step 15) draw their words as pen

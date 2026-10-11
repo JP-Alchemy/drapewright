@@ -22,6 +22,7 @@ import { ContextMenu } from './ContextMenu.tsx'
 import { DeviceDialog } from './DeviceDialog.tsx'
 import { ImportDialog } from './ImportDialog.tsx'
 import { Inspector } from './Inspector.tsx'
+import { MeasurementsDialog } from './MeasurementsDialog.tsx'
 import { PieceList } from './PieceList.tsx'
 import { PrintDialog } from './PrintDialog.tsx'
 import { type ProjectActions, ProjectsDialog } from './ProjectsDialog.tsx'
@@ -91,6 +92,7 @@ function TopBar({
         <FolderOpen size={18} aria-hidden="true" />
         {t.actions.open}
       </Button>
+      <MeasurementsDialog session={session} />
       <PrintDialog session={session} />
       <Button className="button" onPress={backup} aria-description={t.projects.backupHint}>
         <Download size={18} aria-hidden="true" />

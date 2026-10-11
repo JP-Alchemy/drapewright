@@ -49,7 +49,7 @@ single exception of sidecars it references explicitly.
 ```json
 {
   "format": "drapewright-project",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "generator": "Drapewright 0.1.0",
   "meta": {
     "id": "7f3c9a2e5b1d4e8f",
@@ -61,6 +61,7 @@ single exception of sidecars it references explicitly.
   "settings": { "displayUnits": "cm" },
   "pieces": [ /* Piece */ ],
   "print": { /* PrintSettings */ },
+  "measurementSets": [ /* MeasurementSet, §10.2 */ ],
   "view": { /* ViewState */ },
   "extensions": {}
 }
@@ -69,7 +70,7 @@ single exception of sidecars it references explicitly.
 | Field | Type | Notes |
 |---|---|---|
 | `format` | `"drapewright-project"` | Identifies the file type. |
-| `schemaVersion` | integer | `1` for this document. See §8. |
+| `schemaVersion` | integer | `2` for this document. See §8. |
 | `generator` | string | Free text naming the program that wrote the file. |
 | `meta.id` | string | Stable project identifier. |
 | `meta.name` | string | Shown to the user. |
@@ -78,6 +79,7 @@ single exception of sidecars it references explicitly.
 | `settings.displayUnits` | `"mm"` \| `"cm"` \| `"in"` | Default `"cm"`. |
 | `pieces` | array of Piece | Order is the order shown in piece lists. |
 | `print` | PrintSettings | Optional; defaults in §6. |
+| `measurementSets` | array of MeasurementSet | People's measurements (§10.2). Default `[]`. Added in version 2. |
 | `view` | ViewState | Optional; non-semantic (§7). |
 | `extensions` | object | Data owned by other programs, keyed by a reverse-DNS or URL namespace (e.g. `"org.example.cutter"`). Readers must preserve it unchanged. |
 
@@ -364,6 +366,11 @@ Non-semantic: readers may ignore it.
 * The reference implementation keeps a fixture file of every past version
   and tests that it migrates to the current one.
 
+| Version | Change |
+|---|---|
+| 1 | The first. |
+| 2 | `measurementSets` (§10.2). Version 1 files have none. |
+
 ## 9. Validation
 
 A file is valid when it matches the JSON Schema and:
@@ -414,20 +421,64 @@ outline (e.g. 38 at the bust to 42 at the hip), followed by truing.
 `outline` always holds the resulting geometry, so a reader that does not
 understand sizing still sees the selected pattern.
 
-### 10.2 Measurement sets (Phase 3)
+### 10.2 Measurement sets (version 2)
+
+No longer a draft: written since schema version 2.
 
 ```json
 "measurementSets": [{
-  "id": "ms1", "name": "Me", "revision": 3, "takenOn": "2026-10-01",
+  "id": "m7", "name": "Me", "figure": "woman", "revision": 2, "takenOn": "2026-10-01",
   "values": { "height": 1650, "bust": 960, "highBust": 880, "underbust": 800, "waist": 780,
               "hip": 1040, "shoulderWidth": 390, "backWaistLength": 410, "armLength": 590, "inseam": 770 },
-  "previous": [{ "revision": 2, "takenOn": "2026-06-12", "values": { "bust": 950 } }]
+  "previous": [{ "revision": 1, "takenOn": "2026-06-12", "values": { "bust": 950 } }]
 }]
 ```
 
-Keys come from a documented vocabulary (each with how-to-measure text),
-with a mapping table to Seamly2D/Valentina and FreeSewing names. Custom keys
-start with `x-`.
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | Unique in the project. |
+| `name` | string | Whose measurements; not empty. |
+| `figure` | `"woman"` \| `"man"` | Which measurements apply, and the avatar's shape. Default `"woman"`. |
+| `revision` | integer | Counts up each time the person is measured again. Default `1`. |
+| `takenOn` | `YYYY-MM-DD` \| null | The day they were taken. |
+| `values` | object | Key → millimetres, each more than zero. |
+| `previous` | array | Earlier revisions (`revision`, `takenOn`, `values`), newest first. |
+
+Keys are camelCase from this vocabulary, or custom ones starting with `x-`.
+"Around" measurements go round the body; the others along it. The
+FreeSewing column maps keys to FreeSewing's measurement names.
+
+| Key | Measured | FreeSewing |
+|---|---|---|
+| `height` | along | — |
+| `bust` (chest on a man's figure) | around | `chest` |
+| `highBust` | around | `highBust` |
+| `underbust` | around | `underbust` |
+| `waist` | around | `waist` |
+| `highHip` | around | `hips` |
+| `hip` | around | `seat` |
+| `neck` | around | `neck` |
+| `shoulderWidth` | along | `shoulderToShoulder` |
+| `shoulderLength` | along | — |
+| `acrossFront` | along | — |
+| `acrossBack` | along | — |
+| `backWaistLength` | along | — |
+| `frontWaistLength` | along | `hpsToWaistFront` |
+| `bustSpan` | along | `bustSpan` |
+| `shoulderToBust` | along | `hpsToBust` |
+| `waistToHip` | along | `waistToSeat` |
+| `armLength` | along | `shoulderToWrist` |
+| `upperArm` | around | `biceps` |
+| `wrist` | around | `wrist` |
+| `inseam` | along | `inseam` |
+| `outseam` | along | `waistToFloor` |
+| `crotchDepth` | along | `crotchDepth` |
+| `thigh` | around | `upperLeg` |
+| `knee` | around | `knee` |
+| `calf` | around | — |
+| `ankle` | around | `ankle` |
+
+How to take each one is shown in the app beside its box.
 
 ### 10.3 Alteration stack (Phase 4)
 

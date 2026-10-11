@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 pub use drapewright_pattern_core::notches::NotchStyle;
 use drapewright_pattern_core::{Id, Piece, Pt};
+
+use crate::measurements::MeasurementSet;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -11,7 +13,7 @@ use ts_rs::TS;
 pub const FORMAT: &str = "drapewright-project";
 
 /// The schema version this build reads and writes.
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -227,6 +229,9 @@ pub struct Document {
     pub pieces: Vec<Arc<Piece>>,
     #[serde(default)]
     pub print: PrintSettings,
+    /// People's measurements (schema version 2).
+    #[serde(default)]
+    pub measurement_sets: Vec<MeasurementSet>,
     /// Data owned by other programs; preserved untouched.
     #[serde(default)]
     pub extensions: serde_json::Map<String, serde_json::Value>,
@@ -239,6 +244,10 @@ impl Document {
 
     pub fn piece_index(&self, id: &str) -> Option<usize> {
         self.pieces.iter().position(|p| p.id == id)
+    }
+
+    pub fn measurement_set(&self, id: &str) -> Option<&MeasurementSet> {
+        self.measurement_sets.iter().find(|m| m.id == id)
     }
 }
 

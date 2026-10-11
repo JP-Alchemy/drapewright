@@ -17,7 +17,10 @@ use drapewright_pattern_core::{
 };
 use drapewright_project::document::{Assembly, Document, Orientation, Paper, PaperName};
 use drapewright_project::hit::placement_affine;
-use drapewright_project::{Command, PieceView};
+use drapewright_project::measurements::{
+    EarlierMeasurements, MeasurementSet, is_valid_key, vocabulary,
+};
+use drapewright_project::{Command, Figure, MeasurementKey, PieceView};
 use kurbo::{BezPath, ParamCurve, Point, Rect};
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
@@ -289,6 +292,20 @@ pub fn all() -> Vec<Tool> {
             Edits,
             "Lays pieces out tidily on the work table in rows no wider than width_mm, tallest first, without turning them. Useful after imports, or to see how they fit a fabric width.",
             arrange_pieces,
+        ),
+        tool(
+            "get_measurements",
+            "Get measurements",
+            Reads,
+            "Each person's body measurements kept in the project (mm), with the measurements Drapewright knows: their keys, whether taken around or along the body, their usual adult range, and FreeSewing's name for each.",
+            get_measurements,
+        ),
+        tool(
+            "set_measurements",
+            "Set measurements",
+            Edits,
+            "Adds a person's measurements, or changes one person's: name, figure (\"woman\" or \"man\"), the date taken, and values in mm by key (see get_measurements; custom keys start with \"x-\"). With measure_again the current values are kept as an earlier measurement first. Values outside the usual range are reported, as they are often in the wrong units.",
+            set_measurements,
         ),
         tool("undo", "Undo", Edits, "Undoes the last change.", undo),
         tool(
@@ -1863,6 +1880,168 @@ fn arrange_pieces(session: &mut Session, a: ArrangeArgs) -> Result<Output, ToolE
         text::length(widest),
         text::length(y + row_height)
     )))
+}
+
+// ------------------------------------------------------------ measurements
+
+fn get_measurements(session: &mut Session, _: NoArgs) -> Result<Output, ToolError> {
+    let doc = session.project()?.engine.document();
+    let people: Vec<Value> = doc
+        .measurement_sets
+        .iter()
+        .map(|m| {
+            json!({
+                "id": m.id,
+                "name": m.name,
+                "figure": m.figure,
+                "measurement": m.revision,
+                "takenOn": m.taken_on,
+                "valuesMm": m.values,
+                "earlierMeasurements": m.previous.len(),
+            })
+        })
+        .collect();
+    let known: Vec<Value> = vocabulary()
+        .into_iter()
+        .map(|m| {
+            json!({
+                "key": m.key.name(),
+                "kind": m.kind,
+                "womenOnly": m.women_only,
+                "usualMm": [m.usual.0, m.usual.1],
+                "freesewing": m.freesewing,
+            })
+        })
+        .collect();
+    Ok(Output::json(
+        &json!({ "people": people, "measurements": known }),
+    ))
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct MeasurementArgs {
+    /// Id of the person's measurements to change; leave out to add a person.
+    person: Option<String>,
+    /// Whose measurements they are ("Me", a client's name).
+    name: Option<String>,
+    /// "woman" or "man".
+    figure: Option<Figure>,
+    /// The day they were taken, YYYY-MM-DD.
+    taken_on: Option<String>,
+    /// Values to set, mm, by key ("bust": 960). Keys from get_measurements,
+    /// or custom ones starting with "x-".
+    values_mm: Option<std::collections::BTreeMap<String, f64>>,
+    /// Keys whose values to clear.
+    remove: Option<Vec<String>>,
+    /// Keep the current values as an earlier measurement before changing
+    /// anything.
+    #[serde(default)]
+    measure_again: bool,
+}
+
+fn set_measurements(session: &mut Session, a: MeasurementArgs) -> Result<Output, ToolError> {
+    let doc = session.project()?.engine.document();
+    let existing = match &a.person {
+        Some(id) => Some(doc.measurement_set(id).cloned().ok_or_else(|| {
+            ToolError::new(format!(
+                "There are no measurements \"{id}\". get_measurements lists them."
+            ))
+        })?),
+        None => None,
+    };
+    for key in a
+        .values_mm
+        .iter()
+        .flat_map(|v| v.keys())
+        .chain(a.remove.iter().flatten())
+    {
+        if !is_valid_key(key) {
+            let keys: Vec<String> = MeasurementKey::ALL.iter().map(|k| k.name()).collect();
+            return Err(ToolError::new(format!(
+                "\"{key}\" is not a measurement Drapewright knows. Use one of {}, or a custom key starting with \"x-\".",
+                keys.join(", ")
+            )));
+        }
+    }
+    let mut set = match existing {
+        Some(mut set) => {
+            if a.measure_again {
+                set.previous.insert(
+                    0,
+                    EarlierMeasurements {
+                        revision: set.revision,
+                        taken_on: set.taken_on.take(),
+                        values: set.values.clone(),
+                    },
+                );
+                set.revision += 1;
+            }
+            set
+        }
+        None => MeasurementSet {
+            id: String::new(),
+            name: "Me".into(),
+            figure: Figure::Woman,
+            revision: 1,
+            taken_on: None,
+            values: Default::default(),
+            previous: Vec::new(),
+        },
+    };
+    if let Some(name) = a.name {
+        set.name = name.trim().to_string();
+    }
+    if let Some(figure) = a.figure {
+        set.figure = figure;
+    }
+    if let Some(date) = a.taken_on {
+        set.taken_on = Some(date);
+    }
+    for key in a.remove.iter().flatten() {
+        set.values.remove(key);
+    }
+    let mut unusual = Vec::new();
+    for (key, mm) in a.values_mm.into_iter().flatten() {
+        if let Some(info) = MeasurementKey::from_name(&key).map(MeasurementKey::info)
+            && (mm < info.usual.0 || mm > info.usual.1)
+        {
+            unusual.push(format!(
+                "{key} {} mm (usually {}–{} mm)",
+                r1(mm),
+                info.usual.0,
+                info.usual.1
+            ));
+        }
+        set.values.insert(key, mm);
+    }
+    let adding = set.id.is_empty();
+    session.dispatch(vec![if adding {
+        Command::AddMeasurementSet { set }
+    } else {
+        Command::SetMeasurementSet { set }
+    }])?;
+    let doc = session.project()?.engine.document();
+    let saved = if adding {
+        doc.measurement_sets.last()
+    } else {
+        a.person.as_deref().and_then(|id| doc.measurement_set(id))
+    }
+    .expect("the set was just written");
+    let mut text = format!(
+        "{} {}'s measurements ({}, {} values).",
+        if adding { "Added" } else { "Updated" },
+        saved.name,
+        saved.id,
+        saved.values.len()
+    );
+    if !unusual.is_empty() {
+        text.push_str(&format!(
+            " Unusual, perhaps in the wrong units: {}.",
+            unusual.join("; ")
+        ));
+    }
+    Ok(Output::text(text))
 }
 
 fn undo(session: &mut Session, _: NoArgs) -> Result<Output, ToolError> {

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Drapewright project (project.json)",
-  "description": "A Drapewright sewing pattern project, schema version 1. See docs/file-format.md.",
+  "description": "A Drapewright sewing pattern project, schema version 2. See docs/file-format.md.",
   "type": "object",
   "properties": {
     "extensions": {
@@ -15,6 +15,14 @@
     },
     "generator": {
       "type": "string"
+    },
+    "measurementSets": {
+      "description": "People's measurements (schema version 2).",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/MeasurementSet"
+      }
     },
     "meta": {
       "$ref": "#/$defs/Meta"
@@ -200,6 +208,35 @@
         "in"
       ]
     },
+    "EarlierMeasurements": {
+      "description": "A revision kept from before the person was measured again.",
+      "type": "object",
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "takenOn": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "values": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "required": [
+        "revision",
+        "values"
+      ]
+    },
     "Edge": {
       "description": "A run of the outline from one corner to the next, e.g. \"side seam\".",
       "type": "object",
@@ -259,6 +296,14 @@
           "type": "string",
           "const": "fold"
         }
+      ]
+    },
+    "Figure": {
+      "description": "Whose figure: which measurements are asked for, and (later) the\navatar's shape.",
+      "type": "string",
+      "enum": [
+        "woman",
+        "man"
       ]
     },
     "Grainline": {
@@ -455,6 +500,59 @@
         "cross",
         "button",
         "buttonhole"
+      ]
+    },
+    "MeasurementSet": {
+      "description": "One person's measurements, mm, with the earlier ones kept.",
+      "type": "object",
+      "properties": {
+        "figure": {
+          "$ref": "#/$defs/Figure",
+          "default": "woman"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "description": "Whose they are (\"Me\", a client's name).",
+          "type": "string"
+        },
+        "previous": {
+          "description": "Earlier revisions, newest first.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/EarlierMeasurements"
+          }
+        },
+        "revision": {
+          "description": "Counts up with each new measuring.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 1,
+          "minimum": 0
+        },
+        "takenOn": {
+          "description": "The day they were taken (`YYYY-MM-DD`).",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "values": {
+          "description": "Measurement key → mm. Keys are the vocabulary's, or custom ones\nstarting with `x-`.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "format": "double"
+          },
+          "default": {}
+        }
+      },
+      "required": [
+        "id",
+        "name"
       ]
     },
     "Meta": {

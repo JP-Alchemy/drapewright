@@ -443,3 +443,54 @@ fn runs_over_stdio() {
             .contains("Over stdio")
     );
 }
+
+#[test]
+fn an_assistant_keeps_a_persons_measurements() {
+    let mut s = server();
+    ok(&mut s, "new_project", json!({ "name": "Blouse for Anna" }));
+    let added = ok(
+        &mut s,
+        "set_measurements",
+        json!({ "name": "Anna", "taken_on": "2026-10-01",
+                "values_mm": { "bust": 960, "waist": 7800, "x-elbow": 260 } }),
+    );
+    // A waist given in tenths of a millimetre, say, is pointed out.
+    assert!(added.contains("Added Anna's measurements"), "{added}");
+    assert!(added.contains("waist 7800 mm"), "{added}");
+    let got = ok_json(&mut s, "get_measurements", json!({}));
+    let anna = &got["people"][0];
+    let id = anna["id"].as_str().unwrap().to_string();
+    assert_eq!(anna["valuesMm"]["bust"], 960.0);
+    assert!(
+        got["measurements"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|m| m["key"] == "hip" && m["freesewing"] == "seat")
+    );
+
+    // Measured again a month later: the first measurement is kept.
+    ok(
+        &mut s,
+        "set_measurements",
+        json!({ "person": id, "measure_again": true, "taken_on": "2026-11-01",
+                "values_mm": { "waist": 780 }, "remove": ["x-elbow"] }),
+    );
+    let anna = &ok_json(&mut s, "get_measurements", json!({}))["people"][0];
+    assert_eq!(anna["measurement"], 2);
+    assert_eq!(anna["earlierMeasurements"], 1);
+    assert_eq!(anna["valuesMm"], json!({ "bust": 960.0, "waist": 780.0 }));
+
+    let wrong = fails(
+        &mut s,
+        "set_measurements",
+        json!({ "values_mm": { "wiast": 780 } }),
+    );
+    assert!(wrong.contains("highBust"), "{wrong}");
+    let gone = fails(
+        &mut s,
+        "set_measurements",
+        json!({ "person": "m99", "name": "X" }),
+    );
+    assert!(gone.contains("get_measurements"), "{gone}");
+}

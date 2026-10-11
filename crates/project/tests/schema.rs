@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use drapewright_project::ProjectFile;
+use drapewright_project::{ProjectFile, SCHEMA_VERSION};
 
 #[test]
 fn json_schema_is_up_to_date() {
@@ -12,7 +12,10 @@ fn json_schema_is_up_to_date() {
     schema.insert("title".into(), "Drapewright project (project.json)".into());
     schema.insert(
         "description".into(),
-        "A Drapewright sewing pattern project, schema version 1. See docs/file-format.md.".into(),
+        format!(
+            "A Drapewright sewing pattern project, schema version {SCHEMA_VERSION}. See docs/file-format.md."
+        )
+        .into(),
     );
     let text = serde_json::to_string_pretty(&schema).unwrap() + "\n";
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/schema/project.schema.json");

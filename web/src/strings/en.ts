@@ -7,6 +7,8 @@ import type {
   DisplayUnits,
   EdgeKind,
   ImportNote,
+  MeasurementGroup,
+  MeasurementKey,
   NotchFrom,
   NotchKind,
   PaperName,
@@ -476,6 +478,106 @@ export const t = {
     save: 'Save',
     saved: 'Screen measured: at 100% pieces show at their real size.',
     standard: 'Back to the standard size: 100% is approximate.',
+  },
+
+  measure: {
+    open: 'Measurements',
+    heading: 'Measurements',
+    intro:
+      'Measure over light clothing, with the tape snug but not tight. Leave out anything you don’t have: only height, bust, waist and hip are needed to start.',
+    empty: 'No measurements yet.',
+    addFirst: 'Add my measurements',
+    add: 'Add a person',
+    defaultName: 'Me',
+    newName: (n: number) => `Person ${n}`,
+    people: 'People',
+    name: 'Name',
+    figure: 'Figure',
+    figures: { woman: 'Woman’s', man: 'Man’s' },
+    takenOn: 'Measured on',
+    revision: (n: number, date: string | null) =>
+      date ? `Measurement ${n}, taken ${date}` : `Measurement ${n}`,
+    again: 'Measure again',
+    againHint:
+      'Starts a new measurement from today’s date. These values are kept as the earlier one.',
+    earlier: (n: number) => plural(n, '1 earlier measurement kept', '# earlier measurements kept'),
+    remove: 'Delete',
+    removeConfirm: (name: string) => `Delete ${name}’s measurements?`,
+    clear: (name: string) => `Clear ${name}`,
+    howTo: 'How to measure',
+    unusual: (name: string) => `Unusual for ${name.toLowerCase()}: check it is in the right units.`,
+    done: 'Done',
+    groups: {
+      height: 'Height',
+      around: 'Around the body',
+      torso: 'Torso lengths',
+      arms: 'Arms',
+      legs: 'Legs',
+    } satisfies Record<MeasurementGroup, string>,
+    names: {
+      height: [
+        'Height',
+        'Barefoot, standing against a wall: from the floor to the top of the head.',
+      ],
+      bust: ['Bust', 'Around the fullest part of the bust, the tape level across the back.'],
+      highBust: [
+        'High bust',
+        'Around the chest just under the arms, above the bust, level across the back.',
+      ],
+      underbust: ['Underbust', 'Around the ribcage just below the bust, level.'],
+      waist: [
+        'Waist',
+        'Around the natural waist, the narrowest part. Bend to one side: the crease is the waist.',
+      ],
+      highHip: ['High hip', 'Around the top of the hip bones, about 10 cm below the waist.'],
+      hip: ['Hip', 'Around the fullest part of the hips and seat, feet together, the tape level.'],
+      neck: ['Neck', 'Around the base of the neck, where a collar sits, over the nape bone.'],
+      shoulderWidth: [
+        'Shoulder width',
+        'Across the back from one shoulder point (the bony tip at the top of the arm) to the other.',
+      ],
+      shoulderLength: ['Shoulder length', 'From the side of the neck to the shoulder point.'],
+      acrossFront: [
+        'Across front',
+        'Across the front from armpit crease to armpit crease, halfway between shoulder and underarm.',
+      ],
+      acrossBack: [
+        'Across back',
+        'Across the back from armpit crease to armpit crease, halfway between nape and underarm.',
+      ],
+      backWaistLength: [
+        'Back waist length',
+        'From the nape bone (the bump at the base of the neck) straight down to the waist.',
+      ],
+      frontWaistLength: [
+        'Front waist length',
+        'From the side of the neck at the shoulder, over the bust point, down to the waist.',
+      ],
+      bustSpan: ['Bust span', 'From one bust point to the other.'],
+      shoulderToBust: [
+        'Shoulder to bust point',
+        'From the side of the neck at the shoulder down to the bust point.',
+      ],
+      waistToHip: ['Waist to hip', 'Down the side from the waist to the fullest part of the hips.'],
+      armLength: [
+        'Arm length',
+        'From the shoulder point, over a slightly bent elbow, to the wrist bone.',
+      ],
+      upperArm: ['Upper arm', 'Around the fullest part of the upper arm, relaxed.'],
+      wrist: ['Wrist', 'Around the wrist, over the wrist bone.'],
+      inseam: ['Inside leg', 'Barefoot: from the crotch down the inside of the leg to the floor.'],
+      outseam: ['Outside leg', 'Down the side from the waist to the floor, barefoot.'],
+      crotchDepth: [
+        'Crotch depth',
+        'Sitting on a hard chair: down the side from the waist to the seat.',
+      ],
+      thigh: ['Thigh', 'Around the fullest part of the thigh.'],
+      knee: ['Knee', 'Around the knee, slightly bent.'],
+      calf: ['Calf', 'Around the fullest part of the calf.'],
+      ankle: ['Ankle', 'Around the ankle, over the ankle bone.'],
+    } satisfies Record<MeasurementKey, readonly [string, string]>,
+    /** Men's figures say chest, not bust. */
+    chest: ['Chest', 'Around the fullest part of the chest, under the arms, the tape level.'],
   },
 
   crash: {

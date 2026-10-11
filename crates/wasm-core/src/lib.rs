@@ -199,6 +199,13 @@ pub fn preview_allowance(piece: JsValue) -> Result<JsValue, JsError> {
     })
 }
 
+/// The measurements Drapewright knows, in form order, with their usual
+/// ranges and FreeSewing names.
+#[wasm_bindgen(js_name = measurementVocabulary)]
+pub fn measurement_vocabulary() -> Result<JsValue, JsError> {
+    to_js(&drapewright_project::measurements::vocabulary())
+}
+
 /// Reads pattern pieces from an SVG file.
 #[wasm_bindgen(js_name = importSvg)]
 pub fn import_svg(data: &[u8], file_name: Option<String>) -> Result<JsValue, JsError> {

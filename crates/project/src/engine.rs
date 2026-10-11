@@ -72,6 +72,7 @@ impl Engine {
             settings: Default::default(),
             pieces: Vec::new(),
             print: Default::default(),
+            measurement_sets: Vec::new(),
             extensions: Default::default(),
         };
         Engine::from_document(doc, ViewState::default(), generator)

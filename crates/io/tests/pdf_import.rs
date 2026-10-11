@@ -50,6 +50,7 @@ fn document(pieces: &[Piece], paper: PaperName, assembly: Assembly) -> Document 
             assembly,
             ..Default::default()
         },
+        measurement_sets: Vec::new(),
         extensions: Default::default(),
     }
 }

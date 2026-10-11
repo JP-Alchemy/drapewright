@@ -91,6 +91,7 @@ assistant that file.
 | `create_piece` | A rectangle, or any closed outline as SVG path data in mm |
 | `delete_pieces` | Removes pieces (undo brings them back) |
 | `move_pieces`, `rotate_piece`, `arrange_pieces` | Arrange the work table, e.g. in rows as wide as the fabric |
+| `get_measurements`, `set_measurements` | People's body measurements kept in the project; values outside the usual range are pointed out |
 | `undo`, `redo` | One tool call is one step |
 | `print_settings` | How the project prints, and its print settings |
 | `export_pdf`, `export_svg` | The tiled true-size PDF, or a true-size SVG |

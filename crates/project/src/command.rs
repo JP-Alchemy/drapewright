@@ -18,6 +18,7 @@ use ts_rs::TS;
 
 use crate::document::{DisplayUnits, Document, PrintSettings};
 use crate::ids::IdAllocator;
+use crate::measurements::{EarlierMeasurements, MeasurementSet};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(
@@ -119,6 +120,23 @@ pub enum Command {
     SetDisplayUnits {
         units: DisplayUnits,
     },
+    /// Adds a person's measurements. The set gets a fresh id.
+    AddMeasurementSet {
+        set: MeasurementSet,
+    },
+    /// Replaces the measurement set with the same id.
+    SetMeasurementSet {
+        set: MeasurementSet,
+    },
+    /// Starts measuring a person again: the current values are kept as the
+    /// previous revision, and the new revision starts from them.
+    RemeasureSet {
+        id: Id,
+        taken_on: Option<String>,
+    },
+    DeleteMeasurementSet {
+        id: Id,
+    },
 }
 
 impl Command {
@@ -145,6 +163,10 @@ impl Command {
             Command::SetPrintSettings { .. } => "print settings",
             Command::RenameProject { .. } => "rename project",
             Command::SetDisplayUnits { .. } => "units",
+            Command::AddMeasurementSet { .. } => "add measurements",
+            Command::SetMeasurementSet { .. } => "measurements",
+            Command::RemeasureSet { .. } => "measure again",
+            Command::DeleteMeasurementSet { .. } => "delete measurements",
         }
     }
 }
@@ -163,6 +185,8 @@ pub enum CommandError {
     UnknownEdge { piece: Id, edge: Id },
     #[error("That notch no longer exists.")]
     UnknownNotch { piece: Id, notch: Id },
+    #[error("Those measurements no longer exist.")]
+    UnknownMeasurementSet { id: Id },
     #[error("{message}")]
     Rejected { message: String },
 }
@@ -183,7 +207,7 @@ pub struct ChangeSet {
     pub added: Vec<Id>,
     pub changed: Vec<Id>,
     pub removed: Vec<Id>,
-    /// Project name, settings or print settings changed.
+    /// Project name, settings, print settings or measurements changed.
     pub document: bool,
 }
 
@@ -213,7 +237,8 @@ impl ChangeSet {
             .collect();
         set.document = before.meta != after.meta
             || before.settings != after.settings
-            || before.print != after.print;
+            || before.print != after.print
+            || before.measurement_sets != after.measurement_sets;
         set
     }
 }
@@ -458,10 +483,74 @@ fn apply_inner(
                 ..Default::default()
             })
         }
+        Command::AddMeasurementSet { mut set } => {
+            set.id = ids.next("m");
+            checked(&set)?;
+            doc.measurement_sets.push(set);
+            Ok(ChangeSet {
+                document: true,
+                ..Default::default()
+            })
+        }
+        Command::SetMeasurementSet { set } => {
+            checked(&set)?;
+            let id = set.id.clone();
+            *measurement_set_mut(doc, &id)? = set;
+            Ok(ChangeSet {
+                document: true,
+                ..Default::default()
+            })
+        }
+        Command::RemeasureSet { id, taken_on } => {
+            let set = measurement_set_mut(doc, &id)?;
+            set.previous.insert(
+                0,
+                EarlierMeasurements {
+                    revision: set.revision,
+                    taken_on: set.taken_on.take(),
+                    values: set.values.clone(),
+                },
+            );
+            set.revision += 1;
+            set.taken_on = taken_on;
+            checked(set)?;
+            Ok(ChangeSet {
+                document: true,
+                ..Default::default()
+            })
+        }
+        Command::DeleteMeasurementSet { id } => {
+            measurement_set_mut(doc, &id)?;
+            doc.measurement_sets.retain(|m| m.id != id);
+            Ok(ChangeSet {
+                document: true,
+                ..Default::default()
+            })
+        }
+    }
+}
+
+fn measurement_set_mut<'a>(
+    doc: &'a mut Document,
+    id: &Id,
+) -> Result<&'a mut MeasurementSet, CommandError> {
+    doc.measurement_sets
+        .iter_mut()
+        .find(|m| m.id == *id)
+        .ok_or_else(|| CommandError::UnknownMeasurementSet { id: id.clone() })
+}
+
+fn checked(set: &MeasurementSet) -> Result<(), CommandError> {
+    match set.problem() {
+        Some(message) => Err(CommandError::Rejected { message }),
+        None => Ok(()),
     }
 }
 
 /// Every id used anywhere in the document.
 pub fn all_ids(doc: &Document) -> impl Iterator<Item = &Id> {
-    doc.pieces.iter().flat_map(|p| piece_ids(p))
+    doc.pieces
+        .iter()
+        .flat_map(|p| piece_ids(p))
+        .chain(doc.measurement_sets.iter().map(|m| &m.id))
 }
