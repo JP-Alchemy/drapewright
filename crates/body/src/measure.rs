@@ -499,6 +499,40 @@ pub fn around_at(model: &BodyModel, body: &Body, y: f64, trunk: bool) -> f64 {
     m.ring(&near, y)
 }
 
+/// The trunk's sections every `step` mm up from `from` to `to`: each
+/// height, the middle (x, z) of the torso there, and half its width and
+/// depth. For placing a garment round the body.
+pub fn trunk_sections(
+    model: &BodyModel,
+    body: &Body,
+    from: f64,
+    to: f64,
+    step: f64,
+) -> Vec<(f64, [f64; 2], [f64; 2])> {
+    let shown = &body.vertices[..model.asset.shown as usize];
+    let mut out = Vec::new();
+    let mut y = from;
+    while y <= to {
+        let (mut low, mut high) = ([f64::MAX; 2], [f64::MIN; 2]);
+        for (i, p) in shown.iter().enumerate() {
+            if (p[1] - y).abs() < step / 2.0 && model.region(i).is_some_and(|r| TRUNK.contains(&r))
+            {
+                low = [low[0].min(p[0]), low[1].min(p[2])];
+                high = [high[0].max(p[0]), high[1].max(p[2])];
+            }
+        }
+        if low[0] < high[0] {
+            out.push((
+                y,
+                [(low[0] + high[0]) / 2.0, (low[1] + high[1]) / 2.0],
+                [(high[0] - low[0]) / 2.0, (high[1] - low[1]) / 2.0],
+            ));
+        }
+        y += step;
+    }
+    out
+}
+
 /// Where measurements are taken, for checking them by eye.
 #[derive(Clone, Debug, Default)]
 pub struct Landmarks {

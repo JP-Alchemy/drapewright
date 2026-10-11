@@ -12,6 +12,53 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 21a — Draping: the engine (Phase 3, part 6)
+
+The cloth simulation that drapes a pattern on the avatar, as a library for
+now: in the app with step 21b.
+
+**Try it** (from the command line):
+
+```bash
+cargo run --release -p drapewright-sim --example drape_picture -- assets/body/adult.dwbody skirt poplin
+```
+
+It drapes a skirt cut for the standard figure (the front cut on the fold,
+the back as a pair with a centre back seam) and draws it from the front and
+the side three times: `skirt-placed.png` (the pieces round the body),
+`skirt-sewn.png` and `skirt-settled.png`. Any of the 12 fabrics can be
+given: cottonLawn, poplin, linen, chambray, denim, twill, crepe, satin,
+jersey, ribKnit, woolSuiting, fleece.
+
+**How it drapes:**
+* Each piece is laid out as cut: a pair as two mirror images, a piece on
+  the fold unfolded whole. Its edges are sampled so both sides of every
+  seam have matching points. It is then meshed in near-equilateral
+  triangles 2 cm across (constrained Delaunay).
+* The pieces go round the body as a ring, in the order their upright seams
+  join them, the front's middle in front. They are wrapped row by row, so
+  an A-line skirt goes on as a cone and its seams meet at every height. A
+  ring with shoulder seams hangs from the shoulders, another from the
+  waist or from the ring it is sewn under.
+* The cloth is XPBD in small steps (1/1800 s). Each fabric stretches
+  firmly along warp and weft and gives on the bias, and bends (Bergou's
+  isometric model). The stitches tighten over the first second as the
+  seams close.
+* The body keeps the cloth off as a distance field (8 mm cells), its
+  points and the middles of its triangles kept 3 mm clear. Friction holds
+  cloth where it rests on the body.
+
+The skirt settles in about five seconds of cloth time: hanging from the
+waist to well below the hip, seams closed, nothing inside the body. Tests
+check a hanging curtain, a cloth falling on a ball, two panels sewn round a
+post, and the skirt on the avatar.
+
+**Not yet:** in the app (21b); sleeves and trousers placed round arms and
+legs; a pattern's own pieces and seams draped (21b); the drape's speed
+(about real time on a computer for a skirt; step 23 moves it to the GPU).
+
+---
+
 ## Step 20 — The avatar in 3D (Phase 3, part 5)
 
 See the avatar, in someone's figure, beside the cutting table, and turn it

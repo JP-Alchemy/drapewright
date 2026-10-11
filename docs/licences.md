@@ -32,11 +32,12 @@ Project licence: **not yet chosen** (see
 | schemars | MIT | JSON Schema generation for the public format | pattern-core, project |
 | ts-rs | MIT | TypeScript types generated from Rust | project, wasm-core |
 | wasm-bindgen | MIT OR Apache-2.0 | JS bindings (facade crate only) | wasm-core |
-| tiny-skia (with png) | BSD-3-Clause | Pictures of pieces for AI assistants | mcp |
+| tiny-skia (with png) | BSD-3-Clause | Pictures of pieces for AI assistants; pictures of figures and drapes to check by eye (examples) | mcp, body, sim |
 | md-5, aes, sha2 | MIT OR Apache-2.0 | Opening "protected" PDF patterns (encrypted with an empty user password), as viewers do | pdf-import |
 | serde-wasm-bindgen | MIT | Passing data across the boundary | wasm-core, wasm-3d |
 | wgpu | MIT OR Apache-2.0 | Drawing the 3D view: WebGPU, or WebGL2 where there is none | render, wasm-3d |
 | bytemuck | Zlib OR Apache-2.0 OR MIT | The 3D view's vertices and settings as bytes | render |
+| spade | MIT OR Apache-2.0 | Meshing pattern pieces for the drape (constrained Delaunay triangulation) | sim |
 | web-sys, wasm-bindgen-futures | MIT OR Apache-2.0 | The canvas handed to the sim worker; waiting for the GPU | wasm-3d |
 | proptest *(dev)* | MIT OR Apache-2.0 | Property-based tests | tests |
 | insta *(dev)* | Apache-2.0 | Golden-file snapshot tests | tests |

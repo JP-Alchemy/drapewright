@@ -1,0 +1,22 @@
+[package]
+name = "drapewright-sim"
+description = "Draping Drapewright's patterns on the avatar: pieces meshed, placed round the body, sewn, and settled as cloth (XPBD)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+drapewright-pattern-core.workspace = true
+drapewright-seams.workspace = true
+spade.workspace = true
+
+[dev-dependencies]
+# Draping on the avatar in the tests.
+drapewright-body.workspace = true
+# Pictures of a drape, to check by eye (the drape_picture example).
+tiny-skia.workspace = true
+
+[lints]
+workspace = true
