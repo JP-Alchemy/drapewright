@@ -1,7 +1,10 @@
 # Phases 3 and 4 — see it on her, fit and edit
 
-Version 0.1 · 2026-10-11 · status: **in progress** (Phase 3 first, as
-agreed)
+Version 0.2 · 2026-10-12 · status: **done**, but for step 23 (the WebGPU
+drape), held back until the iPad shows it is needed. What each step does,
+and what it doesn't do yet, is in [demo-notes.md](demo-notes.md); the
+sewing choices waiting for the seamstress are in
+[open-questions.md](open-questions.md) (18 to 29).
 
 **Phase 3, see it on her:** enter the wearer's measurements and see an
 avatar with that figure; pair the pattern's seams (Drapewright suggests,
