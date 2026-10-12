@@ -189,6 +189,24 @@ export const t = {
     cancel: 'Cancel',
   },
 
+  projector: {
+    open: 'Projector',
+    openHint: 'Project the pieces true size onto fabric on the cutting table.',
+    heading: 'Projector',
+    calibrate: 'Calibrate the projector',
+    calibrateHow:
+      'Mark a rectangle on the mat (with tape, or along the mat’s own lines) and say how big it is. Then drag the four corners onto its corners.',
+    width: 'Rectangle across',
+    height: 'Rectangle down',
+    done: 'Done',
+    close: 'Close',
+    recalibrate: 'Calibrate',
+    slide: 'Drag to slide the pattern across the fabric.',
+    stitching: 'Stitching lines',
+    calibrationLabel: 'The rectangle to calibrate by, with its corners to drag.',
+    projectionLabel: 'The pieces, true size.',
+  },
+
   fabric: {
     heading: 'Measure a fabric',
     change: (name: string) => `Change “${name}”`,

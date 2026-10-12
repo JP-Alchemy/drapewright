@@ -137,6 +137,8 @@ export interface UiState {
   sewing: { piece: string; edge: string } | null
   /** The 3D view of the avatar is open beside the table. */
   avatar: boolean
+  /** Projecting the pieces onto fabric, full screen. */
+  projector: boolean
   /** Whose measurements the avatar is fitted to: a measurement set's id. */
   avatarPerson: string | null
   /** The fabric the garment is draped on the avatar in: ready made, or one's own (by id). */
@@ -179,6 +181,7 @@ export class Session {
       seam: null,
       sewing: null,
       avatar: false,
+      projector: false,
       avatarPerson: null,
       drapeFabric: 'poplin',
     })
@@ -380,6 +383,11 @@ export class Session {
       viewport: { ...s.viewport, pxPerMm: pxPerMm ?? NOMINAL_PX_PER_MM },
       screenMeasured: pxPerMm !== null,
     }))
+  }
+
+  /** Projects the pieces onto fabric, full screen, or stops. */
+  showProjector(open: boolean): void {
+    this.ui.set((s) => ({ ...s, projector: open }))
   }
 
   /** Opens or closes the 3D view of the avatar. */

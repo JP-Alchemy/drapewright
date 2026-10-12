@@ -12,6 +12,44 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 30 — Projector mode (Phase 4, part 9)
+
+Project the pieces true size onto fabric on the cutting table, from a
+projector above it, and cut without printing.
+
+**Try it** (any project with pieces; with the iPad mirrored to a
+projector, or on a second screen):
+
+1. Press **Projector** in the top bar. The screen goes black, full
+   screen, and shows a rectangle with a 10 cm grid and a corner handle at
+   each corner.
+2. **Calibrate:** mark a rectangle on the mat with tape, or use the mat's
+   own lines, and enter its size (40 × 30 cm to start). Drag each corner
+   handle until it sits on the marked corner on the table. A projector
+   that isn't square on to the table is straightened by this too (the
+   rectangle is drawn as the projector sees it). **Done.**
+3. The pieces show in bright lines on black, which casts no light on the
+   fabric: white cutting lines and notches, dashed cyan stitching lines
+   (**Stitching lines** turns them off), yellow grainlines, and each
+   piece's name. **Drag** anywhere to slide the pattern across the fabric.
+   The pieces are laid out as on the cutting table, so arrange them there
+   first.
+4. The calibration is kept for this device and screen size. Next time it
+   projects straight away; **Calibrate** does it again. **Close** or Esc
+   leaves.
+
+**How it works:** the four corners and the rectangle's real size give a
+projective map (a homography) from the mat's millimetres to the
+projector's pixels, solved from the four pairs of points. Every line is
+drawn through it, so the scale and any tilt are taken out exactly.
+
+**Not yet:** pieces can't be turned or moved in projector mode itself
+(move them on the table first). There's no mirrored projection for a
+projector shining through a mirror; most projectors can flip their own
+picture.
+
+---
+
 ## Step 29 — Your own fabric, measured at home (Phase 4, part 8)
 
 Drape in the fabric you actually have, from a few measurements anyone can

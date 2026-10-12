@@ -1,5 +1,15 @@
 import { loadEngine } from '@drapewright/engine'
-import { Download, FolderOpen, Maximize2, Minus, Plus, Redo2, Rotate3d, Undo2 } from 'lucide-react'
+import {
+  Download,
+  FolderOpen,
+  Maximize2,
+  Minus,
+  Plus,
+  Projector,
+  Redo2,
+  Rotate3d,
+  Undo2,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button, ToggleButton } from 'react-aria-components'
 import { PatternCanvas } from '../canvas/PatternCanvas.tsx'
@@ -19,6 +29,7 @@ import {
 import { t } from '../strings/en.ts'
 import { IoClient } from '../workers/io-client.ts'
 import { AvatarPane } from './AvatarPane.tsx'
+import { ProjectorView } from './ProjectorView.tsx'
 import { ContextMenu } from './ContextMenu.tsx'
 import { DeviceDialog } from './DeviceDialog.tsx'
 import { ImportDialog } from './ImportDialog.tsx'
@@ -107,6 +118,14 @@ function TopBar({
         <span className="button-label">{t.avatar.open}</span>
       </ToggleButton>
       <PrintDialog session={session} />
+      <Button
+        className="button"
+        onPress={() => session.showProjector(true)}
+        aria-description={t.projector.openHint}
+      >
+        <Projector size={18} aria-hidden="true" />
+        <span className="button-label">{t.projector.open}</span>
+      </Button>
       <Button className="button" onPress={backup} aria-description={t.projects.backupHint}>
         <Download size={18} aria-hidden="true" />
         <span className="button-label">{t.projects.backup}</span>
@@ -184,7 +203,7 @@ function Workspace({
   actions: ProjectActions
 }) {
   const fileInput = useRef<HTMLInputElement>(null)
-  const { busy, notice, toast, tip, sewing, avatar } = useStore(session.ui)
+  const { busy, notice, toast, tip, sewing, avatar, projector } = useStore(session.ui)
   useEngineState(session)
   const empty = session.engine.document().pieces.length === 0
   const open = () => fileInput.current?.click()
@@ -276,6 +295,7 @@ function Workspace({
         </aside>
       </div>
       <ImportDialog session={session} />
+      {projector && <ProjectorView session={session} />}
     </div>
   )
 }
