@@ -12,6 +12,63 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 32 — PDFs with pages of instructions, and sizes drawn in turn
+
+Many PDF patterns start (or end) with pages of words: a warning, how to
+print, a size chart. Those pages are now left out on their own, and you can
+see which pages were read and choose others. Tiles go together where the
+labels printed on them say ("1A", "1B" and, at each edge, the label of the
+page that joins it there), and words printed over every page ("FREE", "Not
+for sale") no longer name pieces.
+
+Patterns in many sizes often draw them in a few line styles taken in turn:
+size A black, B black dashed, C red, D red dashed, E black again. Each size
+is now a size of its own, named by the letter on its line.
+
+**Try it** (with a free corset pattern in 13 sizes, A to M, on 21 A4 pages,
+the first of them its size chart and instructions):
+
+1. **Open pattern** and choose the PDF. The dialog says **Found 10 pieces
+   in 13 sizes** and **Read 20 of the 21 pages. Left out page 1 (1A):
+   instructions, not pattern.**
+2. **Choose pages…** lists every page with its label. Untick one and press
+   **Read these 19 pages**: the pieces on it are gone. **Read as at first**
+   brings them back.
+3. The sizes A to M each show their line. Pick one: each piece is named as
+   printed (Front Center, Back Side, Crotch Back… from under the piece's
+   number), has its grainline, and the lines across it (bust, waist,
+   shorten or lengthen here) stop at its own outline, though the pattern
+   draws them once, out to the largest size. The modesty panel, one for all
+   sizes, comes with every size.
+4. In an AI assistant, `inspect_pattern_file` says which pages were read
+   and which left out, and why, and `import_pattern` takes `pages`.
+
+In the bought trousers, the belt-loop strip now has its two fold lines and
+the marks where it is cut into five loops (they end on its outline, and were
+left out before).
+
+**How it works:**
+
+* *Pages of words.* A page with five or more lines of four or more words is
+  instructions, unless you chose it. A page that shares no lines with the
+  others is no part of the sheet (a cover).
+* *Labels.* Each tile prints its own label largest. The labels at its edges
+  name its neighbours, which says whether the number counts rows or
+  columns. Labelled pages join only their neighbours, on the side the labels
+  say, as far apart as the lines they share say (tiles overlap or are
+  trimmed); a tile that shares no line goes where its label says.
+* *Sizes in turn.* The outlines of a piece nest, one per size, smallest
+  first. When the line styles come round again in the nest, each outline is
+  a size, named by the letter on its line.
+* *Every size draws its whole outline*, the stretches the sizes share too,
+  so a line drawn twice on one page is kept twice. A dashed outline's
+  corners are marked by solid stubs, which carry its dashes on to the
+  corner. Where a size's outline is partly drawn in another style (every
+  size's crotch seam in black), that stretch closes it. Where the sizes
+  meet at a corner they share, no outline turns back into another size's.
+
+---
+
 ## Step 31 — A bought blouse found and draped
 
 A blouse from a bought PDF now goes from import to the avatar with **Find

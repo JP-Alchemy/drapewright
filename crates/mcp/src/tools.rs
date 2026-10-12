@@ -9,7 +9,7 @@ use std::sync::{Arc, OnceLock};
 use drapewright_body::BodyModel;
 use drapewright_io::pdf::{PdfTexts, PrintPlan, export_pdf, plan_print};
 use drapewright_io::svg::{SvgExportOptions, export_svg};
-use drapewright_io::{AllowanceAnswer, ImportResult};
+use drapewright_io::{AllowanceAnswer, ImportResult, PageLeftOut};
 use drapewright_pattern_core::build::{DEFAULT_CORNER_ANGLE, counter, outline_from_path};
 use drapewright_pattern_core::ops::normalize_orientation;
 use drapewright_pattern_core::{
@@ -186,14 +186,14 @@ pub fn all() -> Vec<Tool> {
             "inspect_pattern_file",
             "Inspect pattern file",
             Reads,
-            "Reads an SVG, DXF or PDF sewing pattern without adding it: the pieces found, the sizes the file holds, how sure its scale is (with what each reading would make the pieces measure), whether seam allowance must be asked about, and what was left out. Use it before import_pattern to know which questions to ask the user.",
+            "Reads an SVG, DXF or PDF sewing pattern without adding it: the pieces found, the sizes the file holds, how sure its scale is (with what each reading would make the pieces measure), whether seam allowance must be asked about, and what was left out (for a PDF, which pages were read and which left out, and why). Use it before import_pattern to know which questions to ask the user.",
             inspect_pattern_file,
         ),
         tool(
             "import_pattern",
             "Import pattern",
             Edits,
-            "Adds the pieces of an SVG, DXF or PDF pattern to the open project (starting a project if none is open), beside any pieces already there. When the file holds several sizes, doesn't say how big it is, or has pieces drawn with one outline, the matching argument is required: ask the user, never guess. The original file is kept in the project.",
+            "Adds the pieces of an SVG, DXF or PDF pattern to the open project (starting a project if none is open), beside any pieces already there. When the file holds several sizes, doesn't say how big it is, or has pieces drawn with one outline, the matching argument is required: ask the user, never guess. For a PDF, pages chooses the pages to read when the ones read by default are wrong. The original file is kept in the project.",
             import_pattern,
         ),
         tool(
@@ -579,7 +579,12 @@ struct Read {
     result: ImportResult,
 }
 
-fn read_pattern(path: &str) -> Result<Read, ToolError> {
+fn read_pattern(path: &str, pages: Option<&[usize]>) -> Result<Read, ToolError> {
+    if pages.is_some_and(|p| p.is_empty() || p.contains(&0)) {
+        return Err(ToolError::new(
+            "pages lists the pages to read, numbered from 1; leave it out to read them all.",
+        ));
+    }
     let path = expand(path);
     let data = std::fs::read(&path)
         .map_err(|e| ToolError::new(format!("Could not read {}: {e}", path.display())))?;
@@ -592,8 +597,14 @@ fn read_pattern(path: &str) -> Result<Read, ToolError> {
         .map(|e| e.to_string_lossy().to_ascii_lowercase())
         .unwrap_or_default();
     let head = String::from_utf8_lossy(&data[..data.len().min(4096)]).to_string();
-    let result = if extension == "pdf" || data.starts_with(b"%PDF") {
-        drapewright_io::pdf::import_pdf(&data, Some(&file_name))
+    let pdf = extension == "pdf" || data.starts_with(b"%PDF");
+    if pages.is_some() && !pdf {
+        return Err(ToolError::new(
+            "pages chooses the pages of a PDF; this file is not one.",
+        ));
+    }
+    let result = if pdf {
+        drapewright_io::pdf::import_pdf_pages(&data, Some(&file_name), pages)
     } else if extension == "svg" || (extension != "dxf" && head.contains("<svg")) {
         drapewright_io::svg::import_svg(&data, Some(&file_name))
     } else if extension == "dxf" || head.contains("SECTION") {
@@ -604,6 +615,12 @@ fn read_pattern(path: &str) -> Result<Read, ToolError> {
         ));
     }
     .map_err(|e| ToolError::new(e.to_string()))?;
+    let count = result.pages.len();
+    if let Some(past) = pages.and_then(|p| p.iter().find(|&&n| n > count)) {
+        return Err(ToolError::new(format!(
+            "{file_name} has {count} pages, so no page {past}."
+        )));
+    }
     Ok(Read {
         file_name,
         data,
@@ -611,9 +628,66 @@ fn read_pattern(path: &str) -> Result<Read, ToolError> {
     })
 }
 
+/// A PDF's pages: those read, and those left out and why.
+#[derive(Serialize)]
+struct PagesReport {
+    /// Page numbers (from 1), with the label printed on each when it has
+    /// one: "2 (1B)".
+    read: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    left_out: Vec<LeftOutPage>,
+    note: &'static str,
+}
+
+#[derive(Serialize)]
+struct LeftOutPage {
+    page: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    label: Option<String>,
+    why: &'static str,
+}
+
+fn pages_report(r: &ImportResult) -> Option<PagesReport> {
+    if r.pages.is_empty() {
+        return None;
+    }
+    let shown = |n: u32, label: &Option<String>| match label {
+        Some(l) => format!("{n} ({l})"),
+        None => n.to_string(),
+    };
+    Some(PagesReport {
+        read: r
+            .pages
+            .iter()
+            .filter(|p| p.left_out.is_none())
+            .map(|p| shown(p.number, &p.label))
+            .collect(),
+        left_out: r
+            .pages
+            .iter()
+            .filter_map(|p| {
+                Some(LeftOutPage {
+                    page: p.number,
+                    label: p.label.clone(),
+                    why: match p.left_out? {
+                        PageLeftOut::Instructions => "a page of instructions or other words",
+                        PageLeftOut::NotJoined => {
+                            "not part of the pattern sheet: it shares no lines with the pages that are (a cover, a legend)"
+                        }
+                        PageLeftOut::NotChosen => "not among the pages chosen",
+                    },
+                })
+            })
+            .collect(),
+        note: "If a page left out holds pattern pieces, or a page read holds none, pass pages with the numbers of the pages to read.",
+    })
+}
+
 #[derive(Serialize)]
 struct FileReport {
     file: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pages: Option<PagesReport>,
     pieces_found: usize,
     pieces: Vec<FoundPiece>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -759,6 +833,7 @@ fn describe_file(read: &Read) -> FileReport {
     };
     FileReport {
         file: read.file_name.clone(),
+        pages: pages_report(r),
         pieces_found: r.pieces.len(),
         pieces,
         sizes: graded.then(|| SizesReport {
@@ -786,10 +861,17 @@ fn describe_file(read: &Read) -> FileReport {
 struct FileArgs {
     /// Path of an SVG, DXF or PDF pattern file. `~/` means the home folder.
     path: String,
+    /// For a PDF, the pages to read, numbered from 1. Leave it out to read
+    /// them all: pages of instructions, and pages not part of the pattern
+    /// sheet, are then left out (the report says which).
+    pages: Option<Vec<usize>>,
 }
 
 fn inspect_pattern_file(_: &mut Session, a: FileArgs) -> Result<Output, ToolError> {
-    Ok(Output::json(&describe_file(&read_pattern(&a.path)?)))
+    Ok(Output::json(&describe_file(&read_pattern(
+        &a.path,
+        a.pages.as_deref(),
+    )?)))
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -819,12 +901,18 @@ struct ImportArgs {
     /// For pieces drawn with one outline: whether seam allowance is included,
     /// and its width. Ask the user.
     seam_allowance: Option<AllowanceArg>,
+    /// For a PDF, the pages to read, numbered from 1, when those read by
+    /// default are wrong (inspect_pattern_file says which were read and
+    /// which left out, and why).
+    pages: Option<Vec<usize>>,
 }
 
 #[derive(Serialize)]
 struct Imported {
     project: String,
     added: Vec<AddedPiece>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pages: Option<PagesReport>,
     notes: Vec<String>,
     next: &'static str,
 }
@@ -897,7 +985,7 @@ fn import_pattern(session: &mut Session, a: ImportArgs) -> Result<Output, ToolEr
         file_name,
         data,
         mut result,
-    } = read_pattern(&a.path)?;
+    } = read_pattern(&a.path, a.pages.as_deref())?;
     if result.pieces.is_empty() {
         let notes: Vec<String> = result
             .notes
@@ -999,12 +1087,14 @@ fn import_pattern(session: &mut Session, a: ImportArgs) -> Result<Output, ToolEr
         .iter()
         .map(|n| text::note(n, &|id| names.get(id).cloned().unwrap_or_else(|| id.into())))
         .collect();
+    let pages = pages_report(&result);
     let added = add_pieces(session, result.pieces)?;
     let project = session.project_mut()?;
     project.keep_source(&result.sha256, &file_name, &data);
     Ok(Output::json(&Imported {
         project: project.engine.document().meta.name.clone(),
         added,
+        pages,
         notes,
         next: "render_preview shows the pieces; save_project keeps them.",
     }))

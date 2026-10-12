@@ -79,8 +79,8 @@ assistant that file.
 |---|---|
 | `project_summary` | The open project and each piece's id, size, allowance, cutting and problems |
 | `new_project`, `open_project`, `save_project` | Start, open and save `.drapewright` projects |
-| `inspect_pattern_file` | What an SVG, DXF or PDF holds, and the questions importing it needs answered |
-| `import_pattern` | Adds a file's pieces, with the answers to those questions |
+| `inspect_pattern_file` | What an SVG, DXF or PDF holds (for a PDF, the pages read and those left out, and why), and the questions importing it needs answered |
+| `import_pattern` | Adds a file's pieces, with the answers to those questions; for a PDF, `pages` chooses the pages to read |
 | `get_piece` | One piece in full: edges, notches, grainline, marks, lines, position |
 | `render_preview` | A picture of the pieces (PNG) with a legend |
 | `update_piece` | Name, seam allowance, cutting instructions |

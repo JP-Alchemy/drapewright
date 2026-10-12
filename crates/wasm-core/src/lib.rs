@@ -259,11 +259,17 @@ pub fn import_dxf(data: &[u8], file_name: Option<String>) -> Result<JsValue, JsE
 
 /// Reads pattern pieces from a PDF: one page or many (copy-shop sheets,
 /// or home-print tiles put back together), named from the words printed
-/// on them.
+/// on them. With `pages` (numbered from 1), only those pages are read.
 #[wasm_bindgen(js_name = importPdf)]
-pub fn import_pdf(data: &[u8], file_name: Option<String>) -> Result<JsValue, JsError> {
-    let result = drapewright_io::pdf::import_pdf(data, file_name.as_deref())
-        .map_err(|e| JsError::new(&e.to_string()))?;
+pub fn import_pdf(
+    data: &[u8],
+    file_name: Option<String>,
+    pages: Option<Vec<u32>>,
+) -> Result<JsValue, JsError> {
+    let pages: Option<Vec<usize>> = pages.map(|p| p.into_iter().map(|n| n as usize).collect());
+    let result =
+        drapewright_io::pdf::import_pdf_pages(data, file_name.as_deref(), pages.as_deref())
+            .map_err(|e| JsError::new(&e.to_string()))?;
     to_js(&result)
 }
 

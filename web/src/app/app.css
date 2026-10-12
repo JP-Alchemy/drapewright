@@ -1880,6 +1880,26 @@ h2 {
   color: #ffffff;
 }
 
+/* A PDF's pages in the import dialog: those read, and the choice of pages. */
+.pages-choice {
+  margin: 8px 0 12px;
+}
+
+.pages-choice p {
+  margin: 0 0 6px;
+}
+
+.pages-list {
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.pages-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* Size chips in the import dialog, for files that hold every size. */
 .size-choice {
   display: grid;

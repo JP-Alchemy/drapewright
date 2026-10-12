@@ -577,3 +577,52 @@ fn an_assistant_sews_and_unpicks_seams() {
     ok(&mut s, "unpick_seams", json!({ "seams": [id] }));
     assert_eq!(ok_json(&mut s, "get_seams", json!({}))["seams"], json!([]));
 }
+
+#[test]
+fn a_pdfs_pages_are_reported_and_can_be_chosen() {
+    let mut s = server();
+    let pdf = fixture("pdf/freesewing-sasha-a0.pdf");
+    // The cover is left out, the two tiles read, each by its label.
+    let report = ok_json(&mut s, "inspect_pattern_file", json!({ "path": pdf }));
+    assert_eq!(report["pages"]["read"], json!(["2 (A1)", "3 (B1)"]));
+    let left_out = report["pages"]["left_out"].as_array().unwrap();
+    assert_eq!(left_out.len(), 1);
+    assert_eq!(left_out[0]["page"], 1);
+    assert!(
+        left_out[0]["why"]
+            .as_str()
+            .unwrap()
+            .contains("not part of the pattern sheet")
+    );
+    let all = report["pieces_found"].as_u64().unwrap();
+
+    // One tile alone (too few to read its label by): fewer pieces, the
+    // others not chosen.
+    let one = ok_json(
+        &mut s,
+        "inspect_pattern_file",
+        json!({ "path": pdf, "pages": [2] }),
+    );
+    assert_eq!(one["pages"]["read"], json!(["2"]));
+    let why: Vec<&str> = one["pages"]["left_out"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["why"].as_str().unwrap())
+        .collect();
+    assert_eq!(why, ["not among the pages chosen"; 2]);
+    assert!(one["pieces_found"].as_u64().unwrap() < all);
+
+    let e = fails(
+        &mut s,
+        "inspect_pattern_file",
+        json!({ "path": pdf, "pages": [2, 9] }),
+    );
+    assert!(e.contains("has 3 pages"), "{e}");
+    let e = fails(
+        &mut s,
+        "import_pattern",
+        json!({ "path": fixture("dxf/aama-graded.dxf"), "pages": [1] }),
+    );
+    assert!(e.contains("not one"), "{e}");
+}

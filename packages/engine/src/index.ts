@@ -222,8 +222,17 @@ export const jobs = {
   importDxf(bytes: Uint8Array, fileName: string | null): ImportResult {
     return importDxfRaw(bytes, fileName ?? undefined) as ImportResult
   },
-  importPdf(bytes: Uint8Array, fileName: string | null): ImportResult {
-    return importPdfRaw(bytes, fileName ?? undefined) as ImportResult
+  /** With `pages` (numbered from 1), only those pages are read. */
+  importPdf(
+    bytes: Uint8Array,
+    fileName: string | null,
+    pages: number[] | null = null,
+  ): ImportResult {
+    return importPdfRaw(
+      bytes,
+      fileName ?? undefined,
+      pages ? Uint32Array.from(pages) : undefined,
+    ) as ImportResult
   },
   /**
    * Applies the user's answers: the sizes to keep (null for all), the

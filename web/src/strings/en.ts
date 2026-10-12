@@ -14,6 +14,8 @@ import type {
   MeasurementKey,
   NotchFrom,
   NotchKind,
+  PageLeftOut,
+  PageUse,
   PaperName,
   ScaleBasis,
   ScaleReason,
@@ -387,6 +389,33 @@ export const t = {
     foundSized: (pieces: number, sizes: number) =>
       `${plural(pieces, 'Found 1 piece', 'Found # pieces')} in ${sizes} sizes`,
     sizeQuestion: 'Which size?',
+    /** A PDF's pages: how many were read, and those left out (by number). */
+    pagesRead: (read: number, total: number) => `Read ${read} of the ${total} pages.`,
+    page: (p: PageUse) => (p.label ? `Page ${p.number} (${p.label})` : `Page ${p.number}`),
+    pagesLeftOut: (pages: PageUse[]): string => {
+      if (pages.length > 3) {
+        return `Left out ${pages.length} pages that are not part of the pattern sheet.`
+      }
+      const which = new Intl.ListFormat('en', { type: 'conjunction' }).format(
+        pages.map((p) => (p.label ? `${p.number} (${p.label})` : String(p.number))),
+      )
+      const why = pages.every((p) => p.leftOut === 'instructions')
+        ? 'instructions, not pattern'
+        : 'not part of the pattern sheet'
+      return `Left out ${plural(pages.length, 'page', 'pages')} ${which}: ${why}.`
+    },
+    pageLeftOut: (why: PageLeftOut): string =>
+      ({
+        instructions: 'instructions',
+        notJoined: 'not part of the sheet',
+        notChosen: 'not chosen',
+      })[why],
+    choosePages: 'Choose pages…',
+    pagesToRead: 'Pages to read',
+    pagesHint:
+      'Tick the pages that hold the pattern. Pages of instructions, and pages that are not part of the pattern sheet, are left out on their own.',
+    readPages: (n: number) => plural(n, 'Read this page', 'Read these # pages'),
+    readAllPages: 'Read as at first',
     piecesToAdd: 'Pieces to add',
     untickHint: 'Untick anything that is not a pattern piece, such as a diagram or a title box.',
     sizeHint:

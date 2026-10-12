@@ -53,6 +53,8 @@ export interface PendingImport {
   result: ImportResult
   /** The file itself, kept with the project once the pieces are added. */
   bytes: Uint8Array
+  /** A PDF's pages she chose to read (from 1); null for those read by default. */
+  pages: number[] | null
 }
 
 type Importer = 'importSvg' | 'importDxf' | 'importPdf'
@@ -457,7 +459,10 @@ export class Session {
     try {
       const bytes = new Uint8Array(await file.arrayBuffer())
       const result = await this.io.call(importer, bytes, file.name)
-      this.ui.set((s) => ({ ...s, pendingImport: { fileName: file.name, result, bytes } }))
+      this.ui.set((s) => ({
+        ...s,
+        pendingImport: { fileName: file.name, result, bytes, pages: null },
+      }))
     } catch (error) {
       this.notify({
         kind: 'error',
@@ -470,6 +475,28 @@ export class Session {
 
   cancelImport(): void {
     this.ui.set((s) => ({ ...s, pendingImport: null }))
+  }
+
+  /**
+   * Reads the pending PDF again, only the pages she chose (numbered from 1),
+   * or all of them as at first (null): when a page of pieces was left out,
+   * or a page of instructions taken for one.
+   */
+  async readPages(pages: number[] | null): Promise<void> {
+    const pending = this.ui.get().pendingImport
+    if (!pending) return
+    this.ui.set((s) => ({ ...s, busy: t.importing.reading(pending.fileName) }))
+    try {
+      const result = await this.io.call('importPdf', pending.bytes, pending.fileName, pages)
+      this.ui.set((s) => ({ ...s, pendingImport: { ...pending, result, pages } }))
+    } catch (error) {
+      this.notify({
+        kind: 'error',
+        text: t.importing.failed(error instanceof Error ? error.message : String(error)),
+      })
+    } finally {
+      this.ui.set((s) => ({ ...s, busy: null }))
+    }
   }
 
   /**

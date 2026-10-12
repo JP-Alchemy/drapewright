@@ -161,7 +161,9 @@ test('opens a PDF pattern, putting its pages back together', async ({ page }) =>
   ])
   await expect(dialog).toContainText('The file says how big it is')
   await expect(dialog).toContainText('Put 2 pages back together into one sheet')
-  await expect(dialog).toContainText('Left out 1 page that is not part of the pattern sheet')
+  await expect(dialog).toContainText(
+    'Read 2 of the 3 pages. Left out page 1: not part of the pattern sheet.',
+  )
   // The stitching lines are printed too, so the allowance is measured.
   await expect(dialog).toContainText('All 7 pieces: found both the cutting and the stitching lines')
   await expect(dialog.getByRole('radiogroup', { name: /seam allowance included/ })).toHaveCount(0)
@@ -240,4 +242,30 @@ test('pieces that are not pattern pieces can be left out', async ({ page }) => {
   const list = page.getByRole('listbox', { name: 'Pieces' })
   await expect(list.getByRole('option')).toHaveCount(5)
   await expect(list.getByRole('option', { name: /Pocket/ })).toHaveCount(0)
+})
+
+test('a PDF’s pages can be chosen and read again', async ({ page }) => {
+  await page.goto('/?debug')
+  await page.getByTestId('pattern-file').setInputFiles(fixture('freesewing-sasha-a0.pdf'))
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: 'Found 7 pieces' })).toBeVisible()
+  // The cover is left out, and she is told so.
+  await expect(dialog).toContainText(
+    'Read 2 of the 3 pages. Left out page 1: not part of the pattern sheet.',
+  )
+  await dialog.getByRole('button', { name: 'Choose pages…' }).click()
+  const pages = dialog.getByRole('group', { name: 'Pages to read' })
+  await expect(pages.getByRole('checkbox', { name: /Page 1/ })).not.toBeChecked()
+  await expect(pages.getByRole('checkbox', { name: /Page 2 \(A1\)/ })).toBeChecked()
+  // Only the first sheet.
+  await pages.getByText('Page 3 (B1)').click()
+  await dialog.getByRole('button', { name: 'Read this page' }).click()
+  await expect(dialog.getByRole('heading', { name: 'Found 5 pieces' })).toBeVisible()
+  await expect(dialog).toContainText('Read 1 of the 3 pages.')
+  // And back to the pages read at first.
+  await dialog.getByRole('button', { name: 'Choose pages…' }).click()
+  await dialog.getByRole('button', { name: 'Read as at first' }).click()
+  await expect(dialog.getByRole('heading', { name: 'Found 7 pieces' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Add 7 pieces' }).click()
+  await expect(dialog).toBeHidden()
 })

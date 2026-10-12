@@ -1,4 +1,4 @@
-import type { AllowanceMode, ImportSizes, Piece, ScaleOption } from '@drapewright/engine'
+import type { AllowanceMode, ImportSizes, PageUse, Piece, ScaleOption } from '@drapewright/engine'
 import { useId, useState } from 'react'
 import { Check } from 'lucide-react'
 import {
@@ -34,8 +34,83 @@ function firstSize(sizes: ImportSizes): string | undefined {
  */
 export function ImportDialog({ session }: { session: Session }) {
   const { pendingImport } = useStore(session.ui)
-  // Unmounted between imports, so every file starts with fresh answers.
-  return pendingImport && <ImportForm session={session} pending={pendingImport} />
+  // Unmounted between imports, and when the file's pages are read again,
+  // so every reading starts with fresh answers.
+  return (
+    pendingImport && (
+      <ImportForm
+        key={pendingImport.pages?.join(',') ?? 'pages as read'}
+        session={session}
+        pending={pendingImport}
+      />
+    )
+  )
+}
+
+/**
+ * A PDF's pages: how many were read and which were left out, and the
+ * choice of pages to read again (a page of pieces left out, or a page of
+ * instructions taken for pattern).
+ */
+function PagesChoice({ session, pending }: { session: Session; pending: PendingImport }) {
+  const pages = pending.result.pages
+  const read = pages.filter((p) => p.leftOut === null).map((p) => p.number)
+  const [choosing, setChoosing] = useState(false)
+  const [chosen, setChosen] = useState<number[]>(read)
+  if (pages.length < 2) return null
+  const leftOut = pages.filter((p): p is PageUse => p.leftOut !== null && p.leftOut !== 'notChosen')
+  const same = chosen.length === read.length && chosen.every((n, i) => n === read[i])
+  return (
+    <div className="pages-choice">
+      <p className="muted small">
+        {t.importing.pagesRead(read.length, pages.length)}
+        {leftOut.length > 0 && ` ${t.importing.pagesLeftOut(leftOut)}`}{' '}
+        {!choosing && (
+          <Button className="link-button" onPress={() => setChoosing(true)}>
+            {t.importing.choosePages}
+          </Button>
+        )}
+      </p>
+      {choosing && (
+        <CheckboxGroup
+          aria-label={t.importing.pagesToRead}
+          value={chosen.map(String)}
+          onChange={(v) => setChosen(v.map(Number).sort((a, b) => a - b))}
+        >
+          <p className="muted small">{t.importing.pagesHint}</p>
+          <ul className="found-list choosable pages-list">
+            {pages.map((p) => (
+              <li key={p.number}>
+                <Checkbox value={String(p.number)} className="piece-check">
+                  <span className="piece-box" aria-hidden="true">
+                    <Check size={14} strokeWidth={3} />
+                  </span>
+                  <span className="piece-name">{t.importing.page(p)}</span>
+                  {p.leftOut && (
+                    <span className="piece-size">{t.importing.pageLeftOut(p.leftOut)}</span>
+                  )}
+                </Checkbox>
+              </li>
+            ))}
+          </ul>
+          <div className="pages-actions">
+            {pending.pages && (
+              <Button className="button" onPress={() => session.readPages(null)}>
+                {t.importing.readAllPages}
+              </Button>
+            )}
+            <Button
+              className="button"
+              isDisabled={chosen.length === 0 || same}
+              onPress={() => session.readPages(chosen)}
+            >
+              {t.importing.readPages(chosen.length)}
+            </Button>
+          </div>
+        </CheckboxGroup>
+      )}
+    </div>
+  )
 }
 
 function ImportForm({ session, pending }: { session: Session; pending: PendingImport }) {
@@ -60,7 +135,11 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
   // diagram, a title box).
   const [leftOut, setLeftOut] = useState<ReadonlySet<string>>(new Set())
   const toAdd = pieces.filter((p) => !leftOut.has(p.id))
-  const notes = result.notes.filter((n) => !('piece' in n) || kept(n.piece))
+  // The pages left out are told of with the pages, when there are several.
+  const notes = result.notes.filter(
+    (n) =>
+      (!('piece' in n) || kept(n.piece)) && !(n.kind === 'pagesLeftOut' && result.pages.length > 1),
+  )
   // As the pieces will be named: comparing sizes, each says its own.
   const shownName = (p: Piece) => {
     const size = sizeOf.get(p.id)
@@ -131,6 +210,7 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
                 : t.importing.found(pieces.length)}
           </Heading>
           <p className="muted small">{fileName}</p>
+          <PagesChoice session={session} pending={pending} />
           {graded && (
             <div className="size-choice">
               <p className="group-label" id={sizesId}>
