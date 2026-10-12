@@ -231,7 +231,7 @@ h2 {
 
 .workspace {
   display: grid;
-  grid-template-columns: 1fr 280px;
+  grid-template-columns: 1fr 320px;
   min-height: 0;
 }
 
@@ -253,24 +253,79 @@ h2 {
   -webkit-touch-callout: none;
 }
 
+/* The side panel: the lists above, the details below, each scrolling on
+   its own; the bar between them moves. */
 .side-panel {
-  /* Positioned, so that the hidden inputs inside switches and radios
-     scroll with it rather than lengthen the page. */
-  position: relative;
-  overflow: auto;
-  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   background: var(--surface);
   border-left: 1px solid var(--border);
 }
 
+.side-lists,
+.side-details {
+  /* Positioned, so that the hidden inputs inside switches and radios
+     scroll with them rather than lengthen the page. */
+  position: relative;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+}
+
+.side-lists {
+  flex: 0 0 var(--split, 45%);
+}
+
+.side-details {
+  flex: 1 1 0;
+}
+
+.side-split {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  height: 14px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  cursor: row-resize;
+  touch-action: none;
+  outline: none;
+}
+
+/* A finger-sized hold above and below the thin bar. */
+.side-split::before {
+  content: '';
+  position: absolute;
+  inset: -12px 0;
+}
+
+.side-split::after {
+  content: '';
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.side-split:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -3px;
+}
+
 /* The avatar beside the table; under it on a tablet held upright. */
 .workspace.with-avatar {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 280px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 320px;
 }
 
 @media (max-width: 1100px) {
   .workspace.with-avatar {
-    grid-template-columns: minmax(0, 1fr) 280px;
+    grid-template-columns: minmax(0, 1fr) 320px;
     grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
   }
 
@@ -304,11 +359,26 @@ h2 {
     grid-area: 3 / 1;
   }
 
+  /* Under the table: the lists and the details side by side. */
   .side-panel {
+    flex-direction: row;
     max-height: 30vh;
     border-left: 0;
     border-top: 1px solid var(--border);
+  }
+
+  .side-lists,
+  .side-details {
     padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .side-lists {
+    flex: 0 0 45%;
+    border-right: 1px solid var(--border);
+  }
+
+  .side-split {
+    display: none;
   }
 }
 
@@ -644,6 +714,34 @@ h2 {
   border-radius: var(--radius-sm);
   cursor: pointer;
   outline: none;
+}
+
+/* Ticking several: a circle before each, ticked when chosen. */
+.piece-item.ticking {
+  grid-template-columns: auto 1fr;
+  column-gap: 10px;
+}
+
+.piece-item.ticking .tick {
+  grid-row: span 2;
+  align-self: center;
+  color: var(--ink-muted);
+}
+
+.piece-item.ticking[data-selected] .tick {
+  color: var(--select);
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.head-actions {
+  display: flex;
+  gap: 12px;
 }
 
 .piece-item[data-hovered] {
@@ -1335,6 +1433,60 @@ h2 {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
+}
+
+/* Parts of the details that fold away */
+
+.details-part {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.details-heading {
+  margin: 0;
+  font-size: 15px;
+}
+
+.details-trigger {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 600 15px var(--font);
+  text-align: start;
+  cursor: pointer;
+  outline: none;
+}
+
+.details-trigger[data-focus-visible] {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.details-chevron {
+  flex: none;
+  transition: rotate 150ms;
+}
+
+.details-part[data-expanded] .details-chevron {
+  rotate: 90deg;
+}
+
+.details-summary {
+  flex-basis: 100%;
+  padding-left: 24px;
+  font-weight: 400;
+}
+
+.details-panel {
+  padding-bottom: 8px;
 }
 
 .subsection h3 {

@@ -12,6 +12,45 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 34 — Pick a piece, change it: the side panel
+
+The side panel was one long column: the pieces, every seam, then the
+chosen piece's details, with **Cutting** below its allowance and grainline.
+Changing how many to cut meant scrolling down, then back up for the next
+piece. Like the outliner and details panels of Unreal Engine, Unity and
+Blender, the lists and the details now scroll on their own, and the most
+used settings sit at the top, in the same order for every piece.
+
+**Try it:**
+
+1. Open a pattern and tap a piece. Its name and **Cutting** (how many,
+   fabric, mirrored pairs) are at the top of the details. Tap the next
+   piece in the list: the list stays where it is, and the details show the
+   new piece from the top.
+2. **Allowance**, **Grainline** and **Alterations** fold away: tap a
+   heading. Folded, each says in a line what it holds ("Added · 1.5 cm",
+   "One way", "2 steps"), and it stays folded for every piece, and after a
+   reload, until opened again.
+3. Drag the bar between the lists and the details to give either more
+   room (or focus it and use the arrow keys; double-click puts it back).
+4. Each piece in the list says how many are cut ("Cut 2").
+5. **Select**, above the pieces, turns tapping into ticking. Tick several
+   pieces and the details set them all at once: how many to cut, fabric,
+   mirrored pairs and allowance. Where they differ the field says
+   **Mixed**, and + and − step each one's own value. **Done** goes back to
+   tapping one piece at a time. With a keyboard, Shift and Command choose
+   several too.
+6. Tap a piece on the table: the list scrolls to it.
+
+On an iPad held upright, the lists and the details sit side by side under
+the table.
+
+With a finger, tapping a second piece in the list used to add it to the
+pieces chosen, so the details showed "2 pieces selected" instead of the
+piece tapped. Now a tap chooses that piece alone, unless **Select** is on.
+
+---
+
 ## Step 33 — A corset drawn for one side, draped
 
 Corset patterns often draw each panel once, for one side, with no notches:

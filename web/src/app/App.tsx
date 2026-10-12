@@ -33,11 +33,9 @@ import { ProjectorView } from './ProjectorView.tsx'
 import { ContextMenu } from './ContextMenu.tsx'
 import { DeviceDialog } from './DeviceDialog.tsx'
 import { ImportDialog } from './ImportDialog.tsx'
-import { Inspector } from './Inspector.tsx'
 import { MeasurementsDialog } from './MeasurementsDialog.tsx'
-import { PieceList } from './PieceList.tsx'
 import { PrintDialog } from './PrintDialog.tsx'
-import { SeamList } from './SeamList.tsx'
+import { SidePanel } from './SidePanel.tsx'
 import { sideLabel } from './labels.ts'
 import { type ProjectActions, ProjectsDialog } from './ProjectsDialog.tsx'
 import { ScreenDialog } from './ScreenDialog.tsx'
@@ -288,11 +286,7 @@ function Workspace({
           )}
         </main>
         {avatar && <AvatarPane session={session} />}
-        <aside className="side-panel">
-          <PieceList session={session} />
-          <SeamList session={session} />
-          <Inspector session={session} />
-        </aside>
+        <SidePanel session={session} />
       </div>
       <ImportDialog session={session} />
       {projector && <ProjectorView session={session} />}

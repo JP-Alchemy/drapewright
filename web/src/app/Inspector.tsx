@@ -1,14 +1,33 @@
-import type { EdgeKind, Piece, PieceView } from '@drapewright/engine'
-import { useState } from 'react'
-import { Button, Input, Label, Radio, RadioGroup, Switch, TextField } from 'react-aria-components'
+import type { DisplayUnits, EdgeKind, Piece, PieceView } from '@drapewright/engine'
+import { ChevronRight } from 'lucide-react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
+import {
+  Button,
+  Disclosure,
+  DisclosurePanel,
+  Heading,
+  Input,
+  Label,
+  Radio,
+  RadioGroup,
+  Switch,
+  TextField,
+} from 'react-aria-components'
+import { remember, remembered } from '../platform/remember.ts'
 import { useEngineState } from '../state/hooks.ts'
 import type { PartRef, Session } from '../state/session.ts'
 import { useStore } from '../state/store.ts'
 import { formatLength, t } from '../strings/en.ts'
 import { CornerChooser } from './CornerChooser.tsx'
 import { LengthField } from './LengthField.tsx'
-import { AlterSection } from './AlterSection.tsx'
-import { CutSection, GrainSection, NotchSection } from './PieceDetails.tsx'
+import { AlterSection, alterSummary } from './AlterSection.tsx'
+import {
+  CutSection,
+  GrainSection,
+  ManyCutSection,
+  NotchSection,
+  grainSummary,
+} from './PieceDetails.tsx'
 import { edgeLabel, sideLabel } from './labels.ts'
 
 /**
@@ -45,6 +64,126 @@ export function CommitTextField({
   )
 }
 
+/** Which parts of the details are folded away, as last left on this device. */
+const FOLDED_KEY = 'drapewright.details.folded'
+
+function useFolded(id: string): [boolean, (folded: boolean) => void] {
+  const [folded, setFolded] = useState(() => remembered<string[]>(FOLDED_KEY, []).includes(id))
+  const set = (next: boolean) => {
+    // Read afresh: other parts may have been folded since this one was drawn.
+    const others = remembered<string[]>(FOLDED_KEY, []).filter((f) => f !== id)
+    remember(FOLDED_KEY, next ? [...others, id] : others)
+    setFolded(next)
+  }
+  return [folded, set]
+}
+
+/**
+ * A part of the details that folds away, saying in a line what it holds
+ * while folded; folded or not as it was last left.
+ */
+function DetailsPart({
+  id,
+  title,
+  summary,
+  children,
+}: {
+  id: string
+  title: string
+  summary: string
+  children: ReactNode
+}) {
+  const [folded, setFolded] = useFolded(id)
+  return (
+    <Disclosure
+      className="details-part"
+      isExpanded={!folded}
+      onExpandedChange={(open) => setFolded(!open)}
+    >
+      <Heading level={3} className="details-heading">
+        <Button slot="trigger" className="details-trigger">
+          <ChevronRight className="details-chevron" size={18} aria-hidden="true" />
+          <span>{title}</span>
+          {folded && <span className="details-summary muted small">{summary}</span>}
+        </Button>
+      </Heading>
+      <DisclosurePanel className="details-panel">{children}</DisclosurePanel>
+    </Disclosure>
+  )
+}
+
+/** "Added · 1.5 cm", or "Included · 1.0 cm, hems 2.0 cm"; "Mixed" where they differ. */
+function allowanceSummary(pieces: Piece[], units: DisplayUnits): string {
+  const [first] = pieces
+  if (!first) return ''
+  const same = pieces.every(
+    (p) =>
+      p.allowance.mode === first.allowance.mode &&
+      p.allowance.seam === first.allowance.seam &&
+      (p.allowance.hem ?? p.allowance.seam) === (first.allowance.hem ?? first.allowance.seam),
+  )
+  if (!same) return t.inspector.mixed
+  const { mode, seam, hem } = first.allowance
+  return t.inspector.allowanceSummary(
+    mode === 'included',
+    formatLength(seam, units),
+    hem !== null && hem !== seam ? formatLength(hem, units) : null,
+  )
+}
+
+/**
+ * The allowance of one piece, or of several chosen together: a value they
+ * don't share shows as mixed, and a change applies to all of them (a run of
+ * changes is one undo step).
+ */
+function AllowanceFields({ session, pieces }: { session: Session; pieces: Piece[] }) {
+  const units = session.engine.document().settings.displayUnits
+  const step = { coalesce: `allowance:${pieces.map((p) => p.id).join(',')}` }
+  const change = (edit: (a: Piece['allowance']) => Piece['allowance']) => {
+    for (const p of pieces) {
+      session.dispatch({ type: 'setAllowance', piece: p.id, allowance: edit(p.allowance) }, step)
+    }
+  }
+  const included = pieces.map((p) => p.allowance.mode === 'included')
+  const all = included.every(Boolean)
+  const some = !all && included.some(Boolean)
+  const shared = (xs: number[]) => (xs.every((x) => x === xs[0]) ? (xs[0] ?? null) : null)
+  return (
+    <>
+      <Switch
+        className="switch"
+        isSelected={all}
+        onChange={(on) => change((a) => ({ ...a, mode: on ? 'included' : 'add' }))}
+      >
+        <span className="switch-track" aria-hidden="true" />
+        {t.inspector.included}
+      </Switch>
+      <p className="muted small">
+        {some ? t.inspector.someIncluded : all ? t.inspector.includedHint : t.inspector.addedHint}
+      </p>
+      <LengthField
+        label={t.inspector.seamAllowance}
+        value={shared(pieces.map((p) => p.allowance.seam))}
+        units={units}
+        onChange={(seam) => change((a) => ({ ...a, seam }))}
+        onStep={(by) => change((a) => ({ ...a, seam: Math.max(0, a.seam + by) }))}
+      />
+      <LengthField
+        label={t.inspector.hemAllowance}
+        value={shared(pieces.map((p) => p.allowance.hem ?? p.allowance.seam))}
+        units={units}
+        onChange={(hem) => change((a) => ({ ...a, hem }))}
+        onStep={(by) => change((a) => ({ ...a, hem: Math.max(0, (a.hem ?? a.seam) + by) }))}
+      />
+    </>
+  )
+}
+
+/**
+ * One piece: its name, how it is cut (first, as it is set for every piece
+ * of a new pattern), then its allowance, grainline and alterations, each of
+ * which folds away.
+ */
 function PieceSection({
   session,
   piece,
@@ -56,14 +195,6 @@ function PieceSection({
 }) {
   const units = session.engine.document().settings.displayUnits
   const [x0, y0, x1, y1] = view.outlineBounds
-  const included = piece.allowance.mode === 'included'
-  const setAllowance = (allowance: Piece['allowance']) =>
-    session.dispatch(
-      { type: 'setAllowance', piece: piece.id, allowance },
-      // Stepping up and down is one undo step.
-      { coalesce: `allowance:${piece.id}` },
-    )
-
   return (
     <section className="panel-section inspector" aria-labelledby="inspector-heading">
       <h2 id="inspector-heading">{t.inspector.heading}</h2>
@@ -78,30 +209,20 @@ function PieceSection({
       <p className="muted small">
         {t.pieces.size(formatLength(x1 - x0, units), formatLength(y1 - y0, units))}
       </p>
-      <Switch
-        className="switch"
-        isSelected={included}
-        onChange={(on) => setAllowance({ ...piece.allowance, mode: on ? 'included' : 'add' })}
-      >
-        <span className="switch-track" aria-hidden="true" />
-        {t.inspector.included}
-      </Switch>
-      <p className="muted small">{included ? t.inspector.includedHint : t.inspector.addedHint}</p>
-      <LengthField
-        label={t.inspector.seamAllowance}
-        value={piece.allowance.seam}
-        units={units}
-        onChange={(seam) => setAllowance({ ...piece.allowance, seam })}
-      />
-      <LengthField
-        label={t.inspector.hemAllowance}
-        value={piece.allowance.hem ?? piece.allowance.seam}
-        units={units}
-        onChange={(hem) => setAllowance({ ...piece.allowance, hem })}
-      />
-      <GrainSection session={session} piece={piece} view={view} />
       <CutSection session={session} piece={piece} />
-      <AlterSection session={session} piece={piece} view={view} />
+      <DetailsPart
+        id="allowance"
+        title={t.inspector.allowance}
+        summary={allowanceSummary([piece], units)}
+      >
+        <AllowanceFields session={session} pieces={[piece]} />
+      </DetailsPart>
+      <DetailsPart id="grain" title={t.grain.heading} summary={grainSummary(piece)}>
+        <GrainSection session={session} piece={piece} view={view} />
+      </DetailsPart>
+      <DetailsPart id="alter" title={t.alter.heading} summary={alterSummary(piece)}>
+        <AlterSection session={session} piece={piece} view={view} />
+      </DetailsPart>
       {view.allowanceNotes.length + view.issues.length > 0 && (
         <ul className="notes">
           {view.allowanceNotes.map((n, i) => (
@@ -112,6 +233,25 @@ function PieceSection({
           ))}
         </ul>
       )}
+    </section>
+  )
+}
+
+/** Several pieces chosen together: how they are cut and their allowance, set for all at once. */
+function ManyPiecesSection({ session, pieces }: { session: Session; pieces: Piece[] }) {
+  const units = session.engine.document().settings.displayUnits
+  return (
+    <section className="panel-section inspector" aria-labelledby="inspector-heading">
+      <h2 id="inspector-heading">{t.inspector.manyHeading(pieces.length)}</h2>
+      <p className="muted small">{t.inspector.manyHint(pieces.map((p) => p.name))}</p>
+      <ManyCutSection session={session} pieces={pieces} />
+      <DetailsPart
+        id="allowance"
+        title={t.inspector.allowance}
+        summary={allowanceSummary(pieces, units)}
+      >
+        <AllowanceFields session={session} pieces={pieces} />
+      </DetailsPart>
     </section>
   )
 }
@@ -244,36 +384,47 @@ function CornerSection({
   )
 }
 
-/** Details of the selected piece, edge or corner, editable in sewing terms. */
+/**
+ * Details of the selected piece, edge or corner, editable in sewing terms;
+ * or of several pieces, set together. Each new choice shows from the top.
+ */
 export function Inspector({ session }: { session: Session }) {
   const { selection, part } = useStore(session.ui)
   useEngineState(session)
+  const top = useRef<HTMLDivElement>(null)
+  const chosen = [...selection].sort().join(',')
+  useEffect(() => {
+    top.current?.closest('.side-details')?.scrollTo({ top: 0 })
+  }, [chosen])
 
-  if (selection.size !== 1) {
-    return (
+  // In the pieces' order, whichever was chosen first.
+  const scene = session.scene().filter((sp) => selection.has(sp.piece.id))
+  let body: ReactNode
+  if (scene.length === 0) {
+    body = (
       <section className="panel-section">
-        <p className="muted small">
-          {selection.size === 0 ? t.inspector.nothing : t.inspector.many(selection.size)}
-        </p>
+        <p className="muted small">{t.inspector.nothing}</p>
       </section>
     )
+  } else if (scene.length > 1) {
+    body = <ManyPiecesSection session={session} pieces={scene.map((sp) => sp.piece)} />
+  } else {
+    const { piece, view } = scene[0]!
+    const own: PartRef | null = part?.piece === piece.id ? part : null
+    body = (
+      <>
+        {own?.kind === 'corner' && (
+          <CornerSection session={session} piece={piece} edgeId={own.edge} />
+        )}
+        {own?.kind === 'edge' && (
+          <EdgeSection session={session} piece={piece} view={view} edgeId={own.edge} />
+        )}
+        {own?.kind === 'notch' && (
+          <NotchSection session={session} piece={piece} view={view} notchId={own.notch} />
+        )}
+        <PieceSection session={session} piece={piece} view={view} />
+      </>
+    )
   }
-  const sp = session.scenePiece([...selection][0]!)
-  if (!sp) return null
-  const { piece, view } = sp
-  const own: PartRef | null = part?.piece === piece.id ? part : null
-  return (
-    <>
-      {own?.kind === 'corner' && (
-        <CornerSection session={session} piece={piece} edgeId={own.edge} />
-      )}
-      {own?.kind === 'edge' && (
-        <EdgeSection session={session} piece={piece} view={view} edgeId={own.edge} />
-      )}
-      {own?.kind === 'notch' && (
-        <NotchSection session={session} piece={piece} view={view} notchId={own.notch} />
-      )}
-      <PieceSection session={session} piece={piece} view={view} />
-    </>
-  )
+  return <div ref={top}>{body}</div>
 }

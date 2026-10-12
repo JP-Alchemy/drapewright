@@ -68,8 +68,7 @@ export function AlterSection({
     })
   }
   return (
-    <div className="subsection">
-      <h3>{t.alter.heading}</h3>
+    <>
       {piece.alterations.length === 0 ? (
         <p className="muted small">{t.alter.none}</p>
       ) : (
@@ -107,8 +106,13 @@ export function AlterSection({
           </Menu>
         </Popover>
       </MenuTrigger>
-    </div>
+    </>
   )
+}
+
+/** "None", "1 step" or "3 steps". */
+export function alterSummary(piece: Piece): string {
+  return t.alter.summary(piece.alterations.length)
 }
 
 /** The kinds of step, in the order offered. */

@@ -85,9 +85,19 @@ export const t = {
 
   inspector: {
     heading: 'Piece',
-    nothing: 'Tap a piece to see its details. Tap an edge or a corner to adjust it.',
-    many: (n: number) => `${n} pieces selected. Drag to move them together.`,
+    nothing:
+      'Tap a piece to see its details. Tap an edge or a corner to adjust it. To set several pieces at once, press Select above the list.',
+    manyHeading: (n: number) => `${n} pieces`,
+    manyHint: (names: string[]) =>
+      `Changes here apply to all of them: ${namesList(names)}. Drag one on the table to move them together.`,
+    mixed: 'Mixed',
+    increase: (label: string) => `Increase ${label}`,
+    decrease: (label: string) => `Decrease ${label}`,
     name: 'Name',
+    allowance: 'Allowance',
+    allowanceSummary: (included: boolean, seam: string, hem: string | null) =>
+      `${included ? 'Included' : 'Added'} · ${seam}${hem ? `, hems ${hem}` : ''}`,
+    someIncluded: 'Some have their allowance included and some don’t: choose for all of them.',
     included: 'Allowance is already included',
     includedHint:
       'The outline is the cutting line, as printed on the pattern. The dashed stitching line is worked out from the allowance below.',
@@ -148,6 +158,9 @@ export const t = {
     add: 'Add a straight grainline',
     remove: 'Remove grainline',
     oneWay: 'One way (napped or one-way fabric)',
+    oneWayShort: 'One way',
+    bothWays: 'Both ways',
+    noneShort: 'None',
   },
 
   pick: {
@@ -234,6 +247,7 @@ export const t = {
 
   alter: {
     heading: 'Alterations',
+    summary: (n: number) => (n === 0 ? 'None' : plural(n, '1 step', '# steps')),
     add: 'Add a step',
     kinds: {
       lengthen: ['Lengthen or shorten', 'Across a line'],
@@ -322,11 +336,13 @@ export const t = {
       contrast: 'Contrast',
     } as Record<string, string>,
     mirrored: 'As mirrored pairs',
+    someMirrored: 'Some are cut as mirrored pairs and some aren’t.',
     onFold: 'On the fold',
     add: 'Also cut in another fabric',
     remove: 'Remove this line',
     summary: (quantity: number, material: string, onFold: boolean) =>
       `Cut ${quantity}${onFold ? ' on the fold' : ''} · ${material}`,
+    short: (quantity: number, onFold: boolean) => `Cut ${quantity}${onFold ? ' on the fold' : ''}`,
   },
 
   corner: {
@@ -374,8 +390,16 @@ export const t = {
     deleteNotch: 'Delete notch',
   },
 
+  sidePanel: {
+    resize: 'Resize the lists and the details',
+  },
+
   pieces: {
     heading: 'Pieces',
+    select: 'Select',
+    selectSeveral: 'Select several pieces',
+    selectAll: 'Select all',
+    done: 'Done',
     none: 'No pieces yet.',
     size: (w: string, h: string) => `${w} × ${h}`,
   },

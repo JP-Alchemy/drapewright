@@ -111,3 +111,17 @@ fn the_blouse_project_is_up_to_date() {
     );
     write("blouse.drapewright", &json);
 }
+
+#[test]
+fn the_corset_project_is_up_to_date() {
+    // As a pattern drawn for one side leaves it: each panel cut once, and
+    // nothing sewn yet.
+    let pieces = drapewright_pattern_core::testing::garments::corset(false);
+    let (json, _) = project(
+        ("corset", "Test corset"),
+        pieces,
+        Vec::new(),
+        &[0.0, 0.0, 0.0, 0.0],
+    );
+    write("corset.drapewright", &json);
+}
