@@ -13,5 +13,5 @@ pub mod svg;
 
 pub use import::{
     AllowanceAnswer, AllowanceQuestion, ImportError, ImportNote, ImportResult, ImportSizes,
-    PieceSize, ScaleInfo, ScaleOption, ScaleReason, SizeSwatch,
+    PageLeftOut, PageUse, PieceSize, ScaleInfo, ScaleOption, ScaleReason, SizeSwatch,
 };

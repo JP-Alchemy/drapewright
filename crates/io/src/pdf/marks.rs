@@ -190,7 +190,8 @@ pub(crate) fn find_grainlines(raw: &mut Vec<RawPath>) {
 }
 
 /// Straight lines long enough to be grainlines with arrowheads at either
-/// end: each line, and its heads.
+/// end, or a closed head partway along (a grainline drawn right across the
+/// piece, its arrow somewhere on it): each line, and its heads.
 fn arrows(raw: &[RawPath]) -> Vec<(usize, Vec<usize>)> {
     let heads = small_heads(raw);
     let mut out = Vec::new();
@@ -206,6 +207,21 @@ fn arrows(raw: &[RawPath]) -> Vec<(usize, Vec<usize>)> {
         let along = (b - a).normalize();
         let mut found = heads_at(&heads, a, -along);
         found.extend(heads_at(&heads, b, along));
+        if found.is_empty() {
+            let length = a.distance(b);
+            for head in heads.iter().filter(|h| h.closed) {
+                // Where the line passes the head, well inside the line.
+                let t = (head.bounds.center() - a).dot(along);
+                if t < MIN_GRAINLINE / 3.0 || t > length - MIN_GRAINLINE / 3.0 {
+                    continue;
+                }
+                let on = a + along * t;
+                let one = std::slice::from_ref(head);
+                if !heads_at(one, on, along).is_empty() || !heads_at(one, on, -along).is_empty() {
+                    found.push(head.index);
+                }
+            }
+        }
         if !found.is_empty() {
             out.push((i, found));
         }

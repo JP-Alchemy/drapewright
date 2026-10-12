@@ -8,6 +8,7 @@ mod import;
 mod lettering;
 mod loops;
 mod marks;
+mod pagelabels;
 mod plan;
 mod reading;
 mod sizes;
@@ -16,6 +17,6 @@ mod text;
 mod tiles;
 mod write;
 
-pub use import::import_pdf;
+pub use import::{import_pdf, import_pdf_pages};
 pub use plan::{PlannedPage, PrintError, PrintPlan, SheetPlacement, plan_print};
 pub use write::{PdfTexts, export_pdf};

@@ -4,7 +4,7 @@
 //! pages, identical but moved, say exactly how those pages fit together:
 //! no page grid or labels need guessing.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use kurbo::{ParamCurve, PathSeg, Point, Rect, Vec2};
 
@@ -102,10 +102,29 @@ impl<'a> Index<'a> {
     }
 }
 
+/// Labelled neighbours may be out of line by this much, mm (drawings
+/// shifted a little on their pages).
+const GUIDED: f64 = 30.0;
+
 /// Groups of pages that are tiles of one sheet, each page with its offset
 /// on the sheet (mm). Pages that share no shapes are groups of one.
-/// `prints[i]` are page i's shapes; `sizes[i]` its width and height, mm.
-pub(crate) fn arrange(prints: &[Vec<Print>], sizes: &[Vec2]) -> Vec<Vec<(usize, Vec2)>> {
+/// `prints[i]` are page i's shapes; `sizes[i]` its width and height, mm;
+/// `grid[i]` where page i's label puts it (column, row), if it is labelled.
+///
+/// Pages are joined by their strongest links first: where most shapes
+/// agree. A page whose every shape is drawn on every page (some tiling
+/// tools draw the whole sheet on each) shares many with its true
+/// neighbours, and only a few, by chance, with others (a page-edge mark, a
+/// motif). Labelled pages join only their label's neighbours, on the side
+/// the labels say, as far off as the shapes say (tiles overlap, or are
+/// trimmed of their margins); one that shares no shape with them (a piece
+/// on a page of its own) still goes where its label says, as far from its
+/// neighbour as the other pages are from theirs.
+pub(crate) fn arrange(
+    prints: &[Vec<Print>],
+    sizes: &[Vec2],
+    grid: &[Option<(i64, i64)>],
+) -> Vec<Vec<(usize, Vec2)>> {
     let n = prints.len();
     let indexes: Vec<Index> = prints.iter().map(Index::new).collect();
     // Page furniture (a frame, a footer rule) sits at the same place on
@@ -163,26 +182,55 @@ pub(crate) fn arrange(prints: &[Vec<Print>], sizes: &[Vec2]) -> Vec<Vec<(usize, 
         };
         side(i, j, overlap, d) && side(j, i, overlap - d, -d)
     };
+    // How far a labelled page's labelled neighbour is on the sheet,
+    // (columns, rows), from page i.
+    let apart = |i: usize, j: usize| -> Option<(i64, i64)> {
+        let ((ci, ri), (cj, rj)) = (grid[i]?, grid[j]?);
+        Some((cj - ci, rj - ri))
+    };
 
-    // Links between pages: page j sits at page i's offset plus d.
-    let mut links: Vec<Vec<(usize, Vec2)>> = vec![Vec::new(); n];
+    // Links between pages: page j sits at page i's offset plus d, as so
+    // many shapes say.
+    let mut links: Vec<(usize, usize, usize, Vec2)> = Vec::new();
     for i in 0..n {
-        for j in i + 1..n {
+        for (j, theirs) in useful_indexes.iter().enumerate().skip(i + 1) {
+            let guide = apart(i, j);
+            // Labelled pages join only their neighbours.
+            if guide.is_some_and(|(c, r)| c.abs() + r.abs() != 1) {
+                continue;
+            }
             let mut votes: HashMap<(i64, i64), (usize, Vec2)> = HashMap::new();
             for a in &useful[i] {
-                let same: Vec<&Print> = useful_indexes[j].matches(a).collect();
+                let same: Vec<&Print> = theirs.matches(a).collect();
                 if same.is_empty() || same.len() > MAX_REPEATS {
                     continue;
                 }
                 for b in same {
+                    // Page j's origin on page i: a shape at `b.first` on
+                    // page j is at `a.first` on page i.
                     let d = a.first - b.first;
-                    // Two tiles are never in the same place, and neighbours
-                    // touch or overlap: they are less than a page apart.
-                    let page = sizes
-                        .get(i)
-                        .copied()
-                        .unwrap_or(Vec2::new(f64::MAX, f64::MAX));
-                    if d.hypot() < 1.0 || d.x.abs() > page.x + 1.0 || d.y.abs() > page.y + 1.0 {
+                    let page = sizes[i];
+                    let near = match guide {
+                        // On the side the labels say, at least half a page
+                        // off and at most a page, and nearly in line.
+                        Some((c, r)) => {
+                            let (along, across, size) = if c != 0 {
+                                (d.x * c as f64, d.y, page.x)
+                            } else {
+                                (d.y * r as f64, d.x, page.y)
+                            };
+                            (0.5 * size..=size + 1.0).contains(&along) && across.abs() <= GUIDED
+                        }
+                        // Two tiles are never in the same place, and
+                        // neighbours touch or overlap: they are less than
+                        // a page apart.
+                        None => {
+                            d.hypot() >= 1.0
+                                && d.x.abs() <= page.x + 1.0
+                                && d.y.abs() <= page.y + 1.0
+                        }
+                    };
+                    if !near {
                         continue;
                     }
                     let key = ((d.x / GRID).round() as i64, (d.y / GRID).round() as i64);
@@ -199,34 +247,85 @@ pub(crate) fn arrange(prints: &[Vec<Print>], sizes: &[Vec2]) -> Vec<Vec<(usize, 
             {
                 let d = sum / count as f64;
                 if agree_where_they_overlap(i, j, d) {
-                    links[i].push((j, d));
-                    links[j].push((i, -d));
+                    links.push((count, i, j, d));
                 }
             }
         }
     }
-    // Each connected group, placed from its first page.
-    let mut placed: Vec<Option<Vec2>> = vec![None; n];
-    let mut groups = Vec::new();
-    for root in 0..n {
-        if placed[root].is_some() {
-            continue;
+    // The strongest links first, each joining two groups not yet joined.
+    links.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)).then(a.2.cmp(&b.2)));
+    let mut group: Vec<usize> = (0..n).collect();
+    let mut offset: Vec<Vec2> = vec![Vec2::ZERO; n];
+    let join = |group: &mut Vec<usize>, offset: &mut Vec<Vec2>, i: usize, j: usize, d: Vec2| {
+        let (gi, gj) = (group[i], group[j]);
+        if gi == gj {
+            return;
         }
-        placed[root] = Some(Vec2::ZERO);
-        let mut group = vec![(root, Vec2::ZERO)];
-        let mut queue = VecDeque::from([root]);
-        while let Some(i) = queue.pop_front() {
-            let at = placed[i].expect("placed before queued");
-            for &(j, d) in &links[i] {
-                if placed[j].is_none() {
-                    placed[j] = Some(at + d);
-                    group.push((j, at + d));
-                    queue.push_back(j);
+        // Page j to page i's offset plus d, its group with it.
+        let shift = offset[i] + d - offset[j];
+        for k in 0..n {
+            if group[k] == gj {
+                group[k] = gi;
+                offset[k] += shift;
+            }
+        }
+    };
+    for &(_, i, j, d) in &links {
+        join(&mut group, &mut offset, i, j, d);
+    }
+    // How far apart labelled neighbours are, across and down, as most
+    // shapes say; a page apart if none do.
+    let step = |across: bool| {
+        let mut steps: Vec<f64> = links
+            .iter()
+            .filter_map(|&(_, i, j, d)| match apart(i, j)? {
+                (c, 0) if across => Some(d.x / c as f64),
+                (0, r) if !across => Some(d.y / r as f64),
+                _ => None,
+            })
+            .collect();
+        steps.sort_by(f64::total_cmp);
+        steps.get(steps.len() / 2).copied()
+    };
+    let (across, down) = (step(true), step(false));
+    // Labelled pages joined to nothing by shapes: beside the labelled page
+    // nearest them on the sheet, where their labels say.
+    loop {
+        let mut best: Option<(i64, usize, usize)> = None;
+        for i in 0..n {
+            for j in 0..n {
+                let (Some((ci, ri)), Some((cj, rj))) = (grid[i], grid[j]) else {
+                    continue;
+                };
+                if group[i] == group[j] {
+                    continue;
+                }
+                let apart = (ci - cj).abs() + (ri - rj).abs();
+                if best.is_none_or(|b| (apart, i, j) < (b.0, b.1, b.2)) {
+                    best = Some((apart, i, j));
                 }
             }
         }
-        group.sort_by_key(|(i, _)| *i);
-        groups.push(group);
+        let Some((_, i, j)) = best else { break };
+        let (c, r) = apart(i, j).expect("both labelled");
+        let page = sizes[i];
+        let d = Vec2::new(
+            c as f64 * across.unwrap_or(page.x),
+            r as f64 * down.unwrap_or(page.y),
+        );
+        join(&mut group, &mut offset, i, j, d);
+    }
+    // Each group, from its first page.
+    let mut groups: Vec<Vec<(usize, Vec2)>> = Vec::new();
+    let mut seen: Vec<usize> = Vec::new();
+    for i in 0..n {
+        if seen.contains(&group[i]) {
+            continue;
+        }
+        seen.push(group[i]);
+        let members: Vec<usize> = (0..n).filter(|&k| group[k] == group[i]).collect();
+        let origin = offset[members[0]];
+        groups.push(members.iter().map(|&k| (k, offset[k] - origin)).collect());
     }
     groups
 }
@@ -275,6 +374,7 @@ mod tests {
                 page(360.0, -0.0001),
             ],
             &[a4; 4],
+            &[None; 4],
         );
         assert_eq!(groups.len(), 2);
         assert_eq!(groups[0], vec![(0, Vec2::ZERO)]);

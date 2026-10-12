@@ -662,12 +662,70 @@ fn grain_segment(segs: &[PathSeg]) -> Option<(Point, Point)> {
 /// A path goes on across a line it meets if it turns at most 60° (the
 /// cosine).
 const JUNCTION_STRAIGHT: f64 = 0.5;
+/// Going on this sharply back (the cosine), where several lines meet, is
+/// no way on: the sizes of a nest meeting at a corner they share.
+const SHARPLY_BACK: f64 = -0.9;
+/// Only lines at least this long, mm, are sizes' outlines and the
+/// stretches they share: a lettered word's strokes turn sharply and meet
+/// everywhere, and join as they always have.
+const GUARDED_LONG: f64 = 10.0;
+
+/// A line placed by the point halfway along it has that point at least
+/// this far inside its piece, mm: not a tick across the outline.
+const LINE_WELL_INSIDE: f64 = 1.0;
+
+/// The point halfway along a line (a straight line's middle, not an end).
+fn halfway(pts: &[Point]) -> Option<Point> {
+    let total: f64 = pts.windows(2).map(|w| w[0].distance(w[1])).sum();
+    let mut left = total / 2.0;
+    for w in pts.windows(2) {
+        let d = w[0].distance(w[1]);
+        if left <= d && d > 0.0 {
+            return Some(w[0].lerp(w[1], left / d));
+        }
+        left -= d;
+    }
+    pts.first().copied()
+}
+
+/// The point `s` mm along `segs`.
+fn point_along(segs: &[PathSeg], s: f64) -> Point {
+    let mut left = s;
+    for seg in segs {
+        let length = seg.arclen(0.01);
+        if left <= length {
+            return seg.eval(seg.inv_arclen(left, 0.01));
+        }
+        left -= length;
+    }
+    segs.last().map_or(Point::ZERO, PathSeg::end)
+}
+
+/// Whether `away`, leaving where `arriving` ends, goes back along it: a
+/// copy of the same line (each size of a nest draws the stretches the
+/// sizes share).
+fn retraces(arriving: PathSeg, away: &[PathSeg]) -> bool {
+    let along: f64 = away.iter().map(|s| s.arclen(0.01)).sum();
+    let probe = 1.0_f64.min(0.5 * arriving.arclen(0.01)).min(0.5 * along);
+    probe > 0.0 && arriving.nearest(point_along(away, probe), 1e-6).distance_sq <= 0.02 * 0.02
+}
 
 /// Joins open paths that meet end to end (within `tolerance` mm) into
 /// longer ones, reversing pieces as needed, and reports which came back to
 /// their start. CAD drawings often build an outline from separate lines and
 /// arcs.
 pub(crate) fn chain(paths: Vec<Vec<PathSeg>>, tolerance: f64) -> Vec<(Vec<PathSeg>, bool)> {
+    chain_crowded(paths, tolerance, &|_| false)
+}
+
+/// `chain`, never going sharply back where `crowded` says many lines meet
+/// (the sizes of a nest at a corner they share), even by the one way
+/// there: two such sizes are not one outline.
+pub(crate) fn chain_crowded(
+    paths: Vec<Vec<PathSeg>>,
+    tolerance: f64,
+    crowded: &dyn Fn(Point) -> bool,
+) -> Vec<(Vec<PathSeg>, bool)> {
     let close = |a: Point, b: Point| a.distance(b) <= tolerance;
     let mut pool: Vec<Option<Vec<PathSeg>>> = paths
         .into_iter()
@@ -743,13 +801,42 @@ pub(crate) fn chain(paths: Vec<Vec<PathSeg>>, tolerance: f64) -> Vec<(Vec<PathSe
                 };
                 Some((along.dot(goes), goes))
             };
+            // The path oriented away from the meeting point at `at_end`.
+            let away = |j: usize, at_end: bool| -> Option<Vec<PathSeg>> {
+                let q = pool[j].as_ref()?;
+                let way = if at_end { end } else { start };
+                Some(if close(way, q[0].start()) {
+                    q.clone()
+                } else {
+                    q.iter().rev().map(PathSeg::reverse).collect()
+                })
+            };
+            let arriving = |at_end: bool| {
+                if at_end {
+                    path[path.len() - 1]
+                } else {
+                    path[0].reverse()
+                }
+            };
             // A path meeting a line that runs on through the meeting point
             // both ways, with none of it straight ahead (a notch cut meeting
-            // the outline it marks), stops there.
+            // the outline it marks), stops there. So does a long one that
+            // could only go back along a copy of itself, or sharply back
+            // along another long line, or along anything where many lines
+            // meet (a dashed outline's stub at a corner its sizes share).
+            let long =
+                |segs: &[PathSeg]| segs.iter().map(|s| s.arclen(0.01)).sum::<f64>() >= GUARDED_LONG;
+            let guarded = |j: usize, at: Point| {
+                long(&path) && (pool[j].as_ref().is_some_and(|q| long(q)) || crowded(at))
+            };
             let pick = |at: Point, at_end: bool| {
                 let mut ways: Vec<(usize, f64, Vec2)> = near(&grid, at)
                     .into_iter()
                     .filter_map(|j| turn(j, at_end).map(|(straight, goes)| (j, straight, goes)))
+                    .filter(|w| {
+                        !guarded(w.0, at)
+                            || away(w.0, at_end).is_none_or(|a| !retraces(arriving(at_end), &a))
+                    })
                     .collect();
                 ways.sort_unstable_by_key(|w| w.0);
                 ways.dedup_by_key(|w| w.0);
@@ -757,6 +844,10 @@ pub(crate) fn chain(paths: Vec<Vec<PathSeg>>, tolerance: f64) -> Vec<(Vec<PathSe
                     .iter()
                     .copied()
                     .max_by(|a, b| a.1.total_cmp(&b.1).then(b.0.cmp(&a.0)))?;
+                if guarded(best.0, at) && (ways.len() >= 2 || crowded(at)) && best.1 < SHARPLY_BACK
+                {
+                    return None;
+                }
                 let through = ways
                     .iter()
                     .any(|a| ways.iter().any(|b| a.2.dot(b.2) < -0.9));
@@ -793,7 +884,15 @@ pub(crate) fn chain(paths: Vec<Vec<PathSeg>>, tolerance: f64) -> Vec<(Vec<PathSe
 /// next begins (round a logo's letters, say). Ends of open paths up to
 /// `reach` apart are joined across the gap with a short line, nearest pairs
 /// first, each end once; a path whose own ends are that close is closed.
-pub(crate) fn bridge(paths: Vec<(Vec<PathSeg>, bool)>, reach: f64) -> Vec<(Vec<PathSeg>, bool)> {
+/// Never sharply back where `crowded` says many lines meet; and with
+/// `straight_on` (reach, length), also joining ends up to that reach apart
+/// of lines at least that long that run straight on into each other.
+pub(crate) fn bridge_crowded(
+    paths: Vec<(Vec<PathSeg>, bool)>,
+    reach: f64,
+    crowded: &dyn Fn(Point) -> bool,
+    straight_on: Option<(f64, f64)>,
+) -> Vec<(Vec<PathSeg>, bool)> {
     let (mut out, open): (Vec<_>, Vec<_>) = paths.into_iter().partition(|(_, closed)| *closed);
     let open: Vec<Vec<PathSeg>> = open.into_iter().map(|(segs, _)| segs).collect();
     // End 2k is path k's start, 2k + 1 its end.
@@ -805,34 +904,92 @@ pub(crate) fn bridge(paths: Vec<(Vec<PathSeg>, bool)>, reach: f64) -> Vec<(Vec<P
             p[p.len() - 1].end()
         }
     };
-    let cell = reach.max(1e-6);
+    let far = straight_on.map_or(reach, |(r, _)| r.max(reach));
+    let cell = far.max(1e-6);
     let key = |p: Point| ((p.x / cell).floor() as i64, (p.y / cell).floor() as i64);
     let mut grid: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
     for e in 0..2 * open.len() {
         grid.entry(key(point(e))).or_default().push(e);
     }
     let length = |segs: &[PathSeg]| segs.iter().map(|s| s.arclen(0.01)).sum::<f64>();
+    let lengths: Vec<f64> = open.iter().map(|p| length(p)).collect();
+    // Each end's path, arriving at it and leaving it.
+    let arriving = |e: usize| {
+        let p = &open[e / 2];
+        if e.is_multiple_of(2) {
+            p[0].reverse()
+        } else {
+            p[p.len() - 1]
+        }
+    };
+    let away = |e: usize| -> Vec<PathSeg> {
+        let p = &open[e / 2];
+        if e.is_multiple_of(2) {
+            p.clone()
+        } else {
+            p.iter().rev().map(PathSeg::reverse).collect()
+        }
+    };
     let mut pairs: Vec<(f64, usize, usize)> = Vec::new();
+    let mut crowd = vec![0usize; 2 * open.len()];
     for e in 0..2 * open.len() {
         let (kx, ky) = key(point(e));
         for dx in -1..=1 {
             for dy in -1..=1 {
                 for &f in grid.get(&(kx + dx, ky + dy)).map_or(&[][..], Vec::as_slice) {
                     let gap = point(e).distance(point(f));
+                    if f != e && gap <= reach {
+                        crowd[e] += 1;
+                    }
+                    let guarded = lengths[e / 2] >= GUARDED_LONG && lengths[f / 2] >= GUARDED_LONG;
                     // A path's own ends close it only when it is no mere
                     // speck of a stroke.
                     let fits = if e / 2 == f / 2 {
-                        length(&open[e / 2]) > 10.0 * reach
+                        lengths[e / 2] > 10.0 * reach
                     } else {
-                        true
+                        // Nor going back along a copy of itself.
+                        !guarded || !retraces(arriving(e), &away(f))
                     };
-                    if f > e && gap <= reach && fits {
-                        pairs.push((gap, e, f));
+                    // Farther, only long lines running straight on.
+                    let near = gap <= reach
+                        || straight_on.is_some_and(|(r, long)| {
+                            let into = unit_tangent(&arriving(e), 1.0);
+                            let on = unit_tangent(&away(f)[0], 0.0);
+                            let across = (point(f) - point(e)).cross(into).abs();
+                            gap <= r
+                                && lengths[e / 2] >= long
+                                && lengths[f / 2] >= long
+                                && into.dot(on) >= 0.98
+                                && across <= 0.2
+                        });
+                    if f > e && near && fits {
+                        // Of long lines' ends as near, the one going
+                        // straight on, as a pencil tracing the line would.
+                        let cost = if guarded {
+                            let into = unit_tangent(&arriving(e), 1.0);
+                            let on = unit_tangent(&away(f)[0], 0.0);
+                            gap * (1.0 + (1.0 - into.dot(on)) / 2.0)
+                        } else {
+                            gap
+                        };
+                        pairs.push((cost, e, f));
                     }
                 }
             }
         }
     }
+    // Where several ends meet, none is joined sharply back to another (the
+    // sizes of a nest meeting at a corner they share).
+    pairs.retain(|&(_, e, f)| {
+        let many = crowd[e] >= 2 || crowd[f] >= 2 || crowded(point(e)) || crowded(point(f));
+        let long = lengths[e / 2] >= GUARDED_LONG && lengths[f / 2] >= GUARDED_LONG;
+        if !many || !long || e / 2 == f / 2 {
+            return true;
+        }
+        let into = unit_tangent(&arriving(e), 1.0);
+        let on = unit_tangent(&away(f)[0], 0.0);
+        into.dot(on) >= SHARPLY_BACK
+    });
     pairs.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)).then(a.2.cmp(&b.2)));
     let mut partner: Vec<Option<usize>> = vec![None; 2 * open.len()];
     for (_, e, f) in pairs {
@@ -1181,6 +1338,23 @@ pub(crate) fn assemble(
             .find(|(_, poly, _)| point_in_polygon(pt, poly))
             .map(|(pi, _, _)| *pi)
     };
+    // The piece a line is on: the one round its middle point, or else the
+    // one well round the point halfway along it (a straight line's middle
+    // point is its end, which can lie past the piece: a line drawn once
+    // across a nest of sizes, out to the largest).
+    let piece_of_line = |pts: &[Point]| {
+        let mid = pts.get(pts.len() / 2).copied()?;
+        find_piece(mid).or_else(|| {
+            let half = halfway(pts)?;
+            regions
+                .iter()
+                .find(|(_, poly, _)| {
+                    point_in_polygon(half, poly)
+                        && distance_to_polyline(half, poly, true) >= LINE_WELL_INSIDE
+                })
+                .map(|(pi, _, _)| *pi)
+        })
+    };
 
     // Each piece's outline, and the cutting line the file drew around it.
     let outlines: Vec<(Vec<Point>, Rect)> = pieces
@@ -1212,8 +1386,8 @@ pub(crate) fn assemble(
             continue;
         }
         let pts = flatten_segs(&r.segs, 0.05);
-        if let (Some(mid), Some((from, to))) = (pts.get(pts.len() / 2), grain_segment(&r.segs))
-            && let Some(pi) = find_piece(*mid)
+        if let Some((from, to)) = grain_segment(&r.segs)
+            && let Some(pi) = piece_of_line(&pts)
         {
             let length = from.distance(to);
             let best = longest_grain.entry(pi).or_insert((length, i));
@@ -1226,15 +1400,15 @@ pub(crate) fn assemble(
     for &i in open.iter().filter(|i| !used_open.contains(i)) {
         let r = &raw[i];
         let pts = flatten_segs(&r.segs, 0.05);
-        let Some(mid) = pts.get(pts.len() / 2).copied() else {
+        if pts.is_empty() {
             continue;
-        };
+        }
         // A copy of part of an outline (FreeSewing draws some seams twice).
         if !r.hint.contains("grain") && !r.hint.contains("cutonfold") && on_outline(&pts) {
             copies += 1;
             continue;
         }
-        let Some(pi) = find_piece(mid) else {
+        let Some(pi) = piece_of_line(&pts) else {
             loose += 1;
             continue;
         };

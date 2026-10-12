@@ -483,6 +483,7 @@ pub fn import_dxf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         sizes: sizes_of(&drawing, piece_sizes),
         notes,
         sha256,
+        pages: Vec::new(),
     })
 }
 

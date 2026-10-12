@@ -114,6 +114,55 @@ pub(crate) fn find_loops(paths: Vec<Vec<PathSeg>>, tolerance: f64) -> Vec<(Vec<P
     out
 }
 
+/// A loop that comes back through a point it passed (two sizes of a nest
+/// traced as one, through a corner they share) as the loops it makes, each
+/// round some room: a mere sliver (a line gone along and back) is not cut
+/// off.
+pub(crate) fn split_touching(segs: Vec<PathSeg>, tolerance: f64) -> Vec<Vec<PathSeg>> {
+    let roomy = |segs: &[PathSeg]| {
+        let pts = flatten_segs(segs, 0.5);
+        let around: f64 = segs.iter().map(|s| s.arclen(0.01)).sum();
+        polygon_area(&pts).abs() >= MIN_WIDTH / 2.0 * around
+    };
+    let cell = |p: Point| {
+        (
+            (p.x / tolerance).floor() as i64,
+            (p.y / tolerance).floor() as i64,
+        )
+    };
+    // Where each segment starts, by cell.
+    let mut starts: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
+    for (i, s) in segs.iter().enumerate() {
+        starts.entry(cell(s.start())).or_default().push(i);
+    }
+    for (k, s) in segs.iter().enumerate() {
+        let end = s.end();
+        let (cx, cy) = cell(end);
+        let mut back: Vec<usize> = (cx - 1..=cx + 1)
+            .flat_map(|x| (cy - 1..=cy + 1).map(move |y| (x, y)))
+            .filter_map(|c| starts.get(&c))
+            .flatten()
+            .copied()
+            .filter(|&i| i > 0 && i <= k && segs[i].start().distance(end) <= tolerance)
+            .collect();
+        back.sort_unstable();
+        for i in back {
+            let inner: Vec<PathSeg> = segs[i..=k].to_vec();
+            let outer: Vec<PathSeg> = segs[..i].iter().chain(&segs[k + 1..]).copied().collect();
+            if outer.is_empty() || !roomy(&inner) || !roomy(&outer) {
+                continue;
+            }
+            let mut out = split_touching(inner, tolerance);
+            out.extend(split_touching(outer, tolerance));
+            return out;
+        }
+    }
+    vec![segs]
+}
+
+/// A piece is at least this wide, mm: narrower loops are slivers.
+const MIN_WIDTH: f64 = 1.0;
+
 /// Where an end of one path lands on the middle of a path: (segment,
 /// parameter) on each path.
 fn landing_points(paths: &[Vec<PathSeg>], tolerance: f64) -> Vec<Vec<(usize, f64)>> {

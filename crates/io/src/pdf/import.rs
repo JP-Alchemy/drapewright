@@ -6,29 +6,36 @@
 
 use std::collections::HashMap;
 
-use drapewright_pattern_core::geom::{distance_to_polyline, flatten_segs, point_in_polygon};
+use drapewright_pattern_core::geom::{
+    distance_to_polyline, flatten_segs, label_point, point_in_polygon, polygon_area, segs_of,
+    unit_tangent,
+};
 use drapewright_pattern_core::{
     CutInstruction, Mark, MarkKind, Piece, Pt, ScaleBasis, SourceFormat,
 };
 use drapewright_pdf_import::{Document, Page, Shape, TextRun};
-use kurbo::{Affine, BezPath, CubicBez, Line, ParamCurve, PathEl, PathSeg, Point, Rect, Vec2};
+use kurbo::{
+    Affine, BezPath, CubicBez, Line, ParamCurve, ParamCurveArclen, PathEl, PathSeg, Point, Rect,
+    Vec2,
+};
 
 use super::butt::{Edges, Stitch, butt_grid, drawn_frame};
 use super::lettering::{
     find_crosses, find_lettering, find_outlined_crosses, find_repeated_decorations,
 };
-use super::loops::find_loops;
+use super::loops::{find_loops, split_touching};
 use super::marks::{arrowheads, find_fold_brackets, find_grainlines, find_notches, test_square};
+use super::pagelabels;
 use super::reading::{FAIR, ReadLine, SURE, read_block};
 use super::sizes::find_sizes;
 use super::tiles::{Print, arrange};
 use crate::assemble::{
-    CLOSE_TOLERANCE, RawPath, assemble, bounds, bridge, chain, is_straight, mark_folds,
-    meaningful_name, sentence_case,
+    CLOSE_TOLERANCE, RawPath, assemble, bounds, bridge_crowded, chain, chain_crowded, is_straight,
+    mark_folds, meaningful_name, sentence_case, to_segments,
 };
 use crate::import::{
-    AllowanceQuestion, ImportError, ImportNote, ImportResult, ImportSizes, PieceSize, ScaleInfo,
-    ScaleOption, ScaleReason, SizeSwatch, sha256_hex,
+    AllowanceQuestion, ImportError, ImportNote, ImportResult, ImportSizes, PageLeftOut, PageUse,
+    PieceSize, ScaleInfo, ScaleOption, ScaleReason, SizeSwatch, sha256_hex,
 };
 
 const MM_PER_POINT: f64 = 25.4 / 72.0;
@@ -38,6 +45,27 @@ const PAGE_GAP: f64 = 100.0;
 const JOIN: f64 = 0.1;
 /// Hairline gaps a plotter driver leaves between strokes, mm.
 const BRIDGE: f64 = 0.5;
+/// A dashed line stops a dash's gap short of its corner, where a solid
+/// stub (half a dash) marks the corner: gaps up to this are bridged, mm.
+const DASH_GAP: f64 = 2.0;
+/// Such a stub is at most this long, mm.
+const DASH_STUB: f64 = 1.5;
+/// Line ends this close together meet at one corner, mm.
+const CROWD: f64 = 1.0;
+/// A line drawn twice on one page is two lines (sizes sharing a stretch)
+/// when it is at least this long, mm; shorter, it is drawn over.
+const SHARED_LONG: f64 = 10.0;
+/// A line drawn in two that overlap or leave a gap, up to this, mm.
+const STRAIGHT_ON: f64 = 1.2;
+/// Each of them at least this long: no dash of a line drawn dash by dash.
+const STRAIGHT_ON_LONG: f64 = 10.0;
+/// A line closing an outline drawn in another style is at most this part
+/// of the outline's own line.
+const CLOSER_SHORTER: f64 = 0.6;
+/// The sizes of a nest each end a hair apart at a corner they share: an
+/// outline drawn partly in another style is closed across gaps up to
+/// this, mm.
+const ACROSS: f64 = 0.5;
 
 /// A line of text printed on the pattern, in millimetres.
 #[derive(Clone, Debug)]
@@ -315,6 +343,23 @@ fn is_instruction(text: &str) -> bool {
         || (t.len() <= 4 && t.chars().next().is_some_and(char::is_alphabetic) && t[1..].chars().all(|c| c.is_ascii_digit()))
 }
 
+/// Whether a label is a piece's number set out in big type: "- 4 -", "#12",
+/// "No. 3", "- MP -".
+fn is_piece_number(text: &str) -> bool {
+    let t = text.trim();
+    let t = t
+        .strip_prefix("No.")
+        .or_else(|| t.strip_prefix("Nr."))
+        .unwrap_or(t);
+    let core: String = t
+        .chars()
+        .filter(|c| !matches!(c, ' ' | '-' | '–' | '—' | '#' | '.'))
+        .collect();
+    (1..=3).contains(&core.chars().count())
+        && (core.chars().all(|c| c.is_ascii_digit())
+            || core.chars().all(|c| c.is_ascii_uppercase()))
+}
+
 fn number_word(w: &str) -> Option<u32> {
     match w {
         "one" | "a" => Some(1),
@@ -403,12 +448,33 @@ pub(crate) fn read_labels(pieces: &mut [Piece], labels: &[Label]) {
             .filter(|(_, o)| **o == Some(index))
             .map(|(l, _)| l)
             .collect();
-        if piece.name.starts_with("Piece ")
-            && let Some(name) = inside
+        let named = |l: &&&Label| l.naming != Naming::Never && !is_instruction(&l.text);
+        // A piece numbered in big type ("- 4 -", "#4") is named on the
+        // line just under its number.
+        let biggest = inside.iter().max_by(|a, b| a.size.total_cmp(&b.size));
+        let under_number = biggest.filter(|n| is_piece_number(&n.text)).and_then(|n| {
+            let down = Vec2::new(-n.dir.y, n.dir.x);
+            inside
                 .iter()
-                .filter(|l| l.naming != Naming::Never && !is_instruction(&l.text))
-                .max_by(|a, b| a.naming.cmp(&b.naming).then(a.size.total_cmp(&b.size)))
-                .and_then(|l| meaningful_name(&l.text))
+                .filter(named)
+                .filter(|l| l.size < n.size)
+                .filter_map(|l| {
+                    let d = l.at - n.at;
+                    let (below, across) = (d.dot(down), d.dot(n.dir).abs());
+                    (below > 0.0 && below <= 2.5 * n.size && across <= 3.0 * n.size)
+                        .then_some((below, l))
+                })
+                .min_by(|a, b| a.0.total_cmp(&b.0))
+                .and_then(|(_, l)| meaningful_name(&l.text))
+        });
+        if piece.name.starts_with("Piece ")
+            && let Some(name) = under_number.or_else(|| {
+                inside
+                    .iter()
+                    .filter(named)
+                    .max_by(|a, b| a.naming.cmp(&b.naming).then(a.size.total_cmp(&b.size)))
+                    .and_then(|l| meaningful_name(&l.text))
+            })
         {
             piece.name = sentence_case(&name);
         }
@@ -621,11 +687,11 @@ fn on_frame(segs: &[PathSeg], frame: Rect) -> bool {
 /// placed by the grid under which lines cut off at one page's frame carry
 /// on from the next's. The pages left over stay on their own. Also the
 /// lines to stitch together across the joins (by page index).
-fn butt_pages(pages: &[PageContent]) -> Option<(Vec<PageGroup>, Vec<Stitch>)> {
+fn butt_pages(pages: &[PageContent], prose: &[bool]) -> Option<(Vec<PageGroup>, Vec<Stitch>)> {
     let framed: Vec<(usize, Rect)> = pages
         .iter()
         .enumerate()
-        .filter(|(_, p)| p.drawn_frame)
+        .filter(|(i, p)| !prose[*i] && p.drawn_frame)
         .filter_map(|(i, p)| p.frame.map(|f| (i, f)))
         .collect();
     // The frame size most pages have.
@@ -785,6 +851,16 @@ fn same_path(a: &[PathSeg], b: &[PathSeg], tolerance: f64) -> bool {
 }
 
 pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, ImportError> {
+    import_pdf_pages(data, file_name, None)
+}
+
+/// `import_pdf`, using only the `pages` given (numbered from 1), when given.
+pub fn import_pdf_pages(
+    data: &[u8],
+    file_name: Option<&str>,
+    pages: Option<&[usize]>,
+) -> Result<ImportResult, ImportError> {
+    let choice = pages;
     let unreadable = |detail: String| ImportError::Unreadable {
         format: "PDF",
         detail,
@@ -797,30 +873,65 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
             .map(|l| l.name.clone())
             .unwrap_or_default()
     };
-    let pages: Vec<PageContent> = (0..doc.page_count())
-        .map(|i| read_page(&doc, i, &layer_name))
+    let chosen = |i: usize| pages.is_none_or(|p| p.contains(&(i + 1)));
+    let numbers: Vec<usize> = (0..doc.page_count()).filter(|&i| chosen(i)).collect();
+    let mut pages: Vec<PageContent> = numbers
+        .iter()
+        .map(|&i| read_page(&doc, i, &layer_name))
         .collect::<Result<_, _>>()?;
+    // Words printed over and over on most pages (a watermark: "FREE",
+    // "Not for sale") name nothing.
+    remove_watermarks(&mut pages);
+    // A page of prose (instructions, a warning) is no part of the sheet;
+    // left out unless chosen.
+    let prose: Vec<bool> = pages
+        .iter()
+        .map(|p| choice.is_none() && is_prose(&p.labels))
+        .collect();
+    // Pages labelled for putting together ("1B") go where their labels
+    // say; the labels are not the pattern's.
+    let labelled = pagelabels::read(
+        &pages
+            .iter()
+            .map(|p| (p.labels.as_slice(), p.width, p.height))
+            .collect::<Vec<_>>(),
+    );
+    let mut grid = vec![None; pages.len()];
+    if let Some(l) = &labelled {
+        for (i, page) in pages.iter_mut().enumerate() {
+            let mut k = 0;
+            page.labels.retain(|_| {
+                k += 1;
+                !l.furniture[i].contains(&(k - 1))
+            });
+            if !prose[i] {
+                grid[i] = l.places[i];
+            }
+        }
+    }
 
     // Tiles of one sheet go back together; other pages lie side by side.
     // When some pages form a sheet, the pages outside it (a cover,
     // instructions) are left out.
     let prints: Vec<Vec<Print>> = pages
         .iter()
-        .map(|p| {
+        .zip(&prose)
+        .map(|(p, &prose)| {
             p.paths
                 .iter()
+                .filter(|_| !prose)
                 .filter_map(|(r, _, _)| Print::of(&r.segs, r.closed))
                 .collect()
         })
         .collect();
     let page_sizes: Vec<Vec2> = pages.iter().map(|p| Vec2::new(p.width, p.height)).collect();
-    let mut groups = arrange(&prints, &page_sizes);
+    let mut groups = arrange(&prints, &page_sizes, &grid);
     // Tiles that share no shapes, each cut off at its frame: placed by
     // where their lines are cut off. They have no marks for joining them.
     let mut butted = false;
     let mut stitches = Vec::new();
     if !groups.iter().any(|g| g.len() > 1)
-        && let Some((placed, lines)) = butt_pages(&pages)
+        && let Some((placed, lines)) = butt_pages(&pages, &prose)
     {
         groups = placed;
         stitches = lines;
@@ -831,6 +942,18 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
     let tiled = groups.iter().any(|g| g.len() > 1);
     let mut notes = Vec::new();
     let mut styled: Vec<PagePath> = Vec::new();
+    // The pages each kept path was drawn on.
+    let mut drawn_on: Vec<Vec<usize>> = Vec::new();
+    // Colours also drawn dashed: their short solid strokes may be the
+    // stubs at a dashed outline's corners, one for each size.
+    let dashed_colours: Vec<(Option<[u8; 3]>, i64)> = pages
+        .iter()
+        .flat_map(|p| &p.paths)
+        .filter(|(_, style, _)| style.dashed)
+        .map(|(_, style, _)| (style.stroke, style.width))
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
     // Where each kept path starts, by 2 mm cell, to find copies quickly.
     let mut starts: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
     let cell = |p: Point| ((p.x / 2.0).floor() as i64, (p.y / 2.0).floor() as i64);
@@ -841,9 +964,20 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
     // Where each page lies on the sheets.
     let mut page_areas: Vec<Rect> = Vec::new();
     let mut x = 0.0;
+    // Each page left out, and why.
+    let mut unused: HashMap<usize, PageLeftOut> = HashMap::new();
     for group in &groups {
-        if tiled && group.len() == 1 {
+        if (tiled && group.len() == 1) || group.iter().all(|(i, _)| prose[*i]) {
             left_out += 1;
+            let i = group[0].0;
+            unused.insert(
+                i,
+                if prose[i] {
+                    PageLeftOut::Instructions
+                } else {
+                    PageLeftOut::NotJoined
+                },
+            );
             continue;
         }
         if group.len() > 1 {
@@ -893,7 +1027,12 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
             for (r, style, shows) in &pages[*i].paths {
                 let segs: Vec<PathSeg> = r.segs.iter().map(|s| to_sheet * *s).collect();
                 // The same shape drawn by several tiles is kept once, and
-                // shows if it shows on any of them.
+                // shows if it shows on any of them. A long line drawn twice
+                // on one page is two lines: each size of a nest draws its
+                // whole outline, the stretches the sizes share too (and,
+                // dashed, the stubs at its corners).
+                let long = segs.iter().map(|s| s.arclen(0.01)).sum::<f64>() >= SHARED_LONG
+                    || dashed_colours.contains(&(style.stroke, style.width));
                 let (cx, cy) = cell(segs[0].start());
                 let copy = (cx - 1..=cx + 1)
                     .flat_map(|x| (cy - 1..=cy + 1).map(move |y| (x, y)))
@@ -902,13 +1041,20 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
                     .copied()
                     .find(|&k| {
                         let (o, os, _) = &styled[k];
-                        os == style && o.closed == r.closed && same_path(&o.segs, &segs, 0.2)
+                        !(long && drawn_on[k].contains(i))
+                            && os == style
+                            && o.closed == r.closed
+                            && same_path(&o.segs, &segs, 0.2)
                     });
                 match copy {
-                    Some(k) => styled[k].2 |= *shows,
+                    Some(k) => {
+                        styled[k].2 |= *shows;
+                        drawn_on[k].push(*i);
+                    }
                     None => {
                         starts.entry((cx, cy)).or_default().push(styled.len());
                         styled.push((RawPath { segs, ..r.clone() }, style.clone(), *shows));
+                        drawn_on.push(vec![*i]);
                     }
                 }
             }
@@ -956,13 +1102,83 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
             }
         }
     }
-    for (style, template, paths) in groups {
-        // Lines left open may make loops together, meeting end to middle.
-        let (joined, open): (Vec<_>, Vec<_>) = bridge(chain(paths, JOIN), BRIDGE)
+    // A dashed outline's corners: solid stubs of its colour, a dash's gap
+    // from its lines' ends. They go with the dashed lines.
+    let ends = |p: &[PathSeg]| [p[0].start(), p[p.len() - 1].end()];
+    let length = |p: &[PathSeg]| p.iter().map(|s| s.arclen(0.01)).sum::<f64>();
+    for d in 0..groups.len() {
+        if !groups[d].0.dashed {
+            continue;
+        }
+        let solid = Style {
+            dashed: false,
+            ..groups[d].0.clone()
+        };
+        let Some(s) = groups.iter().position(|(st, _, _)| *st == solid) else {
+            continue;
+        };
+        let dashed_ends: Vec<Point> = groups[d].2.iter().flat_map(|p| ends(p)).collect();
+        let near_dash = |p: Point| dashed_ends.iter().any(|e| e.distance(p) <= DASH_GAP);
+        let (stubs, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut groups[s].2)
             .into_iter()
-            .partition(|(_, closed)| *closed);
-        let looped = find_loops(open.into_iter().map(|(segs, _)| segs).collect(), JOIN);
-        for (segs, closed) in joined.into_iter().chain(looped) {
+            .partition(|p| length(p) <= DASH_STUB && ends(p).into_iter().any(near_dash));
+        groups[s].2 = rest;
+        let carried = continue_dashes(&groups[d].2, stubs);
+        groups[d].2.extend(carried);
+    }
+    groups.retain(|(_, _, paths)| !paths.is_empty());
+    // Where three or more lines end, of any style: the sizes of a nest at
+    // a corner they share, and what closes them there. No line goes
+    // sharply back there.
+    let mut line_ends: HashMap<(i64, i64), Vec<Point>> = HashMap::new();
+    let end_cell = |p: Point| ((p.x / CROWD).floor() as i64, (p.y / CROWD).floor() as i64);
+    for (_, _, paths) in &groups {
+        for p in paths {
+            for at in ends(p) {
+                line_ends.entry(end_cell(at)).or_default().push(at);
+            }
+        }
+    }
+    let crowded = |at: Point| {
+        let (cx, cy) = end_cell(at);
+        (cx - 1..=cx + 1)
+            .flat_map(|x| (cy - 1..=cy + 1).map(move |y| (x, y)))
+            .filter_map(|c| line_ends.get(&c))
+            .flatten()
+            .filter(|p| p.distance(at) <= CROWD)
+            .count()
+            >= 3
+    };
+    // Each style's lines joined end to end: its loops (those traced through
+    // a corner they share, apart) and the lines left open.
+    let mut joined: Vec<Joined> = groups
+        .iter_mut()
+        .map(|(style, _, paths)| {
+            let reach = if style.dashed { DASH_GAP } else { BRIDGE };
+            let chained = chain_crowded(std::mem::take(paths), JOIN, &crowded);
+            // A line drawn in two long pieces that run straight on into
+            // each other, overlapping a little or a little apart (a panel's
+            // side drawn from each end to the middle), is one line; the
+            // hair where they overlap goes with the other spikes.
+            let straight_on = Some((STRAIGHT_ON, STRAIGHT_ON_LONG));
+            let (loops, open): (Vec<_>, Vec<_>) =
+                bridge_crowded(chained, reach, &crowded, straight_on)
+                    .into_iter()
+                    .partition(|(_, closed)| *closed);
+            (
+                loops
+                    .into_iter()
+                    .flat_map(|(segs, _)| split_touching(segs, JOIN))
+                    .collect(),
+                open.into_iter().map(|(segs, _)| segs).collect(),
+            )
+        })
+        .collect();
+    close_across_styles(&mut joined);
+    for ((style, template, _), (loops, open)) in groups.into_iter().zip(joined) {
+        // Lines left open may make loops together, meeting end to middle.
+        let looped = find_loops(open, JOIN);
+        for (segs, closed) in loops.into_iter().map(|segs| (segs, true)).chain(looped) {
             raw.push((
                 RawPath {
                     segs,
@@ -1103,6 +1319,13 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
             assemble(raw, &notches, SourceFormat::Pdf, &scale, file_name, &sha256);
         read_labels(&mut found, &labels);
         add_crosses(&mut found, &crosses);
+        // Lines drawn once for all the sizes reach the largest size's
+        // outline: each size's stop at its own.
+        if size.is_some() {
+            for piece in &mut found {
+                clip_inside(piece);
+            }
+        }
         // Piece ids stay unique across sizes.
         let suffix = size.map(|k| format!("-{k}")).unwrap_or_default();
         for piece in &mut found {
@@ -1150,6 +1373,20 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
                 .collect(),
         })
         .unwrap_or_default();
+    // Every page, and whether it was used.
+    let pages = (0..doc.page_count())
+        .map(|i| {
+            let k = numbers.iter().position(|&n| n == i);
+            PageUse {
+                number: u32::try_from(i + 1).unwrap_or(u32::MAX),
+                label: k.and_then(|k| labelled.as_ref().and_then(|l| l.names[k].clone())),
+                left_out: match k {
+                    None => Some(PageLeftOut::NotChosen),
+                    Some(k) => unused.get(&k).copied(),
+                },
+            }
+        })
+        .collect();
     Ok(ImportResult {
         allowance: AllowanceQuestion::for_unmeasured(&pieces, &notes, None),
         pieces,
@@ -1157,7 +1394,338 @@ pub fn import_pdf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         sizes,
         notes,
         sha256,
+        pages,
     })
+}
+
+/// A style's lines joined: its loops, and the lines left open.
+type Joined = (Vec<Vec<PathSeg>>, Vec<Vec<PathSeg>>);
+/// A line left open: (style, line).
+type LineOf = (usize, usize);
+
+/// Outlines drawn partly in another style: each size of a nest drawn in
+/// its own, but for a stretch every size draws alike (a crotch's black
+/// seam). A line left open whose two ends are the two ends of a much
+/// shorter line of another style is closed by it (never by another size's
+/// outline, running from the same corners): the one that fits best, each
+/// such line closing one outline unless there are no more of them (a
+/// stretch drawn once for all the sizes; the outlines it closes then nest,
+/// never lying either side of it).
+fn close_across_styles(joined: &mut [Joined]) {
+    let ends = |p: &[PathSeg]| (p[0].start(), p[p.len() - 1].end());
+    let length = |p: &[PathSeg]| p.iter().map(|s| s.arclen(0.01)).sum::<f64>();
+    let cell = |p: Point| ((p.x / ACROSS).floor() as i64, (p.y / ACROSS).floor() as i64);
+    let around = |p: Point| {
+        let (cx, cy) = cell(p);
+        (cx - 1..=cx + 1).flat_map(move |x| (cy - 1..=cy + 1).map(move |y| (x, y)))
+    };
+    // Open lines by where they start and where they end: (style, line).
+    let mut by_end: HashMap<(i64, i64), Vec<LineOf>> = HashMap::new();
+    for (g, (_, open)) in joined.iter().enumerate() {
+        for (k, p) in open.iter().enumerate() {
+            let (a, b) = ends(p);
+            if a.distance(b) > ACROSS {
+                for at in [a, b] {
+                    let list = by_end.entry(cell(at)).or_default();
+                    if list.last() != Some(&(g, k)) {
+                        list.push((g, k));
+                    }
+                }
+            }
+        }
+    }
+    // Every fit: (gaps, line, closing line, closing line reversed?).
+    let mut fits: Vec<(f64, LineOf, LineOf, bool)> = Vec::new();
+    for (g, (_, open)) in joined.iter().enumerate() {
+        for (k, p) in open.iter().enumerate() {
+            let (a, b) = ends(p);
+            if a.distance(b) <= ACROSS {
+                continue;
+            }
+            let long = length(p);
+            let mut seen: Vec<LineOf> = Vec::new();
+            for &(h, j) in around(b).filter_map(|c| by_end.get(&c)).flatten() {
+                if h == g || seen.contains(&(h, j)) {
+                    continue;
+                }
+                seen.push((h, j));
+                let q = &joined[h].1[j];
+                if length(q) > CLOSER_SHORTER * long {
+                    continue;
+                }
+                let (qa, qb) = ends(q);
+                for (reversed, from, to) in [(false, qa, qb), (true, qb, qa)] {
+                    let gaps = from.distance(b) + to.distance(a);
+                    if from.distance(b) <= ACROSS && to.distance(a) <= ACROSS {
+                        fits.push((gaps, (g, k), (h, j), reversed));
+                    }
+                }
+            }
+        }
+    }
+    fits.sort_by(|x, y| x.0.total_cmp(&y.0).then(x.1.cmp(&y.1)).then(x.2.cmp(&y.2)));
+    // The outline a line and its closing line make.
+    let outline = |line: LineOf, closer: LineOf, reversed: bool| {
+        let mut segs = joined[line.0].1[line.1].clone();
+        let q = &joined[closer.0].1[closer.1];
+        if reversed {
+            segs.extend(q.iter().rev().map(PathSeg::reverse));
+        } else {
+            segs.extend(q.iter().copied());
+        }
+        flatten_segs(&segs, 0.5)
+    };
+    let nest = |a: &[Point], b: &[Point]| {
+        let (inside_a, _) = label_point(a);
+        let (inside_b, _) = label_point(b);
+        point_in_polygon(inside_a, b) || point_in_polygon(inside_b, a)
+    };
+    // Best fits first, each line closed once, each closing line used once
+    // while any is left unused.
+    let mut uses: HashMap<LineOf, usize> = HashMap::new();
+    let mut closed: Vec<(LineOf, LineOf, bool)> = Vec::new();
+    for round in 0..2 {
+        for &(_, line, closer, reversed) in &fits {
+            if closed.iter().any(|c| c.0 == line || c.0 == closer)
+                || uses.contains_key(&line)
+                || (round == 0 && uses.contains_key(&closer))
+            {
+                continue;
+            }
+            if round == 1 {
+                let mine = outline(line, closer, reversed);
+                let apart = closed
+                    .iter()
+                    .filter(|c| c.1 == closer)
+                    .any(|c| !nest(&mine, &outline(c.0, c.1, c.2)));
+                if apart {
+                    continue;
+                }
+            }
+            *uses.entry(closer).or_default() += 1;
+            closed.push((line, closer, reversed));
+        }
+    }
+    // The loops, each round some room; the lines that closed them are
+    // part of them now.
+    let mut gone: Vec<LineOf> = Vec::new();
+    for &((g, k), (h, j), reversed) in &closed {
+        let q = &joined[h].1[j];
+        let back: Vec<PathSeg> = if reversed {
+            q.iter().rev().map(PathSeg::reverse).collect()
+        } else {
+            q.clone()
+        };
+        let mut segs = joined[g].1[k].clone();
+        let (end, start) = (segs[segs.len() - 1].end(), segs[0].start());
+        if end.distance(back[0].start()) > 1e-9 {
+            segs.push(PathSeg::Line(Line::new(end, back[0].start())));
+        }
+        let last = back[back.len() - 1].end();
+        segs.extend(back);
+        if last.distance(start) > 1e-9 {
+            segs.push(PathSeg::Line(Line::new(last, start)));
+        }
+        let pts = flatten_segs(&segs, 0.5);
+        let around: f64 = segs.iter().map(|s| s.arclen(0.01)).sum();
+        if polygon_area(&pts).abs() < 0.5 * around {
+            continue;
+        }
+        joined[g].0.push(segs);
+        gone.push((g, k));
+        gone.push((h, j));
+    }
+    gone.sort_unstable();
+    gone.dedup();
+    for &(g, k) in gone.iter().rev() {
+        joined[g].1.remove(k);
+    }
+}
+
+/// Dashed lines carried on to their corners by the stubs that mark them:
+/// a stub straight on from a line's end, a dash's gap away, carries it on
+/// (a stub between two lines carries both). The stubs, and the gaps
+/// across to the lines they carry on, to be joined with the lines.
+fn continue_dashes(dashed: &[Vec<PathSeg>], stubs: Vec<Vec<PathSeg>>) -> Vec<Vec<PathSeg>> {
+    // Each dashed line's ends: (point, heading on).
+    let mut ends: Vec<(Point, Vec2)> = Vec::new();
+    for p in dashed {
+        ends.push((p[0].start(), -unit_tangent(&p[0], 0.0)));
+        ends.push((p[p.len() - 1].end(), unit_tangent(&p[p.len() - 1], 1.0)));
+    }
+    // Every stub end that carries a line's end on: (gap, line end, stub
+    // end); stub end 2k is stub k's start, 2k + 1 its end.
+    let mut fits: Vec<(f64, usize, usize)> = Vec::new();
+    for (e, &(at, on)) in ends.iter().enumerate() {
+        for (k, stub) in stubs.iter().enumerate() {
+            let (a, b) = (stub[0].start(), stub[stub.len() - 1].end());
+            for (near, far, end) in [(a, b, 2 * k), (b, a, 2 * k + 1)] {
+                let gap = near - at;
+                let along = far - near;
+                let straight_on = along.hypot() < 1e-6 || along.dot(on) >= 0.95 * along.hypot();
+                if gap.hypot() <= DASH_GAP
+                    && gap.dot(on) >= -JOIN
+                    && gap.cross(on).abs() <= 0.15
+                    && straight_on
+                {
+                    fits.push((gap.hypot(), e, end));
+                }
+            }
+        }
+    }
+    fits.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)).then(a.2.cmp(&b.2)));
+    let (mut end_taken, mut stub_end_taken) =
+        (vec![false; ends.len()], vec![false; 2 * stubs.len()]);
+    let mut gaps: Vec<Vec<PathSeg>> = Vec::new();
+    for (gap, e, end) in fits {
+        if end_taken[e] || stub_end_taken[end] {
+            continue;
+        }
+        end_taken[e] = true;
+        stub_end_taken[end] = true;
+        let stub = &stubs[end / 2];
+        let near = if end.is_multiple_of(2) {
+            stub[0].start()
+        } else {
+            stub[stub.len() - 1].end()
+        };
+        if gap > 1e-9 {
+            gaps.push(vec![PathSeg::Line(Line::new(ends[e].0, near))]);
+        }
+    }
+    let mut out = stubs;
+    out.extend(gaps);
+    out
+}
+
+/// Words printed several times over on most pages (a watermark, "FREE",
+/// "Not for sale"), taken out: they name nothing.
+fn remove_watermarks(pages: &mut [PageContent]) {
+    let key = |l: &Label| (l.text.trim().to_lowercase(), (l.size * 2.0).round() as i64);
+    let mut on_pages: HashMap<(String, i64), usize> = HashMap::new();
+    for page in pages.iter() {
+        let mut here: HashMap<(String, i64), usize> = HashMap::new();
+        for l in &page.labels {
+            *here.entry(key(l)).or_default() += 1;
+        }
+        for (k, count) in here {
+            if count >= 2 {
+                *on_pages.entry(k).or_default() += 1;
+            }
+        }
+    }
+    let n = pages.len();
+    let marks: Vec<(String, i64)> = on_pages
+        .into_iter()
+        .filter(|(_, count)| *count >= 3.max(n.div_ceil(2)))
+        .map(|(k, _)| k)
+        .collect();
+    if marks.is_empty() {
+        return;
+    }
+    for page in pages {
+        page.labels.retain(|l| !marks.contains(&key(l)));
+    }
+}
+
+/// Lines of prose this many, of `PROSE_WORDS` words or more, make a page of
+/// instructions.
+const PROSE_LINES: usize = 5;
+const PROSE_WORDS: usize = 4;
+
+/// Whether a page's words are mostly prose to read: instructions, a
+/// warning, not a pattern's labels.
+fn is_prose(labels: &[Label]) -> bool {
+    labels
+        .iter()
+        .filter(|l| {
+            l.text
+                .split_whitespace()
+                .filter(|w| w.chars().any(char::is_alphabetic))
+                .count()
+                >= PROSE_WORDS
+        })
+        .count()
+        >= PROSE_LINES
+}
+
+/// A piece's lines, and its grainline, cut back to its outline: of a line
+/// crossing it, the longest part inside is kept; one wholly outside goes.
+fn clip_inside(piece: &mut Piece) {
+    let outline = flatten_segs(&piece.outline.path_segs(), 0.05);
+    let edges: Vec<Line> = outline
+        .iter()
+        .zip(outline.iter().cycle().skip(1))
+        .map(|(a, b)| Line::new(*a, *b))
+        .collect();
+    let inside_part = |segs: &[PathSeg]| -> Option<Vec<PathSeg>> {
+        // Each segment cut where it crosses the outline, each part in or
+        // out by its middle.
+        let mut parts: Vec<(PathSeg, bool)> = Vec::new();
+        for seg in segs {
+            let mut cuts: Vec<f64> = edges
+                .iter()
+                .flat_map(|e| seg.intersect_line(*e))
+                .filter(|x| (0.0..=1.0).contains(&x.line_t))
+                .map(|x| x.segment_t)
+                .filter(|t| *t > 1e-6 && *t < 1.0 - 1e-6)
+                .collect();
+            cuts.sort_by(f64::total_cmp);
+            cuts.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+            let mut from = 0.0;
+            for t in cuts.into_iter().chain([1.0]) {
+                let part = seg.subsegment(from..t);
+                parts.push((part, point_in_polygon(part.eval(0.5), &outline)));
+                from = t;
+            }
+        }
+        if parts.iter().all(|(_, inside)| *inside) {
+            return None;
+        }
+        // The longest run of parts inside.
+        let mut best: Option<(f64, usize, usize)> = None;
+        let mut k = 0;
+        while k < parts.len() {
+            if !parts[k].1 {
+                k += 1;
+                continue;
+            }
+            let start = k;
+            let mut length = 0.0;
+            while k < parts.len() && parts[k].1 {
+                length += parts[k].0.arclen(0.01);
+                k += 1;
+            }
+            if best.is_none_or(|(l, _, _)| length > l) {
+                best = Some((length, start, k));
+            }
+        }
+        Some(match best {
+            Some((_, a, b)) => parts[a..b].iter().map(|(p, _)| *p).collect(),
+            None => Vec::new(),
+        })
+    };
+    piece.lines.retain_mut(
+        |line| match inside_part(&segs_of(line.start, &line.segments)) {
+            None => true,
+            Some(part) if part.iter().map(|s| s.arclen(0.01)).sum::<f64>() < 1.0 => false,
+            Some(part) => {
+                line.start = Pt::from(part[0].start());
+                line.segments = to_segments(&part);
+                true
+            }
+        },
+    );
+    if let Some(g) = &mut piece.grainline {
+        let seg = PathSeg::Line(Line::new(Point::from(g.from), Point::from(g.to)));
+        if let Some(part) = inside_part(&[seg])
+            && let (Some(first), Some(last)) = (part.first(), part.last())
+            && first.start().distance(last.end()) >= 10.0
+        {
+            g.from = Pt::from(first.start());
+            g.to = Pt::from(last.end());
+        }
+    }
 }
 
 /// "+" marks on the pieces they sit inside.

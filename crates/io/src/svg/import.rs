@@ -412,5 +412,6 @@ pub fn import_svg(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         sizes: Default::default(),
         notes,
         sha256,
+        pages: Vec::new(),
     })
 }

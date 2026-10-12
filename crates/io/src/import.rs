@@ -227,6 +227,35 @@ fn measured(notes: &[ImportNote]) -> Vec<Id> {
         .collect()
 }
 
+/// Why a page of a PDF was left out.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum PageLeftOut {
+    /// Words to read (instructions, a warning, a size chart), no pattern.
+    Instructions,
+    /// Not joined to the pattern's other pages (a cover, a map of the
+    /// pages).
+    NotJoined,
+    /// Not among the pages chosen.
+    NotChosen,
+}
+
+/// A page of a PDF, and whether its pattern was used.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct PageUse {
+    /// Numbered from 1, as in the file.
+    pub number: u32,
+    /// The label it prints for putting the pages together ("1B"), if any.
+    #[serde(default)]
+    pub label: Option<String>,
+    /// Why it was left out; none when it was used.
+    #[serde(default)]
+    pub left_out: Option<PageLeftOut>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -240,6 +269,9 @@ pub struct ImportResult {
     pub notes: Vec<ImportNote>,
     /// SHA-256 of the imported file, hex.
     pub sha256: String,
+    /// A PDF's pages, and which were used; empty for other files.
+    #[serde(default)]
+    pub pages: Vec<PageUse>,
 }
 
 impl ImportResult {

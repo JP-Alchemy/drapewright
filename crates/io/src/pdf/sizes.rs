@@ -4,11 +4,15 @@
 //! is then assembled on its own, so nested size lines are never taken for
 //! a cutting line and its stitching line.
 
-use drapewright_pattern_core::geom::{flatten_segs, point_in_polygon, polygon_area};
-use kurbo::Point;
+use std::collections::HashMap;
+
+use drapewright_pattern_core::geom::{
+    distance_to_polyline, flatten_segs, label_point, point_in_polygon, polygon_area,
+};
+use kurbo::{Point, Rect};
 
 use super::import::{Label, Style};
-use crate::assemble::{MIN_PIECE_AREA, RawPath};
+use crate::assemble::{MIN_PIECE_AREA, RawPath, bounds};
 
 /// How each size's lines are told apart, and which paths draw each size.
 #[derive(Debug)]
@@ -156,6 +160,174 @@ fn by_layers(
     })
 }
 
+/// Whether two paths are drawn in the same line.
+fn same(a: &Style, b: &Style) -> bool {
+    a.stroke == b.stroke && a.dashed == b.dashed && a.width == b.width
+}
+
+/// Whether two outlines' boxes are about as big, and about in one place:
+/// the same piece in neighbouring sizes.
+fn alike(a: &Rect, b: &Rect) -> bool {
+    let ratio = a.area() / b.area().max(1e-9);
+    let reach = 0.15 * a.width().hypot(a.height());
+    (0.6..=1.7).contains(&ratio) && a.center().distance(b.center()) <= reach
+}
+
+/// A size's letter or number on its line is this near it, mm.
+const ON_LINE: f64 = 2.5;
+
+/// Sizes nested in fewer line styles than there are sizes, the styles
+/// taken in turn (A black, B black dashed, C red, D red dashed, E black
+/// again…): each piece's nest holds an outline for each size, smallest
+/// first, often with the size's name on its line. The lines inside the
+/// pieces, drawn once, are every size's.
+fn by_nesting(
+    paths: &[(RawPath, Style)],
+    labels: &[Label],
+    styles: &[(Style, usize, f64)],
+) -> Option<Sizes> {
+    // The outlines in the sizes' styles: (path, outline, area, box).
+    let outlines: Vec<(usize, Vec<Point>, f64, Rect)> = paths
+        .iter()
+        .enumerate()
+        .filter(|(_, (r, s))| is_outline(r) && styles.iter().any(|(t, _, _)| same(t, s)))
+        .map(|(i, (r, _))| {
+            let pts = flatten_segs(&r.segs, 0.5);
+            let area = polygon_area(&pts).abs();
+            let b = bounds(&pts);
+            (i, pts, area, b)
+        })
+        .collect();
+    // Nests: outlines alike, one inside the other.
+    let n = outlines.len();
+    let mut parent: Vec<usize> = (0..n).collect();
+    fn root(parent: &mut [usize], mut i: usize) -> usize {
+        while parent[i] != i {
+            parent[i] = parent[parent[i]];
+            i = parent[i];
+        }
+        i
+    }
+    for a in 0..n {
+        for b in a + 1..n {
+            let (oa, ob) = (&outlines[a], &outlines[b]);
+            if !alike(&oa.3, &ob.3) {
+                continue;
+            }
+            let (small, big) = if oa.2 < ob.2 { (oa, ob) } else { (ob, oa) };
+            if !point_in_polygon(label_point(&small.1).0, &big.1) {
+                continue;
+            }
+            let (ra, rb) = (root(&mut parent, a), root(&mut parent, b));
+            if ra != rb {
+                parent[ra] = rb;
+            }
+        }
+    }
+    let mut nests: HashMap<usize, Vec<usize>> = HashMap::new();
+    for k in 0..n {
+        let r = root(&mut parent, k);
+        nests.entry(r).or_default().push(k);
+    }
+    let mut nests: Vec<Vec<usize>> = nests.into_values().filter(|v| v.len() >= 2).collect();
+    for nest in &mut nests {
+        nest.sort_by(|&a, &b| outlines[a].2.total_cmp(&outlines[b].2));
+    }
+    nests.sort_by_key(|nest| outlines[nest[0]].0);
+    // As many sizes as most nests hold.
+    let style_of = |k: usize| &paths[outlines[k].0].1;
+    let mut lengths: HashMap<usize, usize> = HashMap::new();
+    for nest in &nests {
+        *lengths.entry(nest.len()).or_default() += 1;
+    }
+    let count = lengths
+        .iter()
+        .max_by_key(|(len, times)| (**times, **len))
+        .map(|(len, _)| *len)?;
+    let whole: Vec<&Vec<usize>> = nests.iter().filter(|nest| nest.len() == count).collect();
+    // Only when the styles come round in turn, two or more of them, and
+    // again: a cutting line round its stitching line, drawn alike, is no
+    // nest of sizes.
+    let in_turn = |nest: &&Vec<usize>| {
+        let mut kinds: Vec<&Style> = Vec::new();
+        for &k in nest.iter() {
+            if !kinds.iter().any(|s| same(s, style_of(k))) {
+                kinds.push(style_of(k));
+            }
+        }
+        let period = kinds.len();
+        period >= 2
+            && nest.len() > period
+            && nest
+                .iter()
+                .enumerate()
+                .all(|(x, &k)| same(style_of(k), style_of(nest[x % period])))
+    };
+    if count < 3 || !whole.iter().all(in_turn) {
+        return None;
+    }
+    // Each size's name: the name most often on its line.
+    let mut votes: Vec<HashMap<String, usize>> = vec![HashMap::new(); count];
+    for nest in &whole {
+        for l in labels {
+            if l.size > 6.0 || size_name(&l.text).is_none() {
+                continue;
+            }
+            let near = nest
+                .iter()
+                .enumerate()
+                .map(|(rank, &k)| (rank, distance_to_polyline(l.at, &outlines[k].1, true)))
+                .min_by(|a, b| a.1.total_cmp(&b.1));
+            if let Some((rank, d)) = near
+                && d <= ON_LINE
+            {
+                let name = size_name(&l.text).unwrap_or_default();
+                *votes[rank].entry(name).or_default() += 1;
+            }
+        }
+    }
+    let named: Vec<Option<String>> = votes
+        .iter()
+        .map(|v| {
+            v.iter()
+                .max_by(|a, b| a.1.cmp(b.1).then(b.0.cmp(a.0)))
+                .map(|(name, _)| name.clone())
+        })
+        .collect();
+    let mut distinct: Vec<&String> = named.iter().flatten().collect();
+    distinct.sort_unstable();
+    distinct.dedup();
+    let names: Vec<String> = if distinct.len() == count {
+        named.into_iter().flatten().collect()
+    } else {
+        (1..=count).map(|k| k.to_string()).collect()
+    };
+    // Each size's line, from a whole nest.
+    let first = whole.first()?;
+    let swatches = first
+        .iter()
+        .map(|&k| {
+            let s = style_of(k);
+            let [r, g, b] = s.stroke.unwrap_or([0, 0, 0]);
+            (format!("#{r:02x}{g:02x}{b:02x}"), s.dashed)
+        })
+        .collect();
+    // Each outline's size: its place in its nest, from the smallest (a
+    // nest short of some sizes, from its smallest too); everything else
+    // drawn in those styles is every size's.
+    let mut of_path: Vec<Option<usize>> = vec![None; paths.len()];
+    for nest in &nests {
+        for (rank, &k) in nest.iter().enumerate().take(count) {
+            of_path[outlines[k].0] = Some(rank);
+        }
+    }
+    Some(Sizes {
+        names,
+        swatches,
+        of_path,
+    })
+}
+
 /// Sizes told apart by their lines: three or more line styles that each
 /// draw outlines, or fewer with a legend naming them.
 fn by_lines(paths: &[(RawPath, Style)], labels: &[Label]) -> Option<Sizes> {
@@ -178,8 +350,9 @@ fn by_lines(paths: &[(RawPath, Style)], labels: &[Label]) -> Option<Sizes> {
             None => styles.push((key, 1, area)),
         }
     }
-    let same =
-        |a: &Style, b: &Style| a.stroke == b.stroke && a.dashed == b.dashed && a.width == b.width;
+    if let Some(sizes) = by_nesting(paths, labels, &styles) {
+        return Some(sizes);
+    }
     // A legend: a short line of a style, outside every outline, with words
     // just after it.
     let outlines: Vec<Vec<Point>> = paths
@@ -234,11 +407,6 @@ fn by_lines(paths: &[(RawPath, Style)], labels: &[Label]) -> Option<Sizes> {
                 .collect()
         };
         let all: Vec<Vec<kurbo::Rect>> = styles.iter().map(|(s, _, _)| boxes(s)).collect();
-        let alike = |a: &kurbo::Rect, b: &kurbo::Rect| {
-            let ratio = a.area() / b.area().max(1e-9);
-            let reach = 0.15 * a.width().hypot(a.height());
-            (0.6..=1.7).contains(&ratio) && a.center().distance(b.center()) <= reach
-        };
         let nested = all.iter().enumerate().all(|(i, mine)| {
             all.iter()
                 .enumerate()

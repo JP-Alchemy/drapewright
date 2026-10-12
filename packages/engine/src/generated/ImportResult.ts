@@ -2,6 +2,7 @@
 import type { AllowanceQuestion } from "./AllowanceQuestion";
 import type { ImportNote } from "./ImportNote";
 import type { ImportSizes } from "./ImportSizes";
+import type { PageUse } from "./PageUse";
 import type { Piece } from "./Piece";
 import type { ScaleInfo } from "./ScaleInfo";
 
@@ -13,4 +14,8 @@ sizes: ImportSizes, notes: Array<ImportNote>,
 /**
  * SHA-256 of the imported file, hex.
  */
-sha256: string, };
+sha256: string, 
+/**
+ * A PDF's pages, and which were used; empty for other files.
+ */
+pages: Array<PageUse>, };
