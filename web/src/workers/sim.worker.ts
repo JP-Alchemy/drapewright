@@ -59,6 +59,7 @@ interface Drape {
   quietly: boolean
   leftOut: string[]
   inside: string[]
+  betweenLegs: string[]
   finish: (last: DrapeUpdate | null) => void
   told: { stage: string; at: number }
 }
@@ -104,7 +105,12 @@ function moveDrape(d: Drape) {
   do progress = d.draping.step()
   while (!done(progress) && performance.now() - start < budget)
   if (!d.quietly || done(progress)) view?.showCloth(d.draping)
-  const update: DrapeUpdate = { ...progress, leftOut: d.leftOut, inside: d.inside }
+  const update: DrapeUpdate = {
+    ...progress,
+    leftOut: d.leftOut,
+    inside: d.inside,
+    betweenLegs: d.betweenLegs,
+  }
   const now = performance.now()
   if (done(progress)) {
     stopDrape(update)
@@ -172,6 +178,7 @@ const handlers: { [M in keyof SimMethods]: (...args: Parameters<SimMethods[M]>) 
         quietly,
         leftOut: draping.leftOut,
         inside: draping.inside,
+        betweenLegs: draping.betweenLegs,
         finish,
         told: { stage: '', at: 0 },
       }

@@ -6,7 +6,7 @@ use drapewright_body::{BodyModel, Shape};
 use drapewright_sim::drape::Drape;
 use drapewright_sim::fabric::preset;
 use drapewright_sim::garment::{assemble, draped_pieces};
-use drapewright_sim::place::{Figure, place};
+use drapewright_sim::place::{Figure, half_round, place};
 
 fn avatar() -> BodyModel {
     let path = concat!(
@@ -226,9 +226,10 @@ fn a_blouse_laid_out_on_its_side_drapes_sewn_as_its_seams_are_found() {
             ..s.seam
         })
         .collect();
-    let (sewn, alone, inside) = draped_pieces(&pieces, &seams);
-    assert!(alone.is_empty(), "{alone:?}");
-    assert_eq!(inside, ["facing"]);
+    let draped = draped_pieces(&pieces, &seams);
+    let sewn = draped.sewn;
+    assert!(draped.alone.is_empty(), "{:?}", draped.alone);
+    assert_eq!(draped.inside, ["facing"]);
     let model = avatar();
     let body = model.shape(&Shape::default());
     let figure = Figure::of(&model, &body);
@@ -312,5 +313,57 @@ fn a_blouse_laid_out_on_its_side_drapes_sewn_as_its_seams_are_found() {
             }
             _ => {}
         }
+    }
+}
+
+/// The seams found for `pieces`, confirmed.
+fn found(pieces: &[drapewright_pattern_core::Piece]) -> Vec<drapewright_seams::Seam> {
+    drapewright_seams::suggest(pieces, &[])
+        .into_iter()
+        .enumerate()
+        .map(|(k, s)| drapewright_seams::Seam {
+            id: format!("s{k}"),
+            confirmed: true,
+            ..s.seam
+        })
+        .collect()
+}
+
+#[test]
+fn a_corset_is_put_on_by_its_waist_line_its_crotch_piece_left_off() {
+    use drapewright_pattern_core::testing::garments::corset;
+    // Cut once, as the pattern leaves its panels: half way round, from the
+    // centre front to the centre back, and said so.
+    let pieces = corset(false);
+    let seams = found(&pieces);
+    let draped = draped_pieces(&pieces, &seams);
+    assert_eq!(draped.alone, ["cr"]);
+    assert!(half_round(&assemble(&draped.sewn, &seams, 20.0).unwrap()));
+    // Cut as pairs: all the way round, the crotch piece (between the legs)
+    // left off ...
+    let pieces = corset(true);
+    let seams = found(&pieces);
+    let draped = draped_pieces(&pieces, &seams);
+    assert!(draped.alone.is_empty(), "{:?}", draped.alone);
+    assert_eq!(draped.between_legs, ["cr"]);
+    let garment = assemble(&draped.sewn, &seams, 20.0).unwrap();
+    assert!(!half_round(&garment));
+    assert_eq!(garment.panels.len(), 6);
+    // ... and each panel put on with its waist line at the avatar's waist,
+    // not hung from its top.
+    let model = avatar();
+    let body = model.shape(&Shape::default());
+    let figure = Figure::of(&model, &body);
+    let starts = place(&garment, &figure);
+    for (k, panel) in garment.panels.iter().enumerate() {
+        let waist = panel.waist.expect("a waist line");
+        let off = panel
+            .mesh
+            .points
+            .iter()
+            .zip(&starts[k])
+            .map(|(q, p)| (p[1] - figure.waist) - (q[1] - waist))
+            .fold(0.0f64, |m, d| m.max(d.abs()));
+        assert!(off < 0.5, "{} {:?}: {off} mm off", panel.piece, panel.copy);
     }
 }

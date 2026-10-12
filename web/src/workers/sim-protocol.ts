@@ -15,6 +15,8 @@ export interface DrapeUpdate extends DrapeProgress {
   leftOut: string[]
   /** The facings and linings left out, as they go inside, by id. */
   inside: string[]
+  /** The pieces between the legs (a crotch) left out, by id. */
+  betweenLegs: string[]
 }
 
 /** What the sim worker can be asked, and what each answers. */

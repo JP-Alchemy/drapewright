@@ -12,6 +12,82 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 33 — A corset drawn for one side, draped
+
+Corset patterns often draw each panel once, for one side, with no notches:
+the bust, underbust, waist and hip lines drawn across the panels say where
+they are sewn. **Find seams** now reads those lines, and a corset goes on
+the avatar by its waist line. Before, the corset in the free pattern from
+Step 32 got six seams, several of them wrong, hung from its waist like a
+skirt, and was dragged out of place by its crotch pieces.
+
+**Try it** (with the free corset pattern in 13 sizes from Step 32):
+
+1. **Open pattern**, choose the PDF, pick a size (C, say) and **Add 10
+   pieces**.
+2. The pattern doesn't print how many of each piece to cut. Select each of
+   the seven panels (Front Center, Front Middle, Front Middle Side, Front
+   Side, Back Side, Back Middle and Back Center) and, under **Cutting**, set
+   **How many** to 2, as mirrored pairs.
+3. In **Seams**, press **Find seams**. Fifteen seams are suggested:
+   * the panels side by side, where their bust, waist and hip lines meet
+     (**lines across meet**). Front Center runs on below Front Middle,
+     which is sewn along its upper part;
+   * the centre front and the centre back, each to its other half
+     (**centre of a pair**): the busk and the lacing, closed for now;
+   * the crotch front to the crotch back (**notches match**), the crotch
+     front along both Front Centers' lower edges, and the crotch back along
+     the backs' (**fits along the opening**).
+4. **Sew all 15**, open the **Avatar** and press **Drape**. The corset goes
+   on with its waist line at the avatar's waist and settles round the
+   bust, waist and hips. The status line says one piece is left off (the
+   modesty panel, sewn to nothing) and that the two crotch pieces are left
+   off: the avatar can't wear pieces between the legs yet.
+
+With the panels left cut once, **Find seams** finds only the seven seams
+between panels, and **Drape** says the pieces sewn go only half way round
+the body, from a front to a back. Set **How many** to 2 on the panels and
+press **Find seams** again: it adds the eight that were missing.
+
+A project sewn with the earlier suggestions keeps its seams, and several of
+them were wrong. Set the panels to 2, unpick the seams and **Find seams**
+again.
+
+Size C is made for a 57.5 cm waist, smaller than the avatar's: a corset
+pulls the waist in. The avatar's body doesn't give way yet, so the corset
+stretches round it.
+
+**How it works:**
+
+* *Lines that meet.* Where a line across a piece (bust, waist, hip,
+  lengthen or shorten here) ends on an edge, it marks the edge. Two edges
+  whose marks fall in the same places (two at least, and most of them,
+  within 3 mm) are as likely sewn together as two edges as long as each
+  other. Where one edge is longer, the shorter is sewn along the part of it
+  where the marks meet. Marks at a corner, hatching, and marks evenly
+  spaced (a ruffle marked in equal parts) say nothing; nor do a piece's
+  copies (a lining, the other sleeve), whose lines lie where its own do.
+  Between panels marked this way, a seam whose lines don't meet (one
+  panel's top to another's) needs more than a matching length.
+* *Centres.* A centre front or back may be shaped a little at the waist:
+  up to 2% of its length off straight.
+* *Along an opening.* A piece left over is sewn along a run of the
+  garment's free edges as long as its own edge, across the centre seam
+  there: a crotch piece along both front panels' lower edges. Only where
+  just one run fits.
+* *Lines named.* Words printed along a line (BUST, WAIST, HIGH HIP) name
+  it.
+* *Put on by the waist.* A ring of pieces hung from nothing, each with a
+  line named for the waist, goes on with those lines at the avatar's
+  waist: a corset is put on at the waist, not hung from its top.
+* *Between the legs.* Pieces named crotch or gusset are left off the
+  drape for now.
+* *Half way round.* A ring of panels open from a front to a back goes only
+  half way round the body, as a pattern drawn for one side and cut once
+  does. **Drape** says so rather than drape half a corset.
+
+---
+
 ## Step 32 — PDFs with pages of instructions, and sizes drawn in turn
 
 Many PDF patterns start (or end) with pages of words: a warning, how to

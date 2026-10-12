@@ -7,7 +7,7 @@ use drapewright_pattern_core::Piece;
 use drapewright_seams::Seam;
 use drapewright_sim::drape::Drape;
 use drapewright_sim::garment::{GarmentError, assemble, draped_pieces};
-use drapewright_sim::place::{Figure, place};
+use drapewright_sim::place::{Figure, half_round, place};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -69,6 +69,9 @@ pub struct DrapeProgress {
 pub enum DrapeError {
     /// No confirmed seams: nothing is sewn to anything.
     NothingSewn,
+    /// The pieces sewn go only half way round the body: a pattern for one
+    /// side, its pieces cut once.
+    HalfRound,
     Garment(GarmentError),
 }
 
@@ -76,6 +79,11 @@ impl std::fmt::Display for DrapeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DrapeError::NothingSewn => f.write_str("no seams are sewn yet"),
+            DrapeError::HalfRound => f.write_str(
+                "the pieces sewn go only half way round the body, from a front to a back. \
+                 Under Cutting, set How many to 2 (a left and a right) on the pieces cut as \
+                 pairs, then press Find seams again",
+            ),
             DrapeError::Garment(e) => e.fmt(f),
         }
     }
@@ -91,12 +99,15 @@ pub struct Draping {
     pub left_out: Vec<String>,
     /// The facings and linings, by id: left out, as they go inside.
     pub inside: Vec<String>,
+    /// The pieces between the legs (a crotch), by id: left out.
+    pub between_legs: Vec<String>,
     done: Option<DrapeStage>,
 }
 
 impl Draping {
     /// Starts draping: the pieces sewn by confirmed seams, but for facings
-    /// and linings, placed round the avatar and let go.
+    /// and linings and pieces between the legs, placed round the avatar and
+    /// let go.
     pub fn start(model: &BodyModel, request: &DrapeRequest) -> Result<Draping, DrapeError> {
         let seams: Vec<Seam> = request
             .seams
@@ -104,11 +115,15 @@ impl Draping {
             .filter(|s| s.confirmed)
             .cloned()
             .collect();
-        let (sewn, left_out, inside) = draped_pieces(&request.pieces, &seams);
+        let draped = draped_pieces(&request.pieces, &seams);
+        let sewn = draped.sewn;
         if sewn.is_empty() {
             return Err(DrapeError::NothingSewn);
         }
         let garment = assemble(&sewn, &seams, SPACING).map_err(DrapeError::Garment)?;
+        if half_round(&garment) {
+            return Err(DrapeError::HalfRound);
+        }
         let body = model.shape(&Shape::from(request.settings.clone()));
         let starts = place(&garment, &Figure::of(model, &body));
         let drape = Drape::new(
@@ -121,8 +136,9 @@ impl Draping {
         );
         Ok(Draping {
             drape,
-            left_out,
-            inside,
+            left_out: draped.alone,
+            inside: draped.inside,
+            between_legs: draped.between_legs,
             done: None,
         })
     }

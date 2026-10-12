@@ -197,13 +197,14 @@ fn sewn(pieces: Vec<Piece>, seams: Vec<Seam>) -> (Vec<Piece>, Vec<Seam>) {
             if s.reversed { ", reversed" } else { "" },
         );
     }
-    let (sewn, alone, inside) = draped_pieces(&pieces, &seams);
+    let draped = draped_pieces(&pieces, &seams);
     eprintln!(
-        "left out: {} sewn to nothing, {} inside",
-        alone.len(),
-        inside.len()
+        "left out: {} sewn to nothing, {} inside, {} between the legs",
+        draped.alone.len(),
+        draped.inside.len(),
+        draped.between_legs.len()
     );
-    (sewn, seams)
+    (draped.sewn, seams)
 }
 
 fn main() {
@@ -234,6 +235,9 @@ fn main() {
         path => project(path, rest.get(2).is_some_and(|s| s == "suggest")),
     };
     let garment = assemble(&pieces, &seams, 20.0).expect("a garment");
+    if drapewright_sim::place::half_round(&garment) {
+        eprintln!("only half way round: cut as pairs?");
+    }
     let starts = place(&garment, &figure);
     let mut drape = Drape::new(&garment, &starts, fabric, (&body.vertices, &triangles));
     let draw = |name: &str, drape: &Drape| {

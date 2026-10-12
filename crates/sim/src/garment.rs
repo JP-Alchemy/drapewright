@@ -9,6 +9,7 @@
 use std::collections::HashMap;
 use std::fmt;
 
+use drapewright_pattern_core::geom::{flatten_segs, segs_of};
 use drapewright_pattern_core::stitching::{
     closed_along, dart_spans, opened_along, stitching_edges,
 };
@@ -58,6 +59,9 @@ pub struct Panel {
     /// Along the grain, flat (a unit vector).
     pub grain: [f64; 2],
     pub edges: Vec<PanelEdge>,
+    /// How high its line named for the waist is, flat: where it goes on the
+    /// body (a corset is put on by its waist, not hung from it).
+    pub waist: Option<f64>,
 }
 
 impl Panel {
@@ -152,6 +156,8 @@ struct Layout {
     darts: Vec<Vec<(f64, f64)>>,
     /// The piece's marks (buttons, say) where they are on the panel.
     marks: Vec<(MarkKind, P2)>,
+    /// How high its line named for the waist is.
+    waist: Option<f64>,
 }
 
 fn reflect(p: P2, a: P2, b: P2) -> P2 {
@@ -310,6 +316,22 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
             .iter()
             .map(|m| (m.kind, quarter_turned([m.at.x, -m.at.y], quarters)))
             .collect();
+        // Where its line named for the waist is, on average.
+        let waist = piece
+            .lines
+            .iter()
+            .find(|l| {
+                l.label
+                    .as_deref()
+                    .is_some_and(|t| t.to_lowercase().contains("waist"))
+            })
+            .map(|l| {
+                let pts = flatten_segs(&segs_of(l.start, &l.segments), 0.5);
+                pts.iter()
+                    .map(|p| quarter_turned([p.x, -p.y], quarters)[1])
+                    .sum::<f64>()
+                    / pts.len().max(1) as f64
+            });
         let fold = kinds.iter().position(|(_, kind)| *kind == EdgeKind::Fold);
         let on_fold = cut.on_fold.unwrap_or(fold.is_some()) && fold.is_some();
         let pair = cut.quantity >= 2 && cut.mirrored.unwrap_or(true);
@@ -345,6 +367,7 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                 fold: Some((a, b)),
                 darts,
                 marks: marks.clone(),
+                waist,
             });
             continue;
         }
@@ -376,6 +399,7 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                     .iter()
                     .map(|&(k, m)| (k, [flip * m[0], m[1]]))
                     .collect(),
+                waist,
             });
         }
     }
@@ -653,21 +677,42 @@ pub fn inside(piece: &Piece) -> bool {
         || (!piece.cut.is_empty() && piece.cut.iter().all(|c| lining(&c.material)))
 }
 
+/// Whether a piece goes between the legs (a bodysuit's crotch, a gusset):
+/// the drape does not yet place pieces there.
+pub fn between_legs(piece: &Piece) -> bool {
+    let name = piece.name.to_lowercase();
+    name.contains("crotch") || name.contains("gusset")
+}
+
+/// What a drape is made of, and what is left out of it (by id).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Draped {
+    /// The pieces sewn by confirmed seams, less those left out below.
+    pub sewn: Vec<Piece>,
+    /// Sewn to nothing.
+    pub alone: Vec<Id>,
+    /// Facings and linings: they go inside.
+    pub inside: Vec<Id>,
+    /// Pieces between the legs.
+    pub between_legs: Vec<Id>,
+}
+
 /// What a drape is made of: the pieces sewn by confirmed seams, less
-/// facings and linings; and, left out, the pieces sewn to nothing and the
-/// facings and linings (by id).
-pub fn draped_pieces(pieces: &[Piece], seams: &[Seam]) -> (Vec<Piece>, Vec<Id>, Vec<Id>) {
-    let (mut sewn, mut alone, mut within) = (Vec::new(), Vec::new(), Vec::new());
+/// facings and linings and pieces between the legs; and those left out.
+pub fn draped_pieces(pieces: &[Piece], seams: &[Seam]) -> Draped {
+    let mut out = Draped::default();
     for piece in pieces {
         if inside(piece) {
-            within.push(piece.id.clone());
-        } else if seams.iter().any(|s| s.confirmed && s.touches(&piece.id)) {
-            sewn.push(piece.clone());
+            out.inside.push(piece.id.clone());
+        } else if !seams.iter().any(|s| s.confirmed && s.touches(&piece.id)) {
+            out.alone.push(piece.id.clone());
+        } else if between_legs(piece) {
+            out.between_legs.push(piece.id.clone());
         } else {
-            alone.push(piece.id.clone());
+            out.sewn.push(piece.clone());
         }
     }
-    (sewn, alone, within)
+    out
 }
 
 /// Lays out the pieces, sews them by `seams` (confirmed ones only), and
@@ -861,6 +906,7 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             mesh: m,
             grain: layout.grain,
             edges: by_layout.into_iter().flatten().collect(),
+            waist: layout.waist,
         });
     }
     // Stitches: the two runs of each seam, point for point.

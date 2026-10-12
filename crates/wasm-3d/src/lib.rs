@@ -177,6 +177,12 @@ impl Draping {
         self.0.inside.clone()
     }
 
+    /// The pieces between the legs (a crotch) left out, by id.
+    #[wasm_bindgen(getter, js_name = betweenLegs)]
+    pub fn between_legs(&self) -> Vec<String> {
+        self.0.between_legs.clone()
+    }
+
     /// Moves the drape on a frame, giving a `DrapeProgress`.
     pub fn step(&mut self) -> Result<JsValue, JsError> {
         self.0

@@ -913,6 +913,12 @@ export const t = {
         'A facing or lining is left off: it goes inside.',
         '# facings and linings are left off: they go inside.',
       ),
+    betweenLegs: (n: number) =>
+      plural(
+        n,
+        'The crotch piece is left off: the avatar can’t wear pieces between the legs yet.',
+        'The # crotch pieces are left off: the avatar can’t wear pieces between the legs yet.',
+      ),
     cannotDrape: (why: string) => `This can’t be draped yet: ${why}.`,
     shows: 'Show the cloth as',
     showsAs: { fabric: 'Fabric', pull: 'Pulling', room: 'Room' } satisfies Record<

@@ -538,8 +538,23 @@ fn spanned(g: &Garment, p: usize, partners: &[(usize, u32, [f64; 3])]) -> Vec<[f
     x
 }
 
-/// Where each panel's points start, the panels upright (see `place`).
-fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
+/// Who is beside whom in a garment: its panels' boxes, the panels joined
+/// side by side to each (this side, the other panel, its side, this
+/// panel's edge there), those joined above and below (each with its edge's
+/// mean height there), and its rings: panels joined side by side in order
+/// round the body (each turned over or not), whether each closes, and each
+/// panel's ring.
+struct Traced {
+    boxes: Vec<([f64; 2], [f64; 2])>,
+    beside: Vec<Vec<(Side, usize, Side, usize)>>,
+    level: Vec<(usize, f64, usize, f64)>,
+    rings: Vec<Vec<(usize, bool)>>,
+    closed: Vec<bool>,
+    ring_of: Vec<usize>,
+    names: Vec<String>,
+}
+
+fn trace(g: &Garment) -> Traced {
     let n = g.panels.len();
     let boxes: Vec<_> = (0..n).map(|p| panel_box(g, p)).collect();
     // Upright links join panels side by side; level ones join them above
@@ -647,6 +662,44 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
         rings.push(ring);
         closed.push(round);
     }
+    Traced {
+        boxes,
+        beside,
+        level,
+        rings,
+        closed,
+        ring_of,
+        names,
+    }
+}
+
+/// Whether a garment goes only half way round the body: its largest ring
+/// runs from a front to a back without closing (a pattern drawn for one
+/// side, its pieces cut once where they should be cut as pairs).
+pub fn half_round(g: &Garment) -> bool {
+    let t = trace(g);
+    let Some(r) = (0..t.rings.len()).max_by_key(|&r| t.rings[r].len()) else {
+        return false;
+    };
+    let ring = &t.rings[r];
+    let (first, last) = (&t.names[ring[0].0], &t.names[ring[ring.len() - 1].0]);
+    let front_and_back = (first.contains("front") && last.contains("back"))
+        || (first.contains("back") && last.contains("front"));
+    ring.len() >= 2 && !t.closed[r] && front_and_back
+}
+
+/// Where each panel's points start, the panels upright (see `place`).
+fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
+    let Traced {
+        boxes,
+        beside,
+        level,
+        rings,
+        closed,
+        ring_of,
+        names,
+    } = trace(g);
+    let n = g.panels.len();
     // Bridges: a panel joined to nothing side by side but sewn by two or
     // more of its edges to others (a yoke, between a front and a back over
     // the shoulder) goes between them once they are placed.
@@ -756,67 +809,80 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
         (left < right).then_some((left, right))
     };
     // A ring round the trunk, hanging from `top`: each panel's points.
-    let wrap_trunk = |ring: &[(usize, bool)], round: bool, top: f64| -> Vec<Vec<[f64; 3]>> {
-        // The front's middle in front, a back's behind; otherwise the
-        // first panel's middle in front. A ring open between two fronts
-        // (buttoned down the front) meets itself in front.
-        let front = ring
-            .iter()
-            .position(|&(p, _)| names[p].contains("front"))
-            .unwrap_or(0);
-        let behind = names[ring[front].0].contains("back");
-        let open_front = !round
-            && ring.len() >= 2
-            && names[ring[0].0].contains("front")
-            && names[ring[ring.len() - 1].0].contains("front");
-        // The ring at each height (every 5 mm): each panel's span there (or
-        // none), and the oval it goes round.
-        let key = |y: f64| (y / 5.0).round() as i64;
-        let mut rows: HashMap<i64, Row> = HashMap::new();
-        for &(p, _) in ring {
-            for q in &g.panels[p].mesh.points {
-                let y = top - (boxes[p].1[1] - q[1]);
-                rows.entry(key(y)).or_insert_with(|| {
-                    let spans: Spans = ring
-                        .iter()
-                        .map(|&(o, _)| between_seams(o, boxes[o].1[1] - (top - y)))
-                        .collect();
-                    let around: f64 = spans.iter().flatten().map(|(a, b)| b - a).sum();
-                    (spans, Oval::round(figure.smoothed(y), around))
-                });
-            }
+    // How far up each panel goes from the panel's flat y, for a ring
+    // whose top is at `top`: each by its waist line where every panel of a
+    // ring has one and it is not hung from something placed (a corset at
+    // the waist, bust and hips where they go), else by its top.
+    let raise = |ring: &[(usize, bool)], top: f64, by_waist: bool| -> Vec<f64> {
+        let waists: Option<Vec<f64>> = ring.iter().map(|&(p, _)| g.panels[p].waist).collect();
+        match waists {
+            Some(waists) if by_waist => waists.iter().map(|w| figure.waist - w).collect(),
+            _ => ring.iter().map(|&(p, _)| top - boxes[p].1[1]).collect(),
         }
-        let mut placed = Vec::new();
-        for (k, &(p, turned)) in ring.iter().enumerate() {
-            let (_, high) = boxes[p];
-            let mut points = Vec::new();
-            for q in &g.panels[p].mesh.points {
-                let y = top - (high[1] - q[1]);
-                let (spans, oval) = &rows[&key(y)];
-                let perimeter = oval.perimeter();
-                let width = |j: usize| spans[j].map_or(0.0, |(a, b)| b - a);
-                let offset: f64 = (0..k).map(width).sum();
-                let (left, right) = spans[k].unwrap_or((q[0], q[0]));
-                let u = if turned { right - q[0] } else { q[0] - left };
-                let middle: f64 = if open_front {
-                    0.0
-                } else {
-                    (0..front).map(width).sum::<f64>() + width(front) / 2.0
-                };
-                // Round the whole oval: a garment smaller than it starts
-                // stretched, to close onto the body.
-                let around: f64 = (0..ring.len()).map(width).sum();
-                let stretch = (perimeter / around.max(1.0)).max(1.0);
-                let s =
-                    (offset + u - middle) * stretch + if behind { perimeter / 2.0 } else { 0.0 };
-                let [x, z] = oval.at(s);
-                let middle = figure.smoothed(y).middle;
-                points.push([x + middle[0], y, z + middle[1]]);
-            }
-            placed.push(points);
-        }
-        placed
     };
+    let wrap_trunk =
+        |ring: &[(usize, bool)], round: bool, top: f64, by_waist: bool| -> Vec<Vec<[f64; 3]>> {
+            let raised = raise(ring, top, by_waist);
+            // The front's middle in front, a back's behind; otherwise the
+            // first panel's middle in front. A ring open between two fronts
+            // (buttoned down the front) meets itself in front.
+            let front = ring
+                .iter()
+                .position(|&(p, _)| names[p].contains("front"))
+                .unwrap_or(0);
+            let behind = names[ring[front].0].contains("back");
+            let open_front = !round
+                && ring.len() >= 2
+                && names[ring[0].0].contains("front")
+                && names[ring[ring.len() - 1].0].contains("front");
+            // The ring at each height (every 5 mm): each panel's span there (or
+            // none), and the oval it goes round.
+            let key = |y: f64| (y / 5.0).round() as i64;
+            let mut rows: HashMap<i64, Row> = HashMap::new();
+            for (k, &(p, _)) in ring.iter().enumerate() {
+                for q in &g.panels[p].mesh.points {
+                    let y = q[1] + raised[k];
+                    rows.entry(key(y)).or_insert_with(|| {
+                        let spans: Spans = ring
+                            .iter()
+                            .enumerate()
+                            .map(|(j, &(o, _))| between_seams(o, y - raised[j]))
+                            .collect();
+                        let around: f64 = spans.iter().flatten().map(|(a, b)| b - a).sum();
+                        (spans, Oval::round(figure.smoothed(y), around))
+                    });
+                }
+            }
+            let mut placed = Vec::new();
+            for (k, &(p, turned)) in ring.iter().enumerate() {
+                let mut points = Vec::new();
+                for q in &g.panels[p].mesh.points {
+                    let y = q[1] + raised[k];
+                    let (spans, oval) = &rows[&key(y)];
+                    let perimeter = oval.perimeter();
+                    let width = |j: usize| spans[j].map_or(0.0, |(a, b)| b - a);
+                    let offset: f64 = (0..k).map(width).sum();
+                    let (left, right) = spans[k].unwrap_or((q[0], q[0]));
+                    let u = if turned { right - q[0] } else { q[0] - left };
+                    let middle: f64 = if open_front {
+                        0.0
+                    } else {
+                        (0..front).map(width).sum::<f64>() + width(front) / 2.0
+                    };
+                    // Round the whole oval: a garment smaller than it starts
+                    // stretched, to close onto the body.
+                    let around: f64 = (0..ring.len()).map(width).sum();
+                    let stretch = (perimeter / around.max(1.0)).max(1.0);
+                    let s = (offset + u - middle) * stretch
+                        + if behind { perimeter / 2.0 } else { 0.0 };
+                    let [x, z] = oval.at(s);
+                    let middle = figure.smoothed(y).middle;
+                    points.push([x + middle[0], y, z + middle[1]]);
+                }
+                placed.push(points);
+            }
+            placed
+        };
     // A ring round an arm (a sleeve), sewn to points already placed
     // (`partners`: its panel, point, and where what it is sewn to is):
     // each panel's points.
@@ -927,7 +993,7 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
     // another.
     for (r, ring) in rings.iter().enumerate() {
         if let Some(top) = tops[r] {
-            for (&(p, _), points) in ring.iter().zip(wrap_trunk(ring, closed[r], top)) {
+            for (&(p, _), points) in ring.iter().zip(wrap_trunk(ring, closed[r], top, false)) {
                 out[p] = points;
             }
         }
@@ -1021,7 +1087,7 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
             .flatten();
         let placed = match arm {
             Some(arm) => wrap_arm(ring, arm, &found),
-            None => wrap_trunk(ring, closed[r], figure.waist + 20.0),
+            None => wrap_trunk(ring, closed[r], figure.waist + 20.0, true),
         };
         for (&(p, _), points) in ring.iter().zip(placed) {
             out[p] = points;

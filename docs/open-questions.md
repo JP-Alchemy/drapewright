@@ -173,3 +173,20 @@ matters.
     up when it is draped: to the other front's buttonholes, or to its edge
     where it has loops instead. *Provisional: always done up. Should she be
     able to see it open?*
+32. ☐ **Pieces drawn once, for one side.** Corset patterns often draw each
+    panel once and don't print how many to cut. *Provisional: each piece is
+    cut as the pattern says, once if it says nothing; when the pieces sewn
+    go only half way round the body, Drape says so and asks for 2 on the
+    panels.* Should Drapewright offer to set them itself?
+33. ☐ **A busk and lacing.** A corset opens at the centre front (a busk)
+    and laces at the centre back. *Provisional: Find seams sews each centre
+    to its other half, and the drape keeps both closed.* Should the back
+    drape laced with a gap (often about 5 cm)?
+34. ☐ **Crotch pieces on the avatar.** A bodysuit's crotch pieces are sewn
+    between the legs. *Provisional: left off the drape, and the status line
+    says so, until the avatar can keep cloth between its legs.*
+35. ☐ **A corset smaller than the body.** A corset's waist is made smaller
+    than the waist it goes on, to pull it in. The avatar's body doesn't give
+    way, so the corset is stretched round it. *Provisional: stretched
+    cloth.* Should the avatar's waist draw in to the corset's, and say by
+    how much?

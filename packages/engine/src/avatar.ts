@@ -79,6 +79,11 @@ export class Draping {
     return drapings.get(this)!.inside
   }
 
+  /** The pieces between the legs (a crotch) left out, by id. */
+  get betweenLegs(): string[] {
+    return drapings.get(this)!.betweenLegs
+  }
+
   /** Moves the drape on a frame (1/60 s of the cloth's time). */
   step(): DrapeProgress {
     return drapings.get(this)!.step() as DrapeProgress

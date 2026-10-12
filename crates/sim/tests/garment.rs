@@ -314,7 +314,7 @@ fn yoked() -> (
 #[test]
 fn pieces_laid_on_their_side_are_stood_upright() {
     let (pieces, seams) = yoked();
-    let (sewn, _, _) = drapewright_sim::garment::draped_pieces(&pieces, &seams);
+    let sewn = drapewright_sim::garment::draped_pieces(&pieces, &seams).sewn;
     let g = assemble(&sewn, &seams, 20.0).unwrap();
     for panel in &g.panels {
         // Up the panel is up the body: the grain up and down it ...
@@ -352,9 +352,10 @@ fn pieces_laid_on_their_side_are_stood_upright() {
 #[test]
 fn facings_are_left_inside_and_fronts_buttoned() {
     let (pieces, seams) = yoked();
-    let (sewn, alone, inside) = drapewright_sim::garment::draped_pieces(&pieces, &seams);
-    assert!(alone.is_empty());
-    assert_eq!(inside, ["facing"]);
+    let draped = drapewright_sim::garment::draped_pieces(&pieces, &seams);
+    let sewn = draped.sewn;
+    assert!(draped.alone.is_empty());
+    assert_eq!(draped.inside, ["facing"]);
     assert!(sewn.iter().all(|p| p.id != "facing"));
     let g = assemble(&sewn, &seams, 20.0).unwrap();
     // Each of the left front's five buttons held to the right front's edge.
