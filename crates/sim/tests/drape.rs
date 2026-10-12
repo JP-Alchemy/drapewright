@@ -366,4 +366,25 @@ fn a_corset_is_put_on_by_its_waist_line_its_crotch_piece_left_off() {
             .fold(0.0f64, |m, d| m.max(d.abs()));
         assert!(off < 0.5, "{} {:?}: {off} mm off", panel.piece, panel.copy);
     }
+    // Its centre front, where the centre front's halves are sewn, at the
+    // front of the body, not off to one side.
+    for (k, panel) in garment.panels.iter().enumerate() {
+        let Some(centre) = panel.edges.iter().find(|e| e.edge == "fcl") else {
+            continue;
+        };
+        for &i in &centre.points {
+            let p = starts[k][i as usize];
+            let section = figure
+                .sections
+                .iter()
+                .min_by(|a, b| (a.y - p[1]).abs().total_cmp(&(b.y - p[1]).abs()))
+                .unwrap();
+            let across = p[0] - section.middle[0];
+            assert!(
+                across.abs() < 5.0 && p[2] > section.middle[1],
+                "{:?}: the centre front {across:.1} mm across",
+                panel.copy
+            );
+        }
+    }
 }

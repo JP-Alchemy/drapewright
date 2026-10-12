@@ -823,14 +823,31 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
     let wrap_trunk =
         |ring: &[(usize, bool)], round: bool, top: f64, by_waist: bool| -> Vec<Vec<[f64; 3]>> {
             let raised = raise(ring, top, by_waist);
-            // The front's middle in front, a back's behind; otherwise the
-            // first panel's middle in front. A ring open between two fronts
+            // In front: the seam between a front's two halves, where they
+            // are sewn at its centre (a pair's copies side by side), else a
+            // front's middle (cut on the fold, say); failing a front, a
+            // back's centre or middle goes behind; failing both, the first
+            // panel's middle in front. A ring open between two fronts
             // (buttoned down the front) meets itself in front.
-            let front = ring
-                .iter()
-                .position(|&(p, _)| names[p].contains("front"))
-                .unwrap_or(0);
-            let behind = names[ring[front].0].contains("back");
+            let n = ring.len();
+            let named = |k: usize, word: &str| names[ring[k].0].contains(word);
+            // Whether the seam before `ring[k]` joins one piece's halves.
+            let halves = |k: usize| {
+                n >= 2
+                    && (k > 0 || round)
+                    && g.panels[ring[(k + n - 1) % n].0].piece == g.panels[ring[k].0].piece
+            };
+            let centre = |word: &str| {
+                (0..n)
+                    .find(|&k| halves(k) && named(k, word))
+                    .map(|k| (k, true))
+                    .or_else(|| (0..n).find(|&k| named(k, word)).map(|k| (k, false)))
+            };
+            let ((front, at_seam), behind) = match (centre("front"), centre("back")) {
+                (Some(c), _) => (c, false),
+                (None, Some(c)) => (c, true),
+                (None, None) => ((0, false), false),
+            };
             let open_front = !round
                 && ring.len() >= 2
                 && names[ring[0].0].contains("front")
@@ -866,6 +883,8 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
                     let u = if turned { right - q[0] } else { q[0] - left };
                     let middle: f64 = if open_front {
                         0.0
+                    } else if at_seam {
+                        (0..front).map(width).sum()
                     } else {
                         (0..front).map(width).sum::<f64>() + width(front) / 2.0
                     };
