@@ -227,6 +227,15 @@ pub(crate) fn median(mut v: Vec<f64>) -> f64 {
     v[v.len() / 2]
 }
 
+/// The indices of `keys`, least key first; equal keys keep their order.
+/// Things are put in order by this one sort: each sort of its own adds
+/// several kilobytes to the WebAssembly the app downloads.
+pub(crate) fn ascending(keys: &[f64]) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..keys.len()).collect();
+    order.sort_by(|&a, &b| keys[a].total_cmp(&keys[b]));
+    order
+}
+
 /// If the piece's outline (a stitching line) runs parallel inside `outer`
 /// (its cutting line), the allowance of each edge.
 ///

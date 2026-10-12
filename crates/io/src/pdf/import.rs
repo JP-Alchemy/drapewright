@@ -30,8 +30,8 @@ use super::reading::{FAIR, ReadLine, SURE, read_block};
 use super::sizes::find_sizes;
 use super::tiles::{Print, arrange};
 use crate::assemble::{
-    CLOSE_TOLERANCE, RawPath, assemble, bounds, bridge_crowded, chain, chain_crowded, is_straight,
-    mark_folds, meaningful_name, sentence_case, to_segments,
+    CLOSE_TOLERANCE, RawPath, ascending, assemble, bounds, bridge_crowded, chain, chain_crowded,
+    is_straight, mark_folds, meaningful_name, sentence_case, to_segments,
 };
 use crate::import::{
     AllowanceQuestion, ImportError, ImportNote, ImportResult, ImportSizes, PageLeftOut, PageUse,
@@ -965,19 +965,16 @@ pub fn import_pdf_pages(
     let mut page_areas: Vec<Rect> = Vec::new();
     let mut x = 0.0;
     // Each page left out, and why.
-    let mut unused: HashMap<usize, PageLeftOut> = HashMap::new();
+    let mut unused: Vec<Option<PageLeftOut>> = vec![None; pages.len()];
     for group in &groups {
         if (tiled && group.len() == 1) || group.iter().all(|(i, _)| prose[*i]) {
             left_out += 1;
             let i = group[0].0;
-            unused.insert(
-                i,
-                if prose[i] {
-                    PageLeftOut::Instructions
-                } else {
-                    PageLeftOut::NotJoined
-                },
-            );
+            unused[i] = Some(if prose[i] {
+                PageLeftOut::Instructions
+            } else {
+                PageLeftOut::NotJoined
+            });
             continue;
         }
         if group.len() > 1 {
@@ -1130,14 +1127,14 @@ pub fn import_pdf_pages(
     // Where three or more lines end, of any style: the sizes of a nest at
     // a corner they share, and what closes them there. No line goes
     // sharply back there.
-    let mut line_ends: HashMap<(i64, i64), Vec<Point>> = HashMap::new();
+    let end_points: Vec<Point> = groups
+        .iter()
+        .flat_map(|(_, _, paths)| paths.iter().flat_map(|p| ends(p)))
+        .collect();
     let end_cell = |p: Point| ((p.x / CROWD).floor() as i64, (p.y / CROWD).floor() as i64);
-    for (_, _, paths) in &groups {
-        for p in paths {
-            for at in ends(p) {
-                line_ends.entry(end_cell(at)).or_default().push(at);
-            }
-        }
+    let mut line_ends: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
+    for (k, &at) in end_points.iter().enumerate() {
+        line_ends.entry(end_cell(at)).or_default().push(k);
     }
     let crowded = |at: Point| {
         let (cx, cy) = end_cell(at);
@@ -1145,7 +1142,7 @@ pub fn import_pdf_pages(
             .flat_map(|x| (cy - 1..=cy + 1).map(move |y| (x, y)))
             .filter_map(|c| line_ends.get(&c))
             .flatten()
-            .filter(|p| p.distance(at) <= CROWD)
+            .filter(|&&k| end_points[k].distance(at) <= CROWD)
             .count()
             >= 3
     };
@@ -1382,7 +1379,7 @@ pub fn import_pdf_pages(
                 label: k.and_then(|k| labelled.as_ref().and_then(|l| l.names[k].clone())),
                 left_out: match k {
                     None => Some(PageLeftOut::NotChosen),
-                    Some(k) => unused.get(&k).copied(),
+                    Some(k) => unused[k],
                 },
             }
         })
@@ -1415,65 +1412,69 @@ fn close_across_styles(joined: &mut [Joined]) {
     let ends = |p: &[PathSeg]| (p[0].start(), p[p.len() - 1].end());
     let length = |p: &[PathSeg]| p.iter().map(|s| s.arclen(0.01)).sum::<f64>();
     let cell = |p: Point| ((p.x / ACROSS).floor() as i64, (p.y / ACROSS).floor() as i64);
-    let around = |p: Point| {
-        let (cx, cy) = cell(p);
-        (cx - 1..=cx + 1).flat_map(move |x| (cy - 1..=cy + 1).map(move |y| (x, y)))
-    };
-    // Open lines by where they start and where they end: (style, line).
-    let mut by_end: HashMap<(i64, i64), Vec<LineOf>> = HashMap::new();
-    for (g, (_, open)) in joined.iter().enumerate() {
-        for (k, p) in open.iter().enumerate() {
-            let (a, b) = ends(p);
-            if a.distance(b) > ACROSS {
-                for at in [a, b] {
-                    let list = by_end.entry(cell(at)).or_default();
-                    if list.last() != Some(&(g, k)) {
-                        list.push((g, k));
-                    }
+    // Every open line, numbered across the styles: (style, line).
+    let lines: Vec<LineOf> = joined
+        .iter()
+        .enumerate()
+        .flat_map(|(g, (_, open))| (0..open.len()).map(move |k| (g, k)))
+        .collect();
+    let line = |n: usize| &joined[lines[n].0].1[lines[n].1];
+    // Open lines by where they start and where they end.
+    let mut by_end: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
+    for n in 0..lines.len() {
+        let (a, b) = ends(line(n));
+        if a.distance(b) > ACROSS {
+            for at in [a, b] {
+                let list = by_end.entry(cell(at)).or_default();
+                if list.last() != Some(&n) {
+                    list.push(n);
                 }
             }
         }
     }
-    // Every fit: (gaps, line, closing line, closing line reversed?).
-    let mut fits: Vec<(f64, LineOf, LineOf, bool)> = Vec::new();
-    for (g, (_, open)) in joined.iter().enumerate() {
-        for (k, p) in open.iter().enumerate() {
-            let (a, b) = ends(p);
-            if a.distance(b) <= ACROSS {
+    // Every fit, by line and then closing line: (gaps, line, closing line,
+    // closing line reversed?).
+    let mut fits: Vec<(f64, usize, usize, bool)> = Vec::new();
+    for n in 0..lines.len() {
+        let p = line(n);
+        let (a, b) = ends(p);
+        if a.distance(b) <= ACROSS {
+            continue;
+        }
+        let long = length(p);
+        let (cx, cy) = cell(b);
+        let mut near: Vec<usize> = (cx - 1..=cx + 1)
+            .flat_map(|x| (cy - 1..=cy + 1).map(move |y| (x, y)))
+            .filter_map(|c| by_end.get(&c))
+            .flatten()
+            .copied()
+            .filter(|&m| lines[m].0 != lines[n].0)
+            .collect();
+        near.sort_unstable();
+        near.dedup();
+        for m in near {
+            let q = line(m);
+            if length(q) > CLOSER_SHORTER * long {
                 continue;
             }
-            let long = length(p);
-            let mut seen: Vec<LineOf> = Vec::new();
-            for &(h, j) in around(b).filter_map(|c| by_end.get(&c)).flatten() {
-                if h == g || seen.contains(&(h, j)) {
-                    continue;
-                }
-                seen.push((h, j));
-                let q = &joined[h].1[j];
-                if length(q) > CLOSER_SHORTER * long {
-                    continue;
-                }
-                let (qa, qb) = ends(q);
-                for (reversed, from, to) in [(false, qa, qb), (true, qb, qa)] {
-                    let gaps = from.distance(b) + to.distance(a);
-                    if from.distance(b) <= ACROSS && to.distance(a) <= ACROSS {
-                        fits.push((gaps, (g, k), (h, j), reversed));
-                    }
+            let (qa, qb) = ends(q);
+            for (reversed, from, to) in [(false, qa, qb), (true, qb, qa)] {
+                if from.distance(b) <= ACROSS && to.distance(a) <= ACROSS {
+                    fits.push((from.distance(b) + to.distance(a), n, m, reversed));
                 }
             }
         }
     }
-    fits.sort_by(|x, y| x.0.total_cmp(&y.0).then(x.1.cmp(&y.1)).then(x.2.cmp(&y.2)));
+    let order = ascending(&fits.iter().map(|f| f.0).collect::<Vec<_>>());
     // The outline a line and its closing line make.
-    let outline = |line: LineOf, closer: LineOf, reversed: bool| {
-        let mut segs = joined[line.0].1[line.1].clone();
-        let q = &joined[closer.0].1[closer.1];
+    let outline = |n: usize, m: usize, reversed: bool| {
+        let mut segs = line(n).clone();
         if reversed {
-            segs.extend(q.iter().rev().map(PathSeg::reverse));
+            segs.extend(line(m).iter().rev().map(PathSeg::reverse));
         } else {
-            segs.extend(q.iter().copied());
+            segs.extend(line(m).iter().copied());
         }
-        flatten_segs(&segs, 0.5)
+        segs
     };
     let nest = |a: &[Point], b: &[Point]| {
         let (inside_a, _) = label_point(a);
@@ -1482,47 +1483,44 @@ fn close_across_styles(joined: &mut [Joined]) {
     };
     // Best fits first, each line closed once, each closing line used once
     // while any is left unused.
-    let mut uses: HashMap<LineOf, usize> = HashMap::new();
-    let mut closed: Vec<(LineOf, LineOf, bool)> = Vec::new();
+    let mut uses = vec![0usize; lines.len()];
+    let mut closed: Vec<(usize, usize, bool)> = Vec::new();
     for round in 0..2 {
-        for &(_, line, closer, reversed) in &fits {
-            if closed.iter().any(|c| c.0 == line || c.0 == closer)
-                || uses.contains_key(&line)
-                || (round == 0 && uses.contains_key(&closer))
+        for &k in &order {
+            let (_, n, m, reversed) = fits[k];
+            if closed.iter().any(|c| c.0 == n || c.0 == m)
+                || uses[n] > 0
+                || (round == 0 && uses[m] > 0)
             {
                 continue;
             }
             if round == 1 {
-                let mine = outline(line, closer, reversed);
+                let mine = flatten_segs(&outline(n, m, reversed), 0.5);
                 let apart = closed
                     .iter()
-                    .filter(|c| c.1 == closer)
-                    .any(|c| !nest(&mine, &outline(c.0, c.1, c.2)));
+                    .filter(|c| c.1 == m)
+                    .any(|c| !nest(&mine, &flatten_segs(&outline(c.0, c.1, c.2), 0.5)));
                 if apart {
                     continue;
                 }
             }
-            *uses.entry(closer).or_default() += 1;
-            closed.push((line, closer, reversed));
+            uses[m] += 1;
+            closed.push((n, m, reversed));
         }
     }
     // The loops, each round some room; the lines that closed them are
     // part of them now.
-    let mut gone: Vec<LineOf> = Vec::new();
-    for &((g, k), (h, j), reversed) in &closed {
-        let q = &joined[h].1[j];
-        let back: Vec<PathSeg> = if reversed {
-            q.iter().rev().map(PathSeg::reverse).collect()
-        } else {
-            q.clone()
-        };
-        let mut segs = joined[g].1[k].clone();
-        let (end, start) = (segs[segs.len() - 1].end(), segs[0].start());
-        if end.distance(back[0].start()) > 1e-9 {
-            segs.push(PathSeg::Line(Line::new(end, back[0].start())));
+    let mut gone = vec![false; lines.len()];
+    let mut loops: Vec<(usize, Vec<PathSeg>)> = Vec::new();
+    for &(n, m, reversed) in &closed {
+        let mut segs = outline(n, m, reversed);
+        // Hairline gaps where the line meets the line closing it.
+        let (start, joint) = (line(n)[0].start(), line(n).len());
+        let (end, back) = (segs[joint - 1].end(), segs[joint].start());
+        if end.distance(back) > 1e-9 {
+            segs.insert(joint, PathSeg::Line(Line::new(end, back)));
         }
-        let last = back[back.len() - 1].end();
-        segs.extend(back);
+        let last = segs[segs.len() - 1].end();
         if last.distance(start) > 1e-9 {
             segs.push(PathSeg::Line(Line::new(last, start)));
         }
@@ -1531,14 +1529,19 @@ fn close_across_styles(joined: &mut [Joined]) {
         if polygon_area(&pts).abs() < 0.5 * around {
             continue;
         }
-        joined[g].0.push(segs);
-        gone.push((g, k));
-        gone.push((h, j));
+        loops.push((lines[n].0, segs));
+        gone[n] = true;
+        gone[m] = true;
     }
-    gone.sort_unstable();
-    gone.dedup();
-    for &(g, k) in gone.iter().rev() {
-        joined[g].1.remove(k);
+    for (g, segs) in loops {
+        joined[g].0.push(segs);
+    }
+    let mut n = 0;
+    for (_, open) in joined.iter_mut() {
+        open.retain(|_| {
+            n += 1;
+            !gone[n - 1]
+        });
     }
 }
 
@@ -1573,11 +1576,12 @@ fn continue_dashes(dashed: &[Vec<PathSeg>], stubs: Vec<Vec<PathSeg>>) -> Vec<Vec
             }
         }
     }
-    fits.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)).then(a.2.cmp(&b.2)));
+    // Nearest first (then by line end and stub end, as found).
+    let order = ascending(&fits.iter().map(|f| f.0).collect::<Vec<_>>());
     let (mut end_taken, mut stub_end_taken) =
         (vec![false; ends.len()], vec![false; 2 * stubs.len()]);
     let mut gaps: Vec<Vec<PathSeg>> = Vec::new();
-    for (gap, e, end) in fits {
+    for (gap, e, end) in order.into_iter().map(|k| fits[k]) {
         if end_taken[e] || stub_end_taken[end] {
             continue;
         }
@@ -1601,23 +1605,32 @@ fn continue_dashes(dashed: &[Vec<PathSeg>], stubs: Vec<Vec<PathSeg>>) -> Vec<Vec
 /// Words printed several times over on most pages (a watermark, "FREE",
 /// "Not for sale"), taken out: they name nothing.
 fn remove_watermarks(pages: &mut [PageContent]) {
-    let key = |l: &Label| (l.text.trim().to_lowercase(), (l.size * 2.0).round() as i64);
-    let mut on_pages: HashMap<(String, i64), usize> = HashMap::new();
-    for page in pages.iter() {
-        let mut here: HashMap<(String, i64), usize> = HashMap::new();
+    // Each word and its size, as a key: its text hashed (FNV-1a), which
+    // keeps to the kinds of map the importer already has.
+    let key = |l: &Label| {
+        let text = l.text.trim().to_lowercase();
+        let hash = text.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+            (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+        });
+        (hash as i64, (l.size * 2.0).round() as i64)
+    };
+    // The pages each word is printed twice or more on.
+    let mut on_pages: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
+    for (p, page) in pages.iter().enumerate() {
+        let mut here: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
         for l in &page.labels {
-            *here.entry(key(l)).or_default() += 1;
+            here.entry(key(l)).or_default().push(p);
         }
-        for (k, count) in here {
-            if count >= 2 {
-                *on_pages.entry(k).or_default() += 1;
+        for (k, times) in here {
+            if times.len() >= 2 {
+                on_pages.entry(k).or_default().push(p);
             }
         }
     }
     let n = pages.len();
-    let marks: Vec<(String, i64)> = on_pages
+    let marks: Vec<(i64, i64)> = on_pages
         .into_iter()
-        .filter(|(_, count)| *count >= 3.max(n.div_ceil(2)))
+        .filter(|(_, on)| on.len() >= 3.max(n.div_ceil(2)))
         .map(|(k, _)| k)
         .collect();
     if marks.is_empty() {

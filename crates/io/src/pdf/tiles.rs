@@ -8,6 +8,8 @@ use std::collections::HashMap;
 
 use kurbo::{ParamCurve, PathSeg, Point, Rect, Vec2};
 
+use crate::assemble::ascending;
+
 /// Shapes shorter than this say too little to match pages by, mm.
 const MIN_LENGTH: f64 = 20.0;
 /// Shapes match when their points agree to within this, mm.
@@ -252,8 +254,10 @@ pub(crate) fn arrange(
             }
         }
     }
-    // The strongest links first, each joining two groups not yet joined.
-    links.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)).then(a.2.cmp(&b.2)));
+    // The strongest links first (then as found), each joining two groups
+    // not yet joined.
+    let order = ascending(&links.iter().map(|l| -(l.0 as f64)).collect::<Vec<_>>());
+    let links: Vec<(usize, usize, usize, Vec2)> = order.into_iter().map(|k| links[k]).collect();
     let mut group: Vec<usize> = (0..n).collect();
     let mut offset: Vec<Vec2> = vec![Vec2::ZERO; n];
     let join = |group: &mut Vec<usize>, offset: &mut Vec<Vec2>, i: usize, j: usize, d: Vec2| {

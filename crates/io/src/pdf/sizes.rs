@@ -12,7 +12,7 @@ use drapewright_pattern_core::geom::{
 use kurbo::{Point, Rect};
 
 use super::import::{Label, Style};
-use crate::assemble::{MIN_PIECE_AREA, RawPath, bounds};
+use crate::assemble::{MIN_PIECE_AREA, RawPath, ascending, bounds};
 
 /// How each size's lines are told apart, and which paths draw each size.
 #[derive(Debug)]
@@ -224,16 +224,27 @@ fn by_nesting(
             }
         }
     }
-    let mut nests: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut by_root: Vec<Vec<usize>> = vec![Vec::new(); n];
     for k in 0..n {
         let r = root(&mut parent, k);
-        nests.entry(r).or_default().push(k);
+        by_root[r].push(k);
     }
-    let mut nests: Vec<Vec<usize>> = nests.into_values().filter(|v| v.len() >= 2).collect();
-    for nest in &mut nests {
-        nest.sort_by(|&a, &b| outlines[a].2.total_cmp(&outlines[b].2));
-    }
-    nests.sort_by_key(|nest| outlines[nest[0]].0);
+    // Each nest smallest first, the nests in drawing order.
+    let nests: Vec<Vec<usize>> = by_root
+        .into_iter()
+        .filter(|v| v.len() >= 2)
+        .map(|nest| {
+            let order = ascending(&nest.iter().map(|&k| outlines[k].2).collect::<Vec<_>>());
+            order.into_iter().map(|x| nest[x]).collect()
+        })
+        .collect();
+    let order = ascending(
+        &nests
+            .iter()
+            .map(|nest: &Vec<usize>| outlines[nest[0]].0 as f64)
+            .collect::<Vec<_>>(),
+    );
+    let nests: Vec<Vec<usize>> = order.into_iter().map(|x| nests[x].clone()).collect();
     // As many sizes as most nests hold.
     let style_of = |k: usize| &paths[outlines[k].0].1;
     let mut lengths: HashMap<usize, usize> = HashMap::new();
@@ -267,7 +278,7 @@ fn by_nesting(
         return None;
     }
     // Each size's name: the name most often on its line.
-    let mut votes: Vec<HashMap<String, usize>> = vec![HashMap::new(); count];
+    let mut votes: Vec<Vec<(String, usize)>> = vec![Vec::new(); count];
     for nest in &whole {
         for l in labels {
             if l.size > 6.0 || size_name(&l.text).is_none() {
@@ -282,7 +293,10 @@ fn by_nesting(
                 && d <= ON_LINE
             {
                 let name = size_name(&l.text).unwrap_or_default();
-                *votes[rank].entry(name).or_default() += 1;
+                match votes[rank].iter_mut().find(|(n, _)| *n == name) {
+                    Some((_, times)) => *times += 1,
+                    None => votes[rank].push((name, 1)),
+                }
             }
         }
     }
@@ -290,14 +304,18 @@ fn by_nesting(
         .iter()
         .map(|v| {
             v.iter()
-                .max_by(|a, b| a.1.cmp(b.1).then(b.0.cmp(a.0)))
+                .max_by(|a, b| a.1.cmp(&b.1).then(b.0.cmp(&a.0)))
                 .map(|(name, _)| name.clone())
         })
         .collect();
-    let mut distinct: Vec<&String> = named.iter().flatten().collect();
-    distinct.sort_unstable();
-    distinct.dedup();
-    let names: Vec<String> = if distinct.len() == count {
+    let distinct = named.iter().enumerate().all(|(x, name)| {
+        name.as_ref().is_some_and(|name| {
+            named[x + 1..]
+                .iter()
+                .all(|other| other.as_ref() != Some(name))
+        })
+    });
+    let names: Vec<String> = if distinct {
         named.into_iter().flatten().collect()
     } else {
         (1..=count).map(|k| k.to_string()).collect()

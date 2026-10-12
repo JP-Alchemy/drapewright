@@ -9,6 +9,7 @@
 use kurbo::Point;
 
 use super::import::Label;
+use crate::assemble::ascending;
 
 /// An edge name is this near its page's edge, mm.
 const EDGE: f64 = 15.0;
@@ -70,13 +71,15 @@ pub(crate) fn read(pages: &[Page]) -> Option<PageLabels> {
         .iter()
         .map(|(labels, w, h)| {
             let inside = |at: Point| (0.0..=*w).contains(&at.x) && (0.0..=*h).contains(&at.y);
-            let mut found: Vec<(usize, (i64, i64), f64)> = labels
+            let found: Vec<(usize, (i64, i64), f64)> = labels
                 .iter()
                 .enumerate()
                 .filter(|(_, l)| inside(l.at))
                 .filter_map(|(k, l)| Some((k, tile_label(&l.text)?, l.size)))
                 .collect();
-            found.sort_by(|a, b| b.2.total_cmp(&a.2));
+            // Largest first.
+            let order = ascending(&found.iter().map(|f| -f.2).collect::<Vec<_>>());
+            let found: Vec<Own> = order.into_iter().map(|k| found[k]).collect();
             match found.as_slice() {
                 [first] => Some(*first),
                 [first, second, ..] if first.2 >= LARGER * second.2 => Some(*first),
@@ -99,10 +102,12 @@ pub(crate) fn read(pages: &[Page]) -> Option<PageLabels> {
     {
         return None;
     }
-    let mut keys: Vec<(i64, i64)> = own.iter().flatten().map(|o| o.1).collect();
-    keys.sort_unstable();
-    keys.dedup();
-    if keys.len() < labelled {
+    let keys: Vec<(i64, i64)> = own.iter().flatten().map(|o| o.1).collect();
+    if keys
+        .iter()
+        .enumerate()
+        .any(|(x, key)| keys[x + 1..].contains(key))
+    {
         return None;
     }
     // The names at each page's edges: (side, label), and their indices.
