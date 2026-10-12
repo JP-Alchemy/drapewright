@@ -4,6 +4,7 @@ packages/engine/pkg
 packages/engine/pkg-3d
 packages/engine/src/generated
 **/dist
+**/dist-dev
 **/dev-dist
 test-results
 playwright-report

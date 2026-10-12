@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 
 test('app loads cross-origin isolated with the pattern engine', async ({ page }) => {
   await page.goto('/')
@@ -10,10 +10,11 @@ test('app loads cross-origin isolated with the pattern engine', async ({ page })
   await expect(dialog.getByTestId('engine-status')).toHaveText(/Pattern engine \d+\.\d+\.\d+/)
 })
 
-test('no request leaves the origin', async ({ page }) => {
+test('no request leaves the origin', async ({ page, baseURL }) => {
+  const origin = new URL(baseURL!).origin
   const foreign: string[] = []
   page.on('request', (req) => {
-    if (new URL(req.url()).origin !== 'http://localhost:4173') foreign.push(req.url())
+    if (new URL(req.url()).origin !== origin) foreign.push(req.url())
   })
   await page.goto('/')
   await expect(page.getByText('Open a sewing pattern to lay it out here.')).toBeVisible()

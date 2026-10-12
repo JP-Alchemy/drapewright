@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
-import { expect, test } from '@playwright/test'
+import { fileURLToPath } from 'node:url'
+import { expect, test } from './fixtures.ts'
 import { openWithFixture } from './helpers.ts'
 
 const projectsButton = /Projects \(open now/
@@ -73,19 +74,24 @@ test('projects can be switched, backed up, restored and deleted', async ({ page 
 })
 
 test('projects saved before the rename (as Soom) still open', async ({ page }) => {
-  await page.goto('/?debug')
-  await page.waitForFunction(() => 'drapewright' in window)
-  // Store a project the way the app did under its earlier name: its list in
-  // the "soom" database and its format called "soom-project".
-  await page.evaluate(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const s = (window as any).drapewright
-    const { kind } = await s.io.call('storageStatus')
-    const json = JSON.parse(s.engine.toJson())
-    json.format = 'soom-project'
-    json.meta.id = 'earlier-1'
-    json.meta.name = 'Saved before the rename'
-    const bytes = new TextEncoder().encode(JSON.stringify(json))
+  // A project stored the way the app did under its earlier name, before this
+  // version ever opened here (as for someone updating): its list in the
+  // "soom" database, its format called "soom-project".
+  const json = JSON.parse(
+    await readFile(
+      fileURLToPath(
+        new URL('../../../crates/project/tests/fixtures/project-v4.json', import.meta.url),
+      ),
+      'utf8',
+    ),
+  )
+  json.format = 'soom-project'
+  json.meta.id = 'earlier-1'
+  json.meta.name = 'Saved before the rename'
+  // A page of the site that is not the app, to store it from.
+  await page.goto('/icon.svg')
+  await page.evaluate(async (text) => {
+    const bytes = new TextEncoder().encode(text)
     await new Promise<void>((resolve, reject) => {
       const open = indexedDB.open('soom', 2)
       open.onupgradeneeded = () => {
@@ -100,9 +106,9 @@ test('projects saved before the rename (as Soom) still open', async ({ page }) =
           id: 'earlier-1',
           name: 'Saved before the rename',
           modified: '2026-10-10T10:00:00Z',
-          pieces: 0,
+          pieces: 2,
         })
-        if (kind === 'indexeddb') tx.objectStore('files').put(bytes, ['earlier-1', 'project.json'])
+        tx.objectStore('files').put(bytes, ['earlier-1', 'project.json'])
         tx.oncomplete = () => {
           db.close()
           resolve()
@@ -110,7 +116,9 @@ test('projects saved before the rename (as Soom) still open', async ({ page }) =
         tx.onerror = () => reject(tx.error)
       }
     })
-    if (kind === 'opfs') {
+    // And in OPFS, where browsers that can keep project files there (not
+    // WebKit here, which keeps them in the database).
+    try {
       const root = await navigator.storage.getDirectory()
       const projects = await root.getDirectoryHandle('projects', { create: true })
       const dir = await projects.getDirectoryHandle('earlier-1', { create: true })
@@ -118,10 +126,13 @@ test('projects saved before the rename (as Soom) still open', async ({ page }) =
       const writer = await file.createWritable()
       await writer.write(bytes)
       await writer.close()
+    } catch {
+      // No OPFS from here: the database has it.
     }
-  })
-  await page.reload()
+  }, JSON.stringify(json))
+  await page.goto('/')
   await expect(
     page.getByRole('button', { name: /open now: Saved before the rename/ }),
   ).toBeVisible()
+  await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(2)
 })

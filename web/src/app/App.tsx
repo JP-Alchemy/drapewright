@@ -376,6 +376,17 @@ class Opener implements ProjectActions {
   }
 }
 
+/**
+ * The page's projects, and the one opened first: made once, however often
+ * the effect asking for them runs (twice, as React checks in development).
+ */
+let starting: Promise<{ projects: Projects; first: Awaited<ReturnType<Projects['openLatest']>> }>
+const start = () =>
+  (starting ??= loadEngine().then(async () => {
+    const projects = new Projects(new IoClient())
+    return { projects, first: await projects.openLatest() }
+  }))
+
 export function App() {
   const [opener, setOpener] = useState<Opener | null>(null)
   const [current, setCurrent] = useState<Current | null>(null)
@@ -383,10 +394,8 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false
-    loadEngine()
-      .then(async () => {
-        const projects = new Projects(new IoClient())
-        const first = await projects.openLatest()
+    start()
+      .then(({ projects, first }) => {
         if (cancelled) return
         const o = new Opener(projects, first, setCurrent)
         setOpener(o)

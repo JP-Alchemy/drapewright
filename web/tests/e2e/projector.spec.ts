@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Page, test } from './fixtures.ts'
 import { fixture } from './helpers.ts'
 
 /** How many of the projection's pixels are lit (not black). */

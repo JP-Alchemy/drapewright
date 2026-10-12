@@ -7,6 +7,7 @@ import tseslint from 'typescript-eslint'
 export default defineConfig([
   globalIgnores([
     '**/dist',
+    '**/dist-dev',
     '**/dev-dist',
     'packages/engine/pkg',
     'packages/engine/pkg-3d',

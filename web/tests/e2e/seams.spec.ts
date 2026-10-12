@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 import { openWithFixture } from './helpers.ts'
 
 /** Picks a piece's edge as a tap on it would (through the debug handle). */

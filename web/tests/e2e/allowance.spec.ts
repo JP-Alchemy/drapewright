@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 import { edgeMiddle, edgesOf, modKey, openWithFixture } from './helpers.ts'
 
 test('marking a hem and choosing a corner shape', async ({ page }) => {

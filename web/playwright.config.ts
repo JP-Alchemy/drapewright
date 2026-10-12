@@ -1,7 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
 
 // End-to-end tests run against the production build (service worker,
-// headers and all), in Chromium and in WebKit emulating an iPad with touch.
+// headers and all), in Chromium and in WebKit emulating an iPad with touch;
+// and in Chromium against the same app built for development, where React
+// and React Aria check what they are given (duplicate keys and the like) and
+// say so in the console, which fails the test (tests/e2e/fixtures.ts).
 export default defineConfig({
   testDir: 'tests/e2e',
   fullyParallel: true,
@@ -12,14 +15,27 @@ export default defineConfig({
     baseURL: 'http://localhost:4173',
     trace: 'on-first-retry',
   },
-  webServer: {
-    command: 'pnpm exec vite build && pnpm exec vite preview',
-    url: 'http://localhost:4173',
-    reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
-  },
+  webServer: [
+    {
+      command: 'pnpm exec vite build && pnpm exec vite preview',
+      url: 'http://localhost:4173',
+      reuseExistingServer: !process.env.CI,
+      timeout: 180_000,
+    },
+    {
+      command:
+        'NODE_ENV=development pnpm exec vite build --mode development --outDir dist-dev && pnpm exec vite preview --outDir dist-dev --port 4174',
+      url: 'http://localhost:4174',
+      reuseExistingServer: !process.env.CI,
+      timeout: 180_000,
+    },
+  ],
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'ipad-webkit', use: { ...devices['iPad Pro 11'] } },
+    {
+      name: 'chromium-dev',
+      use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:4174' },
+    },
   ],
 })

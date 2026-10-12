@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Page, test } from './fixtures.ts'
 import { fixture } from './helpers.ts'
 
 /** Adds a step of the kind named, from the inspector's menu. */

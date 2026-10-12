@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Page, test } from './fixtures.ts'
 import { drawnInTheMiddle, fixture, openWithFixture } from './helpers.ts'
 
 /** The share of two screenshots' pixels that differ, 0 to 1. */

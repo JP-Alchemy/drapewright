@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, test } from '@playwright/test'
+import { expect, type Locator, type Page, test } from './fixtures.ts'
 import { drawnInTheMiddle } from './helpers.ts'
 
 /** The figure is drawn in the middle of the view, and a drag turns it. */

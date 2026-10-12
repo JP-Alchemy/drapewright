@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 import { openWithFixture } from './helpers.ts'
 

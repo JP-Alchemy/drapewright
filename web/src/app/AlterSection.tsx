@@ -119,13 +119,6 @@ const KINDS = [
   'shoulder',
   'swayback',
   'waist',
-
-  'lengthen',
-  'spread',
-  'bust',
-  'shoulder',
-  'swayback',
-  'waist',
   'hip',
   'pivot',
   'trueUp',

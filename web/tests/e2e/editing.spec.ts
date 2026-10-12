@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 import { modKey, multiTap, openWithFixture, pieceCentre, placementOf } from './helpers.ts'
 
 test.describe('moving pieces', () => {

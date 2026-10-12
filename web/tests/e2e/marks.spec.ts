@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 import { edgeMiddle, notchesOf, openWithFixture, toPage } from './helpers.ts'
 
 test('the notch tool adds, cycles and slides notches', async ({ page }, info) => {

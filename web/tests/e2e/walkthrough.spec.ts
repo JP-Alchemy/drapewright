@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 import { edgeMiddle, edgesOf, fixture, notchesOf, openWithFixture } from './helpers.ts'
 
 /** The project as saved: what she would get back after closing the app. */
