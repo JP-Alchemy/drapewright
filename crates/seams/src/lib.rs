@@ -3,6 +3,7 @@
 //! pattern that has no seams yet. Every suggestion waits to be confirmed;
 //! nothing here changes a piece.
 
+mod assembly;
 mod measure;
 mod model;
 mod suggest;

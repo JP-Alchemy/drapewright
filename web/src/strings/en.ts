@@ -657,6 +657,7 @@ export const t = {
     seam: (n: number, name: string) => (name ? `${n} · ${name}` : `Seam ${n}`),
     between: (a: string, b: string) => `${a} ↔ ${b}`,
     otherHalf: (piece: string) => `${piece}, other half`,
+    partOf: (edge: string) => `part of ${edge}`,
     sameLength: 'Same length',
     lengths: (a: string, b: string) => `${a} and ${b}`,
     longer: (which: 'first' | 'second', by: string) =>
@@ -678,6 +679,9 @@ export const t = {
       endsMatch: 'hems meet',
       frontAndBack: 'front to back',
       centreOfPair: 'centre of a pair',
+      gathered: 'gathered to fit',
+      continues: 'goes on from a seam',
+      fitsOpening: 'fits round the opening',
     } satisfies Record<Reason, string>,
     sewTo: 'Sew to another edge…',
     sewingHint: (edge: string) =>

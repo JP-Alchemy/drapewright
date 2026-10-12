@@ -3,6 +3,8 @@
 
 use std::f64::consts::TAU;
 
+pub mod garments;
+
 use proptest::prelude::*;
 
 use crate::Pt;

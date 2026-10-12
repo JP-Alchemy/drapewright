@@ -23,5 +23,7 @@ export function sideLabel(doc: Document, side: SeamSide): string {
   const piece = doc.pieces.find((p) => p.id === side.piece)
   if (!piece) return '?'
   const name = side.mirror ? t.seams.otherHalf(piece.name) : piece.name
-  return `${name} · ${edgeLabel(piece, side.edge)}`
+  const edge = edgeLabel(piece, side.edge)
+  const part = side.from != null || side.to != null
+  return `${name} · ${part ? t.seams.partOf(edge) : edge}`
 }

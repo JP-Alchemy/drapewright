@@ -1,13 +1,20 @@
 //! Suggesting seams for a pattern that has none yet. Edges that are about
 //! as long as each other, shaped alike, notched alike or named alike are
-//! likely sewn together; so is a hem end with a hem end. A centre edge of a
-//! piece cut as a pair may be sewn to its other half. Each suggestion says
-//! why, and waits to be confirmed.
+//! likely sewn together; so is a hem end with a hem end, and an edge marked
+//! to be gathered with a shorter one. A centre edge of a piece cut as a
+//! pair may be sewn to its other half. Each likely seam is tried on the
+//! garment as far as it is sewn (`assembly`): one that would pinch a piece,
+//! or have it both right side and wrong side out, is passed over. Then a
+//! sleeve's head goes round what is left of an armhole, which may be the
+//! edges of several pieces. Each suggestion says why, and waits to be
+//! confirmed.
 
 use std::borrow::Borrow;
+use std::cmp::Reverse;
 
+use drapewright_pattern_core::geom::{flatten_segs, segs_of};
 use drapewright_pattern_core::stitching::{
-    closed_along, closed_polyline, dart_spans, polyline_length, stitching_edges,
+    closed_along, closed_polyline, dart_spans, opened_along, polyline_length, stitching_edges,
 };
 use drapewright_pattern_core::{EdgeKind, Id, NotchFrom, NotchKind, Piece};
 use kurbo::{Point, Vec2};
@@ -15,6 +22,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::assembly::{Assembly, CopyEdge, Part};
 use crate::model::{Ease, Seam, SeamSide};
 
 /// Why a pair of edges looks like a seam.
@@ -36,6 +44,13 @@ pub enum Reason {
     FrontAndBack,
     /// A centre edge of a piece cut as a pair, sewn to its other half.
     CentreOfPair,
+    /// Marked to be gathered, to fit a shorter edge.
+    Gathered,
+    /// Goes on from a seam already suggested, along both pieces.
+    Continues,
+    /// Round an opening left by other seams (a sleeve's head round an
+    /// armhole), as long as it.
+    FitsOpening,
 }
 
 /// A seam Drapewright thinks likely, not yet confirmed.
@@ -61,6 +76,18 @@ const SAMPLES: usize = 21;
 const STRAIGHT: f64 = 2.0;
 /// A pair needs at least this score to be suggested.
 const THRESHOLD: f64 = 1.4;
+/// A pair going on from a seam suggested needs only this.
+const CONTINUING: f64 = 0.8;
+/// An edge gathered is at least this much longer than what it is gathered
+/// to, and at most `MOST_GATHERED`.
+const LEAST_GATHERED: f64 = 1.08;
+const MOST_GATHERED: f64 = 4.0;
+/// A sleeve's head is within this share of its armhole's length (eased in,
+/// or stretched a little).
+const EASED: f64 = 0.06;
+/// A notch within this of where a sleeve's head meets a seam of the armhole
+/// marks that place, mm.
+const NOTCH_SNAP: f64 = 6.0;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Side {
@@ -73,6 +100,8 @@ enum Side {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum End {
     Hem,
+    /// A seam with a hem's allowance: likely a hem, though not marked one.
+    Deep,
     Fold,
     Other,
 }
@@ -106,6 +135,172 @@ struct Candidate {
     with_grain: bool,
     /// Furthest from its chord, mm.
     depth: f64,
+    /// Marked to be gathered.
+    gathered: bool,
+    /// On a facing or a lining: sewn only to edges shaped as it is.
+    inside: bool,
+    /// On a strip (a rouleau, a tie, binding): sewn to nothing by an edge.
+    strip: bool,
+    /// What the piece is, as far as what it is sewn to goes.
+    role: Role,
+    /// Its darts, where they are along its stitching line.
+    darts: Vec<(f64, f64)>,
+    /// On a left or a right piece, the mirror image of this edge on the
+    /// piece for the other side (by index), as long as it.
+    mirror_of: Option<usize>,
+    /// The piece drawn as this one's mirror image, edge for edge, if any:
+    /// the other side's, though not named so (by index).
+    twin: Option<usize>,
+}
+
+/// For each piece, another drawn as its mirror image if there is one: as
+/// many edges, as long as its own taken the other way round.
+fn mirror_twins(lengths: &[Vec<f64>]) -> Vec<Option<usize>> {
+    let alike = |x: f64, y: f64| (x - y).abs() <= 1.0f64.max(0.005 * x.max(y));
+    (0..lengths.len())
+        .map(|p| {
+            let a = &lengths[p];
+            let n = a.len();
+            (0..lengths.len()).find(|&q| {
+                let b = &lengths[q];
+                q != p
+                    && b.len() == n
+                    && n > 0
+                    && (0..n).any(|k| (0..n).all(|i| alike(a[i], b[(k + n - i) % n])))
+            })
+        })
+        .collect()
+}
+
+/// What a piece is, from its name, as far as what it is sewn to goes.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Role {
+    Sleeve,
+    Cuff,
+    Yoke,
+    Other,
+}
+
+fn role_of(name: &str) -> Role {
+    let name = name.to_lowercase();
+    if name.contains("cuff") {
+        Role::Cuff
+    } else if name.contains("yoke") {
+        Role::Yoke
+    } else if name.contains("sleeve") {
+        Role::Sleeve
+    } else {
+        Role::Other
+    }
+}
+
+/// A facing or a lining.
+pub(crate) fn inside(piece: &Piece) -> bool {
+    let name = piece.name.to_lowercase();
+    name.contains("facing") || name.contains("lining")
+}
+
+/// A strip made into something other than a seam: a rouleau (button
+/// loops), a tie, binding.
+fn strip(piece: &Piece) -> bool {
+    let name = piece.name.to_lowercase();
+    [
+        "rouleau",
+        "loop",
+        "tie",
+        "binding",
+        "bias strip",
+        "drawstring",
+        "belt loop",
+    ]
+    .iter()
+    .any(|w| name.contains(w))
+}
+
+/// Which of a piece's edges are marked to be gathered: a wavy line drawn
+/// along it (pattern CAD's sign for gathering), or named so.
+fn gathered_edges(piece: &Piece) -> Vec<bool> {
+    let n = piece.outline.edges.len();
+    let outline: Vec<Vec<Point>> = (0..n)
+        .map(|i| piece.outline.edge_geom(i).flatten(0.1))
+        .collect();
+    let mut out: Vec<bool> = piece
+        .outline
+        .edges
+        .iter()
+        .map(|e| e.name.to_lowercase().contains("gather"))
+        .collect();
+    for line in &piece.lines {
+        let points = flatten_segs(&segs_of(line.start, &line.segments), 0.1);
+        if points.len() < 12 {
+            continue;
+        }
+        let drawn = polyline_length(&points);
+        for (e, edge) in outline.iter().enumerate() {
+            let length = polyline_length(edge);
+            if length <= 0.0 {
+                continue;
+            }
+            // Its points beside the edge, and how far along it each is.
+            let beside: Vec<f64> = points
+                .iter()
+                .filter_map(|&p| {
+                    let (d, along) = nearest_on(edge, p);
+                    (d <= 25.0).then_some(along)
+                })
+                .collect();
+            if (beside.len() as f64) < 0.8 * points.len() as f64 {
+                continue;
+            }
+            let (low, high) = beside
+                .iter()
+                .fold((f64::MAX, f64::MIN), |(l, h), &a| (l.min(a), h.max(a)));
+            let span = high - low;
+            // Along a good part of it, and far longer than it is straight.
+            if span >= 0.4 * length && drawn >= 1.12 * span {
+                out[e] = true;
+            }
+        }
+    }
+    out
+}
+
+/// How far `p` is from a polyline, and how far along it the nearest point
+/// is.
+fn nearest_on(points: &[Point], p: Point) -> (f64, f64) {
+    let (mut best, mut best_along, mut walked) = (f64::MAX, 0.0, 0.0);
+    for w in points.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let d = b - a;
+        let l = d.hypot();
+        let t = if l > 0.0 {
+            ((p - a).dot(d) / (l * l)).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let q = a + d * t;
+        let dist = q.distance(p);
+        if dist < best {
+            best = dist;
+            best_along = walked + t * l;
+        }
+        walked += l;
+    }
+    (best, best_along)
+}
+
+/// Notches on the same place (a pattern drawn with a notch on its cutting
+/// line and another on its stitching line) as one.
+fn one_each(mut notches: Vec<(NotchKind, f64)>) -> Vec<(NotchKind, f64)> {
+    notches.sort_by(|a, b| a.1.total_cmp(&b.1));
+    let mut out: Vec<(NotchKind, f64)> = Vec::new();
+    for n in notches {
+        match out.last() {
+            Some(last) if last.0 == n.0 && (n.1 - last.1).abs() <= 1.5 => {}
+            _ => out.push(n),
+        }
+    }
+    out
 }
 
 /// A piece's name without "left" and "right": "Left front" → "front".
@@ -169,17 +364,33 @@ fn side_of(name: &str) -> Side {
     }
 }
 
-fn end_of(kind: EdgeKind) -> End {
-    match kind {
+/// What a piece's edge is, as an end of its neighbours: a hem is marked as
+/// one, or likely one where it has a deeper allowance than the seams (as a
+/// pattern with its allowance drawn gives it).
+fn end_of(piece: &Piece, index: usize) -> End {
+    match piece.outline.edges[index].kind {
         EdgeKind::Hem => End::Hem,
         EdgeKind::Fold => End::Fold,
+        EdgeKind::Seam if deeper(piece, index) => End::Deep,
         EdgeKind::Seam => End::Other,
     }
+}
+
+/// A seam's allowance this much deeper than the piece's own, and at least
+/// `HEM_ALLOWANCE` mm, is a hem's.
+const HEM_DEEPER: f64 = 1.5;
+const HEM_ALLOWANCE: f64 = 15.0;
+
+/// Whether an edge marked as a seam has a hem's allowance.
+fn deeper(piece: &Piece, index: usize) -> bool {
+    let allowance = piece.edge_allowance(index);
+    allowance >= HEM_DEEPER * piece.allowance.seam.max(1.0) && allowance >= HEM_ALLOWANCE
 }
 
 /// The edges that could be seams (`every`: all edges, for judging a pair
 /// chosen by hand), leaving out those in `taken`.
 fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -> Vec<Candidate> {
+    let twins = mirror_twins(&sewn_lengths(pieces));
     let mut out = Vec::new();
     for (pi, piece) in pieces.iter().map(Borrow::borrow).enumerate() {
         let stitching = stitching_edges(piece);
@@ -207,6 +418,7 @@ fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -
         } else {
             counterparts(piece, &sewn, grain.unwrap_or(Vec2::new(0.0, 1.0)))
         };
+        let gathered = gathered_edges(piece);
         for (ei, edge) in edges.iter().enumerate() {
             let points = &sewn[ei];
             let length = polyline_length(points);
@@ -222,19 +434,20 @@ fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -
             } else {
                 1.0
             };
-            let mut notches: Vec<(NotchKind, f64)> = piece
-                .notches
-                .iter()
-                .filter(|m| m.edge == edge.id)
-                .map(|m| {
-                    let at = match m.from {
-                        NotchFrom::Start => m.at,
-                        NotchFrom::End => outline_length - m.at,
-                    };
-                    (m.kind, closed_along(&darts[ei], at * scale))
-                })
-                .collect();
-            notches.sort_by(|a, b| a.1.total_cmp(&b.1));
+            let notches = one_each(
+                piece
+                    .notches
+                    .iter()
+                    .filter(|m| m.edge == edge.id)
+                    .map(|m| {
+                        let at = match m.from {
+                            NotchFrom::Start => m.at,
+                            NotchFrom::End => outline_length - m.at,
+                        };
+                        (m.kind, closed_along(&darts[ei], at * scale))
+                    })
+                    .collect(),
+            );
             let chord = points[points.len() - 1] - points[0];
             let depth = profile(points).iter().fold(0.0f64, |m, y| m.max(y.abs()));
             let with_grain = depth < STRAIGHT
@@ -249,10 +462,7 @@ fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -
                 points: points.clone(),
                 length,
                 notches,
-                ends: (
-                    end_of(edges[(ei + n - 1) % n].kind),
-                    end_of(edges[(ei + 1) % n].kind),
-                ),
+                ends: (end_of(piece, (ei + n - 1) % n), end_of(piece, (ei + 1) % n)),
                 side: side_of(&piece.name),
                 // A front or back leg is half a tube.
                 tube: side_of(&piece.name) == Side::Neither
@@ -265,10 +475,48 @@ fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -
                 pair,
                 with_grain,
                 depth,
+                gathered: gathered[ei],
+                inside: inside(piece),
+                strip: strip(piece),
+                role: role_of(&piece.name),
+                darts: darts[ei].clone(),
+                mirror_of: None,
+                twin: twins[pi],
             });
         }
     }
+    // A left piece's edges mirror a right piece's: as long, and shaped
+    // alike run the other way.
+    for i in 0..out.len() {
+        let found = (0..out.len()).find(|&j| {
+            let (a, b) = (&out[i], &out[j]);
+            ((a.handed && b.handed && a.stem == b.stem) || a.twin == Some(b.piece))
+                && a.piece != b.piece
+                && (a.length - b.length).abs() <= 1.0
+                && (a.depth < STRAIGHT && b.depth < STRAIGHT || unlike(a, b, true) < 2.0)
+                && a.notches.len() == b.notches.len()
+        });
+        out[i].mirror_of = found;
+    }
     out
+}
+
+/// Each piece's edges' lengths as sewn (darts closed), mm: for putting the
+/// garment together.
+fn sewn_lengths<P: Borrow<Piece>>(pieces: &[P]) -> Vec<Vec<f64>> {
+    pieces
+        .iter()
+        .map(|p| {
+            let piece = p.borrow();
+            let stitching = stitching_edges(piece);
+            (0..stitching.len())
+                .map(|e| {
+                    let spans = dart_spans(piece, e, &stitching[e]);
+                    polyline_length(&closed_polyline(&stitching[e], &spans))
+                })
+                .collect()
+        })
+        .collect()
 }
 
 /// How far each of `SAMPLES` points, evenly along the curve, is to the
@@ -388,13 +636,17 @@ fn score(a: &Candidate, b: &Candidate, reversed: bool) -> (f64, Vec<Reason>) {
         b.ends
     };
     let mut matched = false;
+    let hemmed = |e: End| matches!(e, End::Hem | End::Deep);
     for (x, y) in [(a.ends.0, b_ends.0), (a.ends.1, b_ends.1)] {
         match (x, y) {
             (End::Other, End::Other) => {}
-            (x, y) if x == y => {
+            (x, y) if x == y || (hemmed(x) && hemmed(y)) => {
                 score += 0.35;
                 matched = true;
             }
+            // A deeper allowance says less against: a facing's end at a
+            // front's hem has a seam's.
+            (End::Deep, End::Other) | (End::Other, End::Deep) => {}
             _ => score -= 0.6,
         }
     }
@@ -421,9 +673,41 @@ fn score(a: &Candidate, b: &Candidate, reversed: bool) -> (f64, Vec<Reason>) {
     } else if a.handed && b.handed && a.stem == b.stem {
         // A left and a right piece mirror each other edge for edge; few of
         // those edges are sewn together, and those are notched or named.
+        // (Halves drawn alike but not named so are often a garment's left
+        // and right halves, sewn at the centre: no less likely.)
         score -= 1.0;
     }
     (score, reasons)
+}
+
+/// How likely `long`, marked to be gathered, is gathered to fit `short`,
+/// and why; none where it can't be (not marked, or not that much longer).
+/// Gathered a little is likelier than a lot; a sleeve's to a cuff and a
+/// front's or a back's to a yoke likelier than others.
+fn gathered_score(long: &Candidate, short: &Candidate) -> Option<(f64, Vec<Reason>)> {
+    if !long.gathered
+        || short.gathered
+        || long.inside
+        || short.inside
+        || short.strip
+        || long.piece == short.piece
+    {
+        return None;
+    }
+    let ratio = long.length / short.length.max(1e-9);
+    if !(LEAST_GATHERED..=MOST_GATHERED).contains(&ratio) {
+        return None;
+    }
+    let mut score = 1.7 - 0.1 * ratio;
+    let fits = match (long.role, short.role) {
+        (Role::Sleeve, Role::Cuff) => true,
+        (_, Role::Yoke) => long.side != Side::Neither,
+        _ => false,
+    };
+    if fits {
+        score += 0.6;
+    }
+    Some((score, vec![Reason::Gathered]))
 }
 
 /// A pair being considered: its score, the two candidates, which way
@@ -436,18 +720,274 @@ type Place = (usize, usize);
 /// Two edges sewn together.
 type Sewn = (Place, Place);
 
-/// The best pairs, each candidate in one at most, leaving out `banned`.
-fn greedy(pairs: &[Pair], banned: &[(usize, usize)], count: usize) -> Vec<Pair> {
-    let mut used = vec![false; count];
+/// A pair taken: its seams (with any made on the other side of the body
+/// with it), and the candidates they use.
+struct Taken {
+    pair: Pair,
+    seams: Vec<Seam>,
+    used: Vec<usize>,
+}
+
+/// A whole edge as a side of a seam.
+fn whole(c: &Candidate, mirror: bool) -> SeamSide {
+    SeamSide {
+        mirror,
+        ..SeamSide::whole(&c.piece_id, &c.edge_id)
+    }
+}
+
+fn seam(a: SeamSide, b: SeamSide, reversed: bool) -> Seam {
+    Seam {
+        id: String::new(),
+        name: String::new(),
+        a,
+        b,
+        reversed,
+        ease: Ease::Even,
+        confirmed: false,
+    }
+}
+
+/// The ways a pair may be sewn, likeliest first, each as its seams: a
+/// piece cut as a pair sewn to a piece drawn whole has its other half sewn
+/// to the mirror image of the edge there (a yoke, to both shoulders of a
+/// back), or to its mirror image on the piece for the other side (to a
+/// left front and a right front); which half goes to which is left to the
+/// garment to say.
+fn ways(
+    cands: &[Candidate],
+    i: usize,
+    j: usize,
+    reversed: bool,
+    either: bool,
+) -> Vec<(Vec<Seam>, Vec<usize>)> {
+    let mut out = ways_round(cands, i, j, reversed);
+    if either {
+        out.extend(ways_round(cands, i, j, !reversed));
+    }
+    // One seam, sewn on both copies of pairs alike, before two.
+    out.sort_by_key(|(seams, _)| seams.len());
+    out
+}
+
+/// `ways`, sewn the given way round.
+fn ways_round(
+    cands: &[Candidate],
+    i: usize,
+    j: usize,
+    reversed: bool,
+) -> Vec<(Vec<Seam>, Vec<usize>)> {
+    let (a, b) = (&cands[i], &cands[j]);
+    let index_of = |piece: usize, edge: usize| {
+        cands
+            .iter()
+            .position(|c| c.piece == piece && c.edge == edge)
+    };
     let mut out = Vec::new();
-    for pair in pairs {
-        let (_, i, j, ..) = *pair;
-        if used[i] || used[j] || banned.contains(&(i, j)) {
+    for (pair, other, pair_is_a) in [(a, b, true), (b, a, false)] {
+        if !pair.pair || other.pair {
             continue;
         }
-        used[i] = true;
-        used[j] = true;
-        out.push(pair.clone());
+        let k = other
+            .counterpart
+            .and_then(|g| index_of(other.piece, g))
+            .or(other.mirror_of);
+        let Some(k) = k else {
+            continue;
+        };
+        let there = &cands[k];
+        for half in [false, true] {
+            let first = if pair_is_a {
+                seam(whole(pair, half), whole(other, false), reversed)
+            } else {
+                seam(whole(other, false), whole(pair, half), reversed)
+            };
+            let second = if pair_is_a {
+                seam(whole(pair, !half), whole(there, false), !reversed)
+            } else {
+                seam(whole(there, false), whole(pair, !half), !reversed)
+            };
+            out.push((vec![first, second], vec![i, j, k]));
+        }
+        return out;
+    }
+    out.push((
+        vec![seam(whole(a, false), whole(b, false), reversed)],
+        vec![i, j],
+    ));
+    // Two pairs sewn, each half to the other's other half.
+    if a.pair && b.pair && a.piece != b.piece {
+        out.push((
+            vec![
+                seam(whole(a, true), whole(b, false), reversed),
+                seam(whole(a, false), whole(b, true), reversed),
+            ],
+            vec![i, j],
+        ));
+    }
+    out
+}
+
+/// The garment's pieces and edges by index, for a side of a seam.
+fn placer<'a, P: Borrow<Piece>>(
+    pieces: &'a [P],
+) -> impl Fn(&SeamSide) -> Option<(usize, usize)> + 'a {
+    move |side: &SeamSide| {
+        let pi = pieces.iter().position(|p| p.borrow().id == side.piece)?;
+        let ei = pieces[pi].borrow().outline.edge_index(&side.edge)?;
+        Some((pi, ei))
+    }
+}
+
+/// Pairs this close in score are as likely as each other.
+const TIE: f64 = 0.05;
+/// At most this many pairs as likely as each other, after one edge, are
+/// weighed against each other.
+const RIVALS: usize = 12;
+
+/// A way to sew a pair, tried on the garment: how far apart the corners
+/// it brings together were, how many openings it leaves (counted when
+/// needed), how many of its parts are right side out, which pair, its
+/// seams and the candidates they use, and the garment so sewn.
+struct Way {
+    apart: f64,
+    openings: Option<usize>,
+    faced: usize,
+    pair: usize,
+    seams: Vec<Seam>,
+    uses: Vec<usize>,
+    garment: Assembly,
+}
+
+impl Way {
+    fn openings(&mut self) -> usize {
+        *self
+            .openings
+            .get_or_insert_with(|| self.garment.loops().len())
+    }
+}
+
+/// The likeliest pairs, each candidate in one at most and none in
+/// `banned`, each tried on the garment and taken if it sews.
+///
+/// Of pairs as likely as each other after the same edge, and of the ways
+/// each may be sewn, the one taken brings together corners nearest each
+/// other round the garment as sewn so far (a back neck facing's end to the
+/// front facing on its own side, beyond a yoke's neck end, not the one
+/// across the neck), then the one that closes most openings, then the one
+/// in fewest seams (a pair sewn to a pair alike on both sides, not
+/// crosswise), then the one that keeps most pieces right side out beside
+/// each other (patterns are drawn right side up: a cuff on a sleeve not
+/// inside out); `either`: pairs whose way round is not known (gathered) are
+/// tried both ways.
+fn take<P: Borrow<Piece>>(
+    pairs: &[(Pair, bool)],
+    banned: &[(usize, usize)],
+    cands: &[Candidate],
+    pieces: &[P],
+    garment: &mut Assembly,
+    used: &mut [bool],
+) -> Vec<Taken> {
+    let place = placer(pieces);
+    let mut out = Vec::new();
+    let mut tried = vec![false; pairs.len()];
+    let open = |k: usize, used: &[bool], tried: &[bool]| {
+        let (_, i, j, ..) = pairs[k].0;
+        !tried[k] && !used[i] && !used[j] && !banned.contains(&(i, j))
+    };
+    let mut k = 0;
+    while k < pairs.len() {
+        if !open(k, used, &tried) {
+            k += 1;
+            continue;
+        }
+        let ((top, ti, tj, tr, _), te) = &pairs[k];
+        // Its rivals: pairs as likely after the same edges.
+        let wanted: Vec<usize> = ways(cands, *ti, *tj, *tr, *te)
+            .into_iter()
+            .flat_map(|(_, uses)| uses)
+            .collect();
+        let rivals: Vec<usize> = (k..pairs.len())
+            .take_while(|&m| pairs[m].0.0 >= top - TIE)
+            .filter(|&m| {
+                let (_, i, j, ..) = pairs[m].0;
+                open(m, used, &tried) && (m == k || wanted.contains(&i) || wanted.contains(&j))
+            })
+            .take(RIVALS)
+            .collect();
+        let mut best: Option<Way> = None;
+        for m in rivals {
+            let ((_, i, j, reversed, _), either) = &pairs[m];
+            let mut sews = false;
+            for (seams, uses) in ways(cands, *i, *j, *reversed, *either) {
+                if uses.iter().any(|&u| u != *i && u != *j && used[u]) {
+                    continue;
+                }
+                let parts: Vec<Part> = seams
+                    .iter()
+                    .flat_map(|s| garment.parts(s, &place))
+                    .collect();
+                let joins: Vec<(usize, usize)> =
+                    parts.iter().flat_map(|p| garment.joins(p)).collect();
+                let apart: f64 = joins
+                    .into_iter()
+                    .map(|(x, y)| garment.distance(x, y).unwrap_or(1e6))
+                    .sum();
+                let mut trial = garment.trial();
+                if !trial.sew(&parts) {
+                    continue;
+                }
+                sews = true;
+                // Laid out flat beside each other, right sides up.
+                let faced = parts
+                    .iter()
+                    .filter(|p| p.4 == (p.0.mirror == p.2.mirror))
+                    .count();
+                let mut way = Way {
+                    apart,
+                    openings: None,
+                    faced,
+                    pair: m,
+                    seams,
+                    uses,
+                    garment: trial,
+                };
+                let better = match &mut best {
+                    None => true,
+                    Some(b) if way.apart < b.apart - 1e-6 => true,
+                    Some(b) if way.apart <= b.apart + 1e-6 => {
+                        // Nearer, then more openings closed, then fewer
+                        // seams, then more right side out.
+                        let theirs = (Reverse(b.openings()), b.seams.len(), Reverse(b.faced));
+                        let mine = (Reverse(way.openings()), way.seams.len(), Reverse(way.faced));
+                        mine < theirs
+                    }
+                    Some(_) => false,
+                };
+                if better {
+                    best = Some(way);
+                }
+            }
+            if !sews {
+                tried[m] = true;
+            }
+        }
+        let Some(way) = best else {
+            k += 1;
+            continue;
+        };
+        *garment = way.garment;
+        for &u in &way.uses {
+            used[u] = true;
+        }
+        // Sewn the other way round than scored: so suggested.
+        let mut pair = pairs[way.pair].0.clone();
+        pair.3 = way.seams[0].reversed;
+        out.push(Taken {
+            pair,
+            seams: way.seams,
+            used: way.uses,
+        });
     }
     out
 }
@@ -517,111 +1057,147 @@ pub fn suggest<P: Borrow<Piece>>(pieces: &[P], existing: &[Seam]) -> Vec<Suggest
         .map(|side| (side.piece.clone(), side.edge.clone()))
         .collect();
     let cands = candidates(pieces, &taken, false);
+    let place = placer(pieces);
     // The seams already sewn, by piece and edge index.
-    let place = |side: &SeamSide| {
-        let pi = pieces.iter().position(|p| p.borrow().id == side.piece)?;
-        let ei = pieces[pi].borrow().outline.edge_index(&side.edge)?;
-        Some((pi, ei))
-    };
     let already: Vec<Sewn> = existing
         .iter()
         .filter_map(|s| Some((place(&s.a)?, place(&s.b)?)))
         .collect();
-    let mut pairs: Vec<(f64, usize, usize, bool, Vec<Reason>)> = Vec::new();
+    // The garment as sewn so far, as far as it can be.
+    let mut sewn = Assembly::new(
+        &pieces.iter().map(Borrow::borrow).collect::<Vec<_>>(),
+        sewn_lengths(pieces),
+    );
+    for s in existing {
+        let parts = sewn.parts(s, &place);
+        sewn.sew(&parts);
+    }
+    // Every pair likely enough (and, less likely, those that might go on
+    // from a seam suggested): which way round, and whether that is known.
+    let mut pairs: Vec<(Pair, bool)> = Vec::new();
+    let mut weak: Vec<(Pair, bool)> = Vec::new();
+    let mut gathers: Vec<(Pair, bool)> = Vec::new();
     for i in 0..cands.len() {
         for j in i + 1..cands.len() {
             let (a, b) = (&cands[i], &cands[j]);
-            if (a.length - b.length).abs() / a.length.max(b.length) > MOST_APART {
-                continue;
-            }
             // Only a tube (a sleeve) is sewn to itself; a piece's left and
             // right sides match but are not sewn together.
             if a.piece == b.piece && !a.tube {
                 continue;
             }
-            let ((s1, r1), (s2, r2)) = (score(a, b, false), score(a, b, true));
-            let (s, reversed, reasons) = if s2 > s1 {
-                (s2, true, r2)
-            } else {
-                (s1, false, r1)
-            };
-            if s >= THRESHOLD {
-                pairs.push((s, i, j, reversed, reasons));
+            // Facings and linings are sewn to edges shaped as they are, and
+            // strips to nothing.
+            if a.strip || b.strip {
+                continue;
+            }
+            if (a.length - b.length).abs() / a.length.max(b.length) <= MOST_APART {
+                let ((s1, r1), (s2, r2)) = (score(a, b, false), score(a, b, true));
+                let (s, reversed, reasons) = if s2 > s1 {
+                    (s2, true, r2.clone())
+                } else {
+                    (s1, false, r1.clone())
+                };
+                let either = (s1 - s2).abs() < 1e-9;
+                if s >= THRESHOLD {
+                    pairs.push(((s, i, j, reversed, reasons), either));
+                    // The other way round, likely too: tried if the garment
+                    // will not have it this way (one of two seams between
+                    // the same pieces sewn so would turn a piece over).
+                    let (other, other_reasons) = if reversed { (s1, r1) } else { (s2, r2) };
+                    if !either && other >= THRESHOLD {
+                        pairs.push(((other, i, j, !reversed, other_reasons), false));
+                    }
+                } else if s >= CONTINUING {
+                    weak.push(((s, i, j, reversed, reasons), either));
+                }
+            }
+            if let Some((s, reasons)) = gathered_score(a, b).or_else(|| gathered_score(b, a)) {
+                // Which way round: as its ends say, if they say.
+                let (s1, s2) = (score(a, b, false).0, score(a, b, true).0);
+                if s >= THRESHOLD {
+                    gathers.push(((s, i, j, s2 > s1, reasons), true));
+                }
             }
         }
     }
-    pairs.sort_by(|x, y| y.0.total_cmp(&x.0));
-    // The best pairs, then again without any that run alongside the others.
+    for list in [&mut pairs, &mut weak, &mut gathers] {
+        list.sort_by(|x, y| y.0.0.total_cmp(&x.0.0));
+    }
+    // The likeliest pairs, then again without any that run alongside the
+    // others.
     let mut banned = Vec::new();
-    let mut accepted = greedy(&pairs, &banned, cands.len());
-    for _ in 0..4 {
-        let along = alongside(&accepted, &cands, &already);
-        if along.is_empty() {
+    let (mut accepted, mut garment, mut used);
+    let mut rounds = 0;
+    loop {
+        garment = sewn.clone();
+        used = vec![false; cands.len()];
+        accepted = take(&pairs, &banned, &cands, pieces, &mut garment, &mut used);
+        // Gathered edges last, once the garment they are gathered to is put
+        // together: which yoke goes to which front, say, is then known.
+        accepted.extend(take(
+            &gathers,
+            &banned,
+            &cands,
+            pieces,
+            &mut garment,
+            &mut used,
+        ));
+        let firsts: Vec<Pair> = accepted.iter().map(|t| t.pair.clone()).collect();
+        let along = alongside(&firsts, &cands, &already);
+        if along.is_empty() || rounds == 4 {
             break;
         }
+        rounds += 1;
         banned.extend(along);
-        accepted = greedy(&pairs, &banned, cands.len());
     }
-    let mut used = vec![false; cands.len()];
-    for (_, i, j, ..) in &accepted {
-        used[*i] = true;
-        used[*j] = true;
-    }
-    let index_of = |piece: usize, edge: usize| {
-        cands
+    // Then pairs less likely by themselves that go on from a seam taken,
+    // along both pieces: a facing's edges, one after another, laid on the
+    // edges it faces. (Other pieces are opened out flat at a seam: what
+    // goes on from it, a front's waist and a back's, is not sewn
+    // together.)
+    loop {
+        let going_on: Vec<(Pair, bool)> = weak
             .iter()
-            .position(|c| c.piece == piece && c.edge == edge)
-    };
+            .filter(|((_, i, j, reversed, _), either)| {
+                let (a, b) = (&cands[*i], &cands[*j]);
+                !used[*i]
+                    && !used[*j]
+                    && a.inside != b.inside
+                    && (continues(&mut garment, a, b, *reversed)
+                        || (*either && continues(&mut garment, a, b, !*reversed)))
+            })
+            .map(|((s, i, j, r, reasons), either)| {
+                let mut reasons = reasons.clone();
+                reasons.push(Reason::Continues);
+                ((*s + 0.6, *i, *j, *r, reasons), *either)
+            })
+            .collect();
+        let more = take(&going_on, &banned, &cands, pieces, &mut garment, &mut used);
+        if more.is_empty() {
+            break;
+        }
+        accepted.extend(more);
+    }
     let mut out = Vec::new();
-    for (s, i, j, reversed, reasons) in accepted {
-        let (a, b) = (&cands[i], &cands[j]);
+    for t in &accepted {
+        let (s, i, j, _, reasons) = &t.pair;
+        let (a, b) = (&cands[*i], &cands[*j]);
         let name = if a.name == b.name {
-            a.name.clone()
+            sentence(&a.name)
         } else {
             String::new()
         };
-        let suggestion = |a: SeamSide, b: SeamSide, reversed: bool| Suggestion {
-            seam: Seam {
-                id: String::new(),
-                name: sentence(&name),
-                a,
-                b,
-                reversed,
-                ease: Ease::Even,
-                confirmed: false,
-            },
-            confidence: (s / 3.0).clamp(0.0, 1.0),
-            reasons: reasons.clone(),
-        };
-        out.push(suggestion(
-            SeamSide::whole(&a.piece_id, &a.edge_id),
-            SeamSide::whole(&b.piece_id, &b.edge_id),
-            reversed,
-        ));
-        // A piece cut as a pair sewn to one drawn whole: its other half is
-        // sewn to the mirror image of the edge (a yoke to both shoulders).
-        for (pair, whole, pair_is_a) in [(a, b, true), (b, a, false)] {
-            let Some(k) = (pair.pair && whole.counterpart.is_some())
-                .then(|| whole.counterpart.and_then(|g| index_of(whole.piece, g)))
-                .flatten()
-            else {
-                continue;
-            };
-            if used[k] {
-                continue;
-            }
-            used[k] = true;
-            let half = SeamSide {
-                mirror: true,
-                ..SeamSide::whole(&pair.piece_id, &pair.edge_id)
-            };
-            let other = SeamSide::whole(&cands[k].piece_id, &cands[k].edge_id);
-            out.push(if pair_is_a {
-                suggestion(half, other, !reversed)
-            } else {
-                suggestion(other, half, !reversed)
+        for seam in &t.seams {
+            out.push(Suggestion {
+                seam: Seam {
+                    name: name.clone(),
+                    ..seam.clone()
+                },
+                confidence: (s / 3.0).clamp(0.0, 1.0),
+                reasons: reasons.clone(),
             });
         }
+        debug_assert!(t.used.iter().all(|&k| used[k]));
     }
     // A centre edge of a piece cut as a pair, left over: sewn to its other
     // half (a centre back seam).
@@ -640,22 +1216,313 @@ pub fn suggest<P: Borrow<Piece>>(pieces: &[P], existing: &[Seam]) -> Vec<Suggest
         if others_outside && !named {
             continue;
         }
+        let centre = seam(whole(c, false), whole(c, true), false);
+        let parts = garment.parts(&centre, &place);
+        if !garment.sew(&parts) {
+            continue;
+        }
         used[k] = true;
         out.push(Suggestion {
             seam: Seam {
-                id: String::new(),
                 name: sentence(&c.name),
-                a: SeamSide::whole(&c.piece_id, &c.edge_id),
-                b: SeamSide {
-                    mirror: true,
-                    ..SeamSide::whole(&c.piece_id, &c.edge_id)
-                },
-                reversed: false,
-                ease: Ease::Even,
-                confirmed: false,
+                ..centre
             },
             confidence: if named { 0.6 } else { 0.4 },
             reasons: vec![Reason::CentreOfPair],
+        });
+    }
+    out.extend(round_openings(&cands, pieces, &mut garment));
+    out
+}
+
+/// Whether sewing `a` to `b` (that way round) goes on from a seam already
+/// sewn: an end of each already meets.
+fn continues(garment: &mut Assembly, a: &Candidate, b: &Candidate, reversed: bool) -> bool {
+    let edge = |c: &Candidate| CopyEdge {
+        piece: c.piece,
+        edge: c.edge,
+        mirror: false,
+    };
+    let (ea, eb) = (edge(a), edge(b));
+    if !garment.has(ea) || !garment.has(eb) {
+        return false;
+    }
+    let (sa, ta) = (garment.start(ea), garment.end(ea));
+    let (sb, tb) = (garment.start(eb), garment.end(eb));
+    if reversed {
+        garment.meet(sa, tb) || garment.meet(ta, sb)
+    } else {
+        garment.meet(sa, sb) || garment.meet(ta, tb)
+    }
+}
+
+/// An opening of the garment, or a tube's open end: its copy edges in
+/// order round it (each run forwards or not), each one's length, and its
+/// notches' places round it from where it starts.
+struct Opening {
+    edges: Vec<(CopyEdge, bool)>,
+    lengths: Vec<f64>,
+    notches: Vec<f64>,
+}
+
+impl Opening {
+    fn new(edges: Vec<(CopyEdge, bool)>, cands: &[Candidate], garment: &Assembly) -> Opening {
+        let lengths: Vec<f64> = edges.iter().map(|(e, _)| garment.length(*e)).collect();
+        let mut notches = Vec::new();
+        let mut walked = 0.0;
+        for (&(e, forwards), &length) in edges.iter().zip(&lengths) {
+            if let Some(c) = cands
+                .iter()
+                .find(|c| c.piece == e.piece && c.edge == e.edge)
+            {
+                for &(_, at) in &c.notches {
+                    notches.push(walked + if forwards { at } else { length - at });
+                }
+            }
+            walked += length;
+        }
+        Opening {
+            edges,
+            lengths,
+            notches,
+        }
+    }
+
+    fn length(&self) -> f64 {
+        self.lengths.iter().sum()
+    }
+
+    /// The same opening, from its `k`th edge on, or round the other way.
+    fn from(&self, k: usize, backwards: bool, cands: &[Candidate], garment: &Assembly) -> Opening {
+        let n = self.edges.len();
+        let mut edges: Vec<(CopyEdge, bool)> = (0..n).map(|i| self.edges[(k + i) % n]).collect();
+        if backwards {
+            // Round the other way, from the same place: the edge before it
+            // first, each run the other way.
+            edges = (0..n)
+                .map(|i| {
+                    let (e, f) = self.edges[(k + n - 1 - i) % n];
+                    (e, !f)
+                })
+                .collect();
+        }
+        Opening::new(edges, cands, garment)
+    }
+}
+
+/// How unlike a tube's end and an opening are when sewn round it, each
+/// from its start: its notches against the opening's notches and the
+/// places its pieces meet, scaled to its length; mm, on average.
+fn misfit(tube: &Opening, opening: &Opening) -> f64 {
+    let scale = tube.length() / opening.length().max(1e-9);
+    let mut marks: Vec<f64> = opening.notches.iter().map(|x| x * scale).collect();
+    let mut walked = 0.0;
+    for &l in &opening.lengths[..opening.lengths.len().saturating_sub(1)] {
+        walked += l;
+        marks.push(walked * scale);
+    }
+    let nearest =
+        |x: f64, among: &[f64]| among.iter().map(|y| (x - y).abs()).fold(20.0f64, f64::min);
+    let mut cost = 0.0;
+    let mut count = 0.0;
+    for &t in &tube.notches {
+        cost += nearest(t, &marks);
+        count += 1.0;
+    }
+    for &o in &opening.notches {
+        cost += nearest(o * scale, &tube.notches);
+        count += 1.0;
+    }
+    if count > 0.0 { cost / count } else { 0.0 }
+}
+
+/// Each tube's open end (a sleeve's head) sewn round an opening of the
+/// rest of the garment as long as it (an armhole, perhaps the edges of a
+/// front, a yoke and a back): split where the opening's edges meet, or at
+/// a notch of its own just there, and started where its notches and the
+/// opening's best agree (its underarm at the side seam, where none say).
+fn round_openings<P: Borrow<Piece>>(
+    cands: &[Candidate],
+    pieces: &[P],
+    garment: &mut Assembly,
+) -> Vec<Suggestion> {
+    let loops = garment.loops();
+    let copy_of = |l: &[(CopyEdge, bool)], g: &Assembly| g.copy(l[0].0);
+    let mut tubes = Vec::new();
+    let mut openings = Vec::new();
+    for l in loops {
+        let copy = copy_of(&l, garment);
+        let one = l.iter().all(|(e, _)| garment.copy(*e) == copy);
+        if one && garment.tube(copy) {
+            tubes.push(l);
+        } else {
+            openings.push(l);
+        }
+    }
+    // Every way round each opening for each tube end, the best first.
+    let mut fits: Vec<(f64, usize, usize, usize, bool)> = Vec::new();
+    for (t, tube) in tubes.iter().enumerate() {
+        let tube_end = Opening::new(tube.clone(), cands, garment);
+        for (o, opening) in openings.iter().enumerate() {
+            let (tc, oc) = (copy_of(tube, garment), copy_of(opening, garment));
+            if garment.joined(tc, oc) {
+                continue;
+            }
+            let round = Opening::new(opening.clone(), cands, garment);
+            let (lt, lo) = (tube_end.length(), round.length());
+            if (lt - lo).abs() > EASED * lo {
+                continue;
+            }
+            for k in 0..opening.len() {
+                for backwards in [false, true] {
+                    let from = round.from(k, backwards, cands, garment);
+                    let start = garment.first(from.edges[0].0, from.edges[0].1);
+                    // Where nothing says otherwise, the underarm at the side
+                    // seam: the longest seam round the opening.
+                    let side = garment.longest_at(start);
+                    let cost = misfit(&tube_end, &from) - 1e-4 * side;
+                    fits.push((cost, t, o, k, backwards));
+                }
+            }
+        }
+    }
+    fits.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut tube_used = vec![false; tubes.len()];
+    let mut opening_used = vec![false; openings.len()];
+    let mut parts: Vec<(Part, f64)> = Vec::new();
+    for (cost, t, o, k, backwards) in fits {
+        if tube_used[t] || opening_used[o] {
+            continue;
+        }
+        let tube_end = Opening::new(tubes[t].clone(), cands, garment);
+        let round =
+            Opening::new(openings[o].clone(), cands, garment).from(k, backwards, cands, garment);
+        let these = sewn_round(&tube_end, &round, cands);
+        if these.is_empty() || !garment.sew(&these) {
+            continue;
+        }
+        tube_used[t] = true;
+        opening_used[o] = true;
+        let confidence = (0.9 - cost.max(0.0) / 20.0).clamp(0.3, 0.9);
+        parts.extend(these.into_iter().map(|p| (p, confidence)));
+    }
+    let whole = |e: CopyEdge, (from, to): (f64, f64)| {
+        let darts = cands
+            .iter()
+            .find(|c| c.piece == e.piece && c.edge == e.edge)
+            .map(|c| c.darts.clone())
+            .unwrap_or_default();
+        from <= 0.5 && to >= opened_along(&darts, garment.length(e)) - 0.5
+    };
+    as_seams(&parts, pieces, whole)
+}
+
+/// A tube's end sewn round an opening, each from its start: the parts of
+/// the tube's edges sewn to each of the opening's edges.
+fn sewn_round(tube: &Opening, round: &Opening, cands: &[Candidate]) -> Vec<Part> {
+    let scale = tube.length() / round.length().max(1e-9);
+    // Where each of the opening's edges ends, round the tube: at a notch of
+    // the tube's just there.
+    let mut cuts = vec![0.0];
+    let mut walked = 0.0;
+    for &l in &round.lengths[..round.lengths.len() - 1] {
+        walked += l;
+        let at = walked * scale;
+        let snapped = tube
+            .notches
+            .iter()
+            .copied()
+            .filter(|n| (n - at).abs() <= NOTCH_SNAP)
+            .min_by(|x, y| (x - at).abs().total_cmp(&(y - at).abs()))
+            .unwrap_or(at);
+        cuts.push(snapped);
+    }
+    cuts.push(tube.length());
+    // Each stretch of the tube, on its own edges.
+    let mut out = Vec::new();
+    for (k, &(edge, forwards)) in round.edges.iter().enumerate() {
+        let (from, to) = (cuts[k], cuts[k + 1]);
+        if to - from <= 0.5 {
+            return Vec::new();
+        }
+        let mut start = 0.0;
+        for (i, &(te, tf)) in tube.edges.iter().enumerate() {
+            let len = tube.lengths[i];
+            let (lo, hi) = (from.max(start), to.min(start + len));
+            start += len;
+            if hi - lo <= 0.5 {
+                continue;
+            }
+            // Along the tube's edge, as sewn: run backwards, from its end.
+            let (a, b) = if tf {
+                (lo - (start - len), hi - (start - len))
+            } else {
+                (start - hi, start - lo)
+            };
+            // On the stitching line, its darts open.
+            let darts = cands
+                .iter()
+                .find(|c| c.piece == te.piece && c.edge == te.edge)
+                .map(|c| c.darts.clone())
+                .unwrap_or_default();
+            let stretch = (opened_along(&darts, a), opened_along(&darts, b));
+            let round_darts = cands
+                .iter()
+                .find(|c| c.piece == edge.piece && c.edge == edge.edge)
+                .map(|c| c.darts.clone())
+                .unwrap_or_default();
+            let round_len = opened_along(&round_darts, round.lengths[k]);
+            // Sewn start to start where both run the same way round.
+            out.push((te, stretch, edge, (0.0, round_len), tf != forwards));
+        }
+    }
+    out
+}
+
+/// Parts sewn on copies, as seams: a part and its mirror image (on the
+/// other copies of pairs) as one seam, which is sewn on both; another
+/// naming the mirror copies it is on. `whole`: whether a part's stretch is
+/// all of its edge.
+fn as_seams<P: Borrow<Piece>>(
+    parts: &[(Part, f64)],
+    pieces: &[P],
+    whole: impl Fn(CopyEdge, (f64, f64)) -> bool,
+) -> Vec<Suggestion> {
+    let side = |e: CopyEdge, stretch: (f64, f64)| {
+        let piece = pieces[e.piece].borrow();
+        let all = whole(e, stretch);
+        SeamSide {
+            piece: piece.id.clone(),
+            edge: piece.outline.edges[e.edge].id.clone(),
+            from: (!all).then_some(stretch.0),
+            to: (!all).then_some(stretch.1),
+            mirror: e.mirror,
+        }
+    };
+    let close = |x: (f64, f64), y: (f64, f64)| (x.0 - y.0).abs() < 0.01 && (x.1 - y.1).abs() < 0.01;
+    // `q` is `p` on the first copies of the same pieces.
+    let first_of = |q: &Part, p: &Part| {
+        q.0.piece == p.0.piece
+            && q.0.edge == p.0.edge
+            && q.2.piece == p.2.piece
+            && q.2.edge == p.2.edge
+            && close(q.1, p.1)
+            && close(q.3, p.3)
+            && q.4 == p.4
+            && !q.0.mirror
+            && !q.2.mirror
+    };
+    let mut out = Vec::new();
+    for (p, confidence) in parts {
+        let (a, sa, b, sb, reversed) = *p;
+        // Sewn on both copies by the first copies' seam.
+        if a.mirror && b.mirror && parts.iter().any(|(q, _)| first_of(q, p)) {
+            continue;
+        }
+        out.push(Suggestion {
+            seam: seam(side(a, sa), side(b, sb), reversed),
+            confidence: *confidence,
+            reasons: vec![Reason::FitsOpening],
         });
     }
     out

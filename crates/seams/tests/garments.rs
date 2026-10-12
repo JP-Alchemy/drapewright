@@ -332,3 +332,152 @@ fn edges_chosen_by_hand_are_turned_the_right_way() {
         &pieces
     ));
 }
+
+/// The seams suggested for the made-up yoked blouse, as
+/// "piece.edge[*]-piece.edge[*]" (mirror copies marked *), sorted; parts
+/// of an edge marked with where they end, to the millimetre.
+fn yoked_pairs(sideways: bool) -> (Vec<drapewright_seams::Suggestion>, Vec<String>) {
+    let pieces = drapewright_pattern_core::testing::garments::yoked_blouse(sideways);
+    let suggested = suggest(&pieces, &[]);
+    let side = |s: &SeamSide| {
+        let part = match (s.from, s.to) {
+            (None, None) => String::new(),
+            (from, to) => format!(
+                "[{:.0}..{}]",
+                from.unwrap_or(0.0),
+                to.map_or("end".into(), |t| format!("{t:.0}"))
+            ),
+        };
+        format!(
+            "{}.{}{}{}",
+            s.piece,
+            s.edge,
+            part,
+            if s.mirror { "*" } else { "" }
+        )
+    };
+    let mut out: Vec<String> = suggested
+        .iter()
+        .map(|s| {
+            let (a, b) = (side(&s.seam.a), side(&s.seam.b));
+            if a <= b {
+                format!("{a}-{b}")
+            } else {
+                format!("{b}-{a}")
+            }
+        })
+        .collect();
+    out.sort();
+    (suggested, out)
+}
+
+#[test]
+fn a_yoked_blouse_is_put_together_from_its_gathers_yokes_and_armholes() {
+    for sideways in [false, true] {
+        let (suggested, pairs) = yoked_pairs(sideways);
+        let has = |pair: &str| pairs.iter().any(|p| p == pair);
+        // Each front's side to one of the back's (which, the back being
+        // alike either side, is for the garment to say).
+        let sides = pairs
+            .iter()
+            .filter(|p| p.contains("back.bside") && p.contains(".fside"))
+            .count();
+        assert_eq!(sides, 2, "{pairs:#?}");
+        // The yoke to both of the back's shoulders, one copy each.
+        let shoulders: Vec<&String> = pairs.iter().filter(|p| p.contains("yback")).collect();
+        assert_eq!(shoulders.len(), 2, "{pairs:#?}");
+        assert_eq!(shoulders.iter().filter(|p| p.contains("yback*")).count(), 1);
+        // Each front gathered to a yoke: one copy each.
+        let gathered: Vec<&drapewright_seams::Suggestion> = suggested
+            .iter()
+            .filter(|s| s.reasons.contains(&Reason::Gathered))
+            .collect();
+        let tops: Vec<&String> = pairs.iter().filter(|p| p.contains("yfront")).collect();
+        assert_eq!(tops.len(), 2, "{pairs:#?}");
+        assert!(tops.iter().any(|p| p.contains("left.ftop")));
+        assert!(tops.iter().any(|p| p.contains("right.ftop")));
+        assert_eq!(tops.iter().filter(|p| p.contains("yfront*")).count(), 1);
+        // The sleeve sewn to itself and gathered into the cuff.
+        assert!(has("sleeve.sback-sleeve.sfront"), "{pairs:#?}");
+        assert!(has("cuff.ctop-sleeve.shem"), "{pairs:#?}");
+        assert_eq!(gathered.len(), 3, "{pairs:#?}");
+        // The back's neck to its facing.
+        assert!(has("back.bneck-facing.fcneck"), "{pairs:#?}");
+        // Each sleeve's head round an armhole of three pieces: the back's,
+        // the yoke's end and the front's, split where its own notches say
+        // the shoulder and the yoke's end are (not where the lengths alone
+        // would, a little off).
+        let heads: Vec<&String> = pairs.iter().filter(|p| p.contains("shead")).collect();
+        for armhole in ["back.barml", "back.barmr", "left.farm", "right.farm"] {
+            assert_eq!(
+                heads.iter().filter(|p| p.contains(armhole)).count(),
+                1,
+                "{armhole}: {pairs:#?}"
+            );
+        }
+        let yoke_ends = heads.iter().filter(|p| p.contains("yoke.yarm")).count();
+        assert!((1..=2).contains(&yoke_ends), "{pairs:#?}");
+        let pieces = drapewright_pattern_core::testing::garments::yoked_blouse(sideways);
+        let sleeve = pieces.iter().find(|p| p.id == "sleeve").unwrap();
+        let notched: Vec<f64> = sleeve.notches.iter().skip(2).map(|n| n.at).collect();
+        for s in suggested
+            .iter()
+            .filter(|s| s.reasons.contains(&Reason::FitsOpening))
+        {
+            let side = if s.seam.a.piece == "sleeve" {
+                &s.seam.a
+            } else {
+                &s.seam.b
+            };
+            for at in [side.from, side.to].into_iter().flatten() {
+                let at_end = !(0.5..=400.0).contains(&at);
+                assert!(
+                    at_end || notched.iter().any(|n| (n - at).abs() < 0.01),
+                    "split at {at}, not at a notch {notched:?}"
+                );
+            }
+        }
+        // Not the fronts' armholes to each other, as long and shaped alike
+        // as they are.
+        assert!(!has("left.farm-right.farm"), "{pairs:#?}");
+        // Nothing sewn twice.
+        let mut edges: Vec<String> = pairs
+            .iter()
+            .flat_map(|p| p.split('-').map(str::to_string).collect::<Vec<_>>())
+            .collect();
+        let count = edges.len();
+        edges.sort();
+        edges.dedup();
+        assert_eq!(edges.len(), count, "{pairs:#?}");
+    }
+}
+
+#[test]
+fn a_sleeve_heads_parts_measure_with_their_notches_met() {
+    let pieces = drapewright_pattern_core::testing::garments::yoked_blouse(false);
+    let parts: Vec<Seam> = suggest(&pieces, &[])
+        .into_iter()
+        .filter(|s| s.reasons.contains(&Reason::FitsOpening))
+        .map(|s| s.seam)
+        .collect();
+    assert!(!parts.is_empty());
+    for seam in &parts {
+        let report = measure(seam, &pieces);
+        assert_eq!(report.problem, None);
+        // Eased in a little: a few percent.
+        assert!(
+            report.difference.abs() < 0.06 * report.a_length,
+            "{report:?}"
+        );
+        // The back's double notch meets the head's; the notches where the
+        // parts meet each other are not left without partners.
+        assert!(
+            report.notches.iter().all(|n| n.apart.is_some()),
+            "{seam:?}: {report:?}"
+        );
+        let back = [&seam.a, &seam.b]
+            .iter()
+            .any(|s| s.edge.starts_with("barm"));
+        assert_eq!(report.notches.len(), if back { 2 } else { 0 }, "{report:?}");
+    }
+}

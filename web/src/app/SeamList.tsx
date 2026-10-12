@@ -34,7 +34,8 @@ export function seamSummary(report: SeamReport, units: DisplayUnits): string {
 }
 
 /** The same two sides, whichever way round. */
-const sideKey = (s: SeamSide) => `${s.piece}:${s.edge}:${s.mirror ? 1 : 0}`
+const sideKey = (s: SeamSide) =>
+  `${s.piece}:${s.edge}:${s.mirror ? 1 : 0}:${s.from ?? ''}:${s.to ?? ''}`
 const suggestionKey = (s: Suggestion) => [sideKey(s.seam.a), sideKey(s.seam.b)].sort().join('|')
 
 /** The seams, numbered as on the table, and the suggestions to confirm. */

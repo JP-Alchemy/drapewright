@@ -16,6 +16,8 @@ schemars.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true
+# The made-up garments shared by tests.
+drapewright-pattern-core = { workspace = true, features = ["testing"] }
 
 [lints]
 workspace = true

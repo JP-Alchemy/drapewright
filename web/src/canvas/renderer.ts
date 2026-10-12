@@ -6,6 +6,7 @@ import type { DisplayUnits } from '@drapewright/engine'
 import type { GrainPreview, MovePreview, PartRef, Picking } from '../state/session.ts'
 import { cutSummary } from '../app/PieceDetails.tsx'
 import { formatLength } from '../strings/en.ts'
+import { edgePoints, stretch } from './edges.ts'
 import { type PiecePaths, addSegment } from './paths.ts'
 import { type ViewportState, scaleOf, toScreen, visibleWorld } from './viewport.ts'
 
@@ -37,6 +38,9 @@ export interface SeamMark {
   mirror: boolean
   /** The picked seam, or an edge waiting to be sewn. */
   strong: boolean
+  /** Sewing only part of the edge: from and to how far along it, mm. */
+  from?: number | null
+  to?: number | null
 }
 
 /** Marks for every seam side, numbered as the seam list numbers them. */
@@ -45,7 +49,7 @@ export function seamMarks(
   picked: string | null,
   sewing: { piece: string; edge: string } | null,
 ): SeamMark[] {
-  const marks = seams.flatMap((seam, i) => {
+  const marks: SeamMark[] = seams.flatMap((seam, i) => {
     // Sewn to its own other half: one edge, one mark.
     const self = seam.a.piece === seam.b.piece && seam.a.edge === seam.b.edge
     return (self ? [seam.a] : [seam.a, seam.b]).map((side) => ({
@@ -54,6 +58,8 @@ export function seamMarks(
       edge: side.edge,
       mirror: side.mirror,
       strong: seam.id === picked,
+      from: side.from,
+      to: side.to,
     }))
   })
   if (sewing) marks.push({ number: 0, ...sewing, mirror: false, strong: true })
@@ -135,6 +141,13 @@ function edgePath(piece: Piece, edgeId: string): Path2D | null {
   const path = new Path2D()
   path.moveTo(sx, sy)
   for (const seg of edges[i]!.segments) addSegment(path, seg)
+  return path
+}
+
+/** A run of points as an open path. */
+function linePath(points: [number, number][]): Path2D {
+  const path = new Path2D()
+  points.forEach(([x, y], k) => (k === 0 ? path.moveTo(x, y) : path.lineTo(x, y)))
   return path
 }
 
@@ -305,11 +318,22 @@ export function draw(
     ctx.setLineDash([])
   }
 
-  // Sewn edges: a band along the edge and the seam's number inside it.
+  // Sewn edges: a band along the edge (or the part of it sewn) and the
+  // seam's number inside it.
   const marks = scene.seams ?? []
+  /** The part of its edge a mark sews, where it sews only part of it. */
+  const partOf = (mark: SeamMark) => {
+    if (mark.from == null && mark.to == null) return null
+    const sp = scene.pieces.find((p) => p.piece.id === mark.piece)
+    const ev = sp?.view.edges.find((e) => e.id === mark.edge)
+    const points = sp && edgePoints(sp.piece, mark.edge)
+    if (!ev || !points || ev.length <= 0) return null
+    return stretch(points, (mark.from ?? 0) / ev.length, (mark.to ?? ev.length) / ev.length)
+  }
   for (const mark of marks) {
     const sp = scene.pieces.find((p) => p.piece.id === mark.piece)
-    const path = sp && edgePath(sp.piece, mark.edge)
+    const part = partOf(mark)
+    const path = part ? linePath(part.points) : sp && edgePath(sp.piece, mark.edge)
     if (!sp || !path) continue
     ctx.setTransform(world.multiply(placement(sp.piece, scene.preview)))
     ctx.strokeStyle = mark.strong ? theme.select : theme.seam
@@ -395,10 +419,9 @@ export function draw(
     const ev = sp?.view.edges.find((e) => e.id === mark.edge)
     if (!sp || !ev) continue
     const inward = 16 / s
-    const local = new DOMPoint(
-      ev.middle[0] - ev.middleNormal[0] * inward,
-      ev.middle[1] - ev.middleNormal[1] * inward,
-    )
+    const part = partOf(mark)
+    const [middle, out] = part ? [part.middle, part.out] : [ev.middle, ev.middleNormal]
+    const local = new DOMPoint(middle[0] - out[0] * inward, middle[1] - out[1] * inward)
     const m = placement(sp.piece, scene.preview).transformPoint(local)
     const at = toScreen(v, { x: m.x, y: m.y })
     drawBadge(ctx, `${mark.number}${mark.mirror ? '′' : ''}`, at.x, at.y, mark.strong, theme)

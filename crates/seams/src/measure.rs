@@ -6,7 +6,7 @@ use std::borrow::Borrow;
 use drapewright_pattern_core::stitching::{
     along_polyline, closed_along, dart_spans, polyline_length, stitching_edges,
 };
-use drapewright_pattern_core::{AllowanceMode, Id, NotchFrom, Piece};
+use drapewright_pattern_core::{AllowanceMode, Id, NotchFrom, NotchKind, Piece};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -76,6 +76,9 @@ struct Measured {
 /// have different numbers of them, mm.
 const PARTNER_REACH: f64 = 30.0;
 
+/// Notches this close are on the same place, mm.
+const SAME_PLACE: f64 = 1.5;
+
 /// Measures a seam among `pieces`.
 pub fn measure<P: Borrow<Piece>>(seam: &Seam, pieces: &[P]) -> SeamReport {
     let a = measure_side(&seam.a, pieces, false);
@@ -141,7 +144,7 @@ fn measure_side<P: Borrow<Piece>>(
     // Measured as sewn, its darts closed.
     let darts = dart_spans(piece, index, &stitching);
     let closed = |along: f64| closed_along(&darts, along);
-    let mut notches: Vec<NotchAt> = piece
+    let mut notches: Vec<(NotchKind, NotchAt)> = piece
         .notches
         .iter()
         .filter(|n| n.edge == side.edge)
@@ -154,23 +157,38 @@ fn measure_side<P: Borrow<Piece>>(
                 AllowanceMode::Add => on_outline,
                 AllowanceMode::Included => along_polyline(&stitching, geom.point_at(on_outline)),
             };
-            (from - 0.1..=to + 0.1)
-                .contains(&on_stitching)
-                .then(|| NotchAt {
-                    notch: n.id.clone(),
-                    at: if from_end {
-                        closed(to) - closed(on_stitching)
-                    } else {
-                        closed(on_stitching) - closed(from)
+            (from - 0.1..=to + 0.1).contains(&on_stitching).then(|| {
+                let at = if from_end {
+                    closed(to) - closed(on_stitching)
+                } else {
+                    closed(on_stitching) - closed(from)
+                };
+                (
+                    n.kind,
+                    NotchAt {
+                        notch: n.id.clone(),
+                        at,
                     },
-                })
+                )
+            })
         })
         .collect();
-    notches.sort_by(|a, b| a.at.total_cmp(&b.at));
-    Ok(Measured {
-        length: closed(to) - closed(from),
-        notches,
-    })
+    notches.sort_by(|a, b| a.1.at.total_cmp(&b.1.at));
+    // Notches on the same place (drawn on the cutting line and again on
+    // the stitching line) as one.
+    notches.dedup_by(|later, earlier| {
+        later.0 == earlier.0 && (later.1.at - earlier.1.at).abs() <= SAME_PLACE
+    });
+    let length = closed(to) - closed(from);
+    let part = side.from.is_some() || side.to.is_some();
+    let notches = notches
+        .into_iter()
+        .map(|(_, n)| n)
+        // Where part of an edge starts or stops, its notch marks the place
+        // the part meets the next: nothing to match.
+        .filter(|n| !part || (SAME_PLACE..=length - SAME_PLACE).contains(&n.at))
+        .collect();
+    Ok(Measured { length, notches })
 }
 
 /// The notches of the two sides paired up: in order when there are as many
