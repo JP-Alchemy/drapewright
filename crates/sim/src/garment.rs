@@ -12,7 +12,7 @@ use std::fmt;
 use drapewright_pattern_core::stitching::{
     closed_along, dart_spans, opened_along, stitching_edges,
 };
-use drapewright_pattern_core::{EdgeKind, Id, Piece};
+use drapewright_pattern_core::{EdgeKind, Id, MarkKind, Piece};
 use drapewright_seams::Seam;
 
 use crate::mesh::{MeshError, PanelMesh, mesh};
@@ -150,6 +150,8 @@ struct Layout {
     fold: Option<(P2, P2)>,
     /// Each edge's darts: where they are along its stitching line.
     darts: Vec<Vec<(f64, f64)>>,
+    /// The piece's marks (buttons, say) where they are on the panel.
+    marks: Vec<(MarkKind, P2)>,
 }
 
 fn reflect(p: P2, a: P2, b: P2) -> P2 {
@@ -199,6 +201,75 @@ fn counter_clockwise(
     }
 }
 
+/// `p` turned a quarter `quarters` times, counter-clockwise (y up).
+fn quarter_turned(p: P2, quarters: u8) -> P2 {
+    match quarters % 4 {
+        0 => p,
+        1 => [-p[1], p[0]],
+        2 => [-p[0], -p[1]],
+        _ => [p[1], -p[0]],
+    }
+}
+
+/// A hem's allowance is at least this much more than a seam's.
+const HEM_DEEPER: f64 = 1.5;
+
+/// How many quarter turns, counter-clockwise (y up), stand a piece upright
+/// as worn: its grain up and down the body and its hems at the bottom.
+/// Pattern CAD lays long pieces on their side to fit the sheet. A piece is
+/// taken as drawn unless its grain or its hems say otherwise; one lying on
+/// its side whose hems don't say which way is up is stood with its grain's
+/// arrow (at `to`) pointing down, as CAD draws it. `lines` are its edges'
+/// stitching lines, y up.
+fn upright(piece: &Piece, lines: &[Vec<P2>]) -> u8 {
+    let grain = piece.grainline.as_ref().map(|g| {
+        let d = [g.to.x - g.from.x, -(g.to.y - g.from.y)];
+        let l = d[0].hypot(d[1]).max(1e-9);
+        [d[0] / l, d[1] / l]
+    });
+    // Hems: marked as such, or given a deeper allowance than the seams.
+    let seam = piece.allowance.seam.max(1.0);
+    let hems: Vec<P2> = (0..lines.len())
+        .filter(|&e| {
+            piece.outline.edges[e].kind == EdgeKind::Hem
+                || (piece.outline.edges[e].kind == EdgeKind::Seam
+                    && piece.edge_allowance(e) >= HEM_DEEPER * seam
+                    && piece.edge_allowance(e) >= 15.0)
+        })
+        .map(|e| at_length(&lines[e], length(&lines[e]) / 2.0))
+        .collect();
+    let all: Vec<P2> = lines.iter().flatten().copied().collect();
+    let score = |quarters: u8| {
+        let mut score = if quarters == 0 { 1.0 } else { 0.0 };
+        if let Some(g) = grain {
+            let g = quarter_turned(g, quarters);
+            if g[1].abs() > std::f64::consts::FRAC_1_SQRT_2 {
+                score += 2.0;
+            }
+            if g[1] < -0.5 {
+                score += 0.75;
+            }
+        }
+        let ys: Vec<f64> = all
+            .iter()
+            .map(|&p| quarter_turned(p, quarters)[1])
+            .collect();
+        let (low, high) = ys
+            .iter()
+            .fold((f64::MAX, f64::MIN), |(l, h), &y| (l.min(y), h.max(y)));
+        if high > low {
+            for &hem in &hems {
+                let height = (quarter_turned(hem, quarters)[1] - low) / (high - low);
+                score += 2.0 * (1.0 - 2.0 * height);
+            }
+        }
+        score
+    };
+    (0..4u8)
+        .max_by(|&a, &b| score(a).total_cmp(&score(b)).then(b.cmp(&a)))
+        .unwrap_or(0)
+}
+
 fn layouts(pieces: &[Piece]) -> Vec<Layout> {
     let mut out = Vec::new();
     for (k, piece) in pieces.iter().enumerate() {
@@ -210,6 +281,12 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
             .into_iter()
             .map(|e| e.into_iter().map(|p| [p.x, -p.y]).collect())
             .collect();
+        // Stood upright, so that up the panel is up the body.
+        let quarters = upright(piece, &lines);
+        let lines: Vec<Vec<P2>> = lines
+            .into_iter()
+            .map(|e| e.into_iter().map(|p| quarter_turned(p, quarters)).collect())
+            .collect();
         let kinds: Vec<(Id, EdgeKind)> = piece
             .outline
             .edges
@@ -219,7 +296,7 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
         let grain = piece.grainline.as_ref().map_or([0.0, 1.0], |g| {
             let d = [g.to.x - g.from.x, -(g.to.y - g.from.y)];
             let l = d[0].hypot(d[1]).max(1e-9);
-            [d[0] / l, d[1] / l]
+            quarter_turned([d[0] / l, d[1] / l], quarters)
         });
         let cut = piece
             .cut
@@ -228,6 +305,11 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
             .or(piece.cut.first())
             .cloned()
             .unwrap_or_default();
+        let marks: Vec<(MarkKind, P2)> = piece
+            .marks
+            .iter()
+            .map(|m| (m.kind, quarter_turned([m.at.x, -m.at.y], quarters)))
+            .collect();
         let fold = kinds.iter().position(|(_, kind)| *kind == EdgeKind::Fold);
         let on_fold = cut.on_fold.unwrap_or(fold.is_some()) && fold.is_some();
         let pair = cut.quantity >= 2 && cut.mirrored.unwrap_or(true);
@@ -262,6 +344,7 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                 grain,
                 fold: Some((a, b)),
                 darts,
+                marks: marks.clone(),
             });
             continue;
         }
@@ -289,6 +372,10 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                 grain: [flip * grain[0], grain[1]],
                 fold: None,
                 darts: spans.clone(),
+                marks: marks
+                    .iter()
+                    .map(|&(k, m)| (k, [flip * m[0], m[1]]))
+                    .collect(),
             });
         }
     }
@@ -552,6 +639,37 @@ struct Side {
     to: f64,
 }
 
+/// A facing or a lining: turned inside when the garment is made up, it
+/// lies against what it faces. Draped, with no cloth of its own to rest
+/// on, it would hang loose from its seams instead.
+pub fn inside(piece: &Piece) -> bool {
+    let name = piece.name.to_lowercase();
+    let lining = |material: &str| {
+        let m = material.to_lowercase();
+        m.contains("lining") || m.contains("interfacing")
+    };
+    name.contains("facing")
+        || name.contains("lining")
+        || (!piece.cut.is_empty() && piece.cut.iter().all(|c| lining(&c.material)))
+}
+
+/// What a drape is made of: the pieces sewn by confirmed seams, less
+/// facings and linings; and, left out, the pieces sewn to nothing and the
+/// facings and linings (by id).
+pub fn draped_pieces(pieces: &[Piece], seams: &[Seam]) -> (Vec<Piece>, Vec<Id>, Vec<Id>) {
+    let (mut sewn, mut alone, mut within) = (Vec::new(), Vec::new(), Vec::new());
+    for piece in pieces {
+        if inside(piece) {
+            within.push(piece.id.clone());
+        } else if seams.iter().any(|s| s.confirmed && s.touches(&piece.id)) {
+            sewn.push(piece.clone());
+        } else {
+            alone.push(piece.id.clone());
+        }
+    }
+    (sewn, alone, within)
+}
+
 /// Lays out the pieces, sews them by `seams` (confirmed ones only), and
 /// meshes them with points about `spacing` mm apart.
 pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garment, GarmentError> {
@@ -786,9 +904,165 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             links.push(link);
         }
     }
+    stitches.extend(buttons(&layouts, pieces, &panels, &sewn[..seams_sewn]));
     Ok(Garment {
         panels,
         stitches,
         links,
     })
+}
+
+/// Buttons are marked this near the edge they button over, mm.
+const BUTTON_STAND: f64 = 40.0;
+
+/// A piece's name without "left" or "right".
+fn stem(name: &str) -> String {
+    name.to_lowercase()
+        .split_whitespace()
+        .filter(|w| *w != "left" && *w != "right")
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// A garment buttoned down the front, as worn: the buttons marked along
+/// one front's open edge (an edge sewn to nothing), each held to a
+/// buttonhole marked along the other front's, or else (buttoned through
+/// loops) to that front's open edge at the same height. Pairs of (panel,
+/// point) held together, as stitches are.
+fn buttons(
+    layouts: &[Layout],
+    pieces: &[Piece],
+    panels: &[Panel],
+    sewn: &[(Side, Side, bool, String)],
+) -> Vec<[(usize, u32); 2]> {
+    let open = |p: usize, e: usize| {
+        !sewn
+            .iter()
+            .any(|(a, b, ..)| (a.panel == p && a.edge == e) || (b.panel == p && b.edge == e))
+    };
+    // Each front's open edge running up and down it (the longest), and
+    // the marks near it: (edge, buttons, buttonholes).
+    type Opening = (usize, Vec<P2>, Vec<P2>);
+    let openings: Vec<Option<Opening>> = layouts
+        .iter()
+        .enumerate()
+        .map(|(p, layout)| {
+            if layout.copy == Copy::Unfolded
+                || !pieces[layout.piece].name.to_lowercase().contains("front")
+            {
+                return None;
+            }
+            let edge = (0..layout.edges.len())
+                .filter(|&e| open(p, e))
+                .filter(|&e| {
+                    let line = &layout.edges[e].3;
+                    let (a, b) = (line[0], line[line.len() - 1]);
+                    (b[1] - a[1]).abs() > (b[0] - a[0]).abs()
+                })
+                .max_by(|&x, &y| {
+                    length(&layout.edges[x].3).total_cmp(&length(&layout.edges[y].3))
+                })?;
+            let line = &layout.edges[edge].3;
+            let near = |m: P2| {
+                line.windows(2).any(|w| {
+                    let (a, b) = (w[0], w[1]);
+                    let d = [b[0] - a[0], b[1] - a[1]];
+                    let l = d[0] * d[0] + d[1] * d[1];
+                    let t = if l > 0.0 {
+                        (((m[0] - a[0]) * d[0] + (m[1] - a[1]) * d[1]) / l).clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    let f = [a[0] + t * d[0], a[1] + t * d[1]];
+                    (m[0] - f[0]).hypot(m[1] - f[1]) <= BUTTON_STAND
+                })
+            };
+            let marked = |kinds: &[MarkKind]| -> Vec<P2> {
+                layout
+                    .marks
+                    .iter()
+                    .filter(|(k, m)| kinds.contains(k) && near(*m))
+                    .map(|&(_, m)| m)
+                    .collect()
+            };
+            Some((
+                edge,
+                marked(&[MarkKind::Button, MarkKind::Cross]),
+                marked(&[MarkKind::Buttonhole]),
+            ))
+        })
+        .collect();
+    let low = |p: usize| {
+        panels[p]
+            .mesh
+            .points
+            .iter()
+            .map(|q| q[1])
+            .fold(f64::MAX, f64::min)
+    };
+    let nearest = |p: usize, m: P2| -> u32 {
+        let points = &panels[p].mesh.points;
+        (0..points.len())
+            .min_by(|&a, &b| {
+                let d = |i: usize| (points[i][0] - m[0]).hypot(points[i][1] - m[1]);
+                d(a).total_cmp(&d(b))
+            })
+            .map_or(0, |i| i as u32)
+    };
+    let mut out = Vec::new();
+    for p in 0..layouts.len() {
+        let Some((_, buttons, _)) = &openings[p] else {
+            continue;
+        };
+        if buttons.is_empty() {
+            continue;
+        }
+        // The other front: as named but for its side, or the other of a pair.
+        let Some(q) = (0..layouts.len()).find(|&q| {
+            q != p
+                && openings[q].is_some()
+                && stem(&pieces[layouts[q].piece].name) == stem(&pieces[layouts[p].piece].name)
+                && !openings[q]
+                    .as_ref()
+                    .is_some_and(|o| !o.1.is_empty() && q < p)
+        }) else {
+            continue;
+        };
+        let (edge, theirs, holes) = openings[q].as_ref().expect("found");
+        let held: Vec<P2> = if holes.is_empty() {
+            theirs.clone()
+        } else {
+            holes.clone()
+        };
+        let (base_p, base_q) = (low(p), low(q));
+        for &b in buttons {
+            let height = b[1] - base_p;
+            let to = if held.is_empty() {
+                // Through a loop at the edge: the edge's point that high.
+                let points = &panels[q].edges[*edge].points;
+                points
+                    .iter()
+                    .copied()
+                    .min_by(|&i, &j| {
+                        let off =
+                            |k: u32| (panels[q].mesh.points[k as usize][1] - base_q - height).abs();
+                        off(i).total_cmp(&off(j))
+                    })
+                    .expect("an edge has points")
+            } else {
+                let m = held
+                    .iter()
+                    .copied()
+                    .min_by(|x, y| {
+                        ((x[1] - base_q) - height)
+                            .abs()
+                            .total_cmp(&((y[1] - base_q) - height).abs())
+                    })
+                    .expect("marks");
+                nearest(q, m)
+            };
+            out.push([(p, nearest(p, b)), (q, to)]);
+        }
+    }
+    out
 }

@@ -2,20 +2,29 @@
 //! pieces are placed, when they are sewn, and when they have settled.
 //!
 //!     cargo run --release -p drapewright-sim --example drape_picture -- \
-//!         assets/body/adult.dwbody out [fabric] [skirt|blouse|long|bust|armhole]
+//!         assets/body/adult.dwbody out [fabric] \
+//!         [skirt|blouse|long|bust|armhole|yoked|<project file> [suggest]]
 //!
 //! writes out-placed.png, out-sewn.png and out-settled.png, draping a
 //! skirt, a blouse, a blouse with long sleeves, or one with a full bust
 //! adjustment (its dart in the side seam, or pivoted into the armhole),
-//! cut for the standard figure.
+//! cut for the standard figure, or a long blouse with yokes, gathers and
+//! cuffs laid out on its side, sewn by the seams suggested for it; or a
+//! project (a `.drapewright` file or its
+//! `project.json`) sewn by its confirmed seams, or with `suggest` by the
+//! seams suggested for it.
 
 #[path = "../tests/common/mod.rs"]
 mod common;
 
 use drapewright_body::{BodyModel, Shape};
+use drapewright_pattern_core::Piece;
+use drapewright_project::container::unpack;
+use drapewright_project::migrate::load;
+use drapewright_seams::Seam;
 use drapewright_sim::drape::Drape;
 use drapewright_sim::fabric::preset;
-use drapewright_sim::garment::assemble;
+use drapewright_sim::garment::{assemble, draped_pieces};
 use drapewright_sim::place::{Figure, place};
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Transform};
 
@@ -117,11 +126,92 @@ fn picture(
     eprintln!("wrote {path}");
 }
 
+/// A project's pieces and confirmed seams, from a `.drapewright` file or its
+/// `project.json`: the pieces sewn to nothing left out, as the app leaves
+/// them. With `suggest`, sewn as suggested instead of by its own seams.
+fn project(path: &str, suggest: bool) -> (Vec<Piece>, Vec<Seam>) {
+    let bytes = std::fs::read(path).expect("a project file");
+    let json = if path.ends_with(".json") {
+        String::from_utf8(bytes).expect("text")
+    } else {
+        unpack(&bytes).expect("a .drapewright file").project_json
+    };
+    let file = load(&json).expect("a project");
+    let pieces: Vec<Piece> = file.document.pieces.iter().map(|p| (**p).clone()).collect();
+    if suggest {
+        return sewn_as_found(pieces);
+    }
+    let seams: Vec<Seam> = file
+        .document
+        .seams
+        .iter()
+        .filter(|s| s.confirmed)
+        .cloned()
+        .collect();
+    sewn(pieces, seams)
+}
+
+/// Pieces sewn by the seams suggested for them.
+fn sewn_as_found(pieces: Vec<Piece>) -> (Vec<Piece>, Vec<Seam>) {
+    let seams = drapewright_seams::suggest(&pieces, &[])
+        .into_iter()
+        .enumerate()
+        .map(|(k, s)| Seam {
+            id: format!("s{k}"),
+            confirmed: true,
+            ..s.seam
+        })
+        .collect();
+    sewn(pieces, seams)
+}
+
+/// The pieces the app drapes, as their seams sew them: those sewn to
+/// nothing and those turned inside left out.
+fn sewn(pieces: Vec<Piece>, seams: Vec<Seam>) -> (Vec<Piece>, Vec<Seam>) {
+    let name = |id: &str| {
+        pieces
+            .iter()
+            .find(|p| p.id == id)
+            .map_or(id.to_string(), |p| p.name.clone())
+    };
+    let part = |side: &drapewright_seams::SeamSide| match (side.from, side.to) {
+        (None, None) => String::new(),
+        (from, to) => format!(
+            " [{:.1}..{}]",
+            from.unwrap_or(0.0),
+            to.map_or("end".to_string(), |t| format!("{t:.1}"))
+        ),
+    };
+    for s in &seams {
+        eprintln!(
+            "seam {}: {} {}{}{} to {} {}{}{}{}",
+            s.id,
+            name(&s.a.piece),
+            s.a.edge,
+            part(&s.a),
+            if s.a.mirror { " (mirror)" } else { "" },
+            name(&s.b.piece),
+            s.b.edge,
+            part(&s.b),
+            if s.b.mirror { " (mirror)" } else { "" },
+            if s.reversed { ", reversed" } else { "" },
+        );
+    }
+    let (sewn, alone, inside) = draped_pieces(&pieces, &seams);
+    eprintln!(
+        "left out: {} sewn to nothing, {} inside",
+        alone.len(),
+        inside.len()
+    );
+    (sewn, seams)
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let [asset, out, rest @ ..] = args.as_slice() else {
         eprintln!(
-            "usage: drape_picture <body file> <out> [fabric] [skirt|blouse|long|bust|armhole]"
+            "usage: drape_picture <body file> <out> [fabric] \
+             [skirt|blouse|long|bust|armhole|yoked|<project file> [suggest]]"
         );
         std::process::exit(2);
     };
@@ -136,7 +226,12 @@ fn main() {
         "long" => common::long_sleeved_blouse(),
         "bust" => common::full_bust_blouse(),
         "armhole" => common::armhole_dart_blouse(),
-        _ => common::skirt(),
+        "skirt" => common::skirt(),
+        "yoked" => {
+            let pieces = drapewright_pattern_core::testing::garments::yoked_blouse(true);
+            sewn_as_found(pieces)
+        }
+        path => project(path, rest.get(2).is_some_and(|s| s == "suggest")),
     };
     let garment = assemble(&pieces, &seams, 20.0).expect("a garment");
     let starts = place(&garment, &figure);

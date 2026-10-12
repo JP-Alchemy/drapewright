@@ -418,6 +418,128 @@ enum Side {
 
 /// Where each panel's points start, mm.
 pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
+    match bands_turned(g) {
+        Some(turned) => place_upright(&turned, figure),
+        None => place_upright(g, figure),
+    }
+}
+
+/// Whether a height `v` on panel `p` is in its top or bottom quarter.
+fn near_end(g: &Garment, p: usize, v: f64) -> (bool, bool) {
+    let (low, high) = panel_box(g, p);
+    let quarter = 0.25 * (high[1] - low[1]);
+    (v > high[1] - quarter, v < low[1] + quarter)
+}
+
+/// The garment with each band turned to hang from what it is sewn to, or
+/// to stand on it: pattern CAD draws a cuff or a waistband either way up.
+/// A band is sewn by one level edge and is not joined side by side to
+/// anything: sewn to another's hem, that edge goes at its top; to another's
+/// top, at its bottom. None when no band needs turning.
+fn bands_turned(g: &Garment) -> Option<Garment> {
+    let n = g.panels.len();
+    // Each panel's links: (its edge, upright, its edge's mean height, the
+    // other panel, the other's edge's mean height).
+    type Sewn = (String, bool, f64, usize, f64);
+    let mut links: Vec<Vec<Sewn>> = vec![Vec::new(); n];
+    for link in &g.links {
+        let (pa, ea, ha) = (link.a.0, &link.a.1, link.a.2);
+        let (pb, eb, hb) = (link.b.0, &link.b.1, link.b.2);
+        let (Some(sa), Some(sb)) = (edge_shape(g, pa, ea, ha), edge_shape(g, pb, eb, hb)) else {
+            continue;
+        };
+        let upright = sa.3 > sa.2 && sb.3 > sb.2;
+        links[pa].push((format!("{ea}{ha:?}"), upright, sa.1, pb, sb.1));
+        links[pb].push((format!("{eb}{hb:?}"), upright, sb.1, pa, sa.1));
+    }
+    let turn: Vec<bool> = (0..n)
+        .map(|p| {
+            let mine = &links[p];
+            let Some(first) = mine.first() else {
+                return false;
+            };
+            if mine.iter().any(|l| l.1 || l.0 != first.0 || l.3 == p) {
+                return false;
+            }
+            let (top, bottom) = near_end(g, p, first.2);
+            let (under, over) = mine.iter().fold((0, 0), |(u, o), l| {
+                let (other_top, other_bottom) = near_end(g, l.3, l.4);
+                (u + usize::from(other_bottom), o + usize::from(other_top))
+            });
+            (under > over && bottom) || (over > under && top)
+        })
+        .collect();
+    if !turn.contains(&true) {
+        return None;
+    }
+    let mut turned = g.clone();
+    for (p, panel) in turned.panels.iter_mut().enumerate() {
+        if !turn[p] {
+            continue;
+        }
+        let (low, high) = panel_box(g, p);
+        let (cx, cy) = (low[0] + high[0], low[1] + high[1]);
+        for q in &mut panel.mesh.points {
+            *q = [cx - q[0], cy - q[1]];
+        }
+        panel.grain = [-panel.grain[0], -panel.grain[1]];
+    }
+    Some(turned)
+}
+
+/// A panel sewn between cloth already placed (a yoke, between a front and
+/// a back): each of its points stitched to placed cloth goes where that
+/// is, and the rest span the gap between, each the mean of its neighbours,
+/// as a soap film spans a wire frame. `partners`: its points and where what
+/// they are sewn to is.
+fn spanned(g: &Garment, p: usize, partners: &[(usize, u32, [f64; 3])]) -> Vec<[f64; 3]> {
+    let panel = &g.panels[p];
+    let n = panel.mesh.points.len();
+    let mut neighbours: Vec<Vec<usize>> = vec![Vec::new(); n];
+    for t in &panel.mesh.triangles {
+        for k in 0..3 {
+            let (a, b) = (t[k] as usize, t[(k + 1) % 3] as usize);
+            if !neighbours[a].contains(&b) {
+                neighbours[a].push(b);
+            }
+            if !neighbours[b].contains(&a) {
+                neighbours[b].push(a);
+            }
+        }
+    }
+    let mut sums = vec![([0.0; 3], 0.0f64); n];
+    for &(q, i, at) in partners {
+        if q == p {
+            let s = &mut sums[i as usize];
+            s.0 = add3(s.0, at);
+            s.1 += 1.0;
+        }
+    }
+    let fixed: Vec<Option<[f64; 3]>> = sums
+        .iter()
+        .map(|(sum, count)| (*count > 0.0).then(|| scale3(*sum, 1.0 / count)))
+        .collect();
+    let held: Vec<[f64; 3]> = fixed.iter().flatten().copied().collect();
+    let middle = held.iter().fold([0.0; 3], |m, &x| {
+        add3(m, scale3(x, 1.0 / held.len().max(1) as f64))
+    });
+    let mut x: Vec<[f64; 3]> = fixed.iter().map(|f| f.unwrap_or(middle)).collect();
+    for _ in 0..400 {
+        for i in 0..n {
+            if fixed[i].is_some() || neighbours[i].is_empty() {
+                continue;
+            }
+            let k = neighbours[i].len() as f64;
+            x[i] = neighbours[i]
+                .iter()
+                .fold([0.0; 3], |m, &j| add3(m, scale3(x[j], 1.0 / k)));
+        }
+    }
+    x
+}
+
+/// Where each panel's points start, the panels upright (see `place`).
+fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
     let n = g.panels.len();
     let boxes: Vec<_> = (0..n).map(|p| panel_box(g, p)).collect();
     // Upright links join panels side by side; level ones join them above
@@ -463,6 +585,9 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
     // turned over if its seams run the other way.
     let mut ring_of = vec![usize::MAX; n];
     let mut rings: Vec<Vec<(usize, bool)>> = Vec::new();
+    // Each ring joined all the way round (a skirt), or open (a blouse
+    // buttoned down the front).
+    let mut closed: Vec<bool> = Vec::new();
     let names: Vec<String> = g.panels.iter().map(|p| p.name.to_lowercase()).collect();
     let starts: Vec<usize> = {
         // Begin with a front cut on the fold, else any front, else anything.
@@ -485,8 +610,12 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
         let r = rings.len();
         ring_of[start] = r;
         let mut ring = vec![(start, false)];
+        let mut round = false;
         // Rightwards from the start, then leftwards for an open ring.
         for going in [Side::Right, Side::Left] {
+            if round {
+                break;
+            }
             let (mut at, mut out) = (start, going);
             loop {
                 let next = beside[at]
@@ -496,6 +625,7 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
                     break;
                 };
                 if q == start {
+                    round = true;
                     break;
                 }
                 ring_of[q] = r;
@@ -515,7 +645,36 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
             }
         }
         rings.push(ring);
+        closed.push(round);
     }
+    // Bridges: a panel joined to nothing side by side but sewn by two or
+    // more of its edges to others (a yoke, between a front and a back over
+    // the shoulder) goes between them once they are placed.
+    let mut sewn_by: Vec<Vec<(String, usize, f64)>> = vec![Vec::new(); n];
+    for link in &g.links {
+        let (pa, pb) = (link.a.0, link.b.0);
+        if pa == pb {
+            continue;
+        }
+        let (Some(sa), Some(sb)) = (
+            edge_shape(g, pa, &link.a.1, link.a.2),
+            edge_shape(g, pb, &link.b.1, link.b.2),
+        ) else {
+            continue;
+        };
+        sewn_by[pa].push((format!("{}{:?}", link.a.1, link.a.2), pb, sb.1));
+        sewn_by[pb].push((format!("{}{:?}", link.b.1, link.b.2), pa, sa.1));
+    }
+    let bridge: Vec<bool> = (0..n)
+        .map(|p| {
+            beside[p].is_empty() && {
+                let mut edges: Vec<&String> = sewn_by[p].iter().map(|s| &s.0).collect();
+                edges.sort();
+                edges.dedup();
+                edges.len() >= 2
+            }
+        })
+        .collect();
     // Near the top of two panels of a ring: over the shoulders (two rings
     // sewn at their tops are a sleeve in an armhole). One's top to the
     // other's bottom: hung under it.
@@ -524,6 +683,9 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
     let mut shoulders = vec![false; n];
     let mut under: Vec<Option<usize>> = vec![None; n];
     for &(pa, va, pb, vb) in &level {
+        if bridge[pa] || bridge[pb] {
+            continue;
+        }
         if near_top(pa, va) && near_top(pb, vb) {
             if ring_of[pa] == ring_of[pb] {
                 shoulders[pa] = true;
@@ -533,6 +695,20 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
             under[pa] = Some(pb);
         } else if near_top(pb, vb) && near_bottom(pa, va) {
             under[pb] = Some(pa);
+        }
+    }
+    // Two panels of a ring sewn near their tops to the same bridge: over
+    // the shoulders too, the bridge between them.
+    for p in (0..n).filter(|&p| bridge[p]) {
+        let tops: Vec<usize> = sewn_by[p]
+            .iter()
+            .filter(|&&(_, q, v)| !bridge[q] && near_top(q, v))
+            .map(|&(_, q, _)| q)
+            .collect();
+        for &a in &tops {
+            if tops.iter().any(|&b| b != a && ring_of[b] == ring_of[a]) {
+                shoulders[a] = true;
+            }
         }
     }
     // Each ring's height: from above the shoulders, under another ring, or
@@ -580,14 +756,19 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
         (left < right).then_some((left, right))
     };
     // A ring round the trunk, hanging from `top`: each panel's points.
-    let wrap_trunk = |ring: &[(usize, bool)], top: f64| -> Vec<Vec<[f64; 3]>> {
+    let wrap_trunk = |ring: &[(usize, bool)], round: bool, top: f64| -> Vec<Vec<[f64; 3]>> {
         // The front's middle in front, a back's behind; otherwise the
-        // first panel's middle in front.
+        // first panel's middle in front. A ring open between two fronts
+        // (buttoned down the front) meets itself in front.
         let front = ring
             .iter()
             .position(|&(p, _)| names[p].contains("front"))
             .unwrap_or(0);
         let behind = names[ring[front].0].contains("back");
+        let open_front = !round
+            && ring.len() >= 2
+            && names[ring[0].0].contains("front")
+            && names[ring[ring.len() - 1].0].contains("front");
         // The ring at each height (every 5 mm): each panel's span there (or
         // none), and the oval it goes round.
         let key = |y: f64| (y / 5.0).round() as i64;
@@ -617,7 +798,11 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
                 let offset: f64 = (0..k).map(width).sum();
                 let (left, right) = spans[k].unwrap_or((q[0], q[0]));
                 let u = if turned { right - q[0] } else { q[0] - left };
-                let middle: f64 = (0..front).map(width).sum::<f64>() + width(front) / 2.0;
+                let middle: f64 = if open_front {
+                    0.0
+                } else {
+                    (0..front).map(width).sum::<f64>() + width(front) / 2.0
+                };
                 // Round the whole oval: a garment smaller than it starts
                 // stretched, to close onto the body.
                 let around: f64 = (0..ring.len()).map(width).sum();
@@ -683,11 +868,12 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
             .map(|((s, _, _), d)| (s, d))
             .min_by(|a, b| a.1.total_cmp(&b.1))
             .expect("a ring of points");
-        // Round the arm `along` mm down it, `sign` the way round.
-        let at = |(s, d, around): (f64, f64, f64), sign: f64, along: f64| {
+        // Round the arm `along` mm down it, `sign` the way round, turned
+        // `turn` radians round from its top over the top of the arm.
+        let at = |(s, d, around): (f64, f64, f64), sign: f64, along: f64, turn: f64| {
             let (middle, up, side, radius) = arm.at(along + d);
             let r = (around / TAU).max(radius * CLEAR);
-            let angle = sign * TAU * (s - top) / around.max(1.0);
+            let angle = sign * TAU * (s - top) / around.max(1.0) + turn;
             add3(
                 middle,
                 add3(scale3(up, r * angle.cos()), scale3(side, r * angle.sin())),
@@ -700,25 +886,30 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
             .enumerate()
             .map(|(k, &(p, turned))| (p, (k, turned)))
             .collect();
-        let mut best = (f64::MAX, 1.0, ARM_BEFORE);
+        // Slid as far as the wrist (a cuff), and turned round the arm in
+        // steps of 15°.
+        let mut best = (f64::MAX, 1.0, ARM_BEFORE, 0.0);
+        let reach = ARM_STEP * (arm.line.len() - 1) as f64;
         for sign in [1.0, -1.0] {
-            for step in 0..=16 {
-                let along = ARM_BEFORE - 100.0 + 10.0 * f64::from(step);
-                let cost: f64 = partners
-                    .iter()
-                    .map(|&(p, i, partner)| {
-                        let (k, turned) = index[&p];
-                        let q = g.panels[p].mesh.points[i as usize];
-                        let d = sub3(at(round(k, turned, q), sign, along), partner);
-                        dot3(d, d)
-                    })
-                    .sum();
-                if cost < best.0 {
-                    best = (cost, sign, along);
+            for turn in (0..24).map(|k| TAU * f64::from(k) / 24.0) {
+                for step in 0..=(reach / 10.0) as u32 {
+                    let along = 10.0 * f64::from(step);
+                    let cost: f64 = partners
+                        .iter()
+                        .map(|&(p, i, partner)| {
+                            let (k, turned) = index[&p];
+                            let q = g.panels[p].mesh.points[i as usize];
+                            let d = sub3(at(round(k, turned, q), sign, along, turn), partner);
+                            dot3(d, d)
+                        })
+                        .sum();
+                    if cost < best.0 {
+                        best = (cost, sign, along, turn);
+                    }
                 }
             }
         }
-        let (_, sign, along) = best;
+        let (_, sign, along, turn) = best;
         ring.iter()
             .enumerate()
             .map(|(k, &(p, turned))| {
@@ -726,7 +917,7 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
                     .mesh
                     .points
                     .iter()
-                    .map(|&q| at(round(k, turned, q), sign, along))
+                    .map(|&q| at(round(k, turned, q), sign, along, turn))
                     .collect()
             })
             .collect()
@@ -736,50 +927,101 @@ pub fn place(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
     // another.
     for (r, ring) in rings.iter().enumerate() {
         if let Some(top) = tops[r] {
-            for (&(p, _), points) in ring.iter().zip(wrap_trunk(ring, top)) {
+            for (&(p, _), points) in ring.iter().zip(wrap_trunk(ring, closed[r], top)) {
                 out[p] = points;
             }
         }
     }
-    // Then the rest: a ring sewn to cloth placed by a shoulder goes round
-    // that arm; another from the waist.
-    for (r, ring) in rings.iter().enumerate() {
-        if tops[r].is_some() {
+    // Then the rest, each once what it is sewn to is placed: a bridge
+    // between what it joins; a ring sewn to cloth by a shoulder or a wrist
+    // round that arm; another from the waist.
+    let mut waiting: Vec<usize> = (0..rings.len()).filter(|&r| tops[r].is_none()).collect();
+    while !waiting.is_empty() {
+        // Each waiting ring's points sewn to cloth placed: (its panel, its
+        // point, where what it is sewn to is).
+        let partners = |r: usize, out: &[Vec<[f64; 3]>]| -> Vec<(usize, u32, [f64; 3])> {
+            g.stitches
+                .iter()
+                .flat_map(|&[a, b]| [(a, b), (b, a)])
+                .filter(|&((p, _), (q, j))| {
+                    ring_of[p] == r
+                        && ring_of[q] != r
+                        && !out[q].is_empty()
+                        && (j as usize) < out[q].len()
+                })
+                .map(|((p, i), (q, j))| (p, i, out[q][j as usize]))
+                .collect()
+        };
+        // A bridge waits for cloth placed on two of its edges at least.
+        let spans = |r: usize, partners: &[(usize, u32, [f64; 3])]| {
+            let p = rings[r][0].0;
+            let mut edges: Vec<usize> = partners
+                .iter()
+                .filter_map(|&(_, i, _)| {
+                    g.panels[p].edges.iter().position(|e| e.points.contains(&i))
+                })
+                .collect();
+            edges.sort_unstable();
+            edges.dedup();
+            edges.len() >= 2
+        };
+        let ready = waiting.iter().position(|&r| {
+            let found = partners(r, &out);
+            !found.is_empty() && (!bridge[rings[r][0].0] || spans(r, &found))
+        });
+        // None ready: the largest from the waist (or, a bridge, between
+        // what is placed of what it joins).
+        let r = match ready {
+            Some(k) => waiting.remove(k),
+            None => {
+                let k = (0..waiting.len())
+                    .max_by(|&a, &b| {
+                        let size = |r: usize| {
+                            rings[r]
+                                .iter()
+                                .map(|&(p, _)| g.panels[p].mesh.points.len())
+                                .sum::<usize>()
+                        };
+                        size(waiting[a]).cmp(&size(waiting[b])).then(b.cmp(&a))
+                    })
+                    .expect("one waiting");
+                waiting.remove(k)
+            }
+        };
+        let ring = &rings[r];
+        let found = partners(r, &out);
+        if bridge[ring[0].0] && !found.is_empty() {
+            out[ring[0].0] = spanned(g, ring[0].0, &found);
             continue;
         }
-        let partners: Vec<(usize, u32, [f64; 3])> = g
-            .stitches
-            .iter()
-            .flat_map(|&[a, b]| [(a, b), (b, a)])
-            .filter(|&((p, _), (q, j))| {
-                ring_of[p] == r
-                    && ring_of[q] != r
-                    && !out[q].is_empty()
-                    && (j as usize) < out[q].len()
-            })
-            .map(|((p, i), (q, j))| (p, i, out[q][j as usize]))
-            .collect();
-        let arm = (!partners.is_empty())
+        let arm = (!found.is_empty())
             .then(|| {
-                let count = partners.len() as f64;
-                let middle = partners
+                let count = found.len() as f64;
+                let middle = found
                     .iter()
                     .fold([0.0; 3], |m, &(_, _, x)| add3(m, scale3(x, 1.0 / count)));
                 figure
                     .arms
                     .iter()
                     .map(|arm| {
-                        let d = sub3(arm.at(ARM_BEFORE).0, middle);
-                        (dot3(d, d).sqrt(), arm)
+                        // Nearest the arm's line, from the shoulder to the
+                        // wrist.
+                        let d = (0..arm.line.len())
+                            .map(|k| {
+                                let d = sub3(arm.line[k], middle);
+                                dot3(d, d).sqrt() - arm.radius[k]
+                            })
+                            .fold(f64::MAX, f64::min);
+                        (d, arm)
                     })
                     .min_by(|a, b| a.0.total_cmp(&b.0))
-                    .filter(|(distance, _)| *distance < 200.0)
+                    .filter(|(distance, _)| *distance < 150.0)
                     .map(|(_, arm)| arm)
             })
             .flatten();
         let placed = match arm {
-            Some(arm) => wrap_arm(ring, arm, &partners),
-            None => wrap_trunk(ring, figure.waist + 20.0),
+            Some(arm) => wrap_arm(ring, arm, &found),
+            None => wrap_trunk(ring, closed[r], figure.waist + 20.0),
         };
         for (&(p, _), points) in ring.iter().zip(placed) {
             out[p] = points;

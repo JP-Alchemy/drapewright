@@ -171,6 +171,12 @@ impl Draping {
         self.0.left_out.clone()
     }
 
+    /// The facings and linings left out, as they go inside, by id.
+    #[wasm_bindgen(getter)]
+    pub fn inside(&self) -> Vec<String> {
+        self.0.inside.clone()
+    }
+
     /// Moves the drape on a frame, giving a `DrapeProgress`.
     pub fn step(&mut self) -> Result<JsValue, JsError> {
         self.0

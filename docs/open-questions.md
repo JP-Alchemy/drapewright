@@ -166,3 +166,10 @@ matters.
 29. ☐ **Projector set-up.** Does she have, or want, a projector over her
     cutting table? Which size of rectangle can she mark on her mat?
     *Provisional: 40 × 30 cm to start, changeable.*
+30. ☐ **Facings and linings on the avatar.** They're left off the drape,
+    and the status line says so. *Provisional: left off. The alternative is
+    to drape them turned inside, which needs cloth that rests on cloth.*
+31. ☐ **Buttoning on the avatar.** Buttons marked along a front are done
+    up when it is draped: to the other front's buttonholes, or to its edge
+    where it has loops instead. *Provisional: always done up. Should she be
+    able to see it open?*

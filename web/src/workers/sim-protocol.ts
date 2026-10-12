@@ -13,6 +13,8 @@ import type { ViewColours } from '@drapewright/engine/avatar'
 export interface DrapeUpdate extends DrapeProgress {
   /** The pieces left out, sewn to nothing, by id. */
   leftOut: string[]
+  /** The facings and linings left out, as they go inside, by id. */
+  inside: string[]
 }
 
 /** What the sim worker can be asked, and what each answers. */

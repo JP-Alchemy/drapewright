@@ -6,7 +6,7 @@ pub use drapewright_fabric::{Fabric, FabricPreset, Measured};
 use drapewright_pattern_core::Piece;
 use drapewright_seams::Seam;
 use drapewright_sim::drape::Drape;
-use drapewright_sim::garment::{GarmentError, assemble};
+use drapewright_sim::garment::{GarmentError, assemble, draped_pieces};
 use drapewright_sim::place::{Figure, place};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -89,12 +89,14 @@ pub struct Draping {
     drape: Drape,
     /// The pieces sewn to nothing, by id: left out.
     pub left_out: Vec<String>,
+    /// The facings and linings, by id: left out, as they go inside.
+    pub inside: Vec<String>,
     done: Option<DrapeStage>,
 }
 
 impl Draping {
-    /// Starts draping: the pieces sewn by confirmed seams, placed round the
-    /// avatar and let go.
+    /// Starts draping: the pieces sewn by confirmed seams, but for facings
+    /// and linings, placed round the avatar and let go.
     pub fn start(model: &BodyModel, request: &DrapeRequest) -> Result<Draping, DrapeError> {
         let seams: Vec<Seam> = request
             .seams
@@ -102,14 +104,10 @@ impl Draping {
             .filter(|s| s.confirmed)
             .cloned()
             .collect();
-        let (sewn, left_out): (Vec<&Piece>, Vec<&Piece>) = request
-            .pieces
-            .iter()
-            .partition(|p| seams.iter().any(|s| s.touches(&p.id)));
+        let (sewn, left_out, inside) = draped_pieces(&request.pieces, &seams);
         if sewn.is_empty() {
             return Err(DrapeError::NothingSewn);
         }
-        let sewn: Vec<Piece> = sewn.into_iter().cloned().collect();
         let garment = assemble(&sewn, &seams, SPACING).map_err(DrapeError::Garment)?;
         let body = model.shape(&Shape::from(request.settings.clone()));
         let starts = place(&garment, &Figure::of(model, &body));
@@ -123,7 +121,8 @@ impl Draping {
         );
         Ok(Draping {
             drape,
-            left_out: left_out.iter().map(|p| p.id.clone()).collect(),
+            left_out,
+            inside,
             done: None,
         })
     }

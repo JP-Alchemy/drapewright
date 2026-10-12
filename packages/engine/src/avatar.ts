@@ -74,6 +74,11 @@ export class Draping {
     return drapings.get(this)!.leftOut
   }
 
+  /** The facings and linings left out, as they go inside, by id. */
+  get inside(): string[] {
+    return drapings.get(this)!.inside
+  }
+
   /** Moves the drape on a frame (1/60 s of the cloth's time). */
   step(): DrapeProgress {
     return drapings.get(this)!.step() as DrapeProgress

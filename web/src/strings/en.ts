@@ -876,6 +876,12 @@ export const t = {
         'One piece isn’t sewn to anything, so it’s left off.',
         '# pieces aren’t sewn to anything, so they’re left off.',
       ),
+    inside: (n: number) =>
+      plural(
+        n,
+        'A facing or lining is left off: it goes inside.',
+        '# facings and linings are left off: they go inside.',
+      ),
     cannotDrape: (why: string) => `This can’t be draped yet: ${why}.`,
     shows: 'Show the cloth as',
     showsAs: { fabric: 'Fabric', pull: 'Pulling', room: 'Room' } satisfies Record<

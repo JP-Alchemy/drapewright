@@ -12,6 +12,86 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 31 — A bought blouse found and draped
+
+A blouse from a bought PDF now goes from import to the avatar with **Find
+seams** alone. The pattern is laid out the way pattern CAD fits it on the
+sheet: back and fronts lying on their sides, a cuff upside down. The blouse
+has a back cut whole, a left and a right front gathered into narrow yokes
+over the shoulders, and sleeves set into armholes made of three pieces and
+gathered into cuffs. It buttons down the front and has facings.
+
+**Try it** (with the blouse, one of the two real bought patterns):
+
+1. **Open pattern**, choose the PDF and add its pieces.
+2. In **Seams**, press **Find seams**. Twenty seams are suggested, each
+   saying why. Besides the side seams, shoulders and facings:
+   * each front is **gathered to fit** a yoke, the one on its own side;
+     the zigzag drawn along the front's top edge marks the gathers;
+   * each sleeve is **gathered to fit** its cuff;
+   * each sleeve's head is sewn in three parts, each one that **fits round
+     the opening**: the back's armhole, the yoke's end and the front's
+     armhole. It is split where the sleeve's own notches are, and on the
+     table each part's number sits on its own stretch of the sleeve's head;
+   * the left front facing's short jog **goes on from a seam**.
+
+   The two fronts' armholes are no longer suggested to each other.
+3. **Sew all**, open the **Avatar** and press **Drape**. The blouse hangs
+   from the shoulders: V neck, gathers under the yokes, full sleeves
+   gathered into the cuffs at the wrists, buttoned down the front. The
+   status line says the rouleau strip is left off (it is sewn to nothing)
+   and the facings go inside.
+
+A project sewn with the earlier suggestions keeps its seams, and two of
+them were wrong: the fronts' armholes sewn to each other, and a yoke sewn to
+its own other half. Start a new project from the PDF (or unpick its seams)
+and **Find seams** again.
+
+**How it works:**
+
+* *Pieces stood upright.* Each piece is turned, a quarter turn at a time,
+  so that its grain runs up and down the body and its hems are at the
+  bottom. A hem is an edge marked as one, or with a deeper allowance than
+  the seams (20 mm against 10 here). A piece lying on its side with no hem
+  to go by is turned so that its grainline's arrow points down, as CAD
+  draws it.
+* *Yokes, open fronts, bands.* A piece sewn by two of its edges between
+  pieces already placed, as a yoke is between a front and a back, is
+  placed after them. It spans the gap, each of its points the mean of its
+  neighbours, and counts as the shoulder they hang from. A ring of pieces
+  open between two fronts meets itself at the centre front. A band sewn by
+  one edge, such as a cuff, is turned to hang from what it is sewn to, and
+  goes round the arm wherever along it its seam is.
+* *Buttons.* Buttons marked along one front's open edge (button marks, or
+  crosses) are held to the other front's buttonholes. Where it has none,
+  as here (it buttons through loops), they are held to its edge at the
+  same height.
+* *Facings and linings* are left off the drape. Turned inside, they lie on
+  what they face; with no cloth of their own to rest on, they would hang
+  loose from their seams.
+* *Find seams* tries each likely seam on a model of the garment as sewn so
+  far: each piece's copies (a pair as two mirror images), which of their
+  corners meet, and which way out each copy is. It passes over a seam that
+  would pinch a piece, bringing two of its corners together through other
+  pieces (as sewing the fronts' armholes together would, once the side
+  seams are sewn), or that would need a copy both right side and wrong
+  side out. Of seams as likely as each other, it takes the one joining
+  corners nearest each other round the garment (a facing's end to the
+  front facing on its own side), then the one closing most openings, then
+  fewer seams, then pieces right side out. Gathered edges (a wavy line drawn
+  along an edge, or an edge named so) are matched to shorter edges last,
+  once the rest is put together: a sleeve to a cuff, or a front or a back to
+  a yoke, likeliest. Last, each sleeve's head goes round what is left open
+  of an armhole as long as it (within 6%), started where their notches
+  agree, or else with the underarm at the side seam.
+
+**Not yet:** "gather to 15.1 cm", written on the pattern, isn't read: the
+gathers are matched by the zigzag and the lengths. A cuff's own buttons
+aren't done up; it wraps the wrist as a closed band. A collar isn't set
+into a neckline the way a sleeve is set into an armhole.
+
+---
+
 ## Step 30 — Projector mode (Phase 4, part 9)
 
 Project the pieces true size onto fabric on the cutting table, from a

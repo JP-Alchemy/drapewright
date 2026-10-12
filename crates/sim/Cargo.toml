@@ -20,6 +20,8 @@ spade.workspace = true
 drapewright-project.workspace = true
 # Pictures of a drape, to check by eye (the drape_picture example).
 tiny-skia.workspace = true
+# The made-up garments shared by tests.
+drapewright-pattern-core = { workspace = true, features = ["testing"] }
 
 [lints]
 workspace = true

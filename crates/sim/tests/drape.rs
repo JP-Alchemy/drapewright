@@ -5,7 +5,7 @@ mod common;
 use drapewright_body::{BodyModel, Shape};
 use drapewright_sim::drape::Drape;
 use drapewright_sim::fabric::preset;
-use drapewright_sim::garment::assemble;
+use drapewright_sim::garment::{assemble, draped_pieces};
 use drapewright_sim::place::{Figure, place};
 
 fn avatar() -> BodyModel {
@@ -208,5 +208,109 @@ fn blouse_hangs(
         eprintln!("sleeve {k}: within {farthest:.0} mm of its arm, {out:.0} mm out");
         assert!(farthest < 120.0, "sleeve {k} {farthest} mm from its arm");
         assert!(out > 180.0, "sleeve {k} only {out} mm out");
+    }
+}
+
+#[test]
+fn a_blouse_laid_out_on_its_side_drapes_sewn_as_its_seams_are_found() {
+    // As pattern CAD lays it on the sheet: its back and fronts on their
+    // sides, its cuffs upside down; sewn by the seams found for it, its
+    // fronts buttoned, its facing left inside.
+    let pieces = drapewright_pattern_core::testing::garments::yoked_blouse(true);
+    let seams: Vec<drapewright_seams::Seam> = drapewright_seams::suggest(&pieces, &[])
+        .into_iter()
+        .enumerate()
+        .map(|(k, s)| drapewright_seams::Seam {
+            id: format!("s{k}"),
+            confirmed: true,
+            ..s.seam
+        })
+        .collect();
+    let (sewn, alone, inside) = draped_pieces(&pieces, &seams);
+    assert!(alone.is_empty(), "{alone:?}");
+    assert_eq!(inside, ["facing"]);
+    let model = avatar();
+    let body = model.shape(&Shape::default());
+    let figure = Figure::of(&model, &body);
+    let garment = assemble(&sewn, &seams, 20.0).unwrap();
+    let starts = place(&garment, &figure);
+    let mut drape = Drape::new(
+        &garment,
+        &starts,
+        preset("poplin").unwrap(),
+        (&body.vertices, &model.skin()),
+    );
+    let mut frames = 0;
+    while !drape.settled() && frames < 60 * 8 {
+        drape.step(1.0 / 60.0);
+        frames += 1;
+    }
+    let x = &drape.cloth.x;
+    assert!(
+        drape.settled(),
+        "still moving at {} m/s",
+        drape.cloth.mean_speed()
+    );
+    // Seams closed, the gathers drawn up and the buttons done up.
+    let gap = drape.cloth.widest_stitch();
+    assert!(gap < 0.008, "a seam is {gap} m open");
+    let deepest = x
+        .iter()
+        .map(|&p| drape.clearance(p))
+        .fold(f32::MAX, f32::min);
+    assert!(deepest > 0.0, "cloth {deepest} m into the body");
+    // From the shoulders, by way of the yokes: its top by the neck, its
+    // hem below the hip.
+    let hip = drapewright_body::measure(&model, &body).1.levels["hip"];
+    let top = x.iter().map(|p| p[1]).fold(f32::MIN, f32::max) * 1000.0;
+    let hem = x.iter().map(|p| p[1]).fold(f32::MAX, f32::min) * 1000.0;
+    eprintln!(
+        "{frames} frames; widest stitch {:.1} mm; top {top:.0} mm (shoulders {:.0}); hem {hem:.0} mm (hip {hip:.0})",
+        gap * 1000.0,
+        figure.shoulders
+    );
+    assert!(
+        (0.0..80.0).contains(&(f64::from(top) - figure.shoulders)),
+        "top {top}"
+    );
+    assert!(f64::from(hem) < hip, "hem {hem}");
+    // Each sleeve round an arm, and each cuff round a wrist.
+    for (k, panel) in garment.panels.iter().enumerate() {
+        let points = &x[drape.firsts[k] as usize..][..panel.mesh.points.len()];
+        let left = points.iter().map(|p| p[0]).sum::<f32>() > 0.0;
+        let arm = figure
+            .arms
+            .iter()
+            .find(|a| (a.line[20][0] > 0.0) == left)
+            .unwrap();
+        let near = |p: &[f32; 3], q: &[f64; 3]| {
+            (0..3)
+                .map(|c| (f64::from(p[c]) * 1000.0 - q[c]).powi(2))
+                .sum::<f64>()
+                .sqrt()
+        };
+        match panel.piece.as_str() {
+            "sleeve" => {
+                let farthest = points
+                    .iter()
+                    .map(|p| arm.line.iter().map(|q| near(p, q)).fold(f64::MAX, f64::min))
+                    .fold(0.0, f64::max);
+                assert!(farthest < 150.0, "sleeve {k} {farthest} mm from its arm");
+            }
+            "cuff" => {
+                // Nearer the wrist than the elbow.
+                let wrist = arm.line[arm.line.len() - 6];
+                let elbow = arm.line[arm.line.len() / 2];
+                let mean = points.iter().fold([0.0f32; 3], |m, p| {
+                    [0, 1, 2].map(|c| m[c] + p[c] / points.len() as f32)
+                });
+                let (to_wrist, to_elbow) = (near(&mean, &wrist), near(&mean, &elbow));
+                eprintln!(
+                    "cuff {k}: {to_wrist:.0} mm from the wrist, {to_elbow:.0} from the elbow"
+                );
+                assert!(to_wrist < to_elbow, "cuff {k} not at the wrist");
+            }
+            _ => {}
+        }
     }
 }

@@ -150,7 +150,10 @@ function drapeText(drape: Drape): string {
             ? text.stillMoving(fabric)
             : text.draped(fabric)
       const left = update?.leftOut.length ?? 0
-      return left > 0 ? `${said} ${text.leftOut(left)}` : said
+      const inside = update?.inside.length ?? 0
+      return [said, left > 0 ? text.leftOut(left) : '', inside > 0 ? text.inside(inside) : '']
+        .filter(Boolean)
+        .join(' ')
     }
   }
 }

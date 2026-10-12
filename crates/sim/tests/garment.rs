@@ -291,3 +291,91 @@ fn a_blouse_is_sewn_into_its_armholes() {
         assert!(cap.points.iter().all(|i| sewn.contains(i)));
     }
 }
+
+/// The made-up yoked blouse laid out as CAD lays it on the sheet, sewn by
+/// the seams found for it: its pieces and seams as draped.
+fn yoked() -> (
+    Vec<drapewright_pattern_core::Piece>,
+    Vec<drapewright_seams::Seam>,
+) {
+    let pieces = drapewright_pattern_core::testing::garments::yoked_blouse(true);
+    let seams: Vec<drapewright_seams::Seam> = drapewright_seams::suggest(&pieces, &[])
+        .into_iter()
+        .enumerate()
+        .map(|(k, s)| drapewright_seams::Seam {
+            id: format!("s{k}"),
+            confirmed: true,
+            ..s.seam
+        })
+        .collect();
+    (pieces, seams)
+}
+
+#[test]
+fn pieces_laid_on_their_side_are_stood_upright() {
+    let (pieces, seams) = yoked();
+    let (sewn, _, _) = drapewright_sim::garment::draped_pieces(&pieces, &seams);
+    let g = assemble(&sewn, &seams, 20.0).unwrap();
+    for panel in &g.panels {
+        // Up the panel is up the body: the grain up and down it ...
+        assert!(
+            panel.grain[1].abs() > 0.99,
+            "{} {:?}: grain {:?}",
+            panel.piece,
+            panel.copy,
+            panel.grain
+        );
+        let low = panel
+            .mesh
+            .points
+            .iter()
+            .map(|p| p[1])
+            .fold(f64::MAX, f64::min);
+        // ... and hems at the bottom.
+        for e in panel.edges.iter().filter(|e| e.edge.ends_with("hem")) {
+            let mean = e
+                .points
+                .iter()
+                .map(|&i| panel.mesh.points[i as usize][1])
+                .sum::<f64>()
+                / e.points.len() as f64;
+            assert!(
+                mean - low < 20.0,
+                "{}'s {} {mean} above {low}",
+                panel.piece,
+                e.edge
+            );
+        }
+    }
+}
+
+#[test]
+fn facings_are_left_inside_and_fronts_buttoned() {
+    let (pieces, seams) = yoked();
+    let (sewn, alone, inside) = drapewright_sim::garment::draped_pieces(&pieces, &seams);
+    assert!(alone.is_empty());
+    assert_eq!(inside, ["facing"]);
+    assert!(sewn.iter().all(|p| p.id != "facing"));
+    let g = assemble(&sewn, &seams, 20.0).unwrap();
+    // Each of the left front's five buttons held to the right front's edge.
+    let index = |id: &str| g.panels.iter().position(|p| p.piece == id).unwrap();
+    let (left, right) = (index("left"), index("right"));
+    let buttons = g
+        .stitches
+        .iter()
+        .filter(|[(pa, _), (pb, _)]| (*pa == left && *pb == right) || (*pa == right && *pb == left))
+        .count();
+    assert_eq!(buttons, 5);
+    let edge = &g.panels[right].edge("fedge", Half::A).unwrap().points;
+    for [(pa, a), (_, b)] in g
+        .stitches
+        .iter()
+        .filter(|[(pa, _), (pb, _)]| *pa == left && *pb == right)
+    {
+        assert_eq!(*pa, left);
+        assert!(
+            edge.contains(b),
+            "button {a} held off the right front's edge"
+        );
+    }
+}
