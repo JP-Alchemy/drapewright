@@ -164,6 +164,12 @@ impl EngineHandle {
         to_js(&self.engine.suggest_seams())
     }
 
+    /// The ids of pieces drawn for one side of the body and cut once.
+    #[wasm_bindgen(js_name = drawnForOneSide)]
+    pub fn drawn_for_one_side(&self) -> Vec<String> {
+        self.engine.drawn_for_one_side()
+    }
+
     #[wasm_bindgen(js_name = hitTest)]
     pub fn hit_test(&mut self, x: f64, y: f64, tolerance: f64) -> Result<JsValue, JsError> {
         to_js(&self.engine.hit_test(Pt::new(x, y), tolerance))

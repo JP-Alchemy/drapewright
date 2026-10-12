@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures.ts'
-import { openWithFixture } from './helpers.ts'
+import { fixture, openWithFixture } from './helpers.ts'
 
 /** Picks a piece's edge as a tap on it would (through the debug handle). */
 async function pickEdge(page: import('@playwright/test').Page, piece: number, edge: number) {
@@ -58,4 +58,37 @@ test('an edge is sewn to another by hand', async ({ page }) => {
   await expect(seams.getByRole('button', { name: /^Seam 1/ })).toBeVisible()
   // The partner's inspector says what it is sewn to.
   await expect(page.getByRole('button', { name: /^Sewn to Front inside/ })).toBeVisible()
+})
+
+test('panels drawn for one side are cut as pairs when seams are found, and it says so', async ({
+  page,
+}) => {
+  await page.goto('/')
+  // The test corset: three panels drawn once, from the centre front round
+  // to the centre back, and a crotch piece; each cut once, as the pattern
+  // leaves them.
+  await page.getByTestId('pattern-file').setInputFiles(fixture('corset.drapewright'))
+  const pieces = page.getByRole('listbox', { name: 'Pieces' })
+  await expect(pieces.getByRole('option')).toHaveCount(4)
+  const centre = pieces.getByRole('option', { name: /Front Center/ })
+  await expect(centre).toContainText('Cut 1')
+
+  const seams = page.getByRole('region', { name: 'Seams' })
+  await seams.getByRole('button', { name: 'Find seams' }).click()
+  await expect(
+    page.getByText(
+      '“Front Center”, “Front Side”, and “Back Center” look drawn for one side, so they’re now cut 2, a left and a right. Undo to cut them once.',
+    ),
+  ).toBeVisible()
+  await expect(centre).toContainText('Cut 2')
+  // So each centre is sewn to its other half, and the crotch piece along
+  // both centre fronts.
+  const found = seams.getByRole('group', { name: 'Edges that look sewn together' })
+  await expect(found.getByText(/centre of a pair/)).toHaveCount(2)
+  await expect(found.getByText(/fits along the opening/)).toHaveCount(2)
+
+  // Undo cuts them once again, in one step.
+  await page.getByRole('button', { name: /^Undo/ }).click()
+  await expect(centre).toContainText('Cut 1')
+  await expect(pieces.getByRole('option', { name: /Back Center/ })).toContainText('Cut 1')
 })

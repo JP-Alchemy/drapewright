@@ -319,7 +319,7 @@ pub fn all() -> Vec<Tool> {
             "get_seams",
             "Get seams",
             Reads,
-            "The seams: which edges are sewn together, each side's length on the stitching line, the difference, and how the notches meet. Also the seams Drapewright suggests for edges not sewn yet, with how likely each is and why; ask the user before sewing them with sew_edges.",
+            "The seams: which edges are sewn together, each side's length on the stitching line, the difference, and how the notches meet. Also the seams Drapewright suggests for edges not sewn yet, with how likely each is and why; ask the user before sewing them with sew_edges. drawnForOneSide lists pieces that look drawn for one side and cut once (a pattern that draws each panel once): tell the user and set them to cut 2 as mirrored pairs first.",
             get_seams,
         ),
         tool(
@@ -2072,9 +2072,20 @@ fn get_seams(session: &mut Session, _: NoArgs) -> Result<Output, ToolError> {
             })
         })
         .collect();
-    Ok(Output::json(
-        &json!({ "seams": seams, "suggested": suggested }),
-    ))
+    let mut out = json!({ "seams": seams, "suggested": suggested });
+    let one_side: Vec<Value> = engine
+        .drawn_for_one_side()
+        .iter()
+        .filter_map(|id| doc.piece(id))
+        .map(|p| json!({ "id": p.id, "name": p.name }))
+        .collect();
+    if !one_side.is_empty() {
+        out["drawnForOneSide"] = json!({
+            "pieces": one_side,
+            "note": "These pieces look drawn for one side of the body and are cut once, so the garment goes only half way round. Tell the user, set each to cut 2 as mirrored pairs (update_piece with cut), then get_seams again: their centres are then sewn to their other halves.",
+        });
+    }
+    Ok(Output::json(&out))
 }
 
 #[derive(Deserialize, JsonSchema)]

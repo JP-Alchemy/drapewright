@@ -191,3 +191,43 @@ fn suggestions_skip_what_is_sewn() {
                 && ![&s.seam.a.edge, &s.seam.b.edge].contains(&&back.1))
     );
 }
+
+#[test]
+fn panels_drawn_for_one_side_are_found_and_cut_as_pairs() {
+    use drapewright_pattern_core::CutInstruction;
+    use drapewright_pattern_core::testing::garments::corset;
+    let mut e = Engine::new("prj", "Corset", "2026-10-12T00:00:00Z", "test");
+    e.dispatch(
+        Command::AddPieces {
+            pieces: corset(false),
+        },
+        Default::default(),
+    )
+    .unwrap();
+    let name = |e: &Engine, id: &str| e.document().piece(id).unwrap().name.clone();
+    let found = e.drawn_for_one_side();
+    let names: Vec<String> = found.iter().map(|id| name(&e, id)).collect();
+    assert_eq!(names, ["Front Center", "Front Side", "Back Center"]);
+    // Cut as pairs, they are found no more, and their centres are sewn.
+    for id in &found {
+        e.dispatch(
+            Command::SetCut {
+                piece: id.clone(),
+                cut: vec![CutInstruction {
+                    quantity: 2,
+                    mirrored: Some(true),
+                    ..Default::default()
+                }],
+            },
+            Default::default(),
+        )
+        .unwrap();
+    }
+    assert!(e.drawn_for_one_side().is_empty());
+    let centres = e
+        .suggest_seams()
+        .iter()
+        .filter(|s| s.seam.a.piece == s.seam.b.piece && s.seam.a.mirror != s.seam.b.mirror)
+        .count();
+    assert_eq!(centres, 2);
+}

@@ -10,4 +10,4 @@ mod suggest;
 
 pub use measure::{NotchMeeting, SeamProblem, SeamReport, measure, side_length};
 pub use model::{Ease, Seam, SeamSide};
-pub use suggest::{Reason, Suggestion, sewn_reversed, suggest};
+pub use suggest::{Reason, Suggestion, drawn_for_one_side, sewn_reversed, suggest};

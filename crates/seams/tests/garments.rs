@@ -548,3 +548,44 @@ fn a_corsets_panels_are_sewn_where_the_lines_across_them_meet() {
         ]
     );
 }
+
+#[test]
+fn pieces_drawn_for_one_side_are_found_to_be_cut_as_pairs() {
+    use drapewright_pattern_core::testing::garments::{corset, yoked_blouse};
+    use drapewright_seams::drawn_for_one_side;
+    // A corset's panels drawn once, from its centre front to its centre
+    // back, both left open: cut as pairs. Not its crotch piece, sewn to
+    // nothing as it is.
+    assert_eq!(drawn_for_one_side(&corset(false), &[]), ["fc", "fs", "bk"]);
+    let (once, _) = listed(&corset(false), &[]);
+    let sewn: Vec<Seam> = once.into_iter().map(|s| s.seam).collect();
+    assert_eq!(
+        drawn_for_one_side(&corset(false), &sewn),
+        ["fc", "fs", "bk"]
+    );
+    // Cut as pairs already, or cut on the fold: nothing to change.
+    assert!(drawn_for_one_side(&corset(true), &[]).is_empty());
+    assert!(drawn_for_one_side(&skirt(), &[]).is_empty());
+    assert!(drawn_for_one_side(&bodice(), &[]).is_empty());
+    assert!(drawn_for_one_side(&yoked_blouse(false), &[]).is_empty());
+    // A skirt drawn as half a front and half a back, each cut once: not its
+    // centre front sewn to its centre back, though both are straight and
+    // nearly as long as each other ...
+    let mut half = skirt();
+    half[0].outline.edges[3].kind = EdgeKind::Seam;
+    half[1].cut[0].quantity = 1;
+    assert_eq!(drawn_for_one_side(&half, &[]), ["front", "back"]);
+    // ... and cut as pairs, each centre to its other half; not the waists
+    // to each other (each goes to the waistband).
+    for p in &mut half {
+        p.cut[0].quantity = 2;
+    }
+    assert_eq!(
+        pairs(&half),
+        [
+            "back.bcb-back.bcb*",
+            "back.bs-front.fs",
+            "front.fcf-front.fcf*"
+        ]
+    );
+}

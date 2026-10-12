@@ -265,6 +265,13 @@ impl Engine {
         drapewright_seams::suggest(&doc.pieces, &doc.seams)
     }
 
+    /// The pieces drawn for one side of the body and cut once: each is to
+    /// be cut as a mirrored pair (see `drapewright_seams::drawn_for_one_side`).
+    pub fn drawn_for_one_side(&self) -> Vec<Id> {
+        let doc = self.document();
+        drapewright_seams::drawn_for_one_side(&doc.pieces, &doc.seams)
+    }
+
     /// The point of an edge nearest to `world` (work-table mm): its distance
     /// along the edge from the start, and how far away it is.
     pub fn nearest_on_edge(&self, piece: &str, edge: &str, world: Pt) -> Option<EdgeNearest> {

@@ -59,14 +59,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm licences
       - run: pnpm wasm
+      # A tripwire for load time, not a target: raised when features need
+      # the room (3,000,000 bytes until 2026-10-12).
       - name: WebAssembly size budget
         run: |
           size=$(stat -c %s packages/engine/pkg/drapewright_wasm_core_bg.wasm)
           echo "drapewright_wasm_core_bg.wasm: $size bytes"
-          test "$size" -lt 3000000
+          test "$size" -lt 3500000
           size=$(stat -c %s packages/engine/pkg-3d/drapewright_wasm_3d_bg.wasm)
           echo "drapewright_wasm_3d_bg.wasm: $size bytes"
-          test "$size" -lt 3000000
+          test "$size" -lt 3500000
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check

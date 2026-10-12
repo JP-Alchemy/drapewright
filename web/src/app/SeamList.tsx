@@ -109,7 +109,15 @@ export function SeamList({ session }: { session: Session }) {
         </ul>
       )}
       {!finding && doc.pieces.length > 1 && (
-        <Button className="button" onPress={() => setFinding(true)}>
+        <Button
+          className="button"
+          onPress={() => {
+            // Panels drawn for one side are cut as pairs first, so their
+            // centres are found too.
+            session.cutOneSideAsPairs()
+            setFinding(true)
+          }}
+        >
           {t.seams.find}
         </Button>
       )}

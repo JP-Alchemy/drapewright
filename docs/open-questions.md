@@ -173,11 +173,12 @@ matters.
     up when it is draped: to the other front's buttonholes, or to its edge
     where it has loops instead. *Provisional: always done up. Should she be
     able to see it open?*
-32. ☐ **Pieces drawn once, for one side.** Corset patterns often draw each
-    panel once and don't print how many to cut. *Provisional: each piece is
-    cut as the pattern says, once if it says nothing; when the pieces sewn
-    go only half way round the body, Drape says so and asks for 2 on the
-    panels.* Should Drapewright offer to set them itself?
+32. ☑ **Pieces drawn once, for one side.** Corset patterns often draw each
+    panel once and don't print how many to cut. Should Drapewright set them
+    itself? *Answered (JP, 2026-10-12): yes, and say so.* **Find seams**
+    sets a band of panels cut once, from an open centre front to an open
+    centre back, to cut 2 as mirrored pairs (one undo step), and the status
+    line names them.
 33. ☐ **A busk and lacing.** A corset opens at the centre front (a busk)
     and laces at the centre back. *Provisional: Find seams sews each centre
     to its other half, and the drape keeps both closed.* Should the back

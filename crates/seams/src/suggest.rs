@@ -164,6 +164,12 @@ struct Candidate {
     /// Running with the grain, near enough straight (a centre back may be
     /// shaped a little at the waist).
     with_grain: bool,
+    /// The piece's one edge with the grain, and it has no fold: a front's
+    /// or a back's, its centre.
+    only_straight: bool,
+    /// Next to the centre of a piece cut as a pair (which is sewn to its
+    /// other half), as a waist or a neckline is.
+    at_centre: bool,
     /// Furthest from its chord, mm.
     depth: f64,
     /// Marked to be gathered.
@@ -584,6 +590,7 @@ fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -
             counterparts(piece, &sewn, grain.unwrap_or(Vec2::new(0.0, 1.0)))
         };
         let gathered = gathered_edges(piece);
+        let first = out.len();
         for (ei, edge) in edges.iter().enumerate() {
             let points = &sewn[ei];
             let length = polyline_length(points);
@@ -655,7 +662,21 @@ fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -
                 darts: darts[ei].clone(),
                 mirror_of: None,
                 twin: twins[pi],
+                only_straight: false,
+                at_centre: false,
             });
+        }
+        let straight = out[first..].iter().filter(|c| c.with_grain).count();
+        for c in &mut out[first..] {
+            c.only_straight = c.with_grain && straight == 1 && !piece.has_fold();
+        }
+        let centre = out[first..]
+            .iter()
+            .find(|c| c.only_straight && c.pair)
+            .map(|c| c.edge);
+        for c in &mut out[first..] {
+            c.at_centre = centre
+                .is_some_and(|e| c.edge != e && ((c.edge + 1) % n == e || (e + 1) % n == c.edge));
         }
     }
     // A left piece's edges mirror a right piece's: as long, and shaped
@@ -835,11 +856,22 @@ fn score(a: &Candidate, b: &Candidate, reversed: bool) -> (f64, Vec<Reason>) {
     if matched {
         reasons.push(Reason::EndsMatch);
     }
+    let front_and_back = matches!(
+        (a.side, b.side),
+        (Side::Front, Side::Back) | (Side::Back, Side::Front)
+    );
+    // A front's centre and a back's, cut as pairs: each is sewn to its own
+    // other half.
+    if front_and_back && a.pair && b.pair && a.only_straight && b.only_straight {
+        score -= 1.0;
+    }
     match (a.side, b.side) {
         (Side::Front, Side::Back) | (Side::Back, Side::Front) => {
-            // Both at a fold: a front's and a back's waist or neckline,
-            // each sewn to something else.
-            let at_fold = |c: &Candidate| c.ends.0 == End::Fold || c.ends.1 == End::Fold;
+            // Both at a fold, or at a centre sewn to its other half: a
+            // front's and a back's waist or neckline, each sewn to
+            // something else.
+            let at_fold =
+                |c: &Candidate| c.ends.0 == End::Fold || c.ends.1 == End::Fold || c.at_centre;
             if at_fold(a) && at_fold(b) {
                 score -= 0.8;
             } else {
@@ -1418,9 +1450,7 @@ pub fn suggest<P: Borrow<Piece>>(pieces: &[P], existing: &[Seam]) -> Vec<Suggest
     // A centre edge of a piece cut as a pair, left over: sewn to its other
     // half (a centre back seam).
     for (k, c) in cands.iter().enumerate() {
-        let named = ["centre", "center", "cb", "cf"]
-            .iter()
-            .any(|w| c.name.split_whitespace().any(|x| x == *w) || c.name.starts_with(w));
+        let named = named_centre(c);
         if used[k] || !c.pair || !(named || c.with_grain && c.side != Side::Neither) {
             continue;
         }
@@ -1887,6 +1917,115 @@ fn as_seams<P: Borrow<Piece>>(
             confidence: *confidence,
             reasons: vec![reason],
         });
+    }
+    out
+}
+
+/// An edge named for the centre: "centre back", "CF".
+fn named_centre(c: &Candidate) -> bool {
+    ["centre", "center", "cb", "cf"]
+        .iter()
+        .any(|w| c.name.split_whitespace().any(|x| x == *w) || c.name.starts_with(w))
+}
+
+/// Pieces drawn for one side of the body and cut once, as patterns that
+/// draw each panel once often leave them (saying to cut two only in their
+/// instructions, if at all): a band of two or more pieces, sewn side by
+/// side by `seams` and the seams suggested for them (edges running with
+/// the grain, not tops or hems), from a centre front left open to a centre
+/// back left open. Each is to be cut as a mirrored pair, a left and a
+/// right.
+pub fn drawn_for_one_side<P: Borrow<Piece>>(pieces: &[P], seams: &[Seam]) -> Vec<Id> {
+    let cands = candidates(pieces, &[], true);
+    let find = |s: &SeamSide| {
+        cands
+            .iter()
+            .find(|c| c.piece_id == s.piece && c.edge_id == s.edge)
+    };
+    // The seams sewn and suggested, but for a front's centre suggested to
+    // a back's: the two halves of a pattern drawn for one side, put
+    // together as if they were the whole of it.
+    let mut sewn: Vec<Seam> = seams.to_vec();
+    for s in suggest(pieces, seams) {
+        let centres = match (find(&s.seam.a), find(&s.seam.b)) {
+            (Some(a), Some(b)) => {
+                a.only_straight
+                    && b.only_straight
+                    && a.side != b.side
+                    && a.side != Side::Neither
+                    && b.side != Side::Neither
+            }
+            _ => false,
+        };
+        if !centres {
+            sewn.push(s.seam);
+        }
+    }
+    // Up and down its piece, within 45° of the grain (or it has none).
+    let upright = |c: &Candidate| {
+        let chord = c.points[c.points.len() - 1] - c.points[0];
+        pieces[c.piece].borrow().grainline.as_ref().is_none_or(|g| {
+            let g = Point::from(g.to) - Point::from(g.from);
+            chord.dot(g).abs() >= 0.7 * chord.hypot() * g.hypot()
+        })
+    };
+    let is_sewn = |piece: &str, edge: &str| {
+        sewn.iter().any(|s| {
+            [&s.a, &s.b]
+                .iter()
+                .any(|x| x.piece == piece && x.edge == edge)
+        })
+    };
+    // The pieces joined by seams, each group by its first piece.
+    let mut group: Vec<usize> = (0..pieces.len()).collect();
+    let root = |group: &[usize], mut i: usize| {
+        while group[i] != i {
+            i = group[i];
+        }
+        i
+    };
+    for s in &sewn {
+        if let (Some(a), Some(b)) = (find(&s.a), find(&s.b))
+            && upright(a)
+            && upright(b)
+        {
+            let (ra, rb) = (root(&group, a.piece), root(&group, b.piece));
+            group[ra.max(rb)] = ra.min(rb);
+        }
+    }
+    // Each piece's centre left open (its outermost straight edge with the
+    // grain, or one named for the centre), if it has one.
+    let free: Vec<bool> = cands
+        .iter()
+        .map(|c| !is_sewn(&c.piece_id, &c.edge_id))
+        .collect();
+    let mut open_centre: Vec<Option<Side>> = vec![None; pieces.len()];
+    for (k, c) in cands.iter().enumerate() {
+        let named = named_centre(c);
+        if !free[k] || c.side == Side::Neither || !(named || c.with_grain) {
+            continue;
+        }
+        let others_outside = cands.iter().enumerate().any(|(m, o)| {
+            free[m] && o.piece == c.piece && o.edge != c.edge && o.with_grain && o.length > c.length
+        });
+        if named || !others_outside {
+            open_centre[c.piece] = Some(c.side);
+        }
+    }
+    let once = |p: &Piece| !p.has_fold() && p.cut.iter().all(|c| c.quantity == 1);
+    let mut out = Vec::new();
+    for first in 0..pieces.len() {
+        let members: Vec<usize> = (0..pieces.len())
+            .filter(|&p| root(&group, p) == first)
+            .collect();
+        let has = |side: Side| members.iter().any(|&p| open_centre[p] == Some(side));
+        if members.len() >= 2
+            && members.iter().all(|&p| once(pieces[p].borrow()))
+            && has(Side::Front)
+            && has(Side::Back)
+        {
+            out.extend(members.iter().map(|&p| pieces[p].borrow().id.clone()));
+        }
     }
     out
 }

@@ -4,6 +4,7 @@
 import type {
   AllowanceAnswer,
   Command,
+  CutInstruction,
   DispatchOptions,
   Engine,
   FabricPreset,
@@ -151,6 +152,9 @@ export interface UiState {
 const IMPORT_GAP = 50
 
 const TOAST_MS = 1400
+
+/** What a piece that says nothing about cutting is cut as. */
+const MAIN_ONCE: CutInstruction = { material: 'main', quantity: 1, mirrored: null, onFold: null }
 
 export class Session {
   readonly ui: Store<UiState>
@@ -409,6 +413,32 @@ export class Session {
 
   notify(notice: Notice | null): void {
     this.ui.set((s) => ({ ...s, notice }))
+  }
+
+  /**
+   * Sets pieces drawn for one side of the body and cut once (a pattern
+   * that draws each panel once) to cut as mirrored pairs, in one undo
+   * step, and says so.
+   */
+  cutOneSideAsPairs(): void {
+    const doc = this.engine.document()
+    const pieces = this.engine
+      .drawnForOneSide()
+      .flatMap((id) => doc.pieces.filter((p) => p.id === id))
+    if (pieces.length === 0) return
+    const step = { coalesce: `pairs:${Date.now()}` }
+    for (const piece of pieces) {
+      const cut = piece.cut.length > 0 ? piece.cut : [{ ...MAIN_ONCE }]
+      this.dispatch(
+        {
+          type: 'setCut',
+          piece: piece.id,
+          cut: cut.map((c) => ({ ...c, quantity: 2, mirrored: true })),
+        },
+        step,
+      )
+    }
+    this.notify({ kind: 'info', text: t.seams.cutAsPairs(pieces.map((p) => p.name)) })
   }
 
   toast(text: string): void {

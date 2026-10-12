@@ -705,6 +705,12 @@ export const t = {
     noneFound: 'No more likely seams found. Pick an edge to sew it by hand.',
     sew: 'Sew',
     sewAll: (n: number) => plural(n, 'Sew it', 'Sew all #'),
+    cutAsPairs: (names: string[]) =>
+      plural(
+        names.length,
+        `${namesList(names)} looks drawn for one side, so it’s now cut 2, a left and a right. Undo to cut it once.`,
+        `${namesList(names)} look drawn for one side, so they’re now cut 2, a left and a right. Undo to cut them once.`,
+      ),
     notThis: 'Not this',
     sewn: 'Sewn. Its number shows on both edges.',
     seam: (n: number, name: string) => (name ? `${n} · ${name}` : `Seam ${n}`),

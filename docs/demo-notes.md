@@ -12,6 +12,45 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 35 — Patterns drawn for one side are cut as pairs
+
+Patterns that draw each panel once, for one side of the body, rarely print
+how many to cut. **Find seams** now sees such a band of panels, running
+from a centre front left open to a centre back left open, and sets each
+panel to cut 2 as mirrored pairs (a left and a right) before it looks for
+seams. The status line says which pieces it changed, and **Undo** puts them
+back to cut 1, all in one step.
+
+**Try it** (with the free corset pattern in 13 sizes from Step 32):
+
+1. **Open pattern**, choose the PDF, pick a size and **Add 10 pieces**.
+   Every piece says **Cut 1** in the list.
+2. In **Seams**, press **Find seams**. The status line says the seven
+   panels "look drawn for one side, so they're now cut 2, a left and a
+   right", and names them. The list says **Cut 2** beside each, and the 15
+   seams of Step 33 are suggested, the centres and the crotch pieces
+   included.
+3. **Undo** sets all seven back to cut 1.
+
+In an AI assistant, `get_seams` lists the pieces as `drawnForOneSide`, with
+a note to tell the user and set them to cut 2.
+
+A skirt drawn as half a front and half a back is found the same way. Cut as
+pairs, each of its centres is now sewn to its own other half, not the
+centre front to the centre back, and its waists are left for the
+waistband.
+
+**How it works:** pieces are joined into a band by the seams sewn and
+suggested along their sides (edges running with the grain, not tops or
+hems). A band of two or more pieces, all cut once and none on a fold, with
+an open centre at a front piece and another at a back piece, is drawn for
+one side. A piece's centre is its outermost edge straight along the grain,
+or an edge named for the centre. A suggestion sewing a front's centre to a
+back's doesn't count, since that is the two halves joined as if they were
+the whole.
+
+---
+
 ## Step 34 — Pick a piece, change it: the side panel
 
 The side panel was one long column: the pieces, every seam, then the

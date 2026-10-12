@@ -157,6 +157,15 @@ export class Engine {
     return this.#handle.suggestSeams() as Suggestion[]
   }
 
+  /**
+   * Pieces drawn for one side of the body and cut once (a band of panels
+   * from an open centre front to an open centre back): each is to be cut
+   * as a mirrored pair.
+   */
+  drawnForOneSide(): string[] {
+    return this.#handle.drawnForOneSide()
+  }
+
   /** Whether two edges chosen to be sewn together go the other way round. */
   sewnReversed(a: SeamSide, b: SeamSide): boolean {
     return this.#handle.sewnReversed(a, b)
