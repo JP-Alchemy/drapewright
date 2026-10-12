@@ -251,6 +251,14 @@ impl Assembly {
         self.faces.find(a).0 == self.faces.find(b).0
     }
 
+    /// How many copies are joined to a copy by seams, itself among them.
+    pub fn joined_to(&mut self, a: usize) -> usize {
+        let root = self.faces.find(a).0;
+        (0..self.tubes.len())
+            .filter(|&c| self.faces.find(c).0 == root)
+            .count()
+    }
+
     /// A seam as its parts on copies: on both copies of pairs, or on those
     /// it names where it names a mirror copy (as it is draped). `place`
     /// finds a side's piece and edge (by index).
@@ -425,6 +433,17 @@ impl Assembly {
     /// start where their corners meet, round a hole in the garment (each
     /// edge run forwards or not). Runs that do not close are left out.
     pub fn loops(&mut self) -> Vec<Vec<(CopyEdge, bool)>> {
+        self.runs()
+            .into_iter()
+            .filter_map(|(run, closed)| closed.then_some(run))
+            .collect()
+    }
+
+    /// The free edges' runs, each as far as it goes either way: the loops
+    /// of `loops`, and runs that stop where the boundary is not plain (an
+    /// edge sewn along part of it): each run's copy edges in order (each
+    /// run forwards or not), and whether it closes.
+    pub fn runs(&mut self) -> Vec<(Vec<(CopyEdge, bool)>, bool)> {
         let mut free = Vec::new();
         for piece in 0..self.cuts.len() {
             for edge in 0..self.edges(piece) {
@@ -440,26 +459,23 @@ impl Assembly {
                 }
             }
         }
-        // Each meeting place's free edge ends.
-        let mut at: HashMap<usize, Vec<(usize, bool)>> = HashMap::new();
-        for (k, &e) in free.iter().enumerate() {
+        // Each free edge's ends, as meeting places.
+        let mut tips: Vec<(usize, usize)> = Vec::new();
+        for &e in &free {
             let (s, t) = (self.start(e), self.end(e));
-            let (s, t) = (self.corners.find(s).0, self.corners.find(t).0);
+            tips.push((self.corners.find(s).0, self.corners.find(t).0));
+        }
+        let mut at: HashMap<usize, Vec<(usize, bool)>> = HashMap::new();
+        for (k, &(s, t)) in tips.iter().enumerate() {
             at.entry(s).or_default().push((k, true));
             at.entry(t).or_default().push((k, false));
         }
-        let mut used = vec![false; free.len()];
-        let mut out = Vec::new();
-        for first in 0..free.len() {
-            if used[first] {
-                continue;
-            }
-            let mut run = vec![(free[first], true)];
-            used[first] = true;
-            let begin = self.corners.find(self.start(free[first])).0;
-            let mut here = self.corners.find(self.end(free[first])).0;
-            let mut closed = here == begin;
-            while !closed {
+        // On from a meeting place: the edges taken (each from its start or
+        // not), and where the walk got to.
+        let walk = |here: usize, begin: usize, used: &mut Vec<bool>| {
+            let mut run: Vec<(usize, bool)> = Vec::new();
+            let mut here = here;
+            loop {
                 let ends = at.get(&here).cloned().unwrap_or_default();
                 // Only where the boundary is plain: two free ends meet.
                 if ends.len() != 2 {
@@ -469,18 +485,39 @@ impl Assembly {
                     break;
                 };
                 used[k] = true;
-                let e = free[k];
-                run.push((e, from_start));
-                here = if from_start {
-                    self.corners.find(self.end(e)).0
-                } else {
-                    self.corners.find(self.start(e)).0
-                };
-                closed = here == begin;
+                run.push((k, from_start));
+                here = if from_start { tips[k].1 } else { tips[k].0 };
+                if here == begin {
+                    break;
+                }
             }
-            if closed {
-                out.push(run);
+            (run, here)
+        };
+        let mut used = vec![false; free.len()];
+        let mut out = Vec::new();
+        for first in 0..free.len() {
+            if used[first] {
+                continue;
             }
+            used[first] = true;
+            let (begin, end) = tips[first];
+            let (ahead, reached) = walk(end, begin, &mut used);
+            let closed = reached == begin;
+            let behind = if closed {
+                Vec::new()
+            } else {
+                walk(begin, end, &mut used).0
+            };
+            // Behind it, run back the other way; then it, then ahead.
+            let mut run: Vec<(CopyEdge, bool)> = Vec::new();
+            for &(k, from_start) in behind.iter().rev() {
+                run.push((free[k], !from_start));
+            }
+            run.push((free[first], true));
+            for &(k, from_start) in &ahead {
+                run.push((free[k], from_start));
+            }
+            out.push((run, closed));
         }
         out
     }

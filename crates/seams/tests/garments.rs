@@ -333,12 +333,14 @@ fn edges_chosen_by_hand_are_turned_the_right_way() {
     ));
 }
 
-/// The seams suggested for the made-up yoked blouse, as
+/// The seams suggested for `pieces`, sewn by `existing` so far, and each as
 /// "piece.edge[*]-piece.edge[*]" (mirror copies marked *), sorted; parts
 /// of an edge marked with where they end, to the millimetre.
-fn yoked_pairs(sideways: bool) -> (Vec<drapewright_seams::Suggestion>, Vec<String>) {
-    let pieces = drapewright_pattern_core::testing::garments::yoked_blouse(sideways);
-    let suggested = suggest(&pieces, &[]);
+fn listed(
+    pieces: &[Piece],
+    existing: &[Seam],
+) -> (Vec<drapewright_seams::Suggestion>, Vec<String>) {
+    let suggested = suggest(pieces, existing);
     let side = |s: &SeamSide| {
         let part = match (s.from, s.to) {
             (None, None) => String::new(),
@@ -374,7 +376,8 @@ fn yoked_pairs(sideways: bool) -> (Vec<drapewright_seams::Suggestion>, Vec<Strin
 #[test]
 fn a_yoked_blouse_is_put_together_from_its_gathers_yokes_and_armholes() {
     for sideways in [false, true] {
-        let (suggested, pairs) = yoked_pairs(sideways);
+        let pieces = drapewright_pattern_core::testing::garments::yoked_blouse(sideways);
+        let (suggested, pairs) = listed(&pieces, &[]);
         let has = |pair: &str| pairs.iter().any(|p| p == pair);
         // Each front's side to one of the back's (which, the back being
         // alike either side, is for the garment to say).
@@ -417,7 +420,6 @@ fn a_yoked_blouse_is_put_together_from_its_gathers_yokes_and_armholes() {
         }
         let yoke_ends = heads.iter().filter(|p| p.contains("yoke.yarm")).count();
         assert!((1..=2).contains(&yoke_ends), "{pairs:#?}");
-        let pieces = drapewright_pattern_core::testing::garments::yoked_blouse(sideways);
         let sleeve = pieces.iter().find(|p| p.id == "sleeve").unwrap();
         let notched: Vec<f64> = sleeve.notches.iter().skip(2).map(|n| n.at).collect();
         for s in suggested
@@ -480,4 +482,69 @@ fn a_sleeve_heads_parts_measure_with_their_notches_met() {
             .any(|s| s.edge.starts_with("barm"));
         assert_eq!(report.notches.len(), if back { 2 } else { 0 }, "{report:?}");
     }
+}
+
+#[test]
+fn a_corsets_panels_are_sewn_where_the_lines_across_them_meet() {
+    use drapewright_pattern_core::testing::garments::corset;
+    // Cut as pairs: the side panel along the top of the centre front's
+    // edge, where the lines across them meet (the centre front running on
+    // below it), and the back to the side panel; each centre to its other
+    // half, and the crotch piece along both centre fronts' lower edges,
+    // across the centre. Not the tops of the centre front and back to each
+    // other, as long as each other as they are.
+    let (suggested, pairs) = listed(&corset(true), &[]);
+    assert_eq!(
+        pairs,
+        [
+            "bk.bkl-fs.fsr",
+            "bk.bkr-bk.bkr*",
+            "cr.crt[0..73]-fc.fcb",
+            "cr.crt[73..146]-fc.fcb*",
+            "fc.fcl-fc.fcl*",
+            "fc.fcr[0..461]-fs.fsl",
+        ]
+    );
+    let why = |edge: &str| -> Vec<Reason> {
+        suggested
+            .iter()
+            .filter(|s| s.seam.a.edge == edge || s.seam.b.edge == edge)
+            .flat_map(|s| s.reasons.clone())
+            .collect()
+    };
+    for edge in ["fsl", "fsr"] {
+        assert!(
+            why(edge).contains(&Reason::LinesMeet),
+            "{edge}: {:?}",
+            why(edge)
+        );
+    }
+    for edge in ["fcl", "bkr"] {
+        assert_eq!(why(edge), [Reason::CentreOfPair], "{edge}");
+    }
+    assert_eq!(why("crt"), [Reason::FitsAlong, Reason::FitsAlong]);
+    // Cut once, as the pattern leaves them: half a corset, with no centre
+    // to sew or to go along.
+    let (once, pairs) = listed(&corset(false), &[]);
+    assert_eq!(pairs, ["bk.bkl-fs.fsr", "fc.fcr[0..461]-fs.fsl"]);
+    // Those sewn, then the panels cut as pairs: the rest, and still not
+    // a panel's top to another's bottom, as long as each other as they are.
+    let sewn: Vec<Seam> = once
+        .into_iter()
+        .enumerate()
+        .map(|(k, s)| Seam {
+            id: format!("s{k}"),
+            ..s.seam
+        })
+        .collect();
+    let (_, pairs) = listed(&corset(true), &sewn);
+    assert_eq!(
+        pairs,
+        [
+            "bk.bkr-bk.bkr*",
+            "cr.crt[0..73]-fc.fcb",
+            "cr.crt[73..146]-fc.fcb*",
+            "fc.fcl-fc.fcl*",
+        ]
+    );
 }

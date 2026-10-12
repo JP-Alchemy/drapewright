@@ -110,6 +110,134 @@ fn on_its_side(p: &mut Piece) {
     }
 }
 
+/// A line across a piece from `a` to `b`, named for where it goes on the
+/// body.
+fn level(p: &mut Piece, name: &str, a: [f64; 2], b: [f64; 2]) {
+    let id = format!("{}l{}", p.id, p.lines.len());
+    p.lines.push(InternalLine {
+        id,
+        kind: LineKind::Line,
+        start: Pt::new(a[0], a[1]),
+        segments: vec![Segment::line(b)],
+        label: Some(name.into()),
+    });
+}
+
+/// An overbust corset drawn for one side, as indie patterns print one: a
+/// centre front, a side and a centre back panel (`pairs`: cut as pairs, as
+/// sewn; else cut once, as the pattern leaves them), with no notches but
+/// their bust, underbust, waist and hip lines drawn across, meeting at each
+/// seam. The seams are shaped in at the waist, the centres straight; the
+/// tops slope up towards the back, level with each other at each seam, so
+/// the lines meet each seam a different way down. The centre front runs on
+/// 40 mm below the side panel. A crotch piece goes along both centre
+/// fronts' lower edges, across the centre front. The tops of the centre
+/// front and back are as long as each other.
+pub fn corset(pairs: bool) -> Vec<Piece> {
+    let quantity = if pairs { 2 } else { 1 };
+    let levels = [
+        ("Bust", 100.0),
+        ("Underbust", 160.0),
+        ("Waist", 260.0),
+        ("Hip", 380.0),
+    ];
+    // An upright side, shaped in at its middle (a seam) or straight (a
+    // centre). Its control points a third and two thirds of the way along,
+    // it is `inwards` × 3t(1 - t) across at t of the way down.
+    let side = |from: [f64; 2], to: [f64; 2], inwards: f64| {
+        if inwards == 0.0 {
+            return line(to);
+        }
+        let at = |t: f64| from[1] + (to[1] - from[1]) * t;
+        cubic(
+            [from[0] + inwards, at(1.0 / 3.0)],
+            [to[0] + inwards, at(2.0 / 3.0)],
+            to,
+        )
+    };
+    let across = |from: [f64; 2], to: [f64; 2], inwards: f64, y: f64| {
+        let t = (y - from[1]) / (to[1] - from[1]);
+        from[0] + 3.0 * inwards * t * (1.0 - t)
+    };
+    // `top` and `bottom`: the heights of the left and right corners.
+    let panel =
+        |id: &str, name: &str, x: f64, w: f64, top: [f64; 2], bottom: [f64; 2], centre: char| {
+            // Clockwise on screen: top, right side down, bottom, left side up;
+            // a centre side straight, a seam's shaped in 15 mm.
+            let (l, r) = match centre {
+                'l' => (0.0, -20.0),
+                'r' => (20.0, 0.0),
+                _ => (20.0, -20.0),
+            };
+            let (tl, tr) = ([x, top[0]], [x + w, top[1]]);
+            let (bl, br) = ([x, bottom[0]], [x + w, bottom[1]]);
+            let mut p = piece(
+                id,
+                name,
+                tl,
+                vec![
+                    edge(&format!("{id}t"), line(tr)),
+                    edge(&format!("{id}r"), side(tr, br, r)),
+                    edge(&format!("{id}b"), line(bl)),
+                    edge(&format!("{id}l"), side(bl, tl, l)),
+                ],
+                quantity,
+            );
+            grain(&mut p, [x + w / 2.0, 30.0], [x + w / 2.0, 330.0]);
+            for (name, y) in levels {
+                let ends = (across(bl, tl, l, y), across(tr, br, r, y));
+                level(&mut p, name, [ends.0, y], [ends.1, y]);
+            }
+            p
+        };
+    // The centre front's left side is its centre, its right sewn to the
+    // side panel's left; the back's right side is the centre back.
+    let front = panel(
+        "fc",
+        "Front Center",
+        0.0,
+        70.0,
+        [10.0, 0.0],
+        [520.0, 500.0],
+        'l',
+    );
+    let middle = panel(
+        "fs",
+        "Front Side",
+        200.0,
+        80.0,
+        [0.0, -15.0],
+        [460.0, 440.0],
+        ' ',
+    );
+    let back = panel(
+        "bk",
+        "Back Center",
+        400.0,
+        70.0,
+        [-15.0, -25.0],
+        [440.0, 430.0],
+        'r',
+    );
+    // Along both centre fronts' lower edges (each 72.8 mm), across the
+    // centre: 145.6 mm.
+    let bottom = (70.0f64).hypot(20.0);
+    let mut crotch = piece(
+        "cr",
+        "Crotch Front",
+        [600.0, 0.0],
+        vec![
+            edge("crt", line([600.0 + 2.0 * bottom, 0.0])),
+            edge("crr", line([710.0, 100.0])),
+            edge("crb", line([650.0, 100.0])),
+            edge("crl", line([600.0, 0.0])),
+        ],
+        1,
+    );
+    grain(&mut crotch, [670.0, 20.0], [670.0, 90.0]);
+    vec![front, middle, back, crotch]
+}
+
 /// A long blouse made up as some bought patterns are: a back cut whole, a
 /// left and a right front buttoned down the front below a V neck, each
 /// gathered into a narrow yoke over the shoulder (cut as a pair) that is

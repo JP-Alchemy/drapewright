@@ -704,6 +704,7 @@ export const t = {
       sameLength: 'same length',
       sameShape: 'same curve',
       notchesMatch: 'notches match',
+      linesMeet: 'lines across meet',
       sameName: 'same name',
       endsMatch: 'hems meet',
       frontAndBack: 'front to back',
@@ -711,6 +712,7 @@ export const t = {
       gathered: 'gathered to fit',
       continues: 'goes on from a seam',
       fitsOpening: 'fits round the opening',
+      fitsAlong: 'fits along the opening',
     } satisfies Record<Reason, string>,
     sewTo: 'Sew to another edge…',
     sewingHint: (edge: string) =>
