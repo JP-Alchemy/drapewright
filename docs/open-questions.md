@@ -135,3 +135,34 @@ matters.
     waist and hip, so the ease map's colours mean something. *Provisional:
     the map shows millimetres, with colours changing at 0 (tight), 20 and
     50 mm.*
+22. ☐ **Full bust adjustment: where the dart's tip stops.** *Provisional:
+    2.5 cm short of the bust point, on the line from the bust point to the
+    middle of the dart's mouth.*
+23. ☐ **Pivoting a dart: about its tip, or about the bust point?** Books
+    pivot about the bust point and then shorten the new dart. *Provisional:
+    about the dart's own tip, so a side dart moved to the waist keeps the
+    side dart's tip (2.5 cm from the bust point, towards the side).*
+24. ☐ **A swayback on a back cut on the fold.** *Provisional: refused, with
+    the advice to make the centre back a seam first. Alternatives: take the
+    wedge out and then straighten the fold (losing some of it at the
+    centre), or move it to the side seams.*
+25. ☐ **Broad and narrow shoulders: which method?** *Provisional: slashed
+    down the grain from the middle of the shoulder seam to the level of a
+    hinge on the armhole (level with its notch), then across to it, and the
+    shoulder's end turned out until it has moved the amount along the
+    shoulder seam. The shoulder seam is then trued straight.*
+26. ☐ **Waist and hip: where the amount goes.** *Provisional: at each side
+    seam, square to the grain; the waist tapers to nothing at the hip, the
+    hip carries straight on down to the hem. A front and a back cut on the
+    fold therefore change the whole garment by four times the amount.*
+27. ☐ **Truing: how far either side of a jog a smooth truing blends.**
+    *Provisional: 2.5 cm, less where jogs are close together.*
+28. ☐ **Measuring her own fabric.** Is the at-home test practical: a 10 cm
+    square weighed; a strip 5 cm wide with 500 g hung from it, along and
+    across the grain; a strip 2.5 cm wide slid over a table's edge until it
+    droops to 45°? Would she rather enter the weight printed on the bolt
+    (g/m²) and choose "stretches a little / a lot"? *Provisional: the
+    tests, each optional.*
+29. ☐ **Projector set-up.** Does she have, or want, a projector over her
+    cutting table? Which size of rectangle can she mark on her mat?
+    *Provisional: 40 × 30 cm to start, changeable.*
