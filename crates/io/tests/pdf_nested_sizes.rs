@@ -5,7 +5,7 @@
 //! draws its bottom edge in black. Dashed corners are marked by solid
 //! stubs. The piece's number is set large with its name under it, its
 //! grainline crosses it with the arrow partway along, and a bust line is
-//! drawn once, out to the largest size.
+//! drawn once, out to the largest size, named along it.
 
 use drapewright_io::pdf::import_pdf;
 use drapewright_pattern_core::Piece;
@@ -174,11 +174,20 @@ fn nested_sizes_in_styles_taken_in_turn() {
             "size {size}: {w} x {h}, not {want_w} x {want_h}"
         );
         assert!(piece.grainline.is_some(), "size {size}: grainline");
-        // The bust line stops at the size's own side.
-        let bust: Vec<f64> = piece
+        // The bust line stops at the size's own side, named for the level
+        // it marks on the body.
+        let lines: Vec<_> = piece
             .lines
             .iter()
             .filter(|l| (l.start.y - (900.0 - 600.0) * MM).abs() < 1.0)
+            .collect();
+        assert!(
+            lines.iter().all(|l| l.label.as_deref() == Some("Bust")),
+            "size {size}: {:?}",
+            lines.iter().map(|l| &l.label).collect::<Vec<_>>()
+        );
+        let bust: Vec<f64> = lines
+            .iter()
             .flat_map(|l| std::iter::once(l.start.x).chain(l.segments.iter().map(|s| s.to().x)))
             .collect();
         assert!(!bust.is_empty(), "size {size}: bust line");

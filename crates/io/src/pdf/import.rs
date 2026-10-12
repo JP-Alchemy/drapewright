@@ -944,16 +944,6 @@ pub fn import_pdf_pages(
     let mut styled: Vec<PagePath> = Vec::new();
     // The pages each kept path was drawn on.
     let mut drawn_on: Vec<Vec<usize>> = Vec::new();
-    // Colours also drawn dashed: their short solid strokes may be the
-    // stubs at a dashed outline's corners, one for each size.
-    let dashed_colours: Vec<(Option<[u8; 3]>, i64)> = pages
-        .iter()
-        .flat_map(|p| &p.paths)
-        .filter(|(_, style, _)| style.dashed)
-        .map(|(_, style, _)| (style.stroke, style.width))
-        .collect::<std::collections::HashSet<_>>()
-        .into_iter()
-        .collect();
     // Where each kept path starts, by 2 mm cell, to find copies quickly.
     let mut starts: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
     let cell = |p: Point| ((p.x / 2.0).floor() as i64, (p.y / 2.0).floor() as i64);
@@ -1006,6 +996,16 @@ pub fn import_pdf_pages(
         );
         for (i, at) in group {
             let to_sheet = Affine::translate(*at + Vec2::new(x - sheet.x0, -sheet.y0));
+            // The ends of the page's dashed lines: a short solid stroke of
+            // their colour at one is a stub marking a dashed outline's
+            // corner, one for each size.
+            let mut dash_ends: Vec<(&Style, Point)> = Vec::new();
+            for (r, style, _) in &pages[*i].paths {
+                if style.dashed && !r.closed {
+                    dash_ends.push((style, r.segs[0].start()));
+                    dash_ends.push((style, r.segs[r.segs.len() - 1].end()));
+                }
+            }
             placed.insert(*i, to_sheet);
             page_areas.push(to_sheet.transform_rect_bbox(Rect::new(
                 0.0,
@@ -1028,8 +1028,19 @@ pub fn import_pdf_pages(
                 // on one page is two lines: each size of a nest draws its
                 // whole outline, the stretches the sizes share too (and,
                 // dashed, the stubs at its corners).
-                let long = segs.iter().map(|s| s.arclen(0.01)).sum::<f64>() >= SHARED_LONG
-                    || dashed_colours.contains(&(style.stroke, style.width));
+                let length = segs.iter().map(|s| s.arclen(0.01)).sum::<f64>();
+                let stub = !style.dashed
+                    && length <= DASH_STUB
+                    && [r.segs[0].start(), r.segs[r.segs.len() - 1].end()]
+                        .iter()
+                        .any(|&end| {
+                            dash_ends.iter().any(|&(dashed, p)| {
+                                dashed.stroke == style.stroke
+                                    && dashed.width == style.width
+                                    && p.distance(end) <= DASH_GAP
+                            })
+                        });
+                let long = length >= SHARED_LONG || stub;
                 let (cx, cy) = cell(segs[0].start());
                 let copy = (cx - 1..=cx + 1)
                     .flat_map(|x| (cy - 1..=cy + 1).map(move |y| (x, y)))
@@ -1315,6 +1326,7 @@ pub fn import_pdf_pages(
         let (mut found, assembled) =
             assemble(raw, &notches, SourceFormat::Pdf, &scale, file_name, &sha256);
         read_labels(&mut found, &labels);
+        name_lines(&mut found, &labels);
         add_crosses(&mut found, &crosses);
         // Lines drawn once for all the sizes reach the largest size's
         // outline: each size's stop at its own.
@@ -1737,6 +1749,66 @@ fn clip_inside(piece: &mut Piece) {
         {
             g.from = Pt::from(first.start());
             g.to = Pt::from(last.end());
+        }
+    }
+}
+
+/// The body's levels a line across a piece may be named for: where it
+/// goes on the body (a corset's waist line at the waist).
+const BODY_LEVELS: [&str; 10] = [
+    "waist",
+    "natural waist",
+    "bust",
+    "underbust",
+    "under bust",
+    "chest",
+    "hip",
+    "high hip",
+    "mid hip",
+    "low hip",
+];
+
+/// Lines across pieces named by the body level printed along them
+/// ("WAIST" just above a line): "Waist".
+fn name_lines(pieces: &mut [Piece], labels: &[Label]) {
+    let levels: Vec<&Label> = labels
+        .iter()
+        .filter(|l| BODY_LEVELS.contains(&l.text.trim().to_lowercase().as_str()))
+        .collect();
+    if levels.is_empty() {
+        return;
+    }
+    for piece in pieces {
+        for line in &mut piece.lines {
+            if line.label.is_some() {
+                continue;
+            }
+            let pts = flatten_segs(&segs_of(line.start, &line.segments), 0.5);
+            let (Some(&a), Some(&b)) = (pts.first(), pts.last()) else {
+                continue;
+            };
+            let along = b - a;
+            if along.hypot() < 20.0 {
+                continue;
+            }
+            let unit = along / along.hypot();
+            // The nearest label naming a level, printed along it.
+            let mut named: Option<(f64, &Label)> = None;
+            for &l in &levels {
+                if l.dir.dot(unit).abs() < 0.95 {
+                    continue;
+                }
+                let d = distance_to_polyline(l.at, &pts, false);
+                if d <= (2.5 * l.size).max(4.0)
+                    && (0.0..=along.hypot()).contains(&(l.at - a).dot(unit))
+                    && named.is_none_or(|(nearest, _)| d < nearest)
+                {
+                    named = Some((d, l));
+                }
+            }
+            if let Some((_, l)) = named {
+                line.label = Some(sentence_case(l.text.trim()));
+            }
         }
     }
 }
