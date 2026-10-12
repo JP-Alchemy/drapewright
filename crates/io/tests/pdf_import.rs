@@ -51,6 +51,7 @@ fn document(pieces: &[Piece], paper: PaperName, assembly: Assembly) -> Document 
             ..Default::default()
         },
         measurement_sets: Vec::new(),
+        fabrics: Vec::new(),
         seams: Vec::new(),
         extensions: Default::default(),
     }

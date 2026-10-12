@@ -151,3 +151,54 @@ test('a draped garment follows changes to its pattern', async ({ page }) => {
     .poll(async () => differing(page, before, await view.screenshot()), { timeout: 10_000 })
     .toBeGreaterThan(0.005)
 })
+
+test('a fabric of one’s own is measured, draped in, and changed', async ({ page }) => {
+  test.setTimeout(240_000)
+  await page.goto('/?debug')
+  await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
+  test.skip(!(await openTheAvatar(page)), 'Draping is seen in the 3D view')
+  const pane = page.getByRole('region', { name: 'Avatar' })
+  const drape = pane.getByRole('group', { name: 'Drape the garment' })
+  const status = pane.getByRole('status').last()
+  await expect(pane.getByRole('status').first()).toHaveText(
+    'A standard figure: add measurements to see someone’s.',
+    { timeout: 60_000 },
+  )
+
+  // Measured: like linen, a 10 cm square 1.9 g, a strip sliding out 6 cm.
+  await drape.getByRole('button', { name: /Fabric/ }).click()
+  await page.getByRole('option', { name: 'Measure a fabric…' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Measure a fabric' })
+  await dialog.getByRole('textbox', { name: 'Name' }).fill('Blue linen')
+  await dialog.getByRole('button', { name: /Most like/ }).click()
+  await page.getByRole('option', { name: 'Linen' }).click()
+  await dialog.getByRole('textbox', { name: 'A 10 cm square weighs' }).fill('1.9')
+  await dialog.getByRole('textbox', { name: 'Slides out over a table’s edge' }).fill('6')
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(drape.getByRole('button', { name: /Fabric/ })).toContainText('Blue linen')
+
+  await drape.getByRole('button', { name: 'Drape', exact: true }).click()
+  await expect(status).toHaveText('Draped in Blue linen.', { timeout: 120_000 })
+  // Changed: draped again in it.
+  await drape.getByRole('button', { name: /Fabric/ }).click()
+  await page.getByRole('option', { name: 'Change “Blue linen”…' }).click()
+  const change = page.getByRole('dialog', { name: 'Change “Blue linen”' })
+  await change.getByRole('textbox', { name: 'A 10 cm square weighs' }).fill('2.4')
+  await change.getByRole('button', { name: 'Save' }).click()
+  await expect(status).toHaveText('Draping it again to follow the change…')
+  await expect(status).toHaveText('Draped in Blue linen.', { timeout: 120_000 })
+  // Kept with the project.
+  const fabrics = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s = (window as any).drapewright
+    return s.engine.document().fabrics
+  })
+  expect(fabrics).toEqual([
+    expect.objectContaining({
+      name: 'Blue linen',
+      like: 'linen',
+      measured: { weight: 240, overhang: 6 },
+    }),
+  ])
+})

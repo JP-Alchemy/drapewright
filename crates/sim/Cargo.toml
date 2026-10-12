@@ -12,6 +12,7 @@ publish.workspace = true
 drapewright-body.workspace = true
 drapewright-pattern-core.workspace = true
 drapewright-seams.workspace = true
+drapewright-fabric.workspace = true
 spade.workspace = true
 
 [dev-dependencies]

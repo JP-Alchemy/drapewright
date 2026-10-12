@@ -12,6 +12,46 @@ pnpm dev        # then open http://localhost:5173
 
 ---
 
+## Step 29 — Your own fabric, measured at home (Phase 4, part 8)
+
+Drape in the fabric you actually have, from a few measurements anyone can
+take with a kitchen scale, a ruler and a table.
+
+**Try it** (open the avatar on the test skirt or blouse):
+
+1. In the drape bar, open **Fabric** and choose **Measure a fabric…**.
+2. Give it a name, and choose the ready-made fabric it is **Most like**:
+   anything you don't measure is taken from that one.
+3. Measure what you can (each is optional):
+   * **A 10 cm square weighs**: cut a 10 × 10 cm square and weigh it in
+     grams.
+   * **Along (or across) the grain, 10 cm stretches to**: cut a strip 5 cm
+     wide, mark 10 cm on it, hang 500 g from it (a bag of sugar, pinned
+     on) and measure the 10 cm again. A woven barely moves; a jersey
+     might reach 13 to 16 cm.
+   * **Slides out over a table's edge**: cut a strip 2.5 × 20 cm along
+     the grain and slide it slowly over a table's edge until its end
+     droops to 45° (a sheet of paper folded corner to corner shows the
+     angle). Note how far it sticks out. A stiff denim goes further than a
+     soft lawn.
+4. **Save**: the fabric is chosen, listed under **Your fabrics**, and kept
+   with the project. **Drape** says **Draped in Blue linen.** (or whatever
+   you called it). **Change “…”…** in the same list edits or removes it.
+   A garment on the avatar is draped again when its fabric changes.
+
+**How it works:** the weight sets the cloth's mass. The pull on the strip
+(500 g across 5 cm, 98 N/m) divided by the stretch gives its stiffness
+along and across the grain. The overhang gives its bending stiffness by
+Peirce's cantilever: half the overhang, cubed, times its weight. The rest
+(how it gives on the bias, its thickness and friction) comes from the
+fabric it's most like. Projects are now schema version 6; older ones open
+with no fabrics of their own.
+
+**Not yet:** a piece can't be given its own fabric; the whole garment is
+draped in the one chosen. Fabrics aren't shared between projects.
+
+---
+
 ## Step 28 — The drape follows the pattern (Phase 4, part 7)
 
 A garment on the avatar now follows edits to its pattern by itself.

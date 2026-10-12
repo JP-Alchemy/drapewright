@@ -15,6 +15,7 @@ drapewright-body.workspace = true
 drapewright-pattern-core.workspace = true
 drapewright-seams.workspace = true
 drapewright-sim.workspace = true
+drapewright-fabric.workspace = true
 wasm-bindgen.workspace = true
 serde.workspace = true
 serde-wasm-bindgen.workspace = true

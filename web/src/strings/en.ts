@@ -189,6 +189,29 @@ export const t = {
     cancel: 'Cancel',
   },
 
+  fabric: {
+    heading: 'Measure a fabric',
+    change: (name: string) => `Change “${name}”`,
+    intro:
+      'Measure what you can of your own fabric; what you leave empty is taken from the ready-made fabric it is most like.',
+    name: 'Name',
+    namePlaceholder: 'Blue linen from the market',
+    like: 'Most like',
+    likeHint: 'Woven or knitted, light or heavy: the closest of the ready-made fabrics.',
+    weight: 'A 10 cm square weighs',
+    weightHow: 'Cut a square 10 cm by 10 cm and weigh it on a kitchen scale.',
+    along: 'Along the grain, 10 cm stretches to',
+    across: 'Across the grain, 10 cm stretches to',
+    stretchHow: (along: boolean) =>
+      `Cut a strip 5 cm wide ${along ? 'along' : 'across'} the grain and mark 10 cm on it. Hang 500 g from it (a bag of sugar, pinned on) and measure the 10 cm again.`,
+    overhang: 'Slides out over a table’s edge',
+    overhangHow:
+      'Cut a strip 2.5 cm wide and 20 cm long along the grain. Lay it on a table and slide it slowly out over the edge until its end droops to 45° (a sheet of paper folded corner to corner shows the angle). Measure how far it sticks out.',
+    remove: 'Remove',
+    cancel: 'Cancel',
+    save: 'Save',
+  },
+
   alter: {
     heading: 'Alterations',
     add: 'Add a step',
@@ -798,6 +821,9 @@ export const t = {
     drawnWith: (backend: string) => `Drawn with ${backend}`,
     drapeGroup: 'Drape the garment',
     fabric: 'Fabric',
+    yourFabrics: 'Your fabrics',
+    measureFabric: 'Measure a fabric…',
+    changeFabric: (name: string) => `Change “${name}”…`,
     fabrics: {
       cottonLawn: 'Cotton lawn',
       poplin: 'Poplin',

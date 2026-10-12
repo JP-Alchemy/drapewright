@@ -139,8 +139,8 @@ export interface UiState {
   avatar: boolean
   /** Whose measurements the avatar is fitted to: a measurement set's id. */
   avatarPerson: string | null
-  /** The fabric the garment is draped on the avatar in. */
-  drapeFabric: FabricPreset
+  /** The fabric the garment is draped on the avatar in: ready made, or one's own (by id). */
+  drapeFabric: FabricPreset | string
 }
 
 /** Space left between imported pieces and what is already on the table, mm. */
@@ -393,7 +393,7 @@ export class Session {
   }
 
   /** Drapes the garment on the avatar in this fabric from now on. */
-  chooseDrapeFabric(fabric: FabricPreset): void {
+  chooseDrapeFabric(fabric: FabricPreset | string): void {
     this.ui.set((s) => ({ ...s, drapeFabric: fabric }))
   }
 

@@ -19,6 +19,7 @@ use ts_rs::TS;
 use crate::document::{DisplayUnits, Document, PrintSettings};
 use crate::ids::IdAllocator;
 use crate::measurements::{EarlierMeasurements, MeasurementSet};
+use drapewright_fabric::OwnFabric;
 use drapewright_seams::Seam;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -138,6 +139,17 @@ pub enum Command {
     DeleteMeasurementSet {
         id: Id,
     },
+    /// Adds a fabric of one's own. It gets a fresh id.
+    AddFabric {
+        fabric: OwnFabric,
+    },
+    /// Replaces the fabric with the same id.
+    SetFabric {
+        fabric: OwnFabric,
+    },
+    DeleteFabric {
+        id: Id,
+    },
     /// Sews edges together: suggestions accepted, or a pair chosen by hand.
     /// Each seam gets a fresh id.
     AddSeams {
@@ -198,6 +210,9 @@ impl Command {
             Command::SetMeasurementSet { .. } => "measurements",
             Command::RemeasureSet { .. } => "measure again",
             Command::DeleteMeasurementSet { .. } => "delete measurements",
+            Command::AddFabric { .. } => "add fabric",
+            Command::SetFabric { .. } => "change fabric",
+            Command::DeleteFabric { .. } => "remove fabric",
             Command::AddSeams { .. } => "sew edges",
             Command::SetSeam { .. } => "change seam",
             Command::DeleteSeams { .. } => "unpick seam",
@@ -244,6 +259,8 @@ pub enum CommandError {
     UnknownMeasurementSet { id: Id },
     #[error("That seam no longer exists.")]
     UnknownSeam { id: Id },
+    #[error("That fabric no longer exists.")]
+    UnknownFabric { id: Id },
     #[error("{message}")]
     Rejected { message: String },
 }
@@ -297,7 +314,8 @@ impl ChangeSet {
             || before.settings != after.settings
             || before.print != after.print
             || before.measurement_sets != after.measurement_sets
-            || before.seams != after.seams;
+            || before.seams != after.seams
+            || before.fabrics != after.fabrics;
         set
     }
 }
@@ -714,6 +732,40 @@ fn apply_unaltered(
                 ..Default::default()
             })
         }
+        Command::AddFabric { mut fabric } => {
+            fabric.id = ids.next("f");
+            checked_fabric(&fabric)?;
+            doc.fabrics.push(fabric);
+            Ok(ChangeSet {
+                document: true,
+                ..Default::default()
+            })
+        }
+        Command::SetFabric { fabric } => {
+            checked_fabric(&fabric)?;
+            let old = doc
+                .fabrics
+                .iter_mut()
+                .find(|f| f.id == fabric.id)
+                .ok_or_else(|| CommandError::UnknownFabric {
+                    id: fabric.id.clone(),
+                })?;
+            *old = fabric;
+            Ok(ChangeSet {
+                document: true,
+                ..Default::default()
+            })
+        }
+        Command::DeleteFabric { id } => {
+            if doc.fabric(&id).is_none() {
+                return Err(CommandError::UnknownFabric { id });
+            }
+            doc.fabrics.retain(|f| f.id != id);
+            Ok(ChangeSet {
+                document: true,
+                ..Default::default()
+            })
+        }
         Command::AddSeams { seams } => {
             for mut seam in seams {
                 seam.id = ids.next("s");
@@ -797,6 +849,18 @@ fn measurement_set_mut<'a>(
         .ok_or_else(|| CommandError::UnknownMeasurementSet { id: id.clone() })
 }
 
+fn checked_fabric(fabric: &OwnFabric) -> Result<(), CommandError> {
+    let message = if fabric.name.trim().is_empty() {
+        Some("A fabric needs a name.".to_owned())
+    } else {
+        fabric.measured.problem()
+    };
+    match message {
+        Some(message) => Err(CommandError::Rejected { message }),
+        None => Ok(()),
+    }
+}
+
 fn checked(set: &MeasurementSet) -> Result<(), CommandError> {
     match set.problem() {
         Some(message) => Err(CommandError::Rejected { message }),
@@ -811,4 +875,5 @@ pub fn all_ids(doc: &Document) -> impl Iterator<Item = &Id> {
         .flat_map(|p| piece_ids(p))
         .chain(doc.measurement_sets.iter().map(|m| &m.id))
         .chain(doc.seams.iter().map(|s| &s.id))
+        .chain(doc.fabrics.iter().map(|f| &f.id))
 }

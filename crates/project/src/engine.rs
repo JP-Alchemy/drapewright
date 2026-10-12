@@ -73,6 +73,7 @@ impl Engine {
             pieces: Vec::new(),
             print: Default::default(),
             measurement_sets: Vec::new(),
+            fabrics: Vec::new(),
             seams: Vec::new(),
             extensions: Default::default(),
         };

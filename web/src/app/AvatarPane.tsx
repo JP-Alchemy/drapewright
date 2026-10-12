@@ -6,6 +6,7 @@ import type {
   Document,
   DrapeRequest,
   FabricPreset,
+  Measured,
 } from '@drapewright/engine'
 import type { ViewColours } from '@drapewright/engine/avatar'
 import { ChevronDown, RotateCcw, X } from 'lucide-react'
@@ -13,8 +14,10 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Button,
   Label,
+  Header,
   ListBox,
   ListBoxItem,
+  ListBoxSection,
   Popover,
   Radio,
   RadioGroup,
@@ -29,6 +32,7 @@ import { formatLength, t } from '../strings/en.ts'
 import { sim } from '../workers/sim-client.ts'
 import { type DrapeUpdate, SimError } from '../workers/sim-protocol.ts'
 import { CLOSE_MM, STANDARD_FIGURE, avatarRequest } from './avatar.ts'
+import { FabricDialog } from './FabricDialog.tsx'
 
 /** "rgb(239, 233, 223)" as sRGB parts, 0 to 1. */
 function rgb(css: string): [number, number, number] {
@@ -77,21 +81,42 @@ type Status =
  */
 type Drape =
   | { kind: 'off' }
-  | { kind: 'draping'; fabric: FabricPreset; update: DrapeUpdate | null }
-  | { kind: 'draped'; fabric: FabricPreset; update: DrapeUpdate }
-  | { kind: 'following'; fabric: FabricPreset; update: DrapeUpdate }
+  | { kind: 'draping'; fabric: string; update: DrapeUpdate | null }
+  | { kind: 'draped'; fabric: string; update: DrapeUpdate }
+  | { kind: 'following'; fabric: string; update: DrapeUpdate }
   | { kind: 'failed'; text: string }
 
 /** How long after the pattern last changed a garment on the avatar follows it, ms. */
 const FOLLOW_AFTER = 400
 
-/** What of a project the garment on the avatar is made of: its pieces' shapes and sewing. */
-function garmentKey(doc: Document): string {
+/** The fabric chosen (ready made, or one's own by id): what to drape in, and what it is called. */
+function fabricOf(
+  doc: Document,
+  chosen: string,
+): { preset: FabricPreset; measured?: Measured; name: string } {
+  const own = doc.fabrics.find((f) => f.id === chosen)
+  if (own) return { preset: own.like, measured: own.measured, name: own.name }
+  const preset = (chosen in t.avatar.fabrics ? chosen : 'poplin') as FabricPreset
+  return { preset, name: t.avatar.fabrics[preset].toLowerCase() }
+}
+
+/**
+ * What the garment on the avatar is made of: its pieces' shapes and
+ * sewing, and the fabric `chosen`.
+ */
+function garmentKey(doc: Document, chosen: string): string {
+  const { preset, measured } = fabricOf(doc, chosen)
   return JSON.stringify([
     doc.pieces.map((p) => [p.id, p.name, p.outline, p.allowance, p.cut, p.grainline, p.darts]),
     doc.seams.filter((s) => s.confirmed),
+    preset,
+    measured,
   ])
 }
+
+/** The fabric list's actions: measuring a fabric, or changing the one chosen. */
+const MEASURE = 'measure'
+const CHANGE = 'change'
 
 function failure(error: unknown): string {
   if (error instanceof SimError && error.failure === 'noBodyFile')
@@ -115,7 +140,7 @@ function drapeText(drape: Drape): string {
     case 'draping':
     case 'draped': {
       const update = drape.update
-      const fabric = text.fabrics[drape.fabric].toLowerCase()
+      const fabric = drape.fabric
       const said =
         drape.kind === 'draping'
           ? update?.stage === 'settling'
@@ -151,6 +176,8 @@ export function AvatarPane({ session }: { session: Session }) {
   const [shows, setShows] = useState<ClothShows>('fabric')
   // The cloth where it was last tapped.
   const [reading, setReading] = useState<ClothReading | null>(null)
+  // A fabric being measured, or the one chosen being changed.
+  const [measuring, setMeasuring] = useState<typeof MEASURE | typeof CHANGE | null>(null)
   const units = session.engine.document().settings.displayUnits
 
   // The canvas, handed to the sim worker to draw on. Made here rather than
@@ -251,18 +278,25 @@ export function AvatarPane({ session }: { session: Session }) {
    * follow a change, `quietly`: the cloth shown stays until the new one has
    * settled.
    */
-  const startDrape = (fabric: FabricPreset, quietly = false) => {
+  const startDrape = (chosen: string, quietly = false) => {
     const settings = shown.current
     if (!settings) return
     const doc = session.engine.document()
     const mine = ++drapes.current
-    draped.current = garmentKey(doc)
+    draped.current = garmentKey(doc, chosen)
+    const { preset, measured, name: fabric } = fabricOf(doc, chosen)
     if (!doc.seams.some((s) => s.confirmed)) {
       if (quietly) void sim.undrape()
       setDrape({ kind: 'failed', text: t.avatar.nothingSewn })
       return
     }
-    const request: DrapeRequest = { pieces: doc.pieces, seams: doc.seams, fabric, settings }
+    const request: DrapeRequest = {
+      pieces: doc.pieces,
+      seams: doc.seams,
+      fabric: preset,
+      ...(measured ? { measured } : {}),
+      settings,
+    }
     setDrape((was) =>
       quietly && (was.kind === 'draped' || was.kind === 'following')
         ? { kind: 'following', fabric, update: was.update }
@@ -295,7 +329,7 @@ export function AvatarPane({ session }: { session: Session }) {
   useEffect(() => {
     const following =
       drape.kind === 'draped' || drape.kind === 'following' || drape.kind === 'draping'
-    if (!following || garmentKey(session.engine.document()) === draped.current) return
+    if (!following || garmentKey(session.engine.document(), drapeFabric) === draped.current) return
     const timer = setTimeout(() => startDrape(drapeFabric, drape.kind !== 'draping'), FOLLOW_AFTER)
     return () => clearTimeout(timer)
     // Followed as the pattern changes; `startDrape` is the latest render's.
@@ -319,11 +353,17 @@ export function AvatarPane({ session }: { session: Session }) {
       : shows === 'room'
         ? t.avatar.roomLegend(formatLength(ROOM_SCALE, units))
         : null
-  const chooseFabric = (fabric: FabricPreset) => {
+  const chooseFabric = (fabric: string) => {
+    if (fabric === MEASURE || fabric === CHANGE) {
+      setMeasuring(fabric)
+      return
+    }
     session.chooseDrapeFabric(fabric)
     // On the avatar already: draped again in the new fabric.
     if (on) startDrape(fabric)
   }
+  const doc = session.engine.document()
+  const ownChosen = doc.fabrics.find((f) => f.id === drapeFabric) ?? null
   const canDrape = backend !== null && (status.kind === 'standard' || status.kind === 'fitted')
   // What the drape is doing, or what was read where tapped.
   const drapeSaid = on && reading ? readingText(reading, units) : drapeText(drape)
@@ -434,11 +474,13 @@ export function AvatarPane({ session }: { session: Session }) {
             <Select
               className="avatar-fabric"
               selectedKey={drapeFabric}
-              onSelectionChange={(f) => chooseFabric(f as FabricPreset)}
+              onSelectionChange={(f) => chooseFabric(String(f))}
             >
               <Label>{text.fabric}</Label>
               <Button className="select-button">
-                <SelectValue>{() => text.fabrics[drapeFabric]}</SelectValue>
+                <SelectValue>
+                  {() => ownChosen?.name ?? text.fabrics[drapeFabric as FabricPreset] ?? ''}
+                </SelectValue>
                 <ChevronDown size={16} aria-hidden="true" />
               </Button>
               <Popover className="popover">
@@ -448,9 +490,41 @@ export function AvatarPane({ session }: { session: Session }) {
                       {text.fabrics[f]}
                     </ListBoxItem>
                   ))}
+                  {doc.fabrics.length > 0 && (
+                    <ListBoxSection>
+                      <Header className="menu-header">{text.yourFabrics}</Header>
+                      {doc.fabrics.map((f) => (
+                        <ListBoxItem key={f.id} id={f.id} className="menu-item">
+                          {f.name}
+                        </ListBoxItem>
+                      ))}
+                    </ListBoxSection>
+                  )}
+                  <ListBoxSection>
+                    <ListBoxItem id={MEASURE} className="menu-item action">
+                      {text.measureFabric}
+                    </ListBoxItem>
+                    {ownChosen && (
+                      <ListBoxItem id={CHANGE} className="menu-item action">
+                        {text.changeFabric(ownChosen.name)}
+                      </ListBoxItem>
+                    )}
+                  </ListBoxSection>
                 </ListBox>
               </Popover>
             </Select>
+            <FabricDialog
+              session={session}
+              fabric={measuring === CHANGE ? ownChosen : null}
+              isOpen={measuring !== null}
+              onClose={() => setMeasuring(null)}
+              onSaved={(id) => {
+                setMeasuring(null)
+                // Once the form has gone. A change to the fabric chosen is
+                // followed like any other.
+                if (id !== drapeFabric) setTimeout(() => chooseFabric(id), 0)
+              }}
+            />
             {drape.kind === 'draping' ? (
               <Button className="button" onPress={takeOff}>
                 {text.stop}

@@ -1,0 +1,19 @@
+[package]
+name = "drapewright-fabric"
+description = "Fabrics for Drapewright: the presets, and fabrics of one's own, measured at home"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+ts-rs.workspace = true
+schemars.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

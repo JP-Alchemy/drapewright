@@ -353,6 +353,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "drapewright-fabric"
+version = "0.1.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_json",
+ "ts-rs",
+]
+
+[[package]]
 name = "drapewright-io"
 version = "0.1.0"
 dependencies = [
@@ -424,6 +434,7 @@ dependencies = [
 name = "drapewright-project"
 version = "0.1.0"
 dependencies = [
+ "drapewright-fabric",
  "drapewright-pattern-core",
  "drapewright-seams",
  "flate2",
@@ -464,6 +475,7 @@ name = "drapewright-sim"
 version = "0.1.0"
 dependencies = [
  "drapewright-body",
+ "drapewright-fabric",
  "drapewright-pattern-core",
  "drapewright-project",
  "drapewright-seams",
@@ -477,6 +489,7 @@ version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "drapewright-body",
+ "drapewright-fabric",
  "drapewright-pattern-core",
  "drapewright-project",
  "drapewright-render",

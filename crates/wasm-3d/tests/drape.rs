@@ -2,7 +2,7 @@
 
 use drapewright_body::{BodyModel, Shape};
 use drapewright_project::{Engine, container};
-use drapewright_sim::fabric::PRESETS;
+use drapewright_wasm_3d::drape::Measured;
 use drapewright_wasm_3d::drape::{DrapeError, Draping};
 use drapewright_wasm_3d::{ClothShows, DrapeRequest, DrapeStage, FabricPreset};
 
@@ -28,6 +28,7 @@ fn garment(name: &str) -> DrapeRequest {
         pieces: doc.pieces.iter().map(|p| (**p).clone()).collect(),
         seams: doc.seams.clone(),
         fabric: FabricPreset::Poplin,
+        measured: None,
         settings: Shape::default().into(),
     }
 }
@@ -105,17 +106,30 @@ fn nothing_is_draped_until_something_is_sewn() {
 }
 
 #[test]
-fn every_fabric_preset_is_the_simulators() {
-    let names: Vec<&str> = FabricPreset::ALL.iter().map(|f| f.name()).collect();
-    let presets: Vec<&str> = PRESETS.iter().map(|(n, _)| *n).collect();
-    assert_eq!(names, presets);
-    // Named in JavaScript as in the simulator.
+fn every_fabric_preset_is_named_alike_in_javascript_and_the_simulator() {
     for f in FabricPreset::ALL {
         assert_eq!(
             serde_json::to_string(&f).unwrap(),
             format!("\"{}\"", f.name())
         );
+        assert_eq!(drapewright_sim::fabric::preset(f.name()), Some(f.fabric()));
     }
+}
+
+#[test]
+fn a_skirt_drapes_in_a_fabric_measured_at_home() {
+    // Like poplin, but heavier and stretching like a knit across.
+    let request = DrapeRequest {
+        measured: Some(Measured {
+            weight: Some(260.0),
+            crosswise: Some(25.0),
+            overhang: Some(5.0),
+            ..Default::default()
+        }),
+        ..garment("skirt")
+    };
+    let draping = drape_until_done(&request);
+    assert_eq!(draping.progress().stage, DrapeStage::Settled);
 }
 
 #[test]

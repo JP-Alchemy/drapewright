@@ -2,10 +2,10 @@
 //! how the drape is going. The draping itself is `drapewright-sim`'s.
 
 use drapewright_body::{BodyModel, Shape};
+pub use drapewright_fabric::{Fabric, FabricPreset, Measured};
 use drapewright_pattern_core::Piece;
 use drapewright_seams::Seam;
 use drapewright_sim::drape::Drape;
-use drapewright_sim::fabric::{Fabric, preset};
 use drapewright_sim::garment::{GarmentError, assemble};
 use drapewright_sim::place::{Figure, place};
 use serde::{Deserialize, Serialize};
@@ -20,64 +20,6 @@ const FRAME: f32 = 1.0 / 60.0;
 /// The longest a drape is given to settle, s.
 const LONGEST: f32 = 20.0;
 
-/// The fabrics to drape in, until a real one is calibrated (step 29).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
-pub enum FabricPreset {
-    CottonLawn,
-    Poplin,
-    Linen,
-    Chambray,
-    Denim,
-    Twill,
-    Crepe,
-    Satin,
-    Jersey,
-    RibKnit,
-    WoolSuiting,
-    Fleece,
-}
-
-impl FabricPreset {
-    pub const ALL: [FabricPreset; 12] = [
-        FabricPreset::CottonLawn,
-        FabricPreset::Poplin,
-        FabricPreset::Linen,
-        FabricPreset::Chambray,
-        FabricPreset::Denim,
-        FabricPreset::Twill,
-        FabricPreset::Crepe,
-        FabricPreset::Satin,
-        FabricPreset::Jersey,
-        FabricPreset::RibKnit,
-        FabricPreset::WoolSuiting,
-        FabricPreset::Fleece,
-    ];
-
-    /// Its name among the simulator's presets.
-    pub fn name(self) -> &'static str {
-        match self {
-            FabricPreset::CottonLawn => "cottonLawn",
-            FabricPreset::Poplin => "poplin",
-            FabricPreset::Linen => "linen",
-            FabricPreset::Chambray => "chambray",
-            FabricPreset::Denim => "denim",
-            FabricPreset::Twill => "twill",
-            FabricPreset::Crepe => "crepe",
-            FabricPreset::Satin => "satin",
-            FabricPreset::Jersey => "jersey",
-            FabricPreset::RibKnit => "ribKnit",
-            FabricPreset::WoolSuiting => "woolSuiting",
-            FabricPreset::Fleece => "fleece",
-        }
-    }
-
-    pub fn fabric(self) -> Fabric {
-        preset(self.name()).expect("every preset is the simulator's")
-    }
-}
-
 /// What to drape: the project's pieces, sewn by its seams, in a fabric, on
 /// the avatar shaped by `settings`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -86,7 +28,12 @@ impl FabricPreset {
 pub struct DrapeRequest {
     pub pieces: Vec<Piece>,
     pub seams: Vec<Seam>,
+    /// The fabric, or for one's own fabric the preset it is like.
     pub fabric: FabricPreset,
+    /// One's own fabric: what was measured of it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub measured: Option<Measured>,
     pub settings: AvatarSettings,
 }
 
@@ -169,7 +116,9 @@ impl Draping {
         let drape = Drape::new(
             &garment,
             &starts,
-            request.fabric.fabric(),
+            request
+                .measured
+                .map_or(request.fabric.fabric(), |m| m.fabric(request.fabric)),
             (&body.vertices, &model.skin()),
         );
         Ok(Draping {

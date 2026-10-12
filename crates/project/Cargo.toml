@@ -10,6 +10,7 @@ publish.workspace = true
 [dependencies]
 drapewright-pattern-core.workspace = true
 drapewright-seams.workspace = true
+drapewright-fabric.workspace = true
 kurbo.workspace = true
 serde.workspace = true
 serde_json.workspace = true

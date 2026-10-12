@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Drapewright project (project.json)",
-  "description": "A Drapewright sewing pattern project, schema version 5. See docs/file-format.md.",
+  "description": "A Drapewright sewing pattern project, schema version 6. See docs/file-format.md.",
   "type": "object",
   "properties": {
     "extensions": {
@@ -9,6 +9,14 @@
       "type": "object",
       "additionalProperties": true,
       "default": {}
+    },
+    "fabrics": {
+      "description": "Fabrics of one's own, measured at home (schema version 6).",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/OwnFabric"
+      }
     },
     "format": {
       "type": "string"
@@ -703,6 +711,24 @@
         }
       ]
     },
+    "FabricPreset": {
+      "description": "The fabrics to drape in, ready made.",
+      "type": "string",
+      "enum": [
+        "cottonLawn",
+        "poplin",
+        "linen",
+        "chambray",
+        "denim",
+        "twill",
+        "crepe",
+        "satin",
+        "jersey",
+        "ribKnit",
+        "woolSuiting",
+        "fleece"
+      ]
+    },
     "Figure": {
       "description": "Whose figure: which measurements are asked for, and (later) the\navatar's shape.",
       "type": "string",
@@ -907,6 +933,44 @@
         "buttonhole"
       ]
     },
+    "Measured": {
+      "description": "What was measured of a fabric at home. What was not is left out, and\ntaken from the preset it is like.",
+      "type": "object",
+      "properties": {
+        "crosswise": {
+          "description": "The same of a strip cut across the grain, %.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "lengthwise": {
+          "description": "How much longer 10 cm of a strip 5 cm wide, cut along the grain,\ngrows with 500 g hanging from it, %.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "overhang": {
+          "description": "How far a strip 2.5 cm wide, cut along the grain, slides out over a\ntable's edge before its end droops to 45° below it, cm.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "weight": {
+          "description": "Its weight, g/m²: a 10 cm square's, in grams, times 100.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        }
+      }
+    },
     "MeasurementSet": {
       "description": "One person's measurements, mm, with the earlier ones kept.",
       "type": "object",
@@ -1088,6 +1152,31 @@
       "required": [
         "start",
         "edges"
+      ]
+    },
+    "OwnFabric": {
+      "description": "A fabric of one's own: like a preset, with what was measured of it.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "like": {
+          "description": "The preset it is most like: what was not measured is taken from it.",
+          "$ref": "#/$defs/FabricPreset"
+        },
+        "measured": {
+          "$ref": "#/$defs/Measured",
+          "default": {}
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "like"
       ]
     },
     "Paper": {

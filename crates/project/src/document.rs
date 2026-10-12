@@ -8,6 +8,7 @@ use drapewright_pattern_core::{Id, Piece, Pt};
 use drapewright_seams::Seam;
 
 use crate::measurements::MeasurementSet;
+use drapewright_fabric::OwnFabric;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -15,7 +16,7 @@ use ts_rs::TS;
 pub const FORMAT: &str = "drapewright-project";
 
 /// The schema version this build reads and writes.
-pub const SCHEMA_VERSION: u32 = 5;
+pub const SCHEMA_VERSION: u32 = 6;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -237,6 +238,9 @@ pub struct Document {
     /// Edges sewn together (schema version 3).
     #[serde(default)]
     pub seams: Vec<Seam>,
+    /// Fabrics of one's own, measured at home (schema version 6).
+    #[serde(default)]
+    pub fabrics: Vec<OwnFabric>,
     /// Data owned by other programs; preserved untouched.
     #[serde(default)]
     pub extensions: serde_json::Map<String, serde_json::Value>,
@@ -257,6 +261,10 @@ impl Document {
 
     pub fn seam(&self, id: &str) -> Option<&Seam> {
         self.seams.iter().find(|s| s.id == id)
+    }
+
+    pub fn fabric(&self, id: &str) -> Option<&OwnFabric> {
+        self.fabrics.iter().find(|f| f.id == id)
     }
 }
 

@@ -871,6 +871,17 @@ h2 {
   font-variant-numeric: tabular-nums;
 }
 
+/* A number with its unit beside it, and no steps. */
+.number-group.with-unit {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.number-unit {
+  min-width: 2em;
+  color: var(--ink-muted);
+}
+
 .step-button {
   display: grid;
   place-items: center;
@@ -903,6 +914,9 @@ h2 {
 
 .popover {
   min-width: 220px;
+  /* A long list scrolls within the room it is given, never over what opened it. */
+  overflow: auto;
+  overscroll-behavior: contain;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -927,6 +941,18 @@ h2 {
 
 .menu-item[data-focused] {
   background: var(--surface-2);
+}
+
+/* A heading over a group of menu items, and an item that does something. */
+.menu-header {
+  padding: 8px 12px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.menu-item.action {
+  color: var(--accent);
 }
 
 /* A menu item with a line saying what it does under it. */

@@ -1,6 +1,6 @@
 # The Drapewright project format
 
-Status: **schema version 5** (Phase 4). Sections marked *draft* describe
+Status: **schema version 6** (Phase 4). Sections marked *draft* describe
 how later phases will extend the format; they become normative, with a
 version bump and a migration, when they are implemented.
 
@@ -49,7 +49,7 @@ single exception of sidecars it references explicitly.
 ```json
 {
   "format": "drapewright-project",
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "generator": "Drapewright 0.1.0",
   "meta": {
     "id": "7f3c9a2e5b1d4e8f",
@@ -63,6 +63,7 @@ single exception of sidecars it references explicitly.
   "print": { /* PrintSettings */ },
   "measurementSets": [ /* MeasurementSet, §10.2 */ ],
   "seams": [ /* Seam, §10.4 */ ],
+  "fabrics": [ /* OwnFabric, §10.5 */ ],
   "view": { /* ViewState */ },
   "extensions": {}
 }
@@ -71,7 +72,7 @@ single exception of sidecars it references explicitly.
 | Field | Type | Notes |
 |---|---|---|
 | `format` | `"drapewright-project"` | Identifies the file type. |
-| `schemaVersion` | integer | `5` for this document. See §8. |
+| `schemaVersion` | integer | `6` for this document. See §8. |
 | `generator` | string | Free text naming the program that wrote the file. |
 | `meta.id` | string | Stable project identifier. |
 | `meta.name` | string | Shown to the user. |
@@ -82,6 +83,7 @@ single exception of sidecars it references explicitly.
 | `print` | PrintSettings | Optional; defaults in §6. |
 | `measurementSets` | array of MeasurementSet | People's measurements (§10.2). Default `[]`. Added in version 2. |
 | `seams` | array of Seam | Edges sewn together (§10.4). Default `[]`. Added in version 3. |
+| `fabrics` | array of OwnFabric | Fabrics of one's own, measured at home (§10.5). Default `[]`. Added in version 6. |
 | `view` | ViewState | Optional; non-semantic (§7). |
 | `extensions` | object | Data owned by other programs, keyed by a reverse-DNS or URL namespace (e.g. `"org.example.cutter"`). Readers must preserve it unchanged. |
 
@@ -523,6 +525,7 @@ Non-semantic: readers may ignore it.
 | 3 | `seams` (§10.4). Earlier files have none. |
 | 4 | A measurement set's `age` (§10.2). Earlier files leave it unknown. |
 | 5 | A piece's `alterations` and `drawn` (§4.13), and its `darts` (§4.14). Earlier pieces have none. |
+| 6 | `fabrics` (§10.5): fabrics of one's own. Earlier files have none. |
 
 ## 9. Validation
 
@@ -676,15 +679,40 @@ A seam must not sew a side to itself, and every side must lie on its edge.
 The reference implementation removes a piece's seams with the piece, and
 refuses to add or remove a corner on a sewn edge until its seam is unpicked.
 
-### 10.5 Fabrics (Phase 3)
+### 10.5 Fabrics (version 6)
+
+No longer a draft: written since schema version 6. Fabrics of one's own,
+measured at home, to drape the garment in.
 
 ```json
-"fabrics": [{ "id": "f1", "name": "Mid-weight linen", "preset": "linen", "weight": 185,
-              "stretch": { "lengthwise": 2, "crosswise": 3 }, "texture": "textures/f1.jpg" }]
+"fabrics": [{
+  "id": "f1", "name": "Blue linen", "like": "linen",
+  "measured": { "weight": 185, "lengthwise": 1.5, "overhang": 6 }
+}]
 ```
 
-Pieces reference a fabric with `"fabric": "f1"`. `weight` is g/m²;
-`stretch` is percent under the calibration test load.
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | Unique in the project. |
+| `name` | string | Not empty. |
+| `like` | preset | The ready-made fabric it is most like: what was not measured is taken from it. One of `cottonLawn`, `poplin`, `linen`, `chambray`, `denim`, `twill`, `crepe`, `satin`, `jersey`, `ribKnit`, `woolSuiting`, `fleece`. |
+| `measured.weight` | number, optional | g/m²: a 10 cm square's weight in grams, times 100. 10 to 2000. |
+| `measured.lengthwise` | number, optional | How much longer 10 cm of a strip 5 cm wide, cut along the grain, grows with 500 g hanging from it, %. 0 to 300. |
+| `measured.crosswise` | number, optional | The same of a strip cut across the grain, %. |
+| `measured.overhang` | number, optional | How far a strip 2.5 cm wide, cut along the grain, slides out over a table's edge before its end droops to 45° below it, cm. 0.5 to 60. |
+
+The reference implementation works out the drape from these as follows.
+The weight is the cloth's mass. A strip 5 cm wide pulled by 500 g is
+under 98.1 N/m, so the stretch stiffness along (and across) the grain is
+98.1 N/m divided by the stretch as a fraction (at least 0.5%: a ruler
+can't tell less). The bias's shear stiffness is the preset's, scaled by
+the geometric mean of how much stiffer along and across the fabric is
+than the preset. The bending stiffness follows Peirce's cantilever: the
+bending length is 0.487 times the overhang, and the stiffness is the
+weight (N/m²) times its cube. Thickness and friction are the preset's.
+
+Pieces do not yet name a fabric: the garment is draped in the one chosen
+on the avatar.
 
 ### 10.6 Parametric construction (Phase 5)
 
