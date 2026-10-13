@@ -19,6 +19,8 @@ import {
   ModalOverlay,
   Radio,
   RadioGroup,
+  TextArea,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
 } from 'react-aria-components'
@@ -28,6 +30,58 @@ import { formatLength, t } from '../strings/en.ts'
 import { groupNotes } from './import-notes.ts'
 import { LengthField } from './LengthField.tsx'
 import { SizeFinder } from './SizeFinder.tsx'
+import { importReport, mailto } from './feedback.ts'
+import { fileName, saveFile } from '../platform/save-file.ts'
+
+/**
+ * A pattern that didn't open right, reported: what's wrong, in the
+ * person's words, and what was read from the file, by email (in their own
+ * mail) or saved to attach.
+ */
+function NotRight({ pending }: { pending: PendingImport }) {
+  const text = t.feedback
+  const [open, setOpen] = useState(false)
+  const [said, setSaid] = useState('')
+  if (!open) {
+    return (
+      <p className="small">
+        <Button className="link-button" onPress={() => setOpen(true)}>
+          {text.notRight}
+        </Button>
+      </p>
+    )
+  }
+  const report = importReport(pending)
+  return (
+    <section className="not-right" aria-label={text.notRight}>
+      <p className="muted small">{text.notRightHow}</p>
+      <TextField className="field" value={said} onChange={setSaid}>
+        <Label>{text.whatsWrong}</Label>
+        <TextArea className="text-area" rows={3} placeholder={text.whatsWrongPlaceholder} />
+      </TextField>
+      <div className="feedback-links">
+        <a
+          className="button"
+          href={mailto(text.reportSubject(pending.fileName), text.reportBody(said, report))}
+        >
+          {text.emailReport}
+        </a>
+        <Button
+          className="button"
+          onPress={() =>
+            saveFile(
+              new TextEncoder().encode(text.reportBody(said, report)),
+              fileName(`${pending.fileName} report`, 'txt'),
+              'text/plain',
+            )
+          }
+        >
+          {text.saveReport}
+        </Button>
+      </div>
+    </section>
+  )
+}
 
 /** The size to offer first: the file's sample size if it holds it, else the middle one. */
 function firstSize(sizes: ImportSizes): string | undefined {
@@ -396,6 +450,7 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
             </ul>
           )}
 
+          <NotRight pending={pending} />
           {!answered && <p className="muted small">{t.importing.allowanceNeeded}</p>}
           <div className="dialog-actions">
             <Button className="button" onPress={close}>

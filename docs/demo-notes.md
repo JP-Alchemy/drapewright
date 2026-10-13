@@ -12,6 +12,26 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 46 — Feedback, and patterns that didn't open right
+
+**Feedback** (the speech bubble at the top right) starts an email to
+Drapewright in your own mail, saying which version of Drapewright and
+which browser it is, or opens LinkedIn. Nothing is sent by the app
+itself.
+
+When a pattern file doesn't open right, **Didn't open right?** in the
+import dialog asks what's wrong and then either starts an email or saves
+a report to attach. The report says what was read from the file (its
+name, size and fingerprint, the scale, pages and sizes, each piece found
+with its size and edges, and what the importer noted), never the file
+itself: attach the file too only if you may share it.
+
+The header also keeps the project's name in view on a laptop: below
+1400 px wide, Print, Layout, Projector and Back up show only their icons
+(below 1000 px, every button does).
+
+---
+
 ## Step 45 — A picture or a turning video of the drape
 
 Two buttons at the top of the avatar save what it shows, to keep or to
@@ -25,8 +45,9 @@ and press the camera; then the film button.
 
 **How it works:** the 3D view draws a frame and a picture is taken of it
 straight away, in the worker that draws it. For the video it is turned a
-72nd of the way round between frames, and the pictures are played at 24 a second into the browser's own video
-recorder. Nothing leaves the device.
+72nd of the way round between frames, and the pictures are played at 24
+a second into the browser's own video recorder. Nothing leaves the
+device.
 
 ---
 

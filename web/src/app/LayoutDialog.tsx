@@ -69,7 +69,7 @@ export function LayoutDialog({ session }: { session: Session }) {
     <DialogTrigger>
       <Button className="button" isDisabled={empty} aria-description={text.openHint}>
         <Scissors size={18} aria-hidden="true" />
-        <span className="button-label">{text.open}</span>
+        <span className="button-label minor">{text.open}</span>
       </Button>
       <ModalOverlay isDismissable className="modal-overlay">
         <Modal className="modal wide">

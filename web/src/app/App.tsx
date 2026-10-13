@@ -32,6 +32,7 @@ import { AvatarPane } from './AvatarPane.tsx'
 import { ProjectorView } from './ProjectorView.tsx'
 import { ContextMenu } from './ContextMenu.tsx'
 import { DeviceDialog } from './DeviceDialog.tsx'
+import { FeedbackDialog } from './FeedbackDialog.tsx'
 import { ImportDialog } from './ImportDialog.tsx'
 import { MeasurementsDialog } from './MeasurementsDialog.tsx'
 import { PrintDialog } from './PrintDialog.tsx'
@@ -126,11 +127,11 @@ function TopBar({
         aria-description={t.projector.openHint}
       >
         <Projector size={18} aria-hidden="true" />
-        <span className="button-label">{t.projector.open}</span>
+        <span className="button-label minor">{t.projector.open}</span>
       </Button>
       <Button className="button" onPress={backup} aria-description={t.projects.backupHint}>
         <Download size={18} aria-hidden="true" />
-        <span className="button-label">{t.projects.backup}</span>
+        <span className="button-label minor">{t.projects.backup}</span>
       </Button>
       <div className="spacer" />
       <Button
@@ -149,6 +150,7 @@ function TopBar({
       >
         <Redo2 size={20} aria-hidden="true" />
       </Button>
+      <FeedbackDialog />
       <DeviceDialog />
     </header>
   )

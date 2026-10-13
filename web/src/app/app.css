@@ -214,7 +214,24 @@ h2 {
   }
 }
 
-@media (max-width: 1200px) {
+/* The output buttons first say only their icons, to leave room for the
+   project's name; then all of them. */
+@media (max-width: 1400px) {
+  .topbar .button-label.minor {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .topbar .button:has(.minor) {
+    padding: 0 12px;
+  }
+}
+
+@media (max-width: 1000px) {
   .topbar .button-label {
     position: absolute;
     width: 1px;
@@ -2392,4 +2409,37 @@ h2 {
 .layout-grain {
   stroke: var(--ink-muted);
   stroke-width: 2;
+}
+
+/* Feedback, and a pattern that didn't open right. */
+.feedback-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.feedback-links a.button {
+  text-decoration: none;
+}
+
+.not-right {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.not-right p {
+  margin: 0;
+}
+
+.text-area {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: 16px var(--font);
+  resize: vertical;
 }

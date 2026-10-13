@@ -123,6 +123,40 @@ export const t = {
       })[why],
   },
 
+  feedback: {
+    heading: 'Feedback',
+    intro:
+      'Drapewright is made by one person, for and with the people who sew. What works, what doesn’t, what you wish it did: all of it helps.',
+    email: 'Email feedback',
+    linkedin: 'Connect on LinkedIn',
+    subject: 'Drapewright feedback',
+    body: (about: string[]) => `\n\n\n—\n${about.join('\n')}`,
+    version: (build: string, engine: string) => `Drapewright ${build}, engine ${engine}`,
+    browser: (agent: string) => `Browser: ${agent}`,
+    notRight: 'Didn’t open right?',
+    notRightHow:
+      'Say what’s wrong, then email the report. It says what was read from the file, not the file itself: attach the file too only if you may share it.',
+    whatsWrong: 'What’s wrong',
+    whatsWrongPlaceholder: 'The back is missing; the sleeve came in twice…',
+    emailReport: 'Email the report',
+    saveReport: 'Save the report',
+    reportSubject: (file: string) => `Drapewright: “${file}” didn’t open right`,
+    reportBody: (said: string, report: string) =>
+      `${said || '(What’s wrong:)'}\n\n— What Drapewright read —\n${report}`,
+    report: {
+      file: (name: string, kb: number, fingerprint: string) =>
+        `File: ${name} (${kb} KB, ${fingerprint}…)`,
+      scale: (basis: string, certain: boolean) => `Scale: ${basis}${certain ? '' : ' (asked)'}`,
+      pages: (read: number, all: number, chosen: number[] | null) =>
+        `Pages: ${read} of ${all} read${chosen ? ` (chosen: ${chosen.join(', ')})` : ''}`,
+      sizes: (names: string[]) => `Sizes: ${names.join(', ')}`,
+      pieces: (n: number) => `Pieces found: ${n}`,
+      piece: (name: string, w: number, h: number, edges: number, cut: number) =>
+        `  ${name}: ${w} × ${h} mm, ${edges} edges, cut ${cut}`,
+      notes: 'Notes:',
+    },
+  },
+
   layout: {
     open: 'Layout',
     openHint: 'How the pieces lie on the fabric to cut, and how much fabric they take.',

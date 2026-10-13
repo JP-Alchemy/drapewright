@@ -42,7 +42,7 @@ export function PrintDialog({ session }: { session: Session }) {
     <DialogTrigger>
       <Button className="button" isDisabled={empty}>
         <Printer size={18} aria-hidden="true" />
-        <span className="button-label">{t.actions.print}</span>
+        <span className="button-label minor">{t.actions.print}</span>
       </Button>
       <ModalOverlay isDismissable className="modal-overlay">
         <Modal className="modal wide">
