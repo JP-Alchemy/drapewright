@@ -175,12 +175,21 @@ export class Projects {
    * Opens a .drapewright file as a project on this device. A backup of a project
    * that is already here becomes a copy beside it; nothing is overwritten.
    */
-  async restore(bytes: Uint8Array): Promise<Opened> {
+  /**
+   * Opens a backup as a project of its own. One already on this device is
+   * copied, not overwritten; `as` opens it as a new project by that name
+   * (a sample, however often it is opened).
+   */
+  async restore(bytes: Uint8Array, as?: { name: string }): Promise<Opened> {
     const { projectJson, sources } = await this.io.call('unpackProject', bytes)
     let json = projectJson
     const parsed = JSON.parse(projectJson) as { meta?: { id?: string; name?: string } }
     const existing = await this.list().catch(() => [])
-    if (parsed.meta && existing.some((p) => p.id === parsed.meta?.id)) {
+    if (parsed.meta && as) {
+      parsed.meta.id = crypto.randomUUID()
+      parsed.meta.name = as.name
+      json = JSON.stringify(parsed)
+    } else if (parsed.meta && existing.some((p) => p.id === parsed.meta?.id)) {
       parsed.meta.id = crypto.randomUUID()
       parsed.meta.name = t.projects.restoredName(parsed.meta.name ?? t.untitled)
       json = JSON.stringify(parsed)

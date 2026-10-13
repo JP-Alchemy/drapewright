@@ -44,7 +44,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,jpg,webp,ico,wasm,webmanifest}'],
+        // The sample dress (a PDF) and its licence too, to try offline.
+        globPatterns: ['**/*.{js,css,html,svg,png,jpg,webp,ico,wasm,webmanifest,pdf,txt}'],
         // Offline, a page of the app opens the app; the site's pages are
         // kept as they are.
         navigateFallback: 'app/index.html',

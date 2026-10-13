@@ -12,6 +12,34 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 38 — Sample patterns to try
+
+Someone arriving from the front page used to meet an empty table and need
+a pattern file of their own to see anything. The empty table now offers
+three samples:
+
+- **A blouse, ready to drape** and **a skirt, ready to drape**: the
+  garments the drape tests use, sewn already. Each opens as a project of
+  its own ("Sample blouse"), with the figure beside it: press **Drape**.
+- **A dress from a PDF pattern**: FreeSewing's Sasha dress as a copy-shop
+  PDF (MIT licence, credited, its licence one tap away), read as any PDF
+  is, piece by piece.
+
+**Try it:**
+
+1. Open https://drapewright.com/app/ in a private window (an empty
+   table), and press **A blouse, ready to drape**. The blouse opens with
+   its seams sewn and the figure beside it; press **Drape**.
+2. On the front page, **Try it on a sample blouse** opens the app straight
+   into the same sample (the address `drapewright.com/app/?sample=blouse`,
+   or `skirt`, or `dress`).
+3. Opening a sample again opens another copy: changes to one never touch
+   another, or anything of your own.
+
+The samples are kept for offline use with the rest of the app.
+
+---
+
 ## Step 37 — The avatar sized, or floating as a window
 
 The avatar's pane can now be made bigger or smaller where it sits, or

@@ -664,12 +664,54 @@ h2 {
   left: 50%;
   translate: -50% -50%;
   width: min(420px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  overflow: auto;
   padding: 24px;
   text-align: center;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+}
+
+/* Patterns to try, under the button to open one's own. */
+.samples {
+  display: grid;
+  gap: 8px;
+  width: min(420px, 100%);
+  margin-top: 20px;
+  text-align: start;
+}
+
+.samples > p {
+  margin: 0;
+}
+
+.sample {
+  display: grid;
+  gap: 2px;
+  min-height: var(--tap);
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.sample[data-hovered] {
+  background: var(--surface-2);
+}
+
+.sample[data-focus-visible] {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.sample-title {
+  font-weight: 600;
 }
 
 .empty-state p {

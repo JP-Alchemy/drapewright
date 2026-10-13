@@ -36,6 +36,7 @@ import { ImportDialog } from './ImportDialog.tsx'
 import { MeasurementsDialog } from './MeasurementsDialog.tsx'
 import { PrintDialog } from './PrintDialog.tsx'
 import { SidePanel } from './SidePanel.tsx'
+import { SAMPLES, type SampleName, isSampleName, sampleFile } from './samples.ts'
 import { useAvatarLayout } from './avatar-layout.ts'
 import { sideLabel } from './labels.ts'
 import { type ProjectActions, ProjectsDialog } from './ProjectsDialog.tsx'
@@ -250,6 +251,27 @@ function Workspace({
                 <FolderOpen size={18} aria-hidden="true" />
                 {t.actions.open}
               </Button>
+              <div className="samples" role="group" aria-labelledby="samples-heading">
+                <p id="samples-heading" className="muted small">
+                  {t.samples.heading}
+                </p>
+                {(Object.keys(SAMPLES) as SampleName[]).map((name) => (
+                  <Button
+                    key={name}
+                    className="sample"
+                    onPress={() => void actions.openSample(name)}
+                  >
+                    <span className="sample-title">{t.samples.titles[name]}</span>
+                    <span className="muted small">{t.samples.about[name]}</span>
+                  </Button>
+                ))}
+                <p className="muted small">
+                  {t.samples.credit}{' '}
+                  <a href={SAMPLES.dress.licence} target="_blank" rel="noopener">
+                    {t.samples.licence}
+                  </a>
+                </p>
+              </div>
             </div>
           )}
           <Toolbar session={session} />
@@ -374,6 +396,28 @@ class Opener implements ProjectActions {
     }
   }
 
+  async openSample(name: SampleName) {
+    try {
+      const file = await sampleFile(name)
+      if (SAMPLES[name].kind === 'pattern') {
+        await this.#current.session.openPatternFile(file)
+        return
+      }
+      await this.projects.flush()
+      const title = t.samples.names[name]
+      const opened = await this.projects.restore(new Uint8Array(await file.arrayBuffer()), {
+        name: title,
+      })
+      this.projects.status.set({ state: 'saved' })
+      this.#replace(opened, t.projects.opened(title))
+      // Sewn already: the figure, ready to drape it.
+      this.#current.session.showAvatar(true)
+      this.#current.session.notify({ kind: 'info', text: t.samples.opened(title) })
+    } catch (e) {
+      this.#fail(t.samples.failed(reason(e)))
+    }
+  }
+
   async remove(project: ProjectSummary) {
     try {
       await this.projects.delete(project.id)
@@ -408,6 +452,15 @@ export function App() {
         const o = new Opener(projects, first, setCurrent)
         setOpener(o)
         setCurrent(o.current)
+        // A sample asked for in the address (the site's "try it" link):
+        // opened once, and taken out of the address.
+        const url = new URL(location.href)
+        const asked = url.searchParams.get('sample')
+        if (isSampleName(asked)) {
+          url.searchParams.delete('sample')
+          history.replaceState(null, '', url)
+          void o.openSample(asked)
+        }
       })
       .catch((e: unknown) => setError(String(e)))
     return () => {

@@ -68,5 +68,6 @@ Project licence: **not yet chosen** (see
 | UI font | — | System font stack; nothing bundled. |
 | PDF font | — | Helvetica, one of the 14 standard PDF fonts, referenced and not embedded. |
 | Test fixtures in `fixtures/` | CC0-1.0 unless noted | Drawn for this project; each folder has a `LICENCE` note. |
+| Sample patterns in the app | CC0-1.0, and MIT for the dress | The test blouse and skirt (`fixtures/drapewright/`), and FreeSewing's Sasha dress as a PDF (`fixtures/pdf/freesewing-sasha-a0.pdf`, MIT, © Joost De Cock), shipped with its licence at `/licences/freesewing.txt` and credited beside the samples. |
 | Body model, `assets/body/adult.dwbody` | CC0-1.0 data; Apache-2.0 method | MakeHuman's mesh, shape targets and skin weights (via MPFB2, CC0-1.0), prepared as in Anny (Copyright 2025 NAVER Corp., Apache-2.0): the adult shape blending and mesh edits. Built by `crates/body/examples/build_body.rs`; see `assets/body/README.md`. Never Anny's non-commercial `smplx` topology, never SMPL. |
 | Fabric textures (Phase 3) | to choose | Prefer CC0 sources. |

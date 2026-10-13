@@ -6,6 +6,7 @@ import type { Session } from '../state/session.ts'
 import { PROJECT_FILE_TYPES, type ProjectSummary } from '../storage/projects.ts'
 import { t } from '../strings/en.ts'
 import { CommitTextField } from './Inspector.tsx'
+import type { SampleName } from './samples.ts'
 
 export interface ProjectActions {
   /** Opens a saved project in place of the current one. */
@@ -14,6 +15,8 @@ export interface ProjectActions {
   create(): void
   /** Opens a .drapewright backup as a project. */
   restore(file: File): Promise<void>
+  /** Opens one of the sample patterns: a project of its own, or imported. */
+  openSample(name: SampleName): Promise<void>
   /** Deletes a saved project from this device. */
   remove(project: ProjectSummary): Promise<void>
   list(): Promise<ProjectSummary[]>

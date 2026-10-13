@@ -75,6 +75,27 @@ export const t = {
     close: 'Close',
   },
 
+  samples: {
+    heading: 'No pattern to hand? Try one of ours:',
+    titles: {
+      blouse: 'A blouse, ready to drape',
+      skirt: 'A skirt, ready to drape',
+      dress: 'A dress from a PDF pattern',
+    },
+    about: {
+      blouse: 'Sewn already: see it on the figure, read where it pulls, alter it.',
+      skirt: 'A front and a back, sewn at the sides, to drape in any fabric.',
+      dress: 'FreeSewing’s Sasha dress as a copy-shop PDF: see it read, piece by piece.',
+    },
+    names: { blouse: 'Sample blouse', skirt: 'Sample skirt', dress: 'Sample dress' },
+    opened: (name: string) =>
+      `“${name}” is open as a project of its own: press Drape beside the figure to see it on.`,
+    failed: (why: string) => `The sample couldn’t be opened. ${why}`,
+    unavailable: 'It isn’t on this device yet; open it once while online.',
+    credit: 'The Sasha dress is by FreeSewing (Joost De Cock), shared under the MIT licence.',
+    licence: 'Licence',
+  },
+
   table: {
     empty: 'Open a sewing pattern to lay it out here.',
     emptyHint:
