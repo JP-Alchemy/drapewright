@@ -12,6 +12,24 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 45 — A picture or a turning video of the drape
+
+Two buttons at the top of the avatar save what it shows, to keep or to
+share: **Save a picture of the figure** (a PNG of the view as it is) and
+**Save a video turning round the figure** (once round in three seconds,
+as WebM, or MP4 in Safari). Both are named for the project ("Test skirt
+on the figure.png").
+
+**Try it:** drape the sample skirt, turn the view to the side you want,
+and press the camera; then the film button.
+
+**How it works:** the 3D view draws a frame and a picture is taken of it
+straight away, in the worker that draws it. For the video it is turned a
+72nd of the way round between frames, and the pictures are played at 24 a second into the browser's own video
+recorder. Nothing leaves the device.
+
+---
+
 ## Step 44 — Projecting the cutting layout, piece by piece
 
 The projector (Step 30) can now project the cutting layout onto the

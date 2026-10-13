@@ -9,7 +9,16 @@ import type {
   Measured,
 } from '@drapewright/engine'
 import type { ViewColours } from '@drapewright/engine/avatar'
-import { ChevronDown, PanelBottom, PanelRight, PictureInPicture2, RotateCcw, X } from 'lucide-react'
+import {
+  Camera,
+  ChevronDown,
+  Film,
+  PanelBottom,
+  PanelRight,
+  PictureInPicture2,
+  RotateCcw,
+  X,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   Button,
@@ -36,6 +45,8 @@ import { DockEdge, useDocksBelow, useFloatingBox } from './AvatarFrame.tsx'
 import { setAvatarLayout, useAvatarLayout } from './avatar-layout.ts'
 import { FabricDialog } from './FabricDialog.tsx'
 import { FitAdvice } from './FitAdvice.tsx'
+import { canRecord, video } from './turnaround.ts'
+import { fileName, saveBlob } from '../platform/save-file.ts'
 
 /** "rgb(239, 233, 223)" as sRGB parts, 0 to 1. */
 function rgb(css: string): [number, number, number] {
@@ -218,6 +229,32 @@ export function AvatarPane({ session }: { session: Session }) {
   // A fabric being measured, or the one chosen being changed.
   const [measuring, setMeasuring] = useState<typeof MEASURE | typeof CHANGE | null>(null)
   const units = session.engine.document().settings.displayUnits
+  // A picture or a video being made of the view.
+  const [saving, setSaving] = useState<'picture' | 'video' | null>(null)
+  const keep = async (what: 'picture' | 'video') => {
+    setSaving(what)
+    const name = session.engine.document().meta.name
+    try {
+      if (what === 'picture') {
+        const file = fileName(t.avatar.onTheFigure(name), 'png')
+        saveBlob(await sim.picture(), file)
+        session.toast(t.avatar.saved(file))
+      } else {
+        // Once round in three seconds.
+        const made = await video(await sim.turnaround(72))
+        const file = fileName(t.avatar.onTheFigure(name), made.extension)
+        saveBlob(made.blob, file)
+        session.toast(t.avatar.saved(file))
+      }
+    } catch (error) {
+      session.notify({
+        kind: 'error',
+        text: t.avatar.notSaved(error instanceof Error ? error.message : String(error)),
+      })
+    } finally {
+      setSaving(null)
+    }
+  }
 
   // The canvas, handed to the sim worker to draw on. Made here rather than
   // by React: a canvas can be handed over only once, and effects may run
@@ -473,6 +510,26 @@ export function AvatarPane({ session }: { session: Session }) {
             <PanelRight size={18} aria-hidden="true" />
           )}
         </Button>
+        {backend && (
+          <>
+            <Button
+              className="icon-button"
+              aria-label={text.savePicture}
+              isDisabled={saving !== null}
+              onPress={() => void keep('picture')}
+            >
+              <Camera size={18} aria-hidden="true" />
+            </Button>
+            <Button
+              className="icon-button"
+              aria-label={saving === 'video' ? text.makingVideo : text.saveVideo}
+              isDisabled={saving !== null || !canRecord()}
+              onPress={() => void keep('video')}
+            >
+              <Film size={18} aria-hidden="true" />
+            </Button>
+          </>
+        )}
         <Button
           className="icon-button"
           aria-label={text.reset}

@@ -230,6 +230,13 @@ impl View {
         }
     }
 
+    /// Turns round the figure by `radians`, as on a turntable.
+    pub fn spin(&mut self, radians: f32) {
+        if let Some(orbit) = &mut self.orbit {
+            orbit.turn(radians, 0.0);
+        }
+    }
+
     /// Comes `factor` times nearer.
     pub fn zoom(&mut self, factor: f32) {
         if let Some(orbit) = &mut self.orbit {

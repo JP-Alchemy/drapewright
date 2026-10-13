@@ -100,6 +100,16 @@ class SimClient {
     return this.#call('measureSizes', [request])
   }
 
+  /** The view as it is, as a PNG. */
+  picture(): Promise<Blob> {
+    return this.#call('picture', [])
+  }
+
+  /** The view turned once round the figure in `frames` steps, each a JPEG. */
+  turnaround(frames: number): Promise<Blob[]> {
+    return this.#call('turnaround', [frames])
+  }
+
   /** Cuts a pattern in a size at each level, blended between them. */
   blendSizes(request: BlendRequest): Promise<Blended> {
     return this.#call('blendSizes', [request])

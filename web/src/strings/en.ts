@@ -1032,6 +1032,12 @@ export const t = {
   },
 
   avatar: {
+    savePicture: 'Save a picture of the figure',
+    saveVideo: 'Save a video turning round the figure',
+    makingVideo: 'Making the video…',
+    onTheFigure: (project: string) => `${project} on the figure`,
+    saved: (file: string) => `Saved “${file}”.`,
+    notSaved: (why: string) => `It couldn’t be saved. ${why}`,
     open: 'Avatar',
     openHint: 'The avatar in 3D, fitted to someone’s measurements.',
     heading: 'Avatar',

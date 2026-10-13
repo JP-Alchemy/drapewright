@@ -206,6 +206,11 @@ export class AvatarView {
     this.#handle.turn(dx, dy)
   }
 
+  /** Turns round the figure by `radians`, as on a turntable. */
+  spin(radians: number): void {
+    this.#handle.spin(radians)
+  }
+
   zoom(factor: number): void {
     this.#handle.zoom(factor)
   }

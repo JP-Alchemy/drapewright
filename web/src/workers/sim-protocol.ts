@@ -34,6 +34,10 @@ export interface SimMethods {
   fitAvatar(request: AvatarRequest): AvatarFit
   /** Sews each size of a pattern and measures it on the avatar. */
   measureSizes(request: SizesRequest): SizeMeasures[]
+  /** The view as it is, as a PNG. */
+  picture(): Blob
+  /** The view turned once round the figure in `frames` steps, each a JPEG. */
+  turnaround(frames: number): Blob[]
   /** Cuts a pattern in a size at each level, blended between them. */
   blendSizes(request: BlendRequest): Blended
   /** The steps altering a garment at its side seams to fit. */

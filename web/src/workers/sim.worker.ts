@@ -43,6 +43,8 @@ function loadAvatar(): Promise<Avatar> {
 }
 
 let view: AvatarView | null = null
+/** The canvas the view draws on, to take pictures of. */
+let surface: OffscreenCanvas | null = null
 /** Counts views started and stopped: a view overtaken while starting is dropped. */
 let attachment = 0
 
@@ -146,6 +148,7 @@ const handlers: { [M in keyof SimMethods]: (...args: Parameters<SimMethods[M]>) 
     }
     if (mine === attachment) {
       view = created
+      surface = canvas
       view.setLook(colours)
       redraw()
     }
@@ -167,6 +170,7 @@ const handlers: { [M in keyof SimMethods]: (...args: Parameters<SimMethods[M]>) 
     drapes++
     stopDrape(null)
     view = null
+    surface = null
     return null
   },
   drape: async (request, quietly) => {
@@ -205,6 +209,24 @@ const handlers: { [M in keyof SimMethods]: (...args: Parameters<SimMethods[M]>) 
     return null
   },
   pick: (x, y, pixelRatio) => view?.pick(x, y, pixelRatio) ?? null,
+  // A picture is taken of a frame as soon as it is drawn, before the
+  // browser shows it and starts the next.
+  picture: async () => {
+    if (!view || !surface) throw new SimError('the view is not open', 'noView')
+    view.draw()
+    return surface.convertToBlob({ type: 'image/png' })
+  },
+  turnaround: async (frames) => {
+    if (!view || !surface) throw new SimError('the view is not open', 'noView')
+    const pictures: Promise<Blob>[] = []
+    for (let k = 0; k < frames; k++) {
+      view.draw()
+      pictures.push(surface.convertToBlob({ type: 'image/jpeg', quality: 0.92 }))
+      view.spin((2 * Math.PI) / frames)
+    }
+    redraw()
+    return Promise.all(pictures)
+  },
 }
 
 function apply(note: SimNote) {
