@@ -9,7 +9,7 @@ import type {
   Measured,
 } from '@drapewright/engine'
 import type { ViewColours } from '@drapewright/engine/avatar'
-import { ChevronDown, RotateCcw, X } from 'lucide-react'
+import { ChevronDown, PanelBottom, PanelRight, PictureInPicture2, RotateCcw, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   Button,
@@ -32,6 +32,8 @@ import { formatLength, t } from '../strings/en.ts'
 import { sim } from '../workers/sim-client.ts'
 import { type DrapeUpdate, SimError } from '../workers/sim-protocol.ts'
 import { CLOSE_MM, STANDARD_FIGURE, avatarRequest } from './avatar.ts'
+import { DockEdge, useDocksBelow, useFloatingBox } from './AvatarFrame.tsx'
+import { setAvatarLayout, useAvatarLayout } from './avatar-layout.ts'
 import { FabricDialog } from './FabricDialog.tsx'
 
 /** "rgb(239, 233, 223)" as sRGB parts, 0 to 1. */
@@ -171,6 +173,11 @@ export function AvatarPane({ session }: { session: Session }) {
   const sets = session.engine.document().measurementSets
   const set = sets.find((s) => s.id === avatarPerson) ?? sets[0] ?? null
   const host = useRef<HTMLDivElement>(null)
+  // Beside (or under) the table, or floating over it as a window.
+  const pane = useRef<HTMLElement>(null)
+  const { floating } = useAvatarLayout()
+  const below = useDocksBelow()
+  const frame = useFloatingBox(pane)
   const [backend, setBackend] = useState<string | null>(null)
   // The view could not start: the avatar is still fitted and reported.
   const [viewFailed, setViewFailed] = useState<string | null>(null)
@@ -389,8 +396,15 @@ export function AvatarPane({ session }: { session: Session }) {
             ? status.text
             : text.starting
   return (
-    <section className="avatar-pane" aria-label={text.heading}>
-      <div className="avatar-head">
+    <section
+      ref={pane}
+      className={floating ? 'avatar-pane floating' : 'avatar-pane'}
+      style={floating ? frame.style : undefined}
+      aria-label={text.heading}
+    >
+      {!floating && <DockEdge pane={pane} />}
+      <div className="avatar-head" onPointerDown={floating ? frame.moveFromHead : undefined}>
+        {floating && frame.grip}
         {sets.length > 1 && set ? (
           <Select
             className="field avatar-person"
@@ -422,6 +436,19 @@ export function AvatarPane({ session }: { session: Session }) {
           {said}
         </span>
         <div className="spacer" />
+        <Button
+          className="icon-button"
+          aria-label={floating ? (below ? text.dockBelow : text.dockBeside) : text.float}
+          onPress={() => setAvatarLayout({ floating: !floating })}
+        >
+          {!floating ? (
+            <PictureInPicture2 size={18} aria-hidden="true" />
+          ) : below ? (
+            <PanelBottom size={18} aria-hidden="true" />
+          ) : (
+            <PanelRight size={18} aria-hidden="true" />
+          )}
+        </Button>
         <Button
           className="icon-button"
           aria-label={text.reset}
@@ -573,6 +600,7 @@ export function AvatarPane({ session }: { session: Session }) {
           </RadioGroup>
         </div>
       )}
+      {floating && frame.corner}
     </section>
   )
 }

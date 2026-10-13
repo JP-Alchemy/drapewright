@@ -10,7 +10,7 @@ import {
   Rotate3d,
   Undo2,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { type CSSProperties, useEffect, useRef, useState } from 'react'
 import { Button, ToggleButton } from 'react-aria-components'
 import { PatternCanvas } from '../canvas/PatternCanvas.tsx'
 import { actualSize, zoomAt } from '../canvas/viewport.ts'
@@ -36,6 +36,7 @@ import { ImportDialog } from './ImportDialog.tsx'
 import { MeasurementsDialog } from './MeasurementsDialog.tsx'
 import { PrintDialog } from './PrintDialog.tsx'
 import { SidePanel } from './SidePanel.tsx'
+import { useAvatarLayout } from './avatar-layout.ts'
 import { sideLabel } from './labels.ts'
 import { type ProjectActions, ProjectsDialog } from './ProjectsDialog.tsx'
 import { ScreenDialog } from './ScreenDialog.tsx'
@@ -202,6 +203,9 @@ function Workspace({
 }) {
   const fileInput = useRef<HTMLInputElement>(null)
   const { busy, notice, toast, tip, sewing, avatar, projector } = useStore(session.ui)
+  // The avatar beside (or under) the table, or floating over it.
+  const avatarLayout = useAvatarLayout()
+  const docked = avatar && !avatarLayout.floating
   useEngineState(session)
   const empty = session.engine.document().pieces.length === 0
   const open = () => fileInput.current?.click()
@@ -225,7 +229,17 @@ function Workspace({
           else if (file) void session.openPatternFile(file)
         }}
       />
-      <div className={avatar ? 'workspace with-avatar' : 'workspace'}>
+      <div
+        className={docked ? 'workspace with-avatar' : 'workspace'}
+        style={
+          docked
+            ? ({
+                '--table-fr': `${(1 - avatarLayout.share).toFixed(3)}fr`,
+                '--avatar-fr': `${avatarLayout.share.toFixed(3)}fr`,
+              } as CSSProperties)
+            : undefined
+        }
+      >
         <main className="table" aria-label="Cutting table">
           <PatternCanvas session={session} />
           {empty && (

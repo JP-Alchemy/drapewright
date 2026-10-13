@@ -12,6 +12,32 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 37 — The avatar sized, or floating as a window
+
+The avatar's pane can now be made bigger or smaller where it sits, or
+lifted off to float over the table as a window that moves and resizes.
+
+**Try it:**
+
+1. Open the **Avatar**. Drag the grip on the edge between the table and the
+   avatar to give either more room (beside the table, or under it on an
+   iPad held upright). Focused, the arrow keys move it too; a double-click
+   puts it back halfway.
+2. Press the float button in the avatar's title bar (two overlapping
+   rectangles). The avatar becomes a window over the table, and the table
+   gets the whole width. Drag the window by its title bar, or by the grip
+   at its left, to move it; drag its bottom-right corner to resize it.
+   Focused, the grip and the corner take the arrow keys.
+3. Press the same button (now **Put back beside the table**) to dock it
+   again.
+
+Where the edge was and where the window floats are kept on the device, so
+the avatar comes back as it was left. A window never leaves the room it
+floats in: when the browser gets smaller, it moves and shrinks to stay in
+view.
+
+---
+
 ## Step 36 — A front page at drapewright.com, the app at /app/
 
 drapewright.com now opens on a page that says what Drapewright is: what it

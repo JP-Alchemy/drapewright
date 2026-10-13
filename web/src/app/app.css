@@ -230,6 +230,8 @@ h2 {
 }
 
 .workspace {
+  /* Positioned: the avatar floats within it. */
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 320px;
   min-height: 0;
@@ -320,13 +322,13 @@ h2 {
 
 /* The avatar beside the table; under it on a tablet held upright. */
 .workspace.with-avatar {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, var(--table-fr, 1fr)) minmax(0, var(--avatar-fr, 1fr)) 320px;
 }
 
 @media (max-width: 1100px) {
   .workspace.with-avatar {
     grid-template-columns: minmax(0, 1fr) 320px;
-    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, var(--table-fr, 1fr)) minmax(0, var(--avatar-fr, 1fr));
   }
 
   .workspace.with-avatar .table {
@@ -352,7 +354,7 @@ h2 {
 
   .workspace.with-avatar {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, var(--table-fr, 1fr)) minmax(0, var(--avatar-fr, 1fr)) auto;
   }
 
   .workspace.with-avatar .side-panel {
@@ -390,6 +392,105 @@ h2 {
   min-height: 0;
   border-left: 1px solid var(--border);
   background: var(--surface);
+}
+
+/* The edge between the table and the docked avatar, which moves. */
+.avatar-edge {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+  outline: none;
+}
+
+.avatar-edge.beside {
+  top: 0;
+  bottom: 0;
+  left: -8px;
+  width: 16px;
+  cursor: col-resize;
+}
+
+.avatar-edge.below {
+  left: 0;
+  right: 0;
+  top: -8px;
+  height: 16px;
+  cursor: row-resize;
+}
+
+.avatar-edge::after {
+  content: '';
+  border-radius: 3px;
+  background: var(--border);
+  box-shadow: 0 0 0 1px var(--surface);
+}
+
+.avatar-edge.beside::after {
+  width: 5px;
+  height: 44px;
+}
+
+.avatar-edge.below::after {
+  width: 44px;
+  height: 5px;
+}
+
+.avatar-edge:hover::after,
+.avatar-edge:focus-visible::after {
+  background: var(--select);
+}
+
+/* Floating over the table: a window moved by its title bar, sized from
+   its corner. */
+.avatar-pane.floating {
+  position: absolute;
+  z-index: 30;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.avatar-pane.floating .avatar-head {
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.avatar-grip {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-right: -4px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-muted);
+  cursor: move;
+  touch-action: none;
+}
+
+.avatar-corner {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  width: 28px;
+  height: 28px;
+  cursor: nwse-resize;
+  touch-action: none;
+  /* Two diagonal strokes in the corner. */
+  background:
+    linear-gradient(135deg, transparent 55%, var(--border) 55%, var(--border) 62%, transparent 62%),
+    linear-gradient(135deg, transparent 72%, var(--border) 72%, var(--border) 79%, transparent 79%);
+}
+
+.avatar-grip:focus-visible,
+.avatar-corner:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -3px;
 }
 
 .avatar-head {
