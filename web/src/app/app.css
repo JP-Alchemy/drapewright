@@ -612,6 +612,15 @@ h2 {
   gap: 6px 10px;
 }
 
+.fit-advice {
+  display: grid;
+  gap: 4px;
+}
+
+.fit-advice .fit-said {
+  margin: 0;
+}
+
 .avatar-fabric {
   display: flex;
   align-items: center;

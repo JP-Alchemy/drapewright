@@ -122,6 +122,36 @@ export const t = {
       })[why],
   },
 
+  fitting: {
+    heading: 'Fit',
+    /** How each fit is named in a sentence. */
+    fitNames: { fitted: 'fitted', relaxed: 'relaxed', close: 'close-fitting' } as Record<
+      string,
+      string
+    >,
+    fits: (fit: string, levels: string[]) =>
+      `It fits as ${fit} should at the ${new Intl.ListFormat('en', { type: 'conjunction' }).format(levels)}.`,
+    tight: (by: string, level: string) => `${by} too tight at the ${level}`,
+    loose: (by: string, level: string) => `${by} too loose at the ${level}`,
+    off: (fit: string, wrong: string[], right: string[]) =>
+      `For ${fit}: ${new Intl.ListFormat('en', { type: 'conjunction' }).format(wrong)}${
+        right.length > 0
+          ? `; right at the ${new Intl.ListFormat('en', { type: 'conjunction' }).format(right)}`
+          : ''
+      }.`,
+    alter: 'Alter to fit',
+    altering: 'Altering…',
+    letOut: (by: string, level: string) => `let out ${by} at the ${level}`,
+    takenIn: (by: string, level: string) => `taken in ${by} at the ${level}`,
+    altered: (done: string[], pieces: string[]) => {
+      const said = new Intl.ListFormat('en', { type: 'conjunction' }).format(done)
+      return `${said.charAt(0).toUpperCase()}${said.slice(1)}, at the side seams of ${namesList(pieces)}: each a step on its piece, to change or switch off. It drapes again to show.`
+    },
+    nothingAltered: 'No side seam could be let out or taken in.',
+    missed: (level: string) => `No seam crosses the ${level} to let out or take in there.`,
+    failed: (why: string) => `It couldn’t be altered to fit. ${why}`,
+  },
+
   samples: {
     heading: 'No pattern to hand? Try one of ours:',
     titles: {
@@ -256,6 +286,11 @@ export const t = {
         'Tap the armhole where it hinges, about level with its notch.',
         '',
       ],
+      bustSide: [
+        'Tap the side seam at the bust.',
+        'Tap the side seam at the waist, where it tapers to nothing.',
+        '',
+      ],
       waist: [
         'Tap the side seam at the waist.',
         'Tap the side seam at the hip, where it tapers to nothing.',
@@ -323,6 +358,7 @@ export const t = {
       bust: ['Bust adjustment', 'Full or small bust, on a front'],
       shoulder: ['Shoulders', 'Broader or narrower'],
       swayback: ['Swayback', 'A wedge out of the centre back'],
+      bustSide: ['Bust at the side', 'At a side seam, tapering to the waist'],
       waist: ['Waist', 'At a side seam, tapering to the hip'],
       hip: ['Hip', 'At a side seam, from the hip down'],
       pivot: ['Move a dart', 'Closed where it is, opened elsewhere'],
@@ -358,6 +394,8 @@ export const t = {
     broader: 'Broader',
     narrower: 'Narrower',
     shoulderHint: 'How far the end of the shoulder seam moves along it.',
+    bustSideStep: (larger: boolean, by: string) =>
+      `Bust ${larger ? 'let out' : 'taken in'} ${by} at the side`,
     waistStep: (larger: boolean, by: string) =>
       `Waist ${larger ? 'let out' : 'taken in'} ${by} at the side`,
     hipStep: (larger: boolean, by: string) =>

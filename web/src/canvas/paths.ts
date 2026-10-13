@@ -78,6 +78,7 @@ function alteredPaths(piece: Piece): { drawn: Path2D | null; alterLines: Path2D 
       }
       // A pivoted dart shows where it went; a side seam moved shows itself.
       case 'pivot':
+      case 'bustSide':
       case 'waist':
       case 'hip':
       case 'trueUp':

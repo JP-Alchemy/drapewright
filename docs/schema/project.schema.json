@@ -379,6 +379,32 @@
           ]
         },
         {
+          "description": "More room at the bust, or less where `by` is less than 0: a side\nseam moved out square to the grain by `by` mm at `at` (on it, at the\nbust) and beyond (up to the underarm), tapering to nothing at `to`\n(on it too, at the waist).",
+          "type": "object",
+          "properties": {
+            "at": {
+              "$ref": "#/$defs/Pt"
+            },
+            "by": {
+              "type": "number",
+              "format": "double"
+            },
+            "to": {
+              "$ref": "#/$defs/Pt"
+            },
+            "type": {
+              "type": "string",
+              "const": "bustSide"
+            }
+          },
+          "required": [
+            "type",
+            "at",
+            "to",
+            "by"
+          ]
+        },
+        {
           "description": "More room at the waist, or less where `by` is less than 0: a side\nseam moved out square to the grain by `by` mm at `at` (on it, at the\nwaist) and beyond, tapering to nothing at `to` (on it too, at the\nhip). The edges meeting it stretch to meet it.",
           "type": "object",
           "properties": {

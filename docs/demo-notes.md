@@ -12,6 +12,40 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 42 — Fit advice, and altering to fit
+
+Once a garment has settled on the figure, the avatar says how it fits
+against how it should, and can alter it to fit.
+
+**Try it:**
+
+1. Open the sample skirt (Step 38), open the avatar and press **Drape**.
+2. Under the drape controls, **Fit** says how it should fit (**Fitted**,
+   **Relaxed**, or **Close** for corsets and stretch fabrics, as in the size
+   finder) and how it does: "For fitted: 5.8 cm too tight at the hip; right
+   at the waist."
+3. Press **Alter to fit**. The side seams are let out or taken in at each
+   level by as much as it needs, as steps on each piece ("Hip let out
+   14 mm at the side"), all one undo. The garment drapes again by itself
+   and says "It fits as fitted should at the waist and hip."
+
+A new step, **Bust at the side**, lets out or takes in a side seam at the
+bust, tapering to the waist, alongside the waist and hip steps; add it by
+hand from **Add a step** like the others.
+
+**How it works:** the ease wanted at each level is the size finder's
+(Step 40). The garment is put on the figure to find where its bust, waist
+and hip fall on each seam; the change round the body is shared among the
+side seams (seams between a front and a back; on a garment of panels,
+every seam), each edge moved by its share divided by how many times it
+goes round the body (twice for a piece cut as a pair or on the fold). At
+each seam the levels to change and those to keep are joined by steps that
+taper from one to the next, so a waist let out leaves the hip as it was.
+A level no seam crosses (a bust line at the armhole) is said, not
+altered.
+
+---
+
 ## Step 41 — Blending between sizes
 
 When the size finder suggests one size at the bust, another at the waist

@@ -35,6 +35,7 @@ import { CLOSE_MM, STANDARD_FIGURE, avatarRequest } from './avatar.ts'
 import { DockEdge, useDocksBelow, useFloatingBox } from './AvatarFrame.tsx'
 import { setAvatarLayout, useAvatarLayout } from './avatar-layout.ts'
 import { FabricDialog } from './FabricDialog.tsx'
+import { FitAdvice } from './FitAdvice.tsx'
 
 /** "rgb(239, 233, 223)" as sRGB parts, 0 to 1. */
 function rgb(css: string): [number, number, number] {
@@ -604,6 +605,14 @@ export function AvatarPane({ session }: { session: Session }) {
               </Button>
             )}
           </div>
+          {drape.kind === 'draped' && drape.update && (
+            <FitAdvice
+              session={session}
+              girths={drape.update.girths}
+              figure={() => shown.current}
+              units={units}
+            />
+          )}
           {/* Always there, so that the bar keeps its height: until something
               is draped, there is nothing to show. */}
           <RadioGroup

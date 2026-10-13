@@ -9,6 +9,8 @@ import type {
   Girth,
   Blended,
   BlendRequest,
+  FitRequest,
+  FitSteps,
   SizeMeasures,
   SizesRequest,
 } from '@drapewright/engine'
@@ -34,6 +36,8 @@ export interface SimMethods {
   measureSizes(request: SizesRequest): SizeMeasures[]
   /** Cuts a pattern in a size at each level, blended between them. */
   blendSizes(request: BlendRequest): Blended
+  /** The steps altering a garment at its side seams to fit. */
+  fitSteps(request: FitRequest): FitSteps
   /** Starts the 3D view on a canvas handed over by the page; how it draws. */
   attachView(canvas: OffscreenCanvas, colours: ViewColours): string
   /** Shows the avatar with these settings in the view, taking off any garment. */

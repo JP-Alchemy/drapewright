@@ -135,6 +135,7 @@ const handlers: { [M in keyof SimMethods]: (...args: Parameters<SimMethods[M]>) 
   fitAvatar: async (request) => (await loadAvatar()).fit(request),
   measureSizes: async (request) => (await loadAvatar()).measureSizes(request),
   blendSizes: async (request) => (await loadAvatar()).blendSizes(request),
+  fitSteps: async (request) => (await loadAvatar()).fitSteps(request),
   attachView: async (canvas, colours) => {
     const mine = ++attachment
     let created: AvatarView

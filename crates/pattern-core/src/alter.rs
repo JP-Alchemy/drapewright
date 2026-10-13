@@ -138,6 +138,11 @@ pub enum Change {
     /// it hinges, and the shoulder's end turned out until the slash is `by`
     /// mm open at the shoulder seam (overlapping where less than 0).
     Shoulder { shoulder: Pt, armhole: Pt, by: f64 },
+    /// More room at the bust, or less where `by` is less than 0: a side
+    /// seam moved out square to the grain by `by` mm at `at` (on it, at the
+    /// bust) and beyond (up to the underarm), tapering to nothing at `to`
+    /// (on it too, at the waist).
+    BustSide { at: Pt, to: Pt, by: f64 },
     /// More room at the waist, or less where `by` is less than 0: a side
     /// seam moved out square to the grain by `by` mm at `at` (on it, at the
     /// waist) and beyond, tapering to nothing at `to` (on it too, at the
@@ -198,7 +203,9 @@ impl Change {
                 *shoulder = f(*shoulder);
                 *armhole = f(*armhole);
             }
-            Change::Waist { at, to, .. } | Change::Hip { at, to, .. } => {
+            Change::BustSide { at, to, .. }
+            | Change::Waist { at, to, .. }
+            | Change::Hip { at, to, .. } => {
                 *at = f(*at);
                 *to = f(*to);
             }
@@ -349,9 +356,9 @@ pub fn alter(drawn: &Drawn, alterations: &[Alteration]) -> Result<Drawn, AlterEr
                 let opening = shoulder_opening(&shape.outline, shoulder, armhole, *by)?;
                 spread(&shape, shoulder, &[bend], armhole, opening, None)?
             }
-            Change::Waist { at, to, by } | Change::Hip { at, to, by } => {
-                widen(&shape, (*at).into(), (*to).into(), *by)?
-            }
+            Change::BustSide { at, to, by }
+            | Change::Waist { at, to, by }
+            | Change::Hip { at, to, by } => widen(&shape, (*at).into(), (*to).into(), *by)?,
             Change::TrueUp { edge, straight } => true_up(&shape, edge, *straight)?,
         };
     }

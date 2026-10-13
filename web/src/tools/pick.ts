@@ -3,8 +3,8 @@
 // edge) and then the part that turns; a bust adjustment takes the bust
 // point, then where the armhole hinges and where the side seam is slashed
 // (both on the edge); a pivot takes the dart to move (unless the piece has
-// only one), then where on the edge it goes; a swayback, shoulder, waist or
-// hip adjustment takes two points on the edge; truing up takes the edge
+// only one), then where on the edge it goes; a swayback, shoulder, bust at
+// the side, waist or hip adjustment takes two points on the edge; truing up takes the edge
 // tapped. Points on the edge snap to it.
 
 import type { Alteration, Piece } from '@drapewright/engine'
@@ -19,6 +19,7 @@ export const ON_EDGE: Record<PickFor, boolean[]> = {
   pivot: [true],
   swayback: [true, true],
   shoulder: [true, true],
+  bustSide: [true, true],
   waist: [true, true],
   hip: [true, true],
   trueUp: [],
@@ -59,6 +60,8 @@ export function placed(picking: Picking): Alteration | null {
       return step({ type: 'swayback', centre: a, side: b, by: 15 })
     case 'shoulder':
       return step({ type: 'shoulder', shoulder: a, armhole: b, by: 10 })
+    case 'bustSide':
+      return step({ type: 'bustSide', at: a, to: b, by: 10 })
     case 'waist':
       return step({ type: 'waist', at: a, to: b, by: 10 })
     case 'hip':

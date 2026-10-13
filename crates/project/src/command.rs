@@ -402,6 +402,7 @@ fn checked_alteration(alteration: &Alteration) -> Result<(), CommandError> {
         | Change::FullBust { by, .. }
         | Change::Swayback { by, .. }
         | Change::Shoulder { by, .. }
+        | Change::BustSide { by, .. }
         | Change::Waist { by, .. }
         | Change::Hip { by, .. } => {
             if !by.is_finite() || by.abs() > MOST_ALTERED {

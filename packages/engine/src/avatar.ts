@@ -17,6 +17,8 @@ import type {
   ClothShows,
   DrapeProgress,
   DrapeRequest,
+  FitRequest,
+  FitSteps,
   Girth,
   SizeMeasures,
   SizesRequest,
@@ -35,6 +37,8 @@ export type {
   DrapeRequest,
   DrapeStage,
   FabricPreset,
+  FitRequest,
+  FitSteps,
   Girth,
   SizeMeasures,
   SizesRequest,
@@ -71,6 +75,14 @@ export class Avatar {
    */
   measureSizes(request: SizesRequest): SizeMeasures[] {
     return handles.get(this)!.measureSizes(request) as SizeMeasures[]
+  }
+
+  /**
+   * The steps letting out or taking in a garment's side seams to change
+   * it round the bust, waist and hip by as much as the request asks.
+   */
+  fitSteps(request: FitRequest): FitSteps {
+    return handles.get(this)!.fitSteps(request) as FitSteps
   }
 
   /**

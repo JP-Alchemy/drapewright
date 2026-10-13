@@ -10,6 +10,7 @@
 //! types generated from the Rust ones (`packages/engine/src/generated`).
 
 pub mod drape;
+pub mod refit;
 pub mod sizes;
 #[cfg(target_arch = "wasm32")]
 mod view;
@@ -156,6 +157,18 @@ impl Avatar {
         let request: sizes::SizesRequest =
             serde_wasm_bindgen::from_value(request).map_err(|e| JsError::new(&e.to_string()))?;
         sizes::measure_sizes(&self.model, &request)
+            .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// The steps letting out or taking in a garment's side seams to change
+    /// it round each level by as much as a `FitRequest` asks, giving
+    /// `FitSteps`.
+    #[wasm_bindgen(js_name = fitSteps)]
+    pub fn fit_steps(&self, request: JsValue) -> Result<JsValue, JsError> {
+        let request: refit::FitRequest =
+            serde_wasm_bindgen::from_value(request).map_err(|e| JsError::new(&e.to_string()))?;
+        refit::fit_steps(&self.model, &request)
             .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
             .map_err(|e| JsError::new(&e.to_string()))
     }

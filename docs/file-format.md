@@ -409,14 +409,16 @@ it, and the part with the shoulder's end turns about `armhole` until that
 end has moved `by` mm along the shoulder seam. The seam jogs where it was
 slashed, to be trued.
 
-**Change** `waist` and `hip` — `{ "type": "waist", "at": [x, y], "to": [x,
-y], "by": mm }`: more room at a side seam (less where `by` is less than
-0). Both points are on the side seam; it moves out square to the grain by
-`by` mm at `at` and beyond it (away from `to`), tapering to nothing at
-`to`, and the edges meeting it stretch to meet it. For the waist, `at` is
-at the waist and `to` at the hip; for the hip, `at` is at the hip (the
-seam moves out from there down to the hem) and `to` at the waist. The two
-kinds differ only in what they are called.
+**Change** `bustSide`, `waist` and `hip` — `{ "type": "waist", "at": [x,
+y], "to": [x, y], "by": mm }`: more room at a side seam (less where `by`
+is less than 0). Both points are on the side seam; it moves out square to
+the grain by `by` mm at `at` and beyond it (away from `to`), tapering to
+nothing at `to`, and the edges meeting it stretch to meet it. For the
+bust, `at` is at the bust (the seam moves out from there up to the
+underarm) and `to` at the waist; for the waist, `at` is at the waist and
+`to` at the hip; for the hip, `at` is at the hip (the seam moves out from
+there down to the hem) and `to` at the waist. The three kinds differ only
+in what they are called.
 
 **Change** `trueUp` — `{ "type": "trueUp", "edge": id, "straight":
 boolean }`: an edge trued, after other steps left jogs or corners in it.

@@ -122,6 +122,7 @@ const KINDS = [
   'bust',
   'shoulder',
   'swayback',
+  'bustSide',
   'waist',
   'hip',
   'pivot',
@@ -146,10 +147,15 @@ function wording(change: Exclude<Change, { type: 'pivot' | 'trueUp' }>, by: stri
         ways: [t.alter.broader, t.alter.narrower],
         hint: t.alter.shoulderHint,
       }
+    case 'bustSide':
     case 'waist':
     case 'hip':
       return {
-        said: (change.type === 'waist' ? t.alter.waistStep : t.alter.hipStep)(more, by),
+        said: {
+          bustSide: t.alter.bustSideStep,
+          waist: t.alter.waistStep,
+          hip: t.alter.hipStep,
+        }[change.type](more, by),
         way: t.alter.sideWay,
         ways: [t.alter.letOut, t.alter.takeOut],
         hint: t.alter.sideHint,

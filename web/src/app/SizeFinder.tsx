@@ -30,20 +30,9 @@ import type { Session } from '../state/session.ts'
 import { formatLength, t } from '../strings/en.ts'
 import { sim } from '../workers/sim-client.ts'
 import { avatarRequest } from './avatar.ts'
+import { FITS, type Fit, LEVELS, type Level } from './fit.ts'
 
 const text = t.sizing
-/** Top down. */
-const LEVELS = ['bust', 'waist', 'hip'] as const
-type Level = (typeof LEVELS)[number]
-
-/** How a garment should fit: the ease wanted at each level, mm. */
-export const FITS = {
-  fitted: { bust: 60, waist: 40, hip: 60 },
-  relaxed: { bust: 120, waist: 120, hip: 120 },
-  close: { bust: -20, waist: -60, hip: -20 },
-} as const
-export type Fit = keyof typeof FITS
-
 /** At each level, the size whose ease comes nearest to what `fit` wants. */
 export function suggest(measured: SizeMeasures[], fit: Fit): Partial<Record<string, string>> {
   const out: Partial<Record<string, string>> = {}
