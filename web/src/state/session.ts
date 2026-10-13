@@ -554,21 +554,32 @@ export class Session {
     }
     // Pieces she left out (by id, which the answers don't change) stay out.
     const chosen = keep ? result.pieces.filter((p) => keep.includes(p.id)) : result.pieces
+    this.addImported(chosen)
+  }
+
+  /**
+   * Adds pieces made from the file being imported (its sizes blended, say)
+   * as its pieces, and closes the import.
+   */
+  addImported(chosen: Piece[]): boolean {
+    const pending = this.ui.get().pendingImport
+    if (!pending) return false
     const pieces = this.#besideExisting(chosen)
     const outcome = this.engine.dispatch({ type: 'addPieces', pieces })
     this.ui.set((s) => ({ ...s, pendingImport: null }))
     if (outcome.status === 'rejected') {
       this.notify({ kind: 'error', text: outcome.error.message })
-      return
+      return false
     }
     this.projects?.keepSource(
       this.engine.document().meta.id,
-      result.sha256,
+      pending.result.sha256,
       pending.fileName,
       pending.bytes,
     )
     this.select(outcome.changes.added)
     this.fitAll()
+    return true
   }
 
   #besideExisting(pieces: Piece[]): Piece[] {

@@ -2277,6 +2277,12 @@ h2 {
   overflow-x: auto;
 }
 
+.size-cut {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .size-table {
   width: 100%;
   border-collapse: collapse;

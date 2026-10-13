@@ -134,6 +134,7 @@ function moveDrape(d: Drape) {
 const handlers: { [M in keyof SimMethods]: (...args: Parameters<SimMethods[M]>) => unknown } = {
   fitAvatar: async (request) => (await loadAvatar()).fit(request),
   measureSizes: async (request) => (await loadAvatar()).measureSizes(request),
+  blendSizes: async (request) => (await loadAvatar()).blendSizes(request),
   attachView: async (canvas, colours) => {
     const mine = ++attachment
     let created: AvatarView

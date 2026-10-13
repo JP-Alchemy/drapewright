@@ -11,6 +11,8 @@ import type {
   AvatarFit,
   AvatarRequest,
   AvatarSettings,
+  Blended,
+  BlendRequest,
   ClothReading,
   ClothShows,
   DrapeProgress,
@@ -24,6 +26,9 @@ export type {
   AvatarFit,
   AvatarRequest,
   AvatarSettings,
+  BlendNote,
+  Blended,
+  BlendRequest,
   ClothReading,
   ClothShows,
   DrapeProgress,
@@ -66,6 +71,15 @@ export class Avatar {
    */
   measureSizes(request: SizesRequest): SizeMeasures[] {
     return handles.get(this)!.measureSizes(request) as SizeMeasures[]
+  }
+
+  /**
+   * Cuts a pattern in the size the request chooses at each of the bust,
+   * waist and hip, blended smoothly between them up and down the figure.
+   * Throws if the size blended from can't be sewn round the body.
+   */
+  blendSizes(request: BlendRequest): Blended {
+    return handles.get(this)!.blendSizes(request) as Blended
   }
 
   /**

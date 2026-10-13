@@ -7,6 +7,8 @@ import type {
   DrapeProgress,
   DrapeRequest,
   Girth,
+  Blended,
+  BlendRequest,
   SizeMeasures,
   SizesRequest,
 } from '@drapewright/engine'
@@ -30,6 +32,8 @@ export interface SimMethods {
   fitAvatar(request: AvatarRequest): AvatarFit
   /** Sews each size of a pattern and measures it on the avatar. */
   measureSizes(request: SizesRequest): SizeMeasures[]
+  /** Cuts a pattern in a size at each level, blended between them. */
+  blendSizes(request: BlendRequest): Blended
   /** Starts the 3D view on a canvas handed over by the page; how it draws. */
   attachView(canvas: OffscreenCanvas, colours: ViewColours): string
   /** Shows the avatar with these settings in the view, taking off any garment. */

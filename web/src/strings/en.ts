@@ -10,6 +10,7 @@ import type {
   FabricPreset,
   ImportNote,
   MeasurementGroup,
+  OneSize,
   Reason,
   MeasurementKey,
   NotchFrom,
@@ -100,6 +101,25 @@ export const t = {
     suggestedHere: 'Suggested',
     ease: (sign: string, by: string) => `${sign}${by}`,
     how: 'Each size is sewn as Find seams would sew it, and measured flat round the figure’s bust, waist and hip. The ease is how much bigger than the body it is there: the size suggested at each has the ease nearest to the fit chosen.',
+    cutAt: 'Size to cut at each',
+    blend: 'Blend between them',
+    blending: 'Blending the sizes…',
+    blendFailed: (why: string) => `The sizes couldn’t be blended. ${why}`,
+    blendHow:
+      'Each piece is cut in the size chosen at each level, and blended smoothly between them up and down the body, as you would blend between the lines of a printed pattern.',
+    /** A blended piece's notes. */
+    blendedNote: (parts: string[]) =>
+      `Blended between sizes: ${new Intl.ListFormat('en', { type: 'conjunction' }).format(parts)}.`,
+    blended: (count: number, parts: string[]) =>
+      `${plural(count, 'One piece', '# pieces')} blended between sizes: ${new Intl.ListFormat('en', { type: 'conjunction' }).format(parts)}.`,
+    oneSize: (piece: string, size: string, why: OneSize, top: string, bottom: string) =>
+      ({
+        oneLevel: `“${piece}” is cut in ${size} all over: it sits where that size is chosen.`,
+        roundAnArm: `“${piece}” goes round the arm, so it is cut in ${size}, the ${top}’s size.`,
+        betweenLegs: `“${piece}” goes between the legs, so it is cut in ${size}, the ${bottom}’s size.`,
+        notWorn: `“${piece}” isn’t worn round the body, so it is cut in ${size}, the ${top}’s size.`,
+        notInEverySize: `“${piece}” isn’t in every size between, so it is cut in ${size}.`,
+      })[why],
   },
 
   samples: {

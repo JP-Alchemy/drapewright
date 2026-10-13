@@ -6,6 +6,7 @@
 
 pub mod allowance;
 pub mod alter;
+pub mod blend;
 pub mod build;
 pub mod geom;
 pub mod model;

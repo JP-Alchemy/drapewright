@@ -1,10 +1,20 @@
 // Which size of a pattern in many sizes fits someone: each size sewn and
 // measured on their figure, round the bust, waist and hip, and the size
-// whose ease comes nearest to how it should fit suggested at each.
+// whose ease comes nearest to how it should fit suggested at each. Where
+// they differ, the pattern can be cut in each level's size, blended
+// between them.
 
-import type { AllowanceAnswer, ImportResult, ScaleOption, SizeMeasures } from '@drapewright/engine'
+import type {
+  AllowanceAnswer,
+  Blended,
+  ImportResult,
+  LevelSize,
+  ScaleOption,
+  SizeMeasures,
+  SizePieces,
+} from '@drapewright/engine'
 import { Check, ChevronDown } from 'lucide-react'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import {
   Button,
   Label,
@@ -22,7 +32,9 @@ import { sim } from '../workers/sim-client.ts'
 import { avatarRequest } from './avatar.ts'
 
 const text = t.sizing
+/** Top down. */
 const LEVELS = ['bust', 'waist', 'hip'] as const
+type Level = (typeof LEVELS)[number]
 
 /** How a garment should fit: the ease wanted at each level, mm. */
 export const FITS = {
@@ -55,7 +67,9 @@ export function SizeFinder({
   scale,
   allowance,
   leftOut,
+  ready,
   onChoose,
+  onBlend,
 }: {
   session: Session
   result: ImportResult
@@ -64,7 +78,11 @@ export function SizeFinder({
   scale: ScaleOption
   allowance: AllowanceAnswer | null
   leftOut: ReadonlySet<string>
+  /** Whether the import's questions are answered, so pieces can be added. */
+  ready: boolean
   onChoose(size: string): void
+  /** The pattern blended, cut in `at`'s size at each level. */
+  onBlend(blended: Blended, at: LevelSize[]): void
 }) {
   const doc = session.engine.document()
   const units = doc.settings.displayUnits
@@ -74,6 +92,10 @@ export function SizeFinder({
   const [measured, setMeasured] = useState<SizeMeasures[] | null>(null)
   const [measuring, setMeasuring] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
+  // The size to cut at each level, where it isn't the one suggested.
+  const [picked, setPicked] = useState<Partial<Record<Level, string>>>({})
+  const [blending, setBlending] = useState(false)
+  const cutId = useId()
   const set = people.find((p) => p.id === person) ?? people[0]
 
   if (!set) {
@@ -87,27 +109,38 @@ export function SizeFinder({
     )
   }
 
+  // Every size's pieces, as they would be added (scale and allowance
+  // answered, named as in the file), and the figure shaped.
+  const prepare = async () => {
+    const finished = await session.io.call(
+      'finishImport',
+      result,
+      result.sizes.names,
+      scale,
+      allowance,
+    )
+    // A piece left out in the size shown is left out of every size.
+    const named = new Map(result.pieces.map((p) => [p.id, p.name]))
+    const unwanted = new Set([...leftOut].map((id) => named.get(id)))
+    const sizes: SizePieces[] = result.sizes.names.map((size) => ({
+      size,
+      pieces: finished.pieces
+        .map((p) => ({ ...p, name: named.get(p.id) ?? p.name }))
+        .filter((p) => {
+          const own = sizeOf.get(p.id)
+          return !unwanted.has(p.name) && (own === undefined || own === size)
+        }),
+    }))
+    const fitted = await sim.fitAvatar(avatarRequest(set))
+    return { sizes, settings: fitted.settings }
+  }
+
   const measure = async () => {
     setMeasuring(true)
     setFailed(null)
     try {
-      // Every size, as it would be added: scale and allowance answered.
-      const finished = await session.io.call(
-        'finishImport',
-        result,
-        result.sizes.names,
-        scale,
-        allowance,
-      )
-      const sizes = result.sizes.names.map((size) => ({
-        size,
-        pieces: finished.pieces.filter((p) => {
-          const own = sizeOf.get(p.id)
-          return !leftOut.has(p.id) && (own === undefined || own === size)
-        }),
-      }))
-      const fitted = await sim.fitAvatar(avatarRequest(set))
-      setMeasured(await sim.measureSizes({ sizes, settings: fitted.settings }))
+      setMeasured(await sim.measureSizes(await prepare()))
+      setPicked({})
     } catch (error) {
       setFailed(text.failed(error instanceof Error ? error.message : String(error)))
     } finally {
@@ -123,6 +156,26 @@ export function SizeFinder({
   const named = LEVELS.flatMap((level) =>
     suggested[level] ? [text.at(t.avatar.levels[level] ?? level, suggested[level])] : [],
   )
+  // The size to cut at each level the garment reaches.
+  const cut: LevelSize[] = levels.flatMap((level) => {
+    const size = picked[level] ?? suggested[level]
+    return size ? [{ level, size }] : []
+  })
+  const one = cut.every((c) => c.size === cut[0]?.size) ? cut[0]?.size : undefined
+  const sewn = (measured ?? []).filter((m) => m.girths.length > 0).map((m) => m.size)
+
+  const blend = async () => {
+    setBlending(true)
+    setFailed(null)
+    try {
+      const { sizes, settings } = await prepare()
+      onBlend(await sim.blendSizes({ sizes, settings, at: cut }), cut)
+    } catch (error) {
+      setFailed(text.blendFailed(error instanceof Error ? error.message : String(error)))
+    } finally {
+      setBlending(false)
+    }
+  }
 
   return (
     <section className="size-finder" aria-labelledby="size-finder-heading">
@@ -237,6 +290,52 @@ export function SizeFinder({
             </table>
           </div>
           <p className="muted small">{text.how}</p>
+          {cut.length > 0 && (
+            <div className="size-cut" role="group" aria-labelledby={cutId}>
+              <p className="group-label" id={cutId}>
+                {text.cutAt}
+              </p>
+              <div className="size-finder-row">
+                {cut.map(({ level, size }) => (
+                  <Select
+                    key={level}
+                    className="field compact"
+                    selectedKey={size}
+                    onSelectionChange={(key) => setPicked({ ...picked, [level]: String(key) })}
+                  >
+                    <Label>{text.columns[level]}</Label>
+                    <Button className="select-button">
+                      <SelectValue />
+                      <ChevronDown size={16} aria-hidden="true" />
+                    </Button>
+                    <Popover className="popover">
+                      <ListBox className="menu">
+                        {sewn.map((n) => (
+                          <ListBoxItem key={n} id={n} className="menu-item">
+                            {n}
+                          </ListBoxItem>
+                        ))}
+                      </ListBox>
+                    </Popover>
+                  </Select>
+                ))}
+                {one ? (
+                  <Button className="button" onPress={() => onChoose(one)}>
+                    {text.choose(one)}
+                  </Button>
+                ) : (
+                  <Button
+                    className="button"
+                    isDisabled={blending || !ready}
+                    onPress={() => void blend()}
+                  >
+                    {blending ? text.blending : text.blend}
+                  </Button>
+                )}
+              </div>
+              {!one && <p className="muted small">{text.blendHow}</p>}
+            </div>
+          )}
         </>
       )}
     </section>

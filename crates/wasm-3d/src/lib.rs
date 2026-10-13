@@ -160,6 +160,18 @@ impl Avatar {
             .map_err(|e| JsError::new(&e.to_string()))
     }
 
+    /// Cuts a pattern in the size a `BlendRequest` chooses at each level,
+    /// blended between them, giving `Blended`.
+    #[wasm_bindgen(js_name = blendSizes)]
+    pub fn blend_sizes(&self, request: JsValue) -> Result<JsValue, JsError> {
+        let request: sizes::BlendRequest =
+            serde_wasm_bindgen::from_value(request).map_err(|e| JsError::new(&e.to_string()))?;
+        sizes::blend_sizes(&self.model, &request)
+            .map_err(|e| JsError::new(&e))?
+            .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+
     /// Starts draping a `DrapeRequest` on the avatar.
     pub fn drape(&self, request: JsValue) -> Result<Draping, JsError> {
         let request: DrapeRequest =

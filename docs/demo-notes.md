@@ -12,6 +12,44 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 41 — Blending between sizes
+
+When the size finder suggests one size at the bust, another at the waist
+and another at the hip, the pattern can be cut that way: each piece in the
+bust's size at the bust, the waist's at the waist, the hip's at the hip,
+and blended smoothly between, as a sewist blends between the lines of a
+printed multi-size pattern.
+
+**Try it:**
+
+1. Open a pattern in several sizes and measure every size on someone (Step
+   40).
+2. Under the table, **Size to cut at each** has the suggested size at each
+   level; change any of them.
+3. Where they differ, press **Blend between them**. One piece is added for
+   each piece of the pattern, named as in the file, its notes saying how it
+   was blended ("Blended between sizes: 36 at the waist and 42 at the
+   hip."). Where they're all the same, **Choose** that size instead.
+
+Some pieces aren't blended, and the app says which and why: a sleeve takes
+the size at the top (it goes round the arm), a crotch piece the size at the
+bottom, a waistband all at the waist the waist's size, and a piece not worn
+round the body (a facing, a modesty panel) the size at the top.
+
+**How it works:** each size between is sewn and placed on the figure
+(Step 40), which says how high every point of each piece goes. A piece's
+sizes are matched by shape, since a pattern's sizes don't share corners
+piece for piece: sharp corners matched to the nearest of the same turn, and
+the outline between them in proportion along its length. Sizes drawn
+nested stay where they're drawn; sizes laid out apart (a CAD file) are
+lined up by how they're worn and by their fold. At each height the size to
+cut moves from one level's to the next along a smooth S-curve, through the
+sizes between; the piece keeps the edges, notches and darts of the middle
+size, its curves kept as curves where they still fit within 0.25 mm, and
+its grainline, marks and lines move with the outline round them.
+
+---
+
 ## Step 40 — Which size fits?
 
 Opening a pattern in several sizes, the import dialog can now sew every
@@ -32,7 +70,7 @@ bust, the waist and the hip.
    a size to add it.
 
 A size that differs between the waist and the hip is what blending between
-sizes is for (next).
+sizes is for (Step 41).
 
 **How it works:** each size is sewn as Find seams would sew it (panels
 drawn for one side cut as pairs), placed on the person's figure, and

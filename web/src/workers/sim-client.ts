@@ -4,6 +4,8 @@ import type {
   AvatarSettings,
   ClothReading,
   DrapeRequest,
+  Blended,
+  BlendRequest,
   SizeMeasures,
   SizesRequest,
 } from '@drapewright/engine'
@@ -94,6 +96,11 @@ class SimClient {
   /** Sews each size of a pattern and measures it on the avatar. */
   measureSizes(request: SizesRequest): Promise<SizeMeasures[]> {
     return this.#call('measureSizes', [request])
+  }
+
+  /** Cuts a pattern in a size at each level, blended between them. */
+  blendSizes(request: BlendRequest): Promise<Blended> {
+    return this.#call('blendSizes', [request])
   }
 
   /** Hands the canvas to the worker for the 3D view; how it draws. */

@@ -1,4 +1,11 @@
-import type { AllowanceMode, ImportSizes, PageUse, Piece, ScaleOption } from '@drapewright/engine'
+import type {
+  AllowanceMode,
+  ImportSizes,
+  LevelSize,
+  PageUse,
+  Piece,
+  ScaleOption,
+} from '@drapewright/engine'
 import { useId, useState } from 'react'
 import { Check } from 'lucide-react'
 import {
@@ -260,7 +267,43 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
                 scale={chosen}
                 allowance={mode && asked.length > 0 ? { mode, width } : null}
                 leftOut={leftOut}
+                ready={answered}
                 onChoose={(size) => setChosenSizes([size])}
+                onBlend={(blended, at) => {
+                  const parts = at.map((c) =>
+                    t.sizing.at(t.avatar.levels[c.level] ?? c.level, c.size),
+                  )
+                  // Blended: those of one size each, not cut in one size.
+                  const oneSize = new Set(blended.notes.map((n) => n.piece))
+                  const mixed = (p: Piece) => sizeOf.has(p.id) && !oneSize.has(p.name)
+                  // Its notes say how it's blended, not the size it was (a
+                  // CAD file's "Size 38").
+                  const notes = (p: Piece) => {
+                    const was = `Size ${sizeOf.get(p.id)}`
+                    const kept = p.notes
+                      .split('. ')
+                      .filter((part) => part && part !== was)
+                      .join('. ')
+                    const note = t.sizing.blendedNote(parts)
+                    return kept ? `${kept}\n${note}` : note
+                  }
+                  const added = session.addImported(
+                    blended.pieces.map((p) => (mixed(p) ? { ...p, notes: notes(p) } : p)),
+                  )
+                  if (!added) return
+                  const levelName = (c?: LevelSize) =>
+                    c ? (t.avatar.levels[c.level] ?? c.level) : ''
+                  const [top, bottom] = [levelName(at[0]), levelName(at[at.length - 1])]
+                  session.notify({
+                    kind: 'info',
+                    text: [
+                      t.sizing.blended(blended.pieces.filter(mixed).length, parts),
+                      ...blended.notes.map((n) =>
+                        t.sizing.oneSize(n.piece, n.size, n.why, top, bottom),
+                      ),
+                    ].join(' '),
+                  })
+                }}
               />
             </div>
           )}

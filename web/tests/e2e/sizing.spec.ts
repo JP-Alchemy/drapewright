@@ -1,8 +1,8 @@
 import { expect, test } from './fixtures.ts'
 import { fixture } from './helpers.ts'
 
-test('every size is sewn and measured on someone, and one is chosen', async ({ page }) => {
-  test.setTimeout(120_000)
+/** Opens the graded skirt for Jo, its allowance answered, and measures every size. */
+async function measured(page: import('@playwright/test').Page) {
   await page.goto('/app/?debug')
   await expect(page.getByText('Open a sewing pattern to lay it out here.')).toBeVisible()
   // Someone's measurements (the debug handle; the Measurements dialog does
@@ -35,6 +35,12 @@ test('every size is sewn and measured on someone, and one is chosen', async ({ p
   await finder.getByRole('button', { name: 'Sew and measure every size on Jo' }).click()
   const table = finder.getByRole('table')
   await expect(table.getByRole('row')).toHaveCount(5, { timeout: 90_000 })
+  return { dialog, finder, table }
+}
+
+test('every size is sewn and measured on someone, and one is chosen', async ({ page }) => {
+  test.setTimeout(120_000)
+  const { dialog, finder, table } = await measured(page)
   // Each size measured round the waist, 4 cm bigger than the one before.
   // (A skirt reaches no bust: its columns are the waist and the hip.)
   await expect(table.getByRole('columnheader')).toHaveText(['Size', 'Waist', 'Hip', 'Choose'])
@@ -52,4 +58,47 @@ test('every size is sewn and measured on someone, and one is chosen', async ({ p
     'true',
   )
   await expect(dialog.getByRole('button', { name: /^38/ })).toHaveAttribute('aria-pressed', 'false')
+})
+
+test('a size at the waist and another at the hip, blended between', async ({ page }) => {
+  test.setTimeout(120_000)
+  const { dialog, finder } = await measured(page)
+  const cut = finder.getByRole('group', { name: 'Size to cut at each' })
+  for (const [level, size] of [
+    ['Waist', '36'],
+    ['Hip', '42'],
+  ] as const) {
+    await cut.getByRole('button', { name: new RegExp(level) }).click()
+    await page.getByRole('option', { name: size, exact: true }).click()
+  }
+  await cut.getByRole('button', { name: 'Blend between them' }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(
+    page.getByText('2 pieces blended between sizes: 36 at the waist and 42 at the hip.'),
+  ).toBeVisible()
+  const list = page.getByRole('listbox', { name: 'Pieces' })
+  await expect(list.getByRole('option')).toHaveText([/^Skirt front/, /^Skirt back/])
+  // The front: size 36's waist (170 mm), size 42's hem (285 mm).
+  const widths = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s = (window as any).drapewright
+    const front = s.engine.document().pieces.find((p: { name: string }) => p.name === 'Skirt front')
+    const points: [number, number][] = [
+      front.outline.start,
+      ...front.outline.edges.flatMap((e: { segments: { to: [number, number] }[] }) =>
+        e.segments.map((g) => g.to),
+      ),
+    ]
+    const xs = points.map((p) => p[0])
+    const top = Math.min(...points.map((p) => p[1]))
+    const atTop = points.filter((p) => p[1] < top + 0.5).map((p) => p[0])
+    return {
+      waist: Math.max(...atTop) - Math.min(...atTop),
+      hem: Math.max(...xs) - Math.min(...xs),
+      notes: front.notes,
+    }
+  })
+  expect(Math.abs(widths.waist - 170), `waist ${widths.waist}`).toBeLessThan(3)
+  expect(Math.abs(widths.hem - 285), `hem ${widths.hem}`).toBeLessThan(1)
+  expect(widths.notes).toBe('Blended between sizes: 36 at the waist and 42 at the hip.')
 })

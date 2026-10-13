@@ -26,7 +26,7 @@ pub fn girths(
 }
 
 /// Whether a panel's points are nearer an arm than the trunk: a sleeve.
-fn round_an_arm(points: &[[f64; 3]], figure: &Figure) -> bool {
+pub(crate) fn round_an_arm(points: &[[f64; 3]], figure: &Figure) -> bool {
     if figure.arms.is_empty() || points.is_empty() {
         return false;
     }
