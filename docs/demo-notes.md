@@ -69,8 +69,9 @@ draped top.
 **Try it:**
 
 1. Add someone's measurements (**Measurements**).
-2. On an empty table, press **A FreeSewing design, made to measure** (or **Draft a FreeSewing design to these measurements**
-   in the Measurements dialog). Choose whose measurements and a design.
+2. On an empty table, press **A FreeSewing design, made to measure**
+   (or **Draft a FreeSewing design to these measurements** in the
+   Measurements dialog). Choose whose measurements and a design.
    It says which of their measurements it drafts to, and which it
    estimates ("Estimated from FreeSewing's standard sizes, in proportion:
    shoulder slope, waist to armpit…": measure those for a closer fit).

@@ -187,11 +187,7 @@ function drapeText(drape: Drape): string {
             : text.draped(fabric)
       const left = update?.leftOut.length ?? 0
       const inside = update?.inside.length ?? 0
-      return [
-        said,
-        left > 0 ? text.leftOut(left) : '',
-        inside > 0 ? text.inside(inside) : '',
-      ]
+      return [said, left > 0 ? text.leftOut(left) : '', inside > 0 ? text.inside(inside) : '']
         .filter(Boolean)
         .join(' ')
     }
