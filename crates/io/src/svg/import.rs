@@ -404,7 +404,15 @@ pub fn import_svg(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         &mut notches,
     );
     let sha256 = sha256_hex(data);
-    let (pieces, notes) = assemble(raw, &notches, SourceFormat::Svg, &scale, file_name, &sha256);
+    let (pieces, notes) = assemble(
+        raw,
+        &notches,
+        false,
+        SourceFormat::Svg,
+        &scale,
+        file_name,
+        &sha256,
+    );
     Ok(ImportResult {
         allowance: AllowanceQuestion::for_unmeasured(&pieces, &notes, None),
         pieces,

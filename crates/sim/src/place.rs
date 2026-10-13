@@ -119,7 +119,7 @@ impl Figure {
     }
 
     /// The trunk's section nearest height `y`.
-    fn section(&self, y: f64) -> Section {
+    pub(crate) fn section(&self, y: f64) -> Section {
         self.sections
             .iter()
             .copied()

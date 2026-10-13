@@ -31,6 +31,13 @@ printed multi-size pattern.
    was blended ("Blended between sizes: 36 at the waist and 42 at the
    hip."). Where they're all the same, **Choose** that size instead.
 
+Measuring is steadier on real patterns too. A level is left out where the
+garment doesn't go round the body there (a bunnysuit, cut up for the legs,
+isn't measured round the hips); a side panel standing out under the arm
+of a big size is no longer taken for a sleeve; and a waist or bust line a
+nested PDF draws once, out to the largest size, now reaches the smallest
+sizes too, so they are put on by their waist like the rest.
+
 Some pieces aren't blended, and the app says which and why: a sleeve takes
 the size at the top (it goes round the arm), a crotch piece the size at the
 bottom, a waistband all at the waist the waist's size, and a piece not worn

@@ -564,7 +564,8 @@ fn generic_pieces(
             });
         }
     }
-    let (mut pieces, notes) = assemble(raw, &[], SourceFormat::Dxf, scale, file_name, sha256);
+    let (mut pieces, notes) =
+        assemble(raw, &[], false, SourceFormat::Dxf, scale, file_name, sha256);
 
     // Names from text inside a piece, when the layer gave none.
     let texts: Vec<(Point, f64, String)> = placed

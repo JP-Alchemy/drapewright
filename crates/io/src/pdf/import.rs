@@ -1323,8 +1323,15 @@ pub fn import_pdf_pages(
         // Before notches: a grainline's head can touch an outline.
         find_grainlines(&mut raw);
         let notches = find_notches(&mut raw, &bracket_ends);
-        let (mut found, assembled) =
-            assemble(raw, &notches, SourceFormat::Pdf, &scale, file_name, &sha256);
+        let (mut found, assembled) = assemble(
+            raw,
+            &notches,
+            size.is_some(),
+            SourceFormat::Pdf,
+            &scale,
+            file_name,
+            &sha256,
+        );
         read_labels(&mut found, &labels);
         name_lines(&mut found, &labels);
         add_crosses(&mut found, &crosses);

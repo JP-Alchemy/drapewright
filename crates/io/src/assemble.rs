@@ -683,6 +683,10 @@ const GUARDED_LONG: f64 = 10.0;
 /// this far inside its piece, mm: not a tick across the outline.
 const LINE_WELL_INSIDE: f64 = 1.0;
 
+/// A line placed by the piece it runs across most runs at least this far
+/// across it (and a quarter of its length), mm.
+const LINE_MOSTLY_ACROSS: f64 = 15.0;
+
 /// The point halfway along a line (a straight line's middle, not an end).
 fn halfway(pts: &[Point]) -> Option<Point> {
     let total: f64 = pts.windows(2).map(|w| w[0].distance(w[1])).sum();
@@ -1086,9 +1090,12 @@ struct Candidate {
     parent: Option<usize>,
 }
 
+/// `nested`: one size of a pattern whose sizes are drawn nested, its lines
+/// drawn once across them all.
 pub(crate) fn assemble(
     mut raw: Vec<RawPath>,
     notches: &[RawNotch],
+    nested: bool,
     format: SourceFormat,
     scale: &ScaleInfo,
     file_name: Option<&str>,
@@ -1350,19 +1357,35 @@ pub(crate) fn assemble(
     // The piece a line is on: the one round its middle point, or else the
     // one well round the point halfway along it (a straight line's middle
     // point is its end, which can lie past the piece: a line drawn once
-    // across a nest of sizes, out to the largest).
+    // across a nest of sizes, out to the largest), or else, in a nest, the
+    // one most of it is across (such a line, on the smallest sizes).
     let piece_of_line = |pts: &[Point]| {
         let mid = pts.get(pts.len() / 2).copied()?;
-        find_piece(mid).or_else(|| {
-            let half = halfway(pts)?;
-            regions
-                .iter()
-                .find(|(_, poly, _)| {
-                    point_in_polygon(half, poly)
-                        && distance_to_polyline(half, poly, true) >= LINE_WELL_INSIDE
-                })
-                .map(|(pi, _, _)| *pi)
-        })
+        find_piece(mid)
+            .or_else(|| {
+                let half = halfway(pts)?;
+                regions
+                    .iter()
+                    .find(|(_, poly, _)| {
+                        point_in_polygon(half, poly)
+                            && distance_to_polyline(half, poly, true) >= LINE_WELL_INSIDE
+                    })
+                    .map(|(pi, _, _)| *pi)
+            })
+            .or_else(|| {
+                if !nested {
+                    return None;
+                }
+                let along = sample(pts, false, 1.0);
+                let across = |poly: &Vec<Point>| {
+                    along.iter().filter(|&&p| point_in_polygon(p, poly)).count()
+                };
+                let (pi, most) = regions
+                    .iter()
+                    .map(|(pi, poly, _)| (*pi, across(poly)))
+                    .max_by_key(|&(pi, n)| (n, std::cmp::Reverse(pi)))?;
+                (most as f64 >= LINE_MOSTLY_ACROSS.max(0.25 * along.len() as f64)).then_some(pi)
+            })
     };
 
     // Each piece's outline, and the cutting line the file drew around it.
@@ -1686,7 +1709,7 @@ mod tests {
             // Inside the big piece only.
             raw(lines(&[(20.0, 20.0), (80.0, 80.0)]), false),
         ];
-        let (pieces, notes) = assemble(paths, &[], SourceFormat::Svg, &scale, None, "");
+        let (pieces, notes) = assemble(paths, &[], false, SourceFormat::Svg, &scale, None, "");
         assert_eq!(pieces.len(), 2);
         assert_eq!((pieces[0].lines.len(), pieces[1].lines.len()), (1, 1));
         assert!(notes.contains(&ImportNote::LinesOnOutlineIgnored { count: 1 }));

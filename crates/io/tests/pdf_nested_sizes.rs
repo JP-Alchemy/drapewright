@@ -111,9 +111,12 @@ fn pattern() -> Vec<u8> {
         .close_path()
         .fill_nonzero();
     text(&mut c, (156.0, 410.0), 8.0, "Grain Line");
-    // The bust line, drawn once out past the largest size.
+    // The bust line, drawn once out past the largest size; the waist line
+    // out far past it, halfway along it past the smallest sizes' side.
     line(&mut c, (100.0, 600.0), (380.0, 600.0));
     text(&mut c, (110.0, 604.0), 8.0, "BUST");
+    line(&mut c, (100.0, 300.0), (540.0, 300.0));
+    text(&mut c, (110.0, 304.0), 8.0, "WAIST");
     // The piece's number, and its name under it; the words above it.
     text(&mut c, (190.0, 520.0), 9.0, "Overbust");
     text(&mut c, (186.0, 470.0), 26.0, "- 1 -");
@@ -196,6 +199,19 @@ fn nested_sizes_in_styles_taken_in_turn() {
         assert!(
             (reach - side).abs() < 1.0,
             "size {size}: bust line to {reach}, side at {side}"
+        );
+        // The waist line too, though it runs on far past the smallest.
+        let waist: Vec<f64> = piece
+            .lines
+            .iter()
+            .filter(|l| l.label.as_deref() == Some("Waist"))
+            .flat_map(|l| std::iter::once(l.start.x).chain(l.segments.iter().map(|s| s.to().x)))
+            .collect();
+        let side = f64::from(300.0 + 15.0 * k as f32 * 200.0 / (600.0 + 10.0 * k as f32)) * MM;
+        let reach = waist.iter().copied().fold(f64::MIN, f64::max);
+        assert!(
+            (reach - side).abs() < 1.0,
+            "size {size}: waist line to {reach}, side at {side}"
         );
     }
 }

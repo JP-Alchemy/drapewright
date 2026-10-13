@@ -259,3 +259,39 @@ fn a_crotch_piece_is_cut_in_the_size_at_the_hip() {
         blended.notes
     );
 }
+
+#[test]
+fn a_corset_measures_in_proportion_however_big() {
+    let corset = pieces("corset");
+    let sizes = [1.0, 1.3, 1.6]
+        .into_iter()
+        .map(|by| SizePieces {
+            size: format!("{by}"),
+            pieces: corset.iter().map(|p| wider(p.clone(), by)).collect(),
+        })
+        .collect();
+    let measured = measure_sizes(
+        &model(),
+        &SizesRequest {
+            sizes,
+            settings: Shape::default().into(),
+        },
+    );
+    let at = |k: usize, level: &str| {
+        measured[k]
+            .girths
+            .iter()
+            .find(|g| g.level == level)
+            .and_then(|g| g.garment)
+            .unwrap_or_else(|| panic!("{level}: {measured:?}"))
+    };
+    for level in ["bust", "waist"] {
+        for (k, by) in [(1, 1.3), (2, 1.6)] {
+            let ratio = at(k, level) / at(0, level);
+            assert!(
+                (ratio - by).abs() < 0.03,
+                "{level} ×{by}: {ratio} {measured:?}"
+            );
+        }
+    }
+}

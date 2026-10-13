@@ -440,6 +440,38 @@ fn a_garment_is_measured_round_the_body_flat_without_its_sleeves() {
     assert!((a - b).abs() < 1.0, "with sleeves {a}, without {b}");
 }
 
+#[test]
+fn cloth_only_part_of_the_way_round_is_not_measured() {
+    // A bunnysuit cut up for the legs doesn't go round the hips: here, the
+    // tube sewn at its sides only down to just below the waist, open below.
+    use drapewright_sim::girth::girths;
+    let model = avatar();
+    let body = model.shape(&Shape::default());
+    let figure = Figure::of(&model, &body);
+    let (pieces, mut seams) = tube();
+    for seam in &mut seams {
+        // Each side edge runs down one piece and up the other.
+        for side in [&mut seam.a, &mut seam.b] {
+            let down = side.edge.ends_with("right");
+            (side.from, side.to) = if down {
+                (Some(0.0), Some(80.0))
+            } else {
+                (Some(320.0), Some(400.0))
+            };
+        }
+    }
+    let draped = draped_pieces(&pieces, &seams);
+    let g = assemble(&draped.sewn, &seams, 20.0).unwrap();
+    let starts = place(&g, &figure);
+    let measured = girths(&g, &starts, &figure);
+    let at = |level: &str| measured.iter().find(|m| m.0 == level).unwrap().1;
+    assert!(
+        at("waist").is_some_and(|w| (w - 600.0).abs() < 1.0),
+        "{measured:?}"
+    );
+    assert_eq!(at("hip"), None, "{measured:?}");
+}
+
 /// A tube of two rectangles, each 300 mm wide and 400 mm long, sewn at both
 /// sides: 600 mm round wherever it reaches.
 fn tube() -> (
