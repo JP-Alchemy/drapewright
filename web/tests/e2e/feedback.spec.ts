@@ -34,7 +34,8 @@ test('a pattern that didn’t open right is reported, with what was read', async
   const saved = page.waitForEvent('download')
   await dialog.getByRole('button', { name: 'Save the report' }).click()
   const report = await saved
-  expect(report.suggestedFilename()).toBe('aama-skirt.dxf report.txt')
+  // (WebKit on Linux saves spaces in a name as underscores.)
+  expect(report.suggestedFilename()).toMatch(/^aama-skirt\.dxf[ _]report\.txt$/)
   const text = await readFile((await report.path())!, 'utf8')
   expect(text).toContain('The waistband is missing.')
   expect(text).toMatch(/Pieces found: \d+/)

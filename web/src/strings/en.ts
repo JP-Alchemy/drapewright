@@ -254,13 +254,13 @@ export const t = {
       blouse: 'A blouse, ready to drape',
       skirt: 'A skirt, ready to drape',
       dress: 'A dress from a PDF pattern',
-      freesewing: 'A FreeSewing design, drafted to measurements',
+      freesewing: 'A FreeSewing design, made to measure',
     },
     about: {
       blouse: 'Sewn already: see it on the figure, read where it pulls, alter it.',
       skirt: 'A front and a back, sewn at the sides, to drape in any fabric.',
       dress: 'FreeSewing’s Sasha dress as a copy-shop PDF: see it read, piece by piece.',
-      freesewing: 'A T-shirt, a dress, skirts, a corset: drafted to someone’s measurements.',
+      freesewing: 'A T-shirt, a dress, skirts, a corset: drafted to fit someone you have measured.',
     },
     names: { blouse: 'Sample blouse', skirt: 'Sample skirt', dress: 'Sample dress' },
     opened: (name: string) =>

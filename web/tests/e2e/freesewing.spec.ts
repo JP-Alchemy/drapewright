@@ -33,7 +33,7 @@ async function addJo(page: Page) {
 
 test('a FreeSewing skirt is drafted to someone’s measurements and added', async ({ page }) => {
   await addJo(page)
-  await page.getByRole('button', { name: /^A FreeSewing design, drafted to measurements/ }).click()
+  await page.getByRole('button', { name: /^A FreeSewing design, made to measure/ }).click()
   const dialog = page.getByRole('dialog', { name: 'Draft a FreeSewing design' })
   await dialog.getByText('Penelope pencil skirt', { exact: true }).click()
   await expect(dialog.getByRole('status')).toHaveText(
@@ -65,9 +65,7 @@ test('every FreeSewing design offered drafts and opens', async ({ page }) => {
     'Diana draped top',
   ]
   for (const design of designs) {
-    await page
-      .getByRole('button', { name: /^A FreeSewing design, drafted to measurements/ })
-      .click()
+    await page.getByRole('button', { name: /^A FreeSewing design, made to measure/ }).click()
     const dialog = page.getByRole('dialog', { name: 'Draft a FreeSewing design' })
     await dialog.getByText(design, { exact: true }).click()
     await expect(dialog.getByRole('status')).toHaveText(/^Drafted to Jo’s/)
@@ -84,7 +82,7 @@ test('a drafted T-shirt is sewn by Find seams, its sleeves set into its armholes
   page,
 }) => {
   await addJo(page)
-  await page.getByRole('button', { name: /^A FreeSewing design, drafted to measurements/ }).click()
+  await page.getByRole('button', { name: /^A FreeSewing design, made to measure/ }).click()
   const dialog = page.getByRole('dialog', { name: 'Draft a FreeSewing design' })
   await dialog.getByText('Teagan T-shirt', { exact: true }).click()
   await expect(dialog.getByRole('status')).toHaveText(/^Drafted to Jo’s/)
