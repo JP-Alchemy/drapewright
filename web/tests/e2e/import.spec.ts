@@ -2,7 +2,7 @@ import { expect, test } from './fixtures.ts'
 import { fixture } from './helpers.ts'
 
 test('opens an SVG pattern and lays out its pieces', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/app/')
   await page.getByTestId('pattern-file').setInputFiles(fixture('inkscape-mm.svg'))
 
   const dialog = page.getByRole('dialog')
@@ -32,7 +32,7 @@ test('opens an SVG pattern and lays out its pieces', async ({ page }) => {
 })
 
 test('asks how big a file without units is', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/app/')
   await page.getByTestId('pattern-file').setInputFiles(fixture('illustrator-pt.svg'))
 
   const dialog = page.getByRole('dialog')
@@ -48,7 +48,7 @@ test('asks how big a file without units is', async ({ page }) => {
 })
 
 test('opens a garment CAD (AAMA) DXF file', async ({ page }) => {
-  await page.goto('/?debug')
+  await page.goto('/app/?debug')
   await page.getByTestId('pattern-file').setInputFiles(fixture('aama-skirt.dxf'))
 
   const dialog = page.getByRole('dialog')
@@ -86,7 +86,7 @@ test('opens a garment CAD (AAMA) DXF file', async ({ page }) => {
 })
 
 test('a file with every size asks which, and adds only those', async ({ page }) => {
-  await page.goto('/?debug')
+  await page.goto('/app/?debug')
   await page.getByTestId('pattern-file').setInputFiles(fixture('aama-graded.dxf'))
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: 'Found 2 pieces in 3 sizes' })).toBeVisible()
@@ -108,7 +108,7 @@ test('a file with every size asks which, and adds only those', async ({ page }) 
 })
 
 test('opens a FreeSewing pattern with its names, fold, notches and cutting', async ({ page }) => {
-  await page.goto('/?debug')
+  await page.goto('/app/?debug')
   await page.getByTestId('pattern-file').setInputFiles(fixture('freesewing-sasha-sa10.svg'))
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: 'Found 7 pieces' })).toBeVisible()
@@ -144,7 +144,7 @@ test('opens a FreeSewing pattern with its names, fold, notches and cutting', asy
 })
 
 test('opens a PDF pattern, putting its pages back together', async ({ page }) => {
-  await page.goto('/?debug')
+  await page.goto('/app/?debug')
   // A copy-shop print of the FreeSewing dress, "protected" as many bought
   // patterns are: it opens without a password, as in any PDF viewer.
   await page.getByTestId('pattern-file').setInputFiles(fixture('freesewing-sasha-a0-protected.pdf'))
@@ -196,7 +196,7 @@ test('opens a PDF pattern, putting its pages back together', async ({ page }) =>
 })
 
 test('a PDF in several colours asks which size, showing each size’s line', async ({ page }) => {
-  await page.goto('/?debug')
+  await page.goto('/app/?debug')
   await page.getByTestId('pattern-file').setInputFiles(fixture('sizes-colours.pdf'))
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: 'Found 2 pieces in 3 sizes' })).toBeVisible()
@@ -228,7 +228,7 @@ test('a PDF in several colours asks which size, showing each size’s line', asy
 })
 
 test('pieces that are not pattern pieces can be left out', async ({ page }) => {
-  await page.goto('/?debug')
+  await page.goto('/app/?debug')
   await page.getByTestId('pattern-file').setInputFiles(fixture('freesewing-sasha-a0.pdf'))
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: 'Found 7 pieces' })).toBeVisible()
@@ -245,7 +245,7 @@ test('pieces that are not pattern pieces can be left out', async ({ page }) => {
 })
 
 test('a PDF’s pages can be chosen and read again', async ({ page }) => {
-  await page.goto('/?debug')
+  await page.goto('/app/?debug')
   await page.getByTestId('pattern-file').setInputFiles(fixture('freesewing-sasha-a0.pdf'))
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: 'Found 7 pieces' })).toBeVisible()

@@ -1,7 +1,7 @@
 import { expect, test } from './fixtures.ts'
 
 test('measurements are entered, checked and kept with the project', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/app/')
   await page.getByRole('button', { name: 'Measurements' }).click()
   const dialog = page.getByRole('dialog', { name: 'Measurements' })
   await dialog.getByRole('button', { name: 'Add my measurements' }).click()

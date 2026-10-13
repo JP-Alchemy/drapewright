@@ -19,7 +19,7 @@ async function lit(page: Page): Promise<number> {
 }
 
 test('the pieces are projected true size once the projector is calibrated', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/app/')
   await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
   await page.getByRole('button', { name: 'Projector', exact: true }).click()
   const projector = page.getByRole('dialog', { name: 'Projector' })

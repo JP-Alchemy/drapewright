@@ -89,7 +89,7 @@ test('projects saved before the rename (as Soom) still open', async ({ page }) =
   json.meta.id = 'earlier-1'
   json.meta.name = 'Saved before the rename'
   // A page of the site that is not the app, to store it from.
-  await page.goto('/icon.svg')
+  await page.goto('/app/icon.svg')
   await page.evaluate(async (text) => {
     const bytes = new TextEncoder().encode(text)
     await new Promise<void>((resolve, reject) => {
@@ -130,7 +130,7 @@ test('projects saved before the rename (as Soom) still open', async ({ page }) =
       // No OPFS from here: the database has it.
     }
   }, JSON.stringify(json))
-  await page.goto('/')
+  await page.goto('/app/')
   await expect(
     page.getByRole('button', { name: /open now: Saved before the rename/ }),
   ).toBeVisible()

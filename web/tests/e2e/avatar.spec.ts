@@ -1,7 +1,7 @@
 import { expect, test } from './fixtures.ts'
 
 test('the avatar is fitted to the measurements and says how close it comes', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/app/')
   await page.getByRole('button', { name: 'Measurements' }).click()
   const dialog = page.getByRole('dialog', { name: 'Measurements' })
   await dialog.getByRole('button', { name: 'Add my measurements' }).click()
@@ -55,7 +55,7 @@ test('the avatar is fitted to the measurements and says how close it comes', asy
 
 test('the avatar fits offline once it has been fitted', async ({ page, context }, info) => {
   test.skip(info.project.name !== 'chromium', 'Playwright drives service workers in Chromium')
-  await page.goto('/')
+  await page.goto('/app/')
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
   await page.getByRole('button', { name: 'Measurements' }).click()
   let dialog = page.getByRole('dialog', { name: 'Measurements' })

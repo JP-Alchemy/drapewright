@@ -44,7 +44,7 @@ test('the skirt is draped, read where it pulls, draped in another fabric, and ta
   page,
 }) => {
   test.setTimeout(240_000)
-  await page.goto('/')
+  await page.goto('/app/')
   // A backup of the test skirt: a front and a back, their seams sewn.
   await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
   await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(2)
@@ -118,7 +118,7 @@ test('nothing is draped until something is sewn', async ({ page }) => {
 
 test('a draped garment follows changes to its pattern', async ({ page }) => {
   test.setTimeout(240_000)
-  await page.goto('/')
+  await page.goto('/app/')
   await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
   test.skip(!(await openTheAvatar(page)), 'Draping is seen in the 3D view')
   const pane = page.getByRole('region', { name: 'Avatar' })
@@ -154,7 +154,7 @@ test('a draped garment follows changes to its pattern', async ({ page }) => {
 
 test('a fabric of one’s own is measured, draped in, and changed', async ({ page }) => {
   test.setTimeout(240_000)
-  await page.goto('/?debug')
+  await page.goto('/app/?debug')
   await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
   test.skip(!(await openTheAvatar(page)), 'Draping is seen in the 3D view')
   const pane = page.getByRole('region', { name: 'Avatar' })

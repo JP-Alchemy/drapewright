@@ -37,7 +37,7 @@ test('saves a tiled PDF that prints at true size', async ({ page }) => {
 })
 
 test('measuring the screen makes 100% true size, and is remembered', async ({ page }) => {
-  await page.goto('/?debug')
+  await page.goto('/app/?debug')
   await page.getByRole('button', { name: /Measure the screen \(not measured/ }).click()
   const dialog = page.getByRole('dialog', { name: 'Measure your screen' })
   const card = dialog.getByTestId('card-outline')

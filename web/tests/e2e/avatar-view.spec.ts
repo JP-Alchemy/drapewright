@@ -23,7 +23,7 @@ async function seeItDrawnAndTurned(page: Page, view: Locator) {
 }
 
 test('the avatar is seen in 3D, turned, and fitted to the measurements', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/app/')
   await page.getByRole('button', { name: 'Avatar' }).click()
   const pane = page.getByRole('region', { name: 'Avatar' })
   const drawnWith = pane.getByText(/^Drawn with (WebGPU|WebGL2)$/)

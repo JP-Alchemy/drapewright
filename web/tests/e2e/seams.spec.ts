@@ -63,7 +63,7 @@ test('an edge is sewn to another by hand', async ({ page }) => {
 test('panels drawn for one side are cut as pairs when seams are found, and it says so', async ({
   page,
 }) => {
-  await page.goto('/')
+  await page.goto('/app/')
   // The test corset: three panels drawn once, from the centre front round
   // to the centre back, and a crotch piece; each cut once, as the pattern
   // leaves them.

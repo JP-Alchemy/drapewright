@@ -59,7 +59,7 @@ test('Phase 1 walk-through: open, adjust, mark, print, and find it again', async
 
 test('works offline after the first visit', async ({ page, context }, info) => {
   test.skip(info.project.name !== 'chromium', 'Playwright drives service workers in Chromium')
-  await page.goto('/?debug')
+  await page.goto('/app/?debug')
   // The service worker has stored the app and taken charge of the page.
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
   await context.setOffline(true)

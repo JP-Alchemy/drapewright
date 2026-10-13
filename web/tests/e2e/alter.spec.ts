@@ -53,7 +53,7 @@ async function tapOn(page: Page, index: number, [x, y]: [number, number]) {
 test('a piece is lengthened, switched off, shortened instead, and as drawn again', async ({
   page,
 }) => {
-  await page.goto('/')
+  await page.goto('/app/')
   // The test blouse: its front and back 60 cm long, sewn at the sides.
   await page.getByTestId('pattern-file').setInputFiles(fixture('blouse.drapewright'))
   const pieces = page.getByRole('listbox', { name: 'Pieces' })
@@ -96,7 +96,7 @@ test('a piece is lengthened, switched off, shortened instead, and as drawn again
 test('a bust adjustment is placed by tapping the bust point, armhole and side seam', async ({
   page,
 }) => {
-  await page.goto('/?debug')
+  await page.goto('/app/?debug')
   await page.getByTestId('pattern-file').setInputFiles(fixture('blouse.drapewright'))
   const front = page.getByRole('listbox', { name: 'Pieces' }).getByRole('option', {
     name: /Blouse front/,
@@ -185,7 +185,7 @@ test('a bust adjustment is placed by tapping the bust point, armhole and side se
 test('shoulders are made broader by tapping the shoulder seam and the armhole', async ({
   page,
 }) => {
-  await page.goto('/?debug')
+  await page.goto('/app/?debug')
   await page.getByTestId('pattern-file').setInputFiles(fixture('blouse.drapewright'))
   await page
     .getByRole('listbox', { name: 'Pieces' })
@@ -230,7 +230,7 @@ test('shoulders are made broader by tapping the shoulder seam and the armhole', 
 })
 
 test('a swayback and a waist are adjusted on a skirt', async ({ page }) => {
-  await page.goto('/?debug')
+  await page.goto('/app/?debug')
   await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
   const pieces = page.getByRole('listbox', { name: 'Pieces' })
   // The back: its centre back a seam, (0, 616) up to (0, 0).

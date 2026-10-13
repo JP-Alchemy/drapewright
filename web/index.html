@@ -3,20 +3,375 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#2f5d50" />
+    <title>Drapewright: Free Sewing Pattern Software with 3D Fitting</title>
     <meta
       name="description"
-      content="Open your sewing patterns, fit them, and print them at true size."
+      content="Open PDF and DXF sewing patterns on iPad or any browser, alter them, print or project at true scale, and see the fit in 3D. Free, offline, no account."
     />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Drapewright" />
+    <link rel="canonical" href="https://drapewright.com/" />
+    <meta name="theme-color" content="#2f5d50" />
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
-    <title>Drapewright</title>
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Drapewright" />
+    <meta property="og:url" content="https://drapewright.com/" />
+    <meta
+      property="og:title"
+      content="Drapewright: see how your sewing pattern fits before you cut"
+    />
+    <meta
+      property="og:description"
+      content="Free sewing pattern software for iPad or any browser: open the PDF patterns you already own, fit them to your measurements in 3D, alter them, and print or project them at true scale."
+    />
+    <meta property="og:image" content="https://drapewright.com/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="A blouse pattern on Drapewright's cutting table, sewn up and draped on a 3D figure."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="stylesheet" href="/src/site/site.css" />
+    <script type="module" src="/src/site/home.ts"></script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Drapewright",
+        "url": "https://drapewright.com/",
+        "applicationCategory": "DesignApplication",
+        "applicationSubCategory": "Sewing pattern software",
+        "operatingSystem": "Any (web browser); iPad, Mac, Windows, Linux",
+        "description": "Free sewing pattern software for iPad or any browser: open PDF, SVG and DXF patterns, add seam allowance, fit them to body measurements and drape them on a 3D figure, make alterations such as a full bust adjustment, and print tiled PDFs at true scale or project them onto a cutting mat.",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "image": "https://drapewright.com/og.jpg"
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <a class="skip" href="#main">Skip to the page</a>
+    <header class="top">
+      <div class="wrap top-row">
+        <a class="brand" href="/" aria-label="Drapewright, home">
+          <img src="/icon.svg" alt="" width="32" height="32" />
+          <span>Drapewright</span>
+        </a>
+        <nav aria-label="On this page">
+          <a href="#what">What it does</a>
+          <a href="#story">Our story</a>
+          <a href="#next">What’s next</a>
+          <a href="#help">Help us</a>
+          <a href="#faq">Questions</a>
+        </nav>
+        <a class="button primary small" href="/app/">Open the studio</a>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="wrap hero-grid">
+          <div class="hero-text">
+            <p class="eyebrow">Free sewing pattern software, in your browser</p>
+            <h1>See how your sewing pattern fits before you cut</h1>
+            <p class="lead">
+              Drapewright opens the patterns you already have, fits them to your measurements, sews
+              them up on a 3D body in your fabric, and prints or projects them at true size. It is
+              free, needs no account, and keeps your patterns on your own device.
+            </p>
+            <p class="actions">
+              <a class="button primary" href="/app/">Open Drapewright: free, no sign-up</a>
+              <a class="button" href="#story">Why we’re building it</a>
+            </p>
+            <p class="small muted">
+              Made first for the iPad at the sewing table; works in Safari, Chrome, Edge and Firefox
+              on any computer, and offline once opened.
+            </p>
+          </div>
+          <figure class="hero-shot">
+            <img
+              src="/site/drape.webp"
+              width="1600"
+              height="1000"
+              alt="A blouse pattern sewn up and draped on a 3D figure in Drapewright, the pattern pieces on a green cutting table beside it."
+            />
+          </figure>
+        </div>
+      </section>
+
+      <section id="what" class="band">
+        <div class="wrap">
+          <h2>A pattern studio for people who sew</h2>
+          <p class="section-lead">
+            Garment design software is made for fashion studios: costly, built for a desk and a
+            mouse, and slow to learn. Drapewright is for working with real sewing patterns, by
+            touch, Pencil or mouse.
+          </p>
+          <ul class="features">
+            <li>
+              <h3>Open the PDF patterns you already own</h3>
+              <p>
+                Tiled A4 and US Letter or A0 copy-shop PDFs, with the pages put back together, the
+                instruction pages left out, and every size of a multi-size pattern kept apart. SVG
+                from Inkscape or FreeSewing, and DXF from garment CAD (tested with exports from
+                Gerber, Lectra, Assyst, CLO and Browzwear).
+              </p>
+            </li>
+            <li>
+              <h3>Seam allowance, notches and cutting</h3>
+              <p>
+                Seam and hem allowance with properly shaped corners, notches, grainlines, and how
+                many to cut of each piece, in which fabric, as mirrored pairs or on the fold.
+              </p>
+            </li>
+            <li>
+              <h3>Fit it to your measurements in 3D</h3>
+              <p>
+                Enter measurements and the figure takes your shape. Drapewright finds which edges
+                are sewn together, sews the garment and drapes it: see where it pulls and where
+                there is room, in poplin, jersey, denim or a fabric you measured at home.
+              </p>
+            </li>
+            <li>
+              <h3>Full bust, swayback and other alterations</h3>
+              <p>
+                Lengthen or shorten, full or small bust adjustment, swayback, shoulders, waist and
+                hip, moving a dart, truing an edge. Each is a step you can switch off, and the drape
+                follows.
+              </p>
+            </li>
+            <li>
+              <h3>Print at true scale, or project onto your mat</h3>
+              <p>
+                Tiled PDFs on A4 or Letter with a test square, or A0 for the copy shop. Or use a
+                sewing projector: the pieces go on your cutting mat at true size, calibrated to the
+                millimetre.
+              </p>
+            </li>
+            <li>
+              <h3>Made for iPad, works offline</h3>
+              <p>
+                Touch and Apple Pencil first. No account, no adverts, no tracking: Drapewright runs
+                in the browser, works offline, and never sends your patterns anywhere. Backups are
+                files you keep.
+              </p>
+            </li>
+          </ul>
+          <figure class="shot">
+            <img
+              src="/site/pattern.webp"
+              width="1600"
+              height="1000"
+              loading="lazy"
+              alt="A FreeSewing dress pattern opened from a PDF on Drapewright's cutting table, with its pieces listed and the chosen piece's details beside them."
+            />
+            <figcaption>
+              A FreeSewing dress, opened from its PDF: every piece named, with its grainline,
+              notches and seam allowance.
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section id="story">
+        <div class="wrap narrow">
+          <h2>Why we started</h2>
+          <p>
+            Drapewright began at home. My wife sews, from patterns bought as PDFs, on an iPad at the
+            sewing table. A pattern means printing and taping pages, finding the right size, and
+            hoping it fits before cutting into good fabric. The software that shows a garment on a
+            body before you cut does exist, but it is made for fashion studios, priced for them, and
+            needs a desk, a mouse and months of learning.
+          </p>
+          <p>
+            So I started building the tool I wished my wife had: one that opens the patterns we
+            already buy, works by touch and Pencil, shows how a pattern will hang on a body with my
+            wife’s measurements, and costs nothing. My wife tests every step and tells me where it’s
+            wrong. Most of what Drapewright knows about sewing comes from those conversations.
+          </p>
+          <p class="signature">JP, who writes the code</p>
+        </div>
+      </section>
+
+      <section id="community" class="band">
+        <div class="wrap">
+          <h2>Free, and given back</h2>
+          <ul class="points">
+            <li>
+              <strong>Free to use.</strong> No account, no trial, no paid tier holding the useful
+              parts back.
+            </li>
+            <li>
+              <strong>Built on open work.</strong> The 3D figure is made from MakeHuman’s
+              public-domain body data, prepared as NAVER’s Anny project does, and Drapewright reads
+              FreeSewing’s open patterns as they are published.
+            </li>
+            <li>
+              <strong>Open file format.</strong> A Drapewright project is a zip of plain JSON with a
+              published schema, so your work is never locked in.
+            </li>
+            <li>
+              <strong>Open source, soon.</strong> We are preparing the code to be opened, so anyone
+              can learn from it, fix it and build on it.
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="next">
+        <div class="wrap">
+          <h2>What we’re building</h2>
+          <p class="section-lead">
+            The aim: anyone who sews can see a pattern on a body like theirs, in their fabric, and
+            change it until it fits, before a single cut. What’s next:
+          </p>
+          <ul class="points">
+            <li>Bodysuits and swimwear: pieces that go between the legs.</li>
+            <li>Linings and facings draped inside the garment, not left off.</li>
+            <li>Corsets that draw the waist in, and backs that lace.</li>
+            <li>A faster drape on the iPad, using its graphics chip (WebGPU).</li>
+            <li>More pattern files read cleanly, as people send us the ones that aren’t.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="help" class="band help">
+        <div class="wrap narrow">
+          <h2>Help us grow it</h2>
+          <p>
+            Drapewright is young, and it gets better every time someone tries it on their own
+            patterns. We’d love to hear from you if you:
+          </p>
+          <ul class="points">
+            <li>sew, and have a pattern that won’t open, or a drape that looks wrong;</li>
+            <li>make or sell patterns, and know what would make this useful for your work;</li>
+            <li>
+              write code (Rust, TypeScript, WebAssembly, cloth simulation), design, test or
+              translate, and want to help build it.
+            </li>
+          </ul>
+          <p class="actions">
+            <a class="button primary" href="mailto:juan.bothma@gmail.com?subject=Drapewright"
+              >Email JP</a
+            >
+            <a class="button" href="https://www.linkedin.com/in/jp-bothma/" rel="noopener"
+              >JP on LinkedIn</a
+            >
+          </p>
+          <p class="small muted">Or write to juan.bothma@gmail.com.</p>
+        </div>
+      </section>
+
+      <section id="faq">
+        <div class="wrap narrow">
+          <h2>Questions</h2>
+          <details>
+            <summary>Is there a free alternative to CLO 3D for home sewing?</summary>
+            <p>
+              Drapewright is one, for checking the fit of sewing patterns. Like CLO 3D and Marvelous
+              Designer, it sews pattern pieces together and drapes them on a 3D figure, so you can
+              see where a garment pulls before you cut. Unlike them, it is free, runs in the browser
+              and on an iPad, and starts from the patterns you already own (PDF, SVG or DXF). It is
+              built for home sewing, not as a fashion design suite: it doesn’t render fabrics for
+              catalogues or design garments from scratch in 3D.
+            </p>
+          </details>
+          <details>
+            <summary>Can I use it on an iPad?</summary>
+            <p>
+              Yes, it was made for one: touch and Apple Pencil, in Safari. Add it to your Home
+              Screen and it opens like an app, and it works offline. It also works in Chrome, Edge,
+              Safari and Firefox on a Mac, Windows or Linux computer.
+            </p>
+          </details>
+          <details>
+            <summary>Will it open my PDF patterns, on A4, US Letter or A0?</summary>
+            <p>
+              Yes: tiled A4 and US Letter PDFs, with the pages put back together, and A0 copy-shop
+              files, including patterns with many sizes drawn in colours or layers. It also opens
+              SVG files (from Inkscape, FreeSewing and others) and DXF files from garment CAD
+              (AAMA/ASTM, tested with exports from Gerber, Lectra, Assyst, CLO and Browzwear). PDFs
+              that need a password to open can’t be read.
+            </p>
+          </details>
+          <details>
+            <summary>Can I print an A0 pattern at home?</summary>
+            <p>
+              Yes. Open the A0 file and print it tiled on A4 or Letter pages, with a test square to
+              check the scale and marks to line the pages up. Or the other way round: a pattern
+              tiled on many pages can be printed on one A0 sheet at a copy shop.
+            </p>
+          </details>
+          <details>
+            <summary>Does it work with a sewing projector?</summary>
+            <p>
+              Yes. Projector mode shows the pieces you choose on your cutting mat at true size, once
+              you have measured the projector’s rectangle on the mat. No need to stitch PDF pages
+              together first.
+            </p>
+          </details>
+          <details>
+            <summary>Does it add seam allowance?</summary>
+            <p>
+              Yes, for the whole piece or edge by edge, with the corners shaped as they should be
+              (folded back at a hem, pointed or squared elsewhere). If the pattern already includes
+              its allowance, Drapewright keeps the cutting line as printed and shows the stitching
+              line inside it.
+            </p>
+          </details>
+          <details>
+            <summary>Can I see the fit before cutting fabric?</summary>
+            <p>
+              Enter your measurements and the 3D figure takes your shape. Press Find seams and
+              Drapewright suggests which edges are sewn together; sew them, open the avatar and
+              press Drape. You see where the garment pulls and where it has room, in the fabric you
+              choose, and every alteration you make shows on the figure. It tells you a lot before
+              you cut, but it doesn’t replace a toile for a close fit.
+            </p>
+          </details>
+          <details>
+            <summary>Can it do a full bust adjustment and other alterations?</summary>
+            <p>
+              Yes: full or small bust adjustment, lengthen or shorten, swayback, broad or narrow
+              shoulders, waist and hip, pivoting a dart, and truing an edge. Each is a step you can
+              switch on and off.
+            </p>
+          </details>
+          <details>
+            <summary>Do I need an account, and where are my files kept?</summary>
+            <p>
+              No account. Everything happens in your browser, and your projects are kept on your
+              device; nothing you open is sent to us or to anyone else. Back up a project as a file
+              whenever you like.
+            </p>
+          </details>
+          <details>
+            <summary>Can I draft a pattern from scratch?</summary>
+            <p>
+              That isn’t what Drapewright is for yet. Patterns drafted elsewhere open in it if the
+              program saves them as SVG, DXF or PDF.
+            </p>
+          </details>
+          <details>
+            <summary>What does it cost? Is it open source?</summary>
+            <p>
+              Nothing, and there is no paid tier. We are preparing the code to be opened as open
+              source.
+            </p>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap foot-row">
+        <p>© <span id="year">2026</span> Drapewright</p>
+        <p class="small muted">
+          CLO 3D and Marvelous Designer are trademarks of CLO Virtual Fashion Inc.; Drapewright
+          isn’t affiliated with them.
+        </p>
+        <p><a href="/app/">Open the studio</a> · <a href="#help">Contact</a></p>
+      </div>
+    </footer>
   </body>
 </html>

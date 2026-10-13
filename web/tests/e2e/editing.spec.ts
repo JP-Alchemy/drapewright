@@ -65,7 +65,7 @@ test('the inspector renames a piece and changes its allowance', async ({ page })
 test('several pieces are chosen with Select and cut at once', async ({ page }, info) => {
   const tap = (target: import('@playwright/test').Locator) =>
     info.project.name === 'ipad-webkit' ? target.tap() : target.click()
-  await page.goto('/')
+  await page.goto('/app/')
   await page.getByTestId('pattern-file').setInputFiles(fixture('corset.drapewright'))
   const pieces = page.getByRole('listbox', { name: 'Pieces' })
   await expect(pieces.getByRole('option')).toHaveCount(4)
@@ -111,7 +111,7 @@ test('several pieces are chosen with Select and cut at once', async ({ page }, i
 })
 
 test('a part of the details folds away, says what it holds, and stays folded', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/app/')
   await page.getByTestId('pattern-file').setInputFiles(fixture('corset.drapewright'))
   await page.getByRole('option', { name: /Front Side/ }).click()
   const allowance = page.getByRole('button', { name: /^Allowance/ })
@@ -133,7 +133,7 @@ test('a part of the details folds away, says what it holds, and stays folded', a
 })
 
 test('the bar between the lists and the details moves', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/app/')
   await page.getByTestId('pattern-file').setInputFiles(fixture('corset.drapewright'))
   // Opened: the panel is the project's own.
   await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(4)

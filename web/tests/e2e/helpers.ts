@@ -15,7 +15,7 @@ export async function openWithFixture(
   add: string,
   allowance: 'Not included' | 'Already included' = 'Not included',
 ): Promise<void> {
-  await page.goto('/?debug')
+  await page.goto('/app/?debug')
   await page.getByTestId('pattern-file').setInputFiles(fixture(name))
   const dialog = page.getByRole('dialog')
   const addButton = dialog.getByRole('button', { name: add })

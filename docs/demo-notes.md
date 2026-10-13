@@ -7,8 +7,39 @@ To run the app locally:
 ```bash
 pnpm install
 pnpm wasm
-pnpm dev        # then open http://localhost:5173
+pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 ```
+
+---
+
+## Step 36 — A front page at drapewright.com, the app at /app/
+
+drapewright.com now opens on a page that says what Drapewright is: what it
+does, why it was started, what is free and given back, what comes next, how
+to help, and the questions people ask (a free alternative to CLO 3D? on an
+iPad? which patterns? is anything uploaded?). The app itself is at
+drapewright.com/app/.
+
+**Try it:**
+
+1. Open https://drapewright.com. Read down the page; **Open Drapewright**
+   (or **Open the studio** at the top) opens the app.
+2. Projects saved before are still there: they are kept for the site, not
+   for the page.
+3. Drapewright added to a Home Screen before still opens straight into the
+   app, and so does a link to the old address.
+4. Share the address in a message: the preview shows a draped blouse.
+
+**How it works:**
+
+* *One site, two pages.* The front page is plain HTML and CSS built with
+  the app; it loads nothing from anywhere else, like the app. The app's
+  offline copy covers both: a page of the app opens the app offline.
+* *Found by search engines.* A title and description in the words people
+  search for, the page's one address, a description of the app as free
+  software (structured data), a sitemap, and a picture for link previews.
+  The pictures are of the made-up test blouse and the FreeSewing dress, not
+  of anyone's own patterns.
 
 ---
 

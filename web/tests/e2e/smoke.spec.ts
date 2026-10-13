@@ -1,7 +1,7 @@
 import { expect, test } from './fixtures.ts'
 
 test('app loads cross-origin isolated with the pattern engine', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/app/')
   await expect(page.getByText('Open a sewing pattern to lay it out here.')).toBeVisible()
   expect(await page.evaluate(() => globalThis.crossOriginIsolated)).toBe(true)
   await page.getByRole('button', { name: 'About this device' }).click()
@@ -16,7 +16,7 @@ test('no request leaves the origin', async ({ page, baseURL }) => {
   page.on('request', (req) => {
     if (new URL(req.url()).origin !== origin) foreign.push(req.url())
   })
-  await page.goto('/')
+  await page.goto('/app/')
   await expect(page.getByText('Open a sewing pattern to lay it out here.')).toBeVisible()
   expect(foreign).toEqual([])
 })
