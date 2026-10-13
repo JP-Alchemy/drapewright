@@ -4,6 +4,8 @@ import type {
   AvatarSettings,
   ClothReading,
   DrapeRequest,
+  SizeMeasures,
+  SizesRequest,
 } from '@drapewright/engine'
 import type { ViewColours } from '@drapewright/engine/avatar'
 import {
@@ -87,6 +89,11 @@ class SimClient {
       if (this.#fits.size > 20) this.#fits.delete(this.#fits.keys().next().value!)
     }
     return fit
+  }
+
+  /** Sews each size of a pattern and measures it on the avatar. */
+  measureSizes(request: SizesRequest): Promise<SizeMeasures[]> {
+    return this.#call('measureSizes', [request])
   }
 
   /** Hands the canvas to the worker for the 3D view; how it draws. */

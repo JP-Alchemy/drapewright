@@ -10,6 +10,7 @@
 //! types generated from the Rust ones (`packages/engine/src/generated`).
 
 pub mod drape;
+pub mod sizes;
 #[cfg(target_arch = "wasm32")]
 mod view;
 
@@ -144,6 +145,17 @@ impl Avatar {
         let request: AvatarRequest =
             serde_wasm_bindgen::from_value(request).map_err(|e| JsError::new(&e.to_string()))?;
         fit_avatar(&self.model, &request)
+            .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Sews each size of a `SizesRequest` and measures it on the avatar,
+    /// giving `SizeMeasures` for each.
+    #[wasm_bindgen(js_name = measureSizes)]
+    pub fn measure_sizes(&self, request: JsValue) -> Result<JsValue, JsError> {
+        let request: sizes::SizesRequest =
+            serde_wasm_bindgen::from_value(request).map_err(|e| JsError::new(&e.to_string()))?;
+        sizes::measure_sizes(&self.model, &request)
             .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
             .map_err(|e| JsError::new(&e.to_string()))
     }

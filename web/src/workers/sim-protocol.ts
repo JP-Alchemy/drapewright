@@ -7,6 +7,8 @@ import type {
   DrapeProgress,
   DrapeRequest,
   Girth,
+  SizeMeasures,
+  SizesRequest,
 } from '@drapewright/engine'
 import type { ViewColours } from '@drapewright/engine/avatar'
 
@@ -26,6 +28,8 @@ export interface DrapeUpdate extends DrapeProgress {
 export interface SimMethods {
   /** Fits the avatar to a person's measurements. */
   fitAvatar(request: AvatarRequest): AvatarFit
+  /** Sews each size of a pattern and measures it on the avatar. */
+  measureSizes(request: SizesRequest): SizeMeasures[]
   /** Starts the 3D view on a canvas handed over by the page; how it draws. */
   attachView(canvas: OffscreenCanvas, colours: ViewColours): string
   /** Shows the avatar with these settings in the view, taking off any garment. */

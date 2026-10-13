@@ -20,6 +20,7 @@ import { useStore } from '../state/store.ts'
 import { formatLength, t } from '../strings/en.ts'
 import { groupNotes } from './import-notes.ts'
 import { LengthField } from './LengthField.tsx'
+import { SizeFinder } from './SizeFinder.tsx'
 
 /** The size to offer first: the file's sample size if it holds it, else the middle one. */
 function firstSize(sizes: ImportSizes): string | undefined {
@@ -252,6 +253,15 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
                   </ToggleButton>
                 ))}
               </ToggleButtonGroup>
+              <SizeFinder
+                session={session}
+                result={result}
+                sizeOf={sizeOf}
+                scale={chosen}
+                allowance={mode && asked.length > 0 ? { mode, width } : null}
+                leftOut={leftOut}
+                onChoose={(size) => setChosenSizes([size])}
+              />
             </div>
           )}
           {pieces.length > 0 && (

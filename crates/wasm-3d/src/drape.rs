@@ -15,7 +15,7 @@ use ts_rs::TS;
 use crate::AvatarSettings;
 
 /// How far apart the cloth's points are, mm.
-const SPACING: f64 = 20.0;
+pub(crate) const SPACING: f64 = 20.0;
 /// A frame of the drape, s.
 const FRAME: f32 = 1.0 / 60.0;
 /// The longest a drape is given to settle, s.

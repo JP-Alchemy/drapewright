@@ -16,6 +16,8 @@ import type {
   DrapeProgress,
   DrapeRequest,
   Girth,
+  SizeMeasures,
+  SizesRequest,
 } from './types'
 
 export type {
@@ -29,6 +31,8 @@ export type {
   DrapeStage,
   FabricPreset,
   Girth,
+  SizeMeasures,
+  SizesRequest,
 } from './types'
 
 let ready: Promise<void> | undefined
@@ -54,6 +58,14 @@ export class Avatar {
   /** Fits the avatar to a person's measurements. */
   fit(request: AvatarRequest): AvatarFit {
     return handles.get(this)!.fit(request) as AvatarFit
+  }
+
+  /**
+   * Sews each size of a pattern and measures it on the avatar shaped by
+   * the request's settings: round the bust, waist and hip, and the ease.
+   */
+  measureSizes(request: SizesRequest): SizeMeasures[] {
+    return handles.get(this)!.measureSizes(request) as SizeMeasures[]
   }
 
   /**

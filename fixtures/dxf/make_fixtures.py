@@ -151,6 +151,35 @@ def aama_graded():
     write("aama-graded.dxf", section("BLOCKS", block) + section("ENTITIES", entities))
 
 
+def aama_graded_skirt():
+    """A skirt in four sizes, 36 to 42: a front and a back, each cut once on
+    the fold, shaped in from the hip to the waist and flaring a little to
+    the hem, with a grainline. Each size grows 10 mm a side (40 mm round).
+    Cutting lines only: the allowance is for the import to ask about."""
+    block = ""
+    entities = text("0", (0, 900), "ANSI/AAMA VERSION: 1.0.0") + text("0", (0, 890), "UNITS: METRIC")
+    entities += text("0", (0, 880), "Sample Size: 38")
+    x = 0
+    for size, grow in (("36", -10), ("38", 0), ("40", 10), ("42", 20)):
+        for piece, waist, hip in (("SKIRT FRONT", 180, 245), ("SKIRT BACK", 190, 250)):
+            name = f"{piece.replace(' ', '_')}_{size}"
+            # Centre on x = 0 (the fold), waist at the top: y up.
+            w, h = waist + grow, hip + grow
+            cut = [(0, 600), (w, 600), (h, 400), (h + 20, 0), (0, 0)]
+            block += pairs((0, "BLOCK"), (8, "0"), (2, name), (70, 0), (10, 0), (20, 0))
+            block += polyline("1", cut)
+            block += "".join(point("2", p) for p in cut)
+            block += line("6", (0, 0), (0, 600))
+            block += line("7", (100, 100), (100, 500))
+            block += text("1", (40, 300), f"Piece Name: {piece}")
+            block += text("1", (40, 290), "Quantity: 1")
+            block += text("1", (40, 280), f"SIZE: {size}")
+            block += pairs((0, "ENDBLK"), (8, "0"))
+            entities += pairs((0, "INSERT"), (8, "0"), (2, name), (10, x), (20, 0))
+            x += h + 80
+    write("aama-graded-skirt.dxf", section("BLOCKS", block) + section("ENTITIES", entities))
+
+
 def unitless():
     write("unitless.dxf", section("ENTITIES", lwpolyline("COLLAR", [(0, 0), (100, 0), (100, 50), (0, 50)])))
 
@@ -158,6 +187,7 @@ def unitless():
 if __name__ == "__main__":
     aama_skirt()
     aama_graded()
+    aama_graded_skirt()
     generic_mm()
     inches()
     unitless()

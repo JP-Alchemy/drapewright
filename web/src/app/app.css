@@ -2251,3 +2251,58 @@ h2 {
   font-weight: 500;
   opacity: 0.85;
 }
+
+/* Which size fits: every size measured on someone's figure */
+
+.size-finder {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.size-finder p {
+  margin: 0;
+}
+
+.size-finder-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px 16px;
+}
+
+.size-table-wrap {
+  overflow-x: auto;
+}
+
+.size-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.size-table th,
+.size-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  white-space: nowrap;
+}
+
+.size-table thead th {
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.size-table td.suggested {
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  font-weight: 600;
+}
+
+.size-table td.suggested svg {
+  margin-right: 4px;
+  vertical-align: -2px;
+  color: var(--ok);
+}

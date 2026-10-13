@@ -12,6 +12,37 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 40 — Which size fits?
+
+Opening a pattern in several sizes, the import dialog can now sew every
+size and measure it on someone's figure, and suggest the size to cut at the
+bust, the waist and the hip.
+
+**Try it:**
+
+1. Add your measurements (**Measurements**, at the top; at least bust,
+   waist and hip).
+2. Open a pattern in several sizes. Under the sizes, **Which size fits?**:
+   choose whose measurements, and how it should fit: **Fitted**,
+   **Relaxed**, or **Close** (corsets and stretch fabrics, smaller than the
+   body).
+3. Press **Sew and measure every size on …**. A table gives each size's
+   bust, waist and hip, and the ease against the body, and says which size
+   to cut at each ("For Jo: 36 at the waist and 40 at the hip"). **Choose**
+   a size to add it.
+
+A size that differs between the waist and the hip is what blending between
+sizes is for (next).
+
+**How it works:** each size is sewn as Find seams would sew it (panels
+drawn for one side cut as pairs), placed on the person's figure, and
+measured as in Step 39. The size suggested at each level is the one whose
+ease is nearest to the fit chosen: fitted wants about 6 cm at the bust and
+hip and 4 cm at the waist; relaxed 12 cm; close 2 cm smaller at the bust and
+hip and 6 cm smaller at the waist.
+
+---
+
 ## Step 39 — The garment measured, and its ease
 
 Once a garment is on the figure, the avatar says how big it is round the

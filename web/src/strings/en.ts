@@ -75,6 +75,33 @@ export const t = {
     close: 'Close',
   },
 
+  sizing: {
+    heading: 'Which size fits?',
+    noPeople:
+      'To see which size fits, add someone’s measurements first (Measurements, at the top).',
+    person: 'Whose measurements',
+    fit: 'How it should fit',
+    fits: {
+      fitted: 'Fitted',
+      relaxed: 'Relaxed',
+      close: 'Close (corsets, stretch)',
+    } as Record<string, string>,
+    measure: (name: string) => `Sew and measure every size on ${name}`,
+    measuring: 'Sewing and measuring every size…',
+    failed: (why: string) => `The sizes couldn’t be measured. ${why}`,
+    suggested: (name: string, parts: string[]) =>
+      `For ${name}: ${new Intl.ListFormat('en', { type: 'conjunction' }).format(parts)}.`,
+    at: (level: string, size: string) => `${size} at the ${level}`,
+    size: 'Size',
+    columns: { bust: 'Bust', waist: 'Waist', hip: 'Hip' } as Record<string, string>,
+    chooseColumn: 'Choose',
+    choose: (size: string) => `Choose ${size}`,
+    notSewn: 'Couldn’t be sewn round the figure',
+    suggestedHere: 'Suggested',
+    ease: (sign: string, by: string) => `${sign}${by}`,
+    how: 'Each size is sewn as Find seams would sew it, and measured flat round the figure’s bust, waist and hip. The ease is how much bigger than the body it is there: the size suggested at each has the ease nearest to the fit chosen.',
+  },
+
   samples: {
     heading: 'No pattern to hand? Try one of ours:',
     titles: {
