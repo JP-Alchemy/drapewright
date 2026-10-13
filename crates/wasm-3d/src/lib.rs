@@ -183,6 +183,16 @@ impl Draping {
         self.0.between_legs.clone()
     }
 
+    /// The garment's size round the body at the figure's bust, waist and
+    /// hip: `Girth`s.
+    #[wasm_bindgen(getter)]
+    pub fn girths(&self) -> Result<JsValue, JsError> {
+        self.0
+            .girths
+            .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+
     /// Moves the drape on a frame, giving a `DrapeProgress`.
     pub fn step(&mut self) -> Result<JsValue, JsError> {
         self.0

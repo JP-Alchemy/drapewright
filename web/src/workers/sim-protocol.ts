@@ -6,6 +6,7 @@ import type {
   ClothShows,
   DrapeProgress,
   DrapeRequest,
+  Girth,
 } from '@drapewright/engine'
 import type { ViewColours } from '@drapewright/engine/avatar'
 
@@ -17,6 +18,8 @@ export interface DrapeUpdate extends DrapeProgress {
   inside: string[]
   /** The pieces between the legs (a crotch) left out, by id. */
   betweenLegs: string[]
+  /** The garment's size round the body at the figure's bust, waist and hip. */
+  girths: Girth[]
 }
 
 /** What the sim worker can be asked, and what each answers. */

@@ -15,6 +15,7 @@ import type {
   ClothShows,
   DrapeProgress,
   DrapeRequest,
+  Girth,
 } from './types'
 
 export type {
@@ -27,6 +28,7 @@ export type {
   DrapeRequest,
   DrapeStage,
   FabricPreset,
+  Girth,
 } from './types'
 
 let ready: Promise<void> | undefined
@@ -82,6 +84,11 @@ export class Draping {
   /** The pieces between the legs (a crotch) left out, by id. */
   get betweenLegs(): string[] {
     return drapings.get(this)!.betweenLegs
+  }
+
+  /** The garment's size round the body at the figure's bust, waist and hip. */
+  get girths(): Girth[] {
+    return drapings.get(this)!.girths as Girth[]
   }
 
   /** Moves the drape on a frame (1/60 s of the cloth's time). */

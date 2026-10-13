@@ -26,6 +26,19 @@ pub struct Figure {
     pub sections: Vec<Section>,
     /// The arms, left and right, for sleeves.
     pub arms: Vec<Arm>,
+    /// Where the body is measured round (bust, waist, hip), and how big it
+    /// is there.
+    pub levels: Vec<Level>,
+}
+
+/// A height the body is measured round.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Level {
+    /// `bust`, `waist` or `hip`.
+    pub name: &'static str,
+    pub y: f64,
+    /// The body's girth there, mm.
+    pub girth: f64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -40,7 +53,7 @@ impl Figure {
     /// and its trunk's sections every 20 mm from 400 mm below the hip to
     /// the shoulders.
     pub fn of(model: &BodyModel, body: &Body) -> Figure {
-        let (_, marks) = measure(model, body);
+        let (measured, marks) = measure(model, body);
         let shoulders = marks.points["shoulderPoint"][1];
         let hip = marks.levels["hip"];
         let sections = trunk_sections(model, body, hip - 400.0, shoulders, 20.0)
@@ -60,12 +73,28 @@ impl Figure {
         .into_iter()
         .filter_map(|(joints, regions)| Arm::of(model, body, joints, regions))
         .collect();
+        let levels = ["bust", "waist", "hip"]
+            .into_iter()
+            .filter_map(|name| {
+                Some(Level {
+                    name,
+                    y: *marks.levels.get(name)?,
+                    girth: *measured.get(name)?,
+                })
+            })
+            .collect();
         Figure {
             waist: marks.levels["waist"],
             shoulders,
             sections,
             arms,
+            levels,
         }
+    }
+
+    /// The trunk's middle at height `y` (x, z).
+    pub fn middle(&self, y: f64) -> [f64; 2] {
+        self.smoothed(y).middle
     }
 
     /// The trunk's section at height `y`, averaged over 60 mm above and

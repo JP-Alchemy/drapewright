@@ -12,6 +12,29 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 39 — The garment measured, and its ease
+
+Once a garment is on the figure, the avatar says how big it is round the
+bust, the waist and the hip, and the ease there: how much bigger than the
+body it is (or smaller, for a corset). It measures the garment as a sewist
+measures a finished one, flat, not as stretched round the body, and leaves
+the sleeves out.
+
+**Try it:** open the sample blouse (Step 38) and press **Drape**. Over the
+figure: "Garment: bust 90.5 cm (1.0 cm ease) · waist 100.7 cm (30.0 cm
+ease) · hip 101.9 cm (3.3 cm ease)". Add measurements and fit the avatar to
+them: the ease is then against that person's body. A skirt says only its
+waist and hip.
+
+**How it works:** the sewn garment, as placed on the figure, is cut across
+at the figure's bust, waist and hip. Where each triangle of cloth crosses
+that height, the crossing is measured on the flat pattern piece, and the
+pieces' crossings are added up. Panels that sit nearer an arm than the
+trunk (sleeves) are left out. A tube of two 30 cm rectangles measures 60.0
+cm, however much it is stretched round the body.
+
+---
+
 ## Step 38 — Sample patterns to try
 
 Someone arriving from the front page used to meet an empty table and need

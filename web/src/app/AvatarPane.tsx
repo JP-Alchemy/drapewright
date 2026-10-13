@@ -129,6 +129,28 @@ function failure(error: unknown): string {
   return t.measure.avatar.failed(error instanceof Error ? error.message : String(error))
 }
 
+/**
+ * How big the garment on the figure is round its bust, waist and hip, and
+ * the ease there: what a sewist measures of a finished garment.
+ */
+function garmentText(drape: Drape, units: DisplayUnits): string {
+  if (drape.kind !== 'draping' && drape.kind !== 'draped') return ''
+  const text = t.avatar
+  const parts = (drape.update?.girths ?? []).flatMap((g) => {
+    if (g.garment === null) return []
+    const ease = g.garment - g.body
+    const by = formatLength(Math.abs(ease), units)
+    return [
+      text.girthAt(
+        text.levels[g.level] ?? g.level,
+        formatLength(g.garment, units),
+        Math.abs(ease) < 1 ? text.noEase : ease > 0 ? text.easeMore(by) : text.easeLess(by),
+      ),
+    ]
+  })
+  return parts.length > 0 ? text.garmentSize(parts) : ''
+}
+
 /** What the drape bar says of the garment on the avatar. */
 function drapeText(drape: Drape): string {
   const text = t.avatar
@@ -383,6 +405,7 @@ export function AvatarPane({ session }: { session: Session }) {
   const canDrape = backend !== null && (status.kind === 'standard' || status.kind === 'fitted')
   // What the drape is doing, or what was read where tapped.
   const drapeSaid = on && reading ? readingText(reading, units) : drapeText(drape)
+  const garmentSaid = garmentText(drape, units)
 
   const text = t.avatar
   const said =
@@ -495,6 +518,7 @@ export function AvatarPane({ session }: { session: Session }) {
                 <span>{legend[1]}</span>
               </div>
             )}
+            {garmentSaid && <p className="avatar-say small avatar-ease">{garmentSaid}</p>}
             <p
               className={`avatar-say small${drape.kind === 'failed' ? ' measure-warning' : ''}${drapeSaid ? '' : ' quiet'}`}
               role="status"

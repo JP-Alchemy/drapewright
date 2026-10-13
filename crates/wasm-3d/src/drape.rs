@@ -7,6 +7,7 @@ use drapewright_pattern_core::Piece;
 use drapewright_seams::Seam;
 use drapewright_sim::drape::Drape;
 use drapewright_sim::garment::{GarmentError, assemble, draped_pieces};
+use drapewright_sim::girth::girths;
 use drapewright_sim::place::{Figure, half_round, place};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -64,6 +65,20 @@ pub struct DrapeProgress {
     pub widest_gap: f64,
 }
 
+/// How big the garment is round the body at one of the figure's levels,
+/// measured flat as a sewist measures a finished garment.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Girth {
+    /// `bust`, `waist` or `hip`.
+    pub level: String,
+    /// The garment round the body there, mm; none where it doesn't reach.
+    pub garment: Option<f64>,
+    /// The body round there, mm.
+    pub body: f64,
+}
+
 /// Why a garment cannot be draped.
 #[derive(Debug)]
 pub enum DrapeError {
@@ -101,6 +116,8 @@ pub struct Draping {
     pub inside: Vec<String>,
     /// The pieces between the legs (a crotch), by id: left out.
     pub between_legs: Vec<String>,
+    /// The garment's size round the body at its bust, waist and hip.
+    pub girths: Vec<Girth>,
     done: Option<DrapeStage>,
 }
 
@@ -125,7 +142,17 @@ impl Draping {
             return Err(DrapeError::HalfRound);
         }
         let body = model.shape(&Shape::from(request.settings.clone()));
-        let starts = place(&garment, &Figure::of(model, &body));
+        let figure = Figure::of(model, &body);
+        let starts = place(&garment, &figure);
+        let girths = girths(&garment, &starts, &figure)
+            .into_iter()
+            .zip(&figure.levels)
+            .map(|((level, garment), at)| Girth {
+                level: level.into(),
+                garment,
+                body: at.girth,
+            })
+            .collect();
         let drape = Drape::new(
             &garment,
             &starts,
@@ -139,6 +166,7 @@ impl Draping {
             left_out: draped.alone,
             inside: draped.inside,
             between_legs: draped.between_legs,
+            girths,
             done: None,
         })
     }

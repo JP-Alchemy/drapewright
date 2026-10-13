@@ -6,6 +6,7 @@ pub mod collide;
 pub mod drape;
 pub mod fabric;
 pub mod garment;
+pub mod girth;
 pub mod mesh;
 pub mod place;
 

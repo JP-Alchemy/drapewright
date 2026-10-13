@@ -3,7 +3,13 @@
 // module and the body file are loaded the first time it is asked for
 // anything, then kept.
 
-import { Avatar, AvatarView, type DrapeProgress, type Draping } from '@drapewright/engine/avatar'
+import {
+  Avatar,
+  AvatarView,
+  type DrapeProgress,
+  type Draping,
+  type Girth,
+} from '@drapewright/engine/avatar'
 import bodyUrl from '../../../assets/body/adult.dwbody?url'
 import {
   type DrapeUpdate,
@@ -60,6 +66,7 @@ interface Drape {
   leftOut: string[]
   inside: string[]
   betweenLegs: string[]
+  girths: Girth[]
   finish: (last: DrapeUpdate | null) => void
   told: { stage: string; at: number }
 }
@@ -110,6 +117,7 @@ function moveDrape(d: Drape) {
     leftOut: d.leftOut,
     inside: d.inside,
     betweenLegs: d.betweenLegs,
+    girths: d.girths,
   }
   const now = performance.now()
   if (done(progress)) {
@@ -179,6 +187,7 @@ const handlers: { [M in keyof SimMethods]: (...args: Parameters<SimMethods[M]>) 
         leftOut: draping.leftOut,
         inside: draping.inside,
         betweenLegs: draping.betweenLegs,
+        girths: draping.girths,
         finish,
         told: { stage: '', at: 0 },
       }

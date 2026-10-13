@@ -388,3 +388,114 @@ fn a_corset_is_put_on_by_its_waist_line_its_crotch_piece_left_off() {
         }
     }
 }
+
+#[test]
+fn a_garment_is_measured_round_the_body_flat_without_its_sleeves() {
+    use drapewright_sim::girth::girths;
+    let model = avatar();
+    let body = model.shape(&Shape::default());
+    let figure = Figure::of(&model, &body);
+    let measured = |(pieces, seams): (
+        Vec<drapewright_pattern_core::Piece>,
+        Vec<drapewright_seams::Seam>,
+    )| {
+        let draped = draped_pieces(&pieces, &seams);
+        let g = assemble(&draped.sewn, &seams, 20.0).unwrap();
+        let starts = place(&g, &figure);
+        girths(&g, &starts, &figure)
+    };
+    let at = |gs: &[(&str, Option<f64>)], level: &str| gs.iter().find(|g| g.0 == level).unwrap().1;
+    // A tube of two 300 mm rectangles is 600 mm round where it reaches,
+    // though it starts stretched round a bigger body.
+    let tube = measured(tube());
+    let reached: Vec<f64> = tube.iter().filter_map(|g| g.1).collect();
+    assert!(!reached.is_empty(), "{tube:?}");
+    for girth in reached {
+        assert!((girth - 600.0).abs() < 1.0, "{tube:?}");
+    }
+    // A skirt reaches the waist and hip, not the bust.
+    let skirt = measured(common::skirt());
+    assert_eq!(at(&skirt, "bust"), None);
+    assert!(
+        at(&skirt, "hip").is_some_and(|g| (900.0..1100.0).contains(&g)),
+        "{skirt:?}"
+    );
+    // The blouse's sleeves are not counted round the bust.
+    let (pieces, seams) = common::blouse();
+    let with_sleeves = measured((pieces.clone(), seams.clone()));
+    let bodice: Vec<_> = pieces
+        .into_iter()
+        .filter(|p| !p.name.contains("leeve"))
+        .collect();
+    let ids: Vec<&str> = bodice.iter().map(|p| p.id.as_str()).collect();
+    let seams: Vec<_> = seams
+        .into_iter()
+        .filter(|s| ids.contains(&s.a.piece.as_str()) && ids.contains(&s.b.piece.as_str()))
+        .collect();
+    let without = measured((bodice, seams));
+    let (a, b) = (
+        at(&with_sleeves, "bust").unwrap(),
+        at(&without, "bust").unwrap(),
+    );
+    assert!((a - b).abs() < 1.0, "with sleeves {a}, without {b}");
+}
+
+/// A tube of two rectangles, each 300 mm wide and 400 mm long, sewn at both
+/// sides: 600 mm round wherever it reaches.
+fn tube() -> (
+    Vec<drapewright_pattern_core::Piece>,
+    Vec<drapewright_seams::Seam>,
+) {
+    use drapewright_pattern_core::{
+        CutInstruction, Edge, EdgeKind, Grainline, Outline, Piece, Pt, Segment,
+    };
+    use drapewright_seams::{Seam, SeamSide};
+    let edge = |id: String, kind: EdgeKind, to: [f64; 2]| Edge {
+        kind,
+        ..Edge::new(&id, vec![Segment::line(to)])
+    };
+    let rectangle = |id: &str, name: &str| {
+        let mut p = Piece::new(
+            id,
+            name,
+            Outline {
+                start: Pt::new(0.0, 0.0),
+                edges: vec![
+                    edge(format!("{id}top"), EdgeKind::Seam, [300.0, 0.0]),
+                    edge(format!("{id}right"), EdgeKind::Seam, [300.0, 400.0]),
+                    edge(format!("{id}hem"), EdgeKind::Hem, [0.0, 400.0]),
+                    edge(format!("{id}left"), EdgeKind::Seam, [0.0, 0.0]),
+                ],
+            },
+        );
+        p.cut = vec![CutInstruction {
+            quantity: 1,
+            ..Default::default()
+        }];
+        p.grainline = Some(Grainline {
+            from: Pt::new(150.0, 100.0),
+            to: Pt::new(150.0, 300.0),
+            one_way: false,
+        });
+        p
+    };
+    let side = |id: &str, a: (&str, &str), b: (&str, &str)| Seam {
+        id: id.into(),
+        name: String::new(),
+        a: SeamSide::whole(a.0, a.1),
+        b: SeamSide::whole(b.0, b.1),
+        reversed: true,
+        ease: Default::default(),
+        confirmed: true,
+    };
+    (
+        vec![
+            rectangle("front", "Tube front"),
+            rectangle("back", "Tube back"),
+        ],
+        vec![
+            side("s1", ("front", "frontright"), ("back", "backleft")),
+            side("s2", ("back", "backright"), ("front", "frontleft")),
+        ],
+    )
+}

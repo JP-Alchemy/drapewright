@@ -69,6 +69,11 @@ test('the skirt is draped, read where it pulls, draped in another fabric, and ta
   await drape.getByRole('button', { name: 'Drape', exact: true }).click()
   await expect(status).toHaveText(/Sewing the seams…|Letting it settle…|Draped in poplin\./)
   await expect(status).toHaveText('Draped in poplin.', { timeout: 120_000 })
+  // How big it is round the figure's waist and hip, and the ease there (a
+  // skirt has no bust).
+  await expect(
+    pane.getByText(/^Garment: waist \d+\.\d cm \(.+\) · hip \d+\.\d cm \(.+\)$/),
+  ).toBeVisible()
   // The skirt is drawn on the figure.
   await expect
     .poll(async () => differing(page, bare, await view.screenshot()), { timeout: 10_000 })
