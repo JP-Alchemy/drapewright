@@ -589,3 +589,54 @@ fn pieces_drawn_for_one_side_are_found_to_be_cut_as_pairs() {
         ]
     );
 }
+
+#[test]
+fn a_crotch_in_two_pieces_is_sewn_to_itself_never_to_a_top() {
+    use EdgeKind::{Fold, Seam};
+    let line = |to: [f64; 2]| Segment::line(to);
+    // A front and a back, each cut on the fold: 160 wide at the top, 200 at
+    // the bottom; their sides sewn.
+    let panel = |id: &str, name: &str| {
+        piece(
+            id,
+            name,
+            [0.0, 0.0],
+            vec![
+                edge(&format!("{id}t"), Seam, line([160.0, 0.0])),
+                edge(&format!("{id}s"), Seam, line([200.0, 500.0])),
+                edge(&format!("{id}b"), Seam, line([0.0, 500.0])),
+                edge(&format!("{id}f"), Fold, line([0.0, 0.0])),
+            ],
+            1,
+        )
+    };
+    // A crotch's front and back, where they meet each other 160 and 158
+    // across (the front's as long as either panel's top: by length alone,
+    // the closer match), 100 where they meet the panels' bottom halves
+    // (200, both halves, along).
+    let crotch = |id: &str, name: &str, across: f64| {
+        piece(
+            id,
+            name,
+            [0.0, 0.0],
+            vec![
+                edge(&format!("{id}m"), Seam, line([across, 0.0])),
+                edge(&format!("{id}r"), Seam, line([across / 2.0 + 50.0, 120.0])),
+                edge(&format!("{id}p"), Seam, line([across / 2.0 - 50.0, 120.0])),
+                edge(&format!("{id}l"), Seam, line([0.0, 0.0])),
+            ],
+            1,
+        )
+    };
+    let pieces = vec![
+        panel("f", "Front"),
+        panel("b", "Back"),
+        crotch("cf", "Crotch front", 160.0),
+        crotch("cb", "Crotch back", 158.0),
+    ];
+    let found = pairs(&pieces);
+    assert!(found.contains(&"cb.cbm-cf.cfm".to_string()), "{found:?}");
+    // No crotch edge sewn to a panel's top.
+    let crotch_to_top = |s: &String| s.contains('c') && (s.contains(".ft") || s.contains(".bt"));
+    assert!(!found.iter().any(crotch_to_top), "{found:?}");
+}

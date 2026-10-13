@@ -172,6 +172,9 @@ struct Candidate {
     at_centre: bool,
     /// Furthest from its chord, mm.
     depth: f64,
+    /// Along the top of a piece drawn upright (its grain up and down the
+    /// page, or none): a neckline, a waist, a corset's top.
+    top: bool,
     /// Marked to be gathered.
     gathered: bool,
     /// On a facing or a lining: sewn only to edges shaped as it is.
@@ -228,6 +231,8 @@ enum Role {
     Sleeve,
     Cuff,
     Yoke,
+    /// Between the legs: a bodysuit's crotch, a gusset.
+    Crotch,
     Other,
 }
 
@@ -239,6 +244,8 @@ fn role_of(name: &str) -> Role {
         Role::Yoke
     } else if name.contains("sleeve") {
         Role::Sleeve
+    } else if name.contains("crotch") || name.contains("gusset") {
+        Role::Crotch
     } else {
         Role::Other
     }
@@ -545,6 +552,12 @@ fn end_of(piece: &Piece, index: usize) -> End {
     }
 }
 
+/// A grainline this much up and down the page (the cosine) has its piece
+/// drawn upright.
+const UPRIGHT_GRAIN: f64 = 0.9;
+/// An edge along this top share of a piece drawn upright is along its top.
+const TOP_SHARE: f64 = 0.15;
+
 /// A seam's allowance this much deeper than the piece's own, and at least
 /// `HEM_ALLOWANCE` mm, is a hem's.
 const HEM_DEEPER: f64 = 1.5;
@@ -591,6 +604,11 @@ fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -
         };
         let gathered = gathered_edges(piece);
         let first = out.len();
+        // How high the piece reaches on the page, as sewn.
+        let (piece_top, piece_bottom) = sewn
+            .iter()
+            .flatten()
+            .fold((f64::MAX, f64::MIN), |(t, b), p| (t.min(p.y), b.max(p.y)));
         for (ei, edge) in edges.iter().enumerate() {
             let points = &sewn[ei];
             let length = polyline_length(points);
@@ -630,6 +648,11 @@ fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -
             let depth = profile(points).iter().fold(0.0f64, |m, y| m.max(y.abs()));
             let with_grain = depth < STRAIGHT.max(CENTRE_BOW * length)
                 && grain.is_some_and(|g| (chord / chord.hypot().max(1e-9)).dot(g).abs() > 0.985);
+            let upright = grain.is_none_or(|g| g.y.abs() > UPRIGHT_GRAIN);
+            let mean_y = points.iter().map(|p| p.y).sum::<f64>() / points.len() as f64;
+            let top = upright
+                && chord.y.abs() < 0.5 * length
+                && mean_y <= piece_top + TOP_SHARE * (piece_bottom - piece_top);
             out.push(Candidate {
                 piece: pi,
                 edge: ei,
@@ -655,6 +678,7 @@ fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -
                 pair,
                 with_grain,
                 depth,
+                top,
                 gathered: gathered[ei],
                 inside: inside(piece),
                 strip: strip(piece),
@@ -855,6 +879,20 @@ fn score(a: &Candidate, b: &Candidate, reversed: bool) -> (f64, Vec<Reason>) {
     }
     if matched {
         reasons.push(Reason::EndsMatch);
+    }
+    // A crotch goes between the legs: from the bottom of a garment, never
+    // its top; and a crotch in two pieces is sewn to itself there.
+    let crotch_to_top =
+        |x: &Candidate, y: &Candidate| x.role == Role::Crotch && y.role != Role::Crotch && y.top;
+    if crotch_to_top(a, b) || crotch_to_top(b, a) {
+        score -= 1.0;
+    }
+    if a.role == Role::Crotch
+        && b.role == Role::Crotch
+        && a.piece != b.piece
+        && apart <= SAME_LENGTH
+    {
+        score += 0.6;
     }
     let front_and_back = matches!(
         (a.side, b.side),

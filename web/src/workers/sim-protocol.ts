@@ -22,8 +22,6 @@ export interface DrapeUpdate extends DrapeProgress {
   leftOut: string[]
   /** The facings and linings left out, as they go inside, by id. */
   inside: string[]
-  /** The pieces between the legs (a crotch) left out, by id. */
-  betweenLegs: string[]
   /** The garment's size round the body at the figure's bust, waist and hip. */
   girths: Girth[]
 }

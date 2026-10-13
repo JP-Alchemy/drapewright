@@ -677,8 +677,7 @@ pub fn inside(piece: &Piece) -> bool {
         || (!piece.cut.is_empty() && piece.cut.iter().all(|c| lining(&c.material)))
 }
 
-/// Whether a piece goes between the legs (a bodysuit's crotch, a gusset):
-/// the drape does not yet place pieces there.
+/// Whether a piece goes between the legs (a bodysuit's crotch, a gusset).
 pub fn between_legs(piece: &Piece) -> bool {
     let name = piece.name.to_lowercase();
     name.contains("crotch") || name.contains("gusset")
@@ -693,12 +692,10 @@ pub struct Draped {
     pub alone: Vec<Id>,
     /// Facings and linings: they go inside.
     pub inside: Vec<Id>,
-    /// Pieces between the legs.
-    pub between_legs: Vec<Id>,
 }
 
 /// What a drape is made of: the pieces sewn by confirmed seams, less
-/// facings and linings and pieces between the legs; and those left out.
+/// facings and linings; and those left out.
 pub fn draped_pieces(pieces: &[Piece], seams: &[Seam]) -> Draped {
     let mut out = Draped::default();
     for piece in pieces {
@@ -706,8 +703,6 @@ pub fn draped_pieces(pieces: &[Piece], seams: &[Seam]) -> Draped {
             out.inside.push(piece.id.clone());
         } else if !seams.iter().any(|s| s.confirmed && s.touches(&piece.id)) {
             out.alone.push(piece.id.clone());
-        } else if between_legs(piece) {
-            out.between_legs.push(piece.id.clone());
         } else {
             out.sewn.push(piece.clone());
         }

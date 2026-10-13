@@ -12,6 +12,28 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 48 — Bodysuits: the crotch between the legs
+
+A bodysuit's crotch piece (a corset bunnysuit's, a leotard's gusset) is
+now draped with the rest, between the legs, instead of left off.
+
+**Try it:** open a bodysuit pattern with its crotch pieces (a corset
+bunnysuit), press **Find seams** and drape it. The crotch's front is sewn
+along the bottom of the fronts, its back along the bottom of the backs,
+and a crotch in two pieces to itself between the legs; on the figure it
+goes under the crotch from the front to the back.
+
+**How it works:** a piece named for the crotch or a gusset starts curved
+under the figure's crotch, from just in front of the body to just behind
+it (a front piece the front half of the curve, a back piece the back
+half), the end sewn to a front at the front; sewing draws it up to the
+pieces it is sewn to. Find seams never sews a crotch piece to the top of a
+piece drawn upright (its neckline or a corset's top, which can be as long
+as the crotch's middle), and sews a crotch's front and back to each other
+where they are as long as each other.
+
+---
+
 ## Step 47 — FreeSewing designs, drafted to your measurements
 
 FreeSewing's designs are drafted to each person's measurements rather than

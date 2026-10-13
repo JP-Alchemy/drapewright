@@ -26,6 +26,8 @@ pub struct Figure {
     pub sections: Vec<Section>,
     /// The arms, left and right, for sleeves.
     pub arms: Vec<Arm>,
+    /// How high the crotch is: where a bodysuit's crotch piece goes under.
+    pub crotch: f64,
     /// Where the body is measured round (bust, waist, hip), and how big it
     /// is there.
     pub levels: Vec<Level>,
@@ -88,6 +90,7 @@ impl Figure {
             shoulders,
             sections,
             arms,
+            crotch: marks.points["crotch"][1],
             levels,
         }
     }
@@ -565,6 +568,112 @@ fn spanned(g: &Garment, p: usize, partners: &[(usize, u32, [f64; 3])]) -> Vec<[f
         }
     }
     x
+}
+
+/// Whether a panel goes between the legs (a bodysuit's crotch, a gusset),
+/// by its name.
+fn between_legs(name: &str) -> bool {
+    let name = name.to_lowercase();
+    name.contains("crotch") || name.contains("gusset")
+}
+
+/// How far below the crotch a crotch piece starts, and how far above it
+/// its ends reach at the front and back, mm.
+const UNDER: f64 = 15.0;
+const UP: f64 = 70.0;
+
+/// A crotch piece's points, curved under the crotch from the front to the
+/// back between the legs: its end sewn to a front at the front, to a back
+/// at the back. A crotch in two pieces, a front and a back, has the front
+/// half of the curve and the back half. Sewn, it draws up to them.
+fn under_the_crotch(
+    g: &Garment,
+    p: usize,
+    placed: &[Vec<[f64; 3]>],
+    figure: &Figure,
+) -> Vec<[f64; 3]> {
+    let panel = &g.panels[p];
+    let points = &panel.mesh.points;
+    if points.is_empty() {
+        return Vec::new();
+    }
+    let n = points.len() as f64;
+    let centre = points
+        .iter()
+        .fold([0.0, 0.0], |c, q| [c[0] + q[0] / n, c[1] + q[1] / n]);
+    // Which way on the panel is towards the front: to its points sewn to a
+    // front (or away from those sewn to a back), else up the panel.
+    let mut towards = [0.0, 0.0];
+    for &[a, b] in &g.stitches {
+        for ((q, i), (o, _)) in [(a, b), (b, a)] {
+            if q != p || o == p || placed[o].is_empty() {
+                continue;
+            }
+            let name = g.panels[o].name.to_lowercase();
+            let sign = if name.contains("front") {
+                1.0
+            } else if name.contains("back") {
+                -1.0
+            } else {
+                continue;
+            };
+            let at = points[i as usize];
+            towards[0] += sign * (at[0] - centre[0]);
+            towards[1] += sign * (at[1] - centre[1]);
+        }
+    }
+    let length = towards[0].hypot(towards[1]);
+    let front = if length > 1e-9 {
+        [towards[0] / length, towards[1] / length]
+    } else {
+        [0.0, 1.0]
+    };
+    let across = [front[1], -front[0]];
+    // Along the curve from the front's top (0) to the back's (1): this
+    // piece's share of it.
+    let name = panel.name.to_lowercase();
+    let (from, to) = if name.contains("front") {
+        (0.0, 0.5)
+    } else if name.contains("back") {
+        (0.5, 1.0)
+    } else {
+        (0.0, 1.0)
+    };
+    let along: Vec<f64> = points
+        .iter()
+        .map(|q| (q[0] - centre[0]) * front[0] + (q[1] - centre[1]) * front[1])
+        .collect();
+    let (low, high) = along
+        .iter()
+        .fold((f64::MAX, f64::MIN), |(l, h), &v| (l.min(v), h.max(v)));
+    // The curve, in the body's middle: a half ellipse under the crotch,
+    // from just in front of the body to just behind it.
+    let top = figure.crotch + UP;
+    let section = figure.section(top);
+    let (middle, depth) = (section.middle, section.half[1] * CLEAR);
+    let bottom = figure.crotch - UNDER;
+    let curve = |t: f64| {
+        // From the front (angle 0) under (π/2) to the back (π).
+        let angle = t * std::f64::consts::PI;
+        [
+            top - (top - bottom) * angle.sin(),
+            middle[1] + depth * angle.cos(),
+        ]
+    };
+    points
+        .iter()
+        .zip(&along)
+        .map(|(q, &v)| {
+            let share = if high > low {
+                (high - v) / (high - low)
+            } else {
+                0.5
+            };
+            let [y, z] = curve(from + (to - from) * share);
+            let x = middle[0] + (q[0] - centre[0]) * across[0] + (q[1] - centre[1]) * across[1];
+            [x, y, z]
+        })
+        .collect()
 }
 
 /// Who is beside whom in a garment: its panels' boxes, the panels joined
@@ -1104,6 +1213,12 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
         };
         let ring = &rings[r];
         let found = partners(r, &out);
+        // A crotch piece: under the crotch, between the legs.
+        if ring.len() == 1 && between_legs(&g.panels[ring[0].0].name) {
+            let p = ring[0].0;
+            out[p] = under_the_crotch(g, p, &out, figure);
+            continue;
+        }
         if bridge[ring[0].0] && !found.is_empty() {
             out[ring[0].0] = spanned(g, ring[0].0, &found);
             continue;

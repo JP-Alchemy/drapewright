@@ -67,7 +67,6 @@ interface Drape {
   quietly: boolean
   leftOut: string[]
   inside: string[]
-  betweenLegs: string[]
   girths: Girth[]
   finish: (last: DrapeUpdate | null) => void
   told: { stage: string; at: number }
@@ -118,7 +117,6 @@ function moveDrape(d: Drape) {
     ...progress,
     leftOut: d.leftOut,
     inside: d.inside,
-    betweenLegs: d.betweenLegs,
     girths: d.girths,
   }
   const now = performance.now()
@@ -193,7 +191,6 @@ const handlers: { [M in keyof SimMethods]: (...args: Parameters<SimMethods[M]>) 
         quietly,
         leftOut: draping.leftOut,
         inside: draping.inside,
-        betweenLegs: draping.betweenLegs,
         girths: draping.girths,
         finish,
         told: { stage: '', at: 0 },

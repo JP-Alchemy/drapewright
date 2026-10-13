@@ -114,8 +114,6 @@ pub struct Draping {
     pub left_out: Vec<String>,
     /// The facings and linings, by id: left out, as they go inside.
     pub inside: Vec<String>,
-    /// The pieces between the legs (a crotch), by id: left out.
-    pub between_legs: Vec<String>,
     /// The garment's size round the body at its bust, waist and hip.
     pub girths: Vec<Girth>,
     done: Option<DrapeStage>,
@@ -165,7 +163,6 @@ impl Draping {
             drape,
             left_out: draped.alone,
             inside: draped.inside,
-            between_legs: draped.between_legs,
             girths,
             done: None,
         })

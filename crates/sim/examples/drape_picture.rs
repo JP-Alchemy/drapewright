@@ -151,8 +151,17 @@ fn project(path: &str, suggest: bool) -> (Vec<Piece>, Vec<Seam>) {
     sewn(pieces, seams)
 }
 
-/// Pieces sewn by the seams suggested for them.
-fn sewn_as_found(pieces: Vec<Piece>) -> (Vec<Piece>, Vec<Seam>) {
+/// Pieces sewn by the seams suggested for them, those drawn for one side
+/// cut as pairs first, as Find seams does.
+fn sewn_as_found(mut pieces: Vec<Piece>) -> (Vec<Piece>, Vec<Seam>) {
+    for id in drapewright_seams::drawn_for_one_side(&pieces, &[]) {
+        if let Some(piece) = pieces.iter_mut().find(|p| p.id == id) {
+            for cut in &mut piece.cut {
+                cut.quantity = 2;
+                cut.mirrored = Some(true);
+            }
+        }
+    }
     let seams = drapewright_seams::suggest(&pieces, &[])
         .into_iter()
         .enumerate()
@@ -199,10 +208,9 @@ fn sewn(pieces: Vec<Piece>, seams: Vec<Seam>) -> (Vec<Piece>, Vec<Seam>) {
     }
     let draped = draped_pieces(&pieces, &seams);
     eprintln!(
-        "left out: {} sewn to nothing, {} inside, {} between the legs",
+        "left out: {} sewn to nothing, {} inside",
         draped.alone.len(),
-        draped.inside.len(),
-        draped.between_legs.len()
+        draped.inside.len()
     );
     (draped.sewn, seams)
 }

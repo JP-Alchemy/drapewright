@@ -119,11 +119,6 @@ export class Draping {
     return drapings.get(this)!.inside
   }
 
-  /** The pieces between the legs (a crotch) left out, by id. */
-  get betweenLegs(): string[] {
-    return drapings.get(this)!.betweenLegs
-  }
-
   /** The garment's size round the body at the figure's bust, waist and hip. */
   get girths(): Girth[] {
     return drapings.get(this)!.girths as Girth[]

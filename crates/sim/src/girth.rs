@@ -143,6 +143,7 @@ mod tests {
                     half: [150.0, 100.0],
                 })
                 .collect(),
+            crotch: 850.0,
             arms: vec![Arm {
                 line: heights.iter().rev().map(|&y| [230.0, y, 0.0]).collect(),
                 up: vec![[1.0, 0.0, 0.0]; heights.len()],

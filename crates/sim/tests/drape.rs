@@ -330,7 +330,7 @@ fn found(pieces: &[drapewright_pattern_core::Piece]) -> Vec<drapewright_seams::S
 }
 
 #[test]
-fn a_corset_is_put_on_by_its_waist_line_its_crotch_piece_left_off() {
+fn a_corset_is_put_on_by_its_waist_line_its_crotch_piece_under_the_crotch() {
     use drapewright_pattern_core::testing::garments::corset;
     // Cut once, as the pattern leaves its panels: half way round, from the
     // centre front to the centre back, and said so.
@@ -339,16 +339,14 @@ fn a_corset_is_put_on_by_its_waist_line_its_crotch_piece_left_off() {
     let draped = draped_pieces(&pieces, &seams);
     assert_eq!(draped.alone, ["cr"]);
     assert!(half_round(&assemble(&draped.sewn, &seams, 20.0).unwrap()));
-    // Cut as pairs: all the way round, the crotch piece (between the legs)
-    // left off ...
+    // Cut as pairs: all the way round, with the crotch piece ...
     let pieces = corset(true);
     let seams = found(&pieces);
     let draped = draped_pieces(&pieces, &seams);
     assert!(draped.alone.is_empty(), "{:?}", draped.alone);
-    assert_eq!(draped.between_legs, ["cr"]);
     let garment = assemble(&draped.sewn, &seams, 20.0).unwrap();
     assert!(!half_round(&garment));
-    assert_eq!(garment.panels.len(), 6);
+    assert_eq!(garment.panels.len(), 7);
     // ... and each panel put on with its waist line at the avatar's waist,
     // not hung from its top.
     let model = avatar();
@@ -356,6 +354,9 @@ fn a_corset_is_put_on_by_its_waist_line_its_crotch_piece_left_off() {
     let figure = Figure::of(&model, &body);
     let starts = place(&garment, &figure);
     for (k, panel) in garment.panels.iter().enumerate() {
+        if panel.piece == "cr" {
+            continue;
+        }
         let waist = panel.waist.expect("a waist line");
         let off = panel
             .mesh
@@ -366,6 +367,25 @@ fn a_corset_is_put_on_by_its_waist_line_its_crotch_piece_left_off() {
             .fold(0.0f64, |m, d| m.max(d.abs()));
         assert!(off < 0.5, "{} {:?}: {off} mm off", panel.piece, panel.copy);
     }
+    // The crotch piece (its front: sewn to the fronts) from in front of the
+    // body to under the crotch.
+    let crotch = garment.panels.iter().position(|p| p.piece == "cr").unwrap();
+    let ys: Vec<f64> = starts[crotch].iter().map(|p| p[1]).collect();
+    let zs: Vec<f64> = starts[crotch].iter().map(|p| p[2]).collect();
+    let lowest = ys.iter().copied().fold(f64::MAX, f64::min);
+    assert!(
+        lowest < figure.crotch && lowest > figure.crotch - 30.0,
+        "lowest {lowest}, crotch {}",
+        figure.crotch
+    );
+    let middle = figure.middle(figure.crotch + 70.0)[1];
+    let (front, back) = zs
+        .iter()
+        .fold((f64::MIN, f64::MAX), |(f, b), &z| (f.max(z), b.min(z)));
+    assert!(
+        front > middle + 50.0 && (back - middle).abs() < 10.0,
+        "{back}..{front} round {middle}"
+    );
     // Its centre front, where the centre front's halves are sewn, at the
     // front of the body, not off to one side.
     for (k, panel) in garment.panels.iter().enumerate() {

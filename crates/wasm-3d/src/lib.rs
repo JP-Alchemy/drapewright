@@ -214,12 +214,6 @@ impl Draping {
         self.0.inside.clone()
     }
 
-    /// The pieces between the legs (a crotch) left out, by id.
-    #[wasm_bindgen(getter, js_name = betweenLegs)]
-    pub fn between_legs(&self) -> Vec<String> {
-        self.0.between_legs.clone()
-    }
-
     /// The garment's size round the body at the figure's bust, waist and
     /// hip: `Girth`s.
     #[wasm_bindgen(getter)]
