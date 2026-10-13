@@ -47,3 +47,30 @@ test('the app, installed on a home screen, opens at /app/', async ({ page }) => 
   // The same app as when it was at the root.
   expect(manifest.id).toBe('/')
 })
+
+test('links to the site and the app show a picture when shared', async ({ page }) => {
+  for (const path of ['/', '/app/']) {
+    await page.goto(path)
+    const meta = (property: string) =>
+      page.locator(`meta[property="${property}"]`).getAttribute('content')
+    const image = new URL((await meta('og:image'))!)
+    expect(image.href).toBe('https://drapewright.com/og.jpg')
+    expect(await meta('og:title')).toBeTruthy()
+    expect(await meta('og:description')).toBeTruthy()
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
+      'content',
+      'summary_large_image',
+    )
+    // The picture is served here, at the size the page gives for it.
+    const size = await page.evaluate(async (src) => {
+      const img = new Image()
+      img.src = src
+      await img.decode()
+      return [img.naturalWidth, img.naturalHeight]
+    }, image.pathname)
+    expect(size).toEqual([
+      Number(await meta('og:image:width')),
+      Number(await meta('og:image:height')),
+    ])
+  }
+})
