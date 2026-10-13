@@ -12,6 +12,48 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 47 — FreeSewing designs, drafted to your measurements
+
+FreeSewing's designs are drafted to each person's measurements rather than
+graded in sizes. Eight of them can now be drafted in Drapewright, on the
+device, and opened as a pattern: the Teagan T-shirt, the Sasha skater
+dress, the Penelope pencil skirt, the Sandy circle skirt, the Cathrin
+underbust corset, the Bella bodice block, the Simone shirt and the Diana
+draped top.
+
+**Try it:**
+
+1. Add someone's measurements (**Measurements**).
+2. On an empty table, press **A FreeSewing design, drafted to
+   measurements** (or **Draft a FreeSewing design to these measurements**
+   in the Measurements dialog). Choose whose measurements and a design.
+   It says which of their measurements it drafts to, and which it
+   estimates ("Estimated from FreeSewing's standard sizes, in proportion:
+   shoulder slope, waist to armpit…": measure those for a closer fit).
+3. Press **Draft**. The pieces open as any pattern does, named, with
+   their grainlines, folds, notches, hems and how many to cut, and 1 cm
+   seam allowance: **Add** them.
+4. **Find seams** sews them: a drafted T-shirt's shoulders, sides and
+   underarms, and each sleeve's head round its armhole. Drape it.
+
+**How it works:** FreeSewing (MIT, freesewing.org) drafts the design in
+the browser, the design loaded only when it is drafted. Drapewright writes
+each drafted piece as FreeSewing writes its own files (its stitching line,
+grainline, fold, notches and cutting instructions) for the SVG import to
+read, saying the allowance to add rather than drawing it, so Drapewright
+draws the cutting line itself; and marking its hems, which it finds where
+FreeSewing's allowance runs at least twice as deep, as deep all along (not
+a dart's leg, which the allowance bridges). Hems are what tell Find seams
+which way round a side seam goes. Measurements not taken are estimated
+from FreeSewing's standard size nearest the person, in proportion to what
+they have measured round the body (or along it, for lengths).
+
+**Not yet:** a design's own options (ease, lengths, necklines) can't be
+changed here; Simone's plackets and collar, and Sasha's princess panels,
+need some seams sewn by hand.
+
+---
+
 ## Step 46 — Feedback, and patterns that didn't open right
 
 **Feedback** (the speech bubble at the top right) starts an email to

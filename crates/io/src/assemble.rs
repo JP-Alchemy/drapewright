@@ -635,6 +635,22 @@ fn close_open_outlines(raw: &mut [RawPath]) -> Vec<Option<Closing>> {
     closings
 }
 
+/// Marks the piece's edges that lie along `hem` (a polyline on its
+/// outline) as hems.
+pub(crate) fn mark_hems(piece: &mut Piece, hem: &[Point]) {
+    const ON_HEM: f64 = 1.0;
+    for i in 0..piece.outline.edges.len() {
+        let geom = piece.outline.edge_geom(i);
+        let length = geom.length();
+        let under = [0.1, 0.5, 0.9]
+            .iter()
+            .all(|&t| distance_to_polyline(geom.point_at(t * length), hem, false) <= ON_HEM);
+        if under && piece.outline.edges[i].kind == EdgeKind::Seam {
+            piece.outline.edges[i].kind = EdgeKind::Hem;
+        }
+    }
+}
+
 /// Marks the piece's straight edges that lie along the line through `a` and
 /// `b` as folds.
 pub(crate) fn mark_folds(piece: &mut Piece, a: Point, b: Point) {
@@ -1433,6 +1449,21 @@ pub(crate) fn assemble(
         let r = &raw[i];
         let pts = flatten_segs(&r.segs, 0.05);
         if pts.is_empty() {
+            continue;
+        }
+        // A hem drawn along a piece's outline (as Drapewright writes a
+        // FreeSewing design it drafts): the edges under it are hems.
+        if r.hint.split_whitespace().any(|w| w == "hem")
+            && let Some(pi) = outlines[..pieces.len()].iter().position(|(poly, around)| {
+                let b = bounds(&pts);
+                around.contains(b.origin())
+                    && around.contains(Point::new(b.x1, b.y1))
+                    && sample(&pts, false, 2.0)
+                        .iter()
+                        .all(|p| distance_to_polyline(*p, poly, true) <= ON_OUTLINE)
+            })
+        {
+            mark_hems(&mut pieces[pi], &pts);
             continue;
         }
         // A copy of part of an outline (FreeSewing draws some seams twice).

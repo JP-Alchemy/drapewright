@@ -33,6 +33,7 @@ import { ProjectorView } from './ProjectorView.tsx'
 import { ContextMenu } from './ContextMenu.tsx'
 import { DeviceDialog } from './DeviceDialog.tsx'
 import { FeedbackDialog } from './FeedbackDialog.tsx'
+import { DraftDialog } from './DraftDialog.tsx'
 import { ImportDialog } from './ImportDialog.tsx'
 import { MeasurementsDialog } from './MeasurementsDialog.tsx'
 import { PrintDialog } from './PrintDialog.tsx'
@@ -269,6 +270,10 @@ function Workspace({
                     <span className="muted small">{t.samples.about[name]}</span>
                   </Button>
                 ))}
+                <Button className="sample" onPress={() => session.showDrafting(true)}>
+                  <span className="sample-title">{t.samples.titles.freesewing}</span>
+                  <span className="muted small">{t.samples.about.freesewing}</span>
+                </Button>
                 <p className="muted small">
                   {t.samples.credit}{' '}
                   <a href={SAMPLES.dress.licence} target="_blank" rel="noopener">
@@ -330,6 +335,7 @@ function Workspace({
       </div>
       <ImportDialog session={session} />
       {projector && <ProjectorView session={session} />}
+      <DraftDialog session={session} />
     </div>
   )
 }

@@ -416,3 +416,37 @@ fn utf16_files_read_like_utf8() {
         plain.pieces.len()
     );
 }
+
+#[test]
+fn a_stitching_line_that_says_its_allowance_and_hem_is_not_asked_about() {
+    // As Drapewright writes a FreeSewing design it drafts: the stitching
+    // line, saying how much allowance to add.
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="200mm" height="300mm" viewBox="0 0 200 300">
+      <g id="fs-stack-penelope.front-part-penelope.front">
+        <path id="fs-1" class="fabric" data-allowance="10" data-hem-allowance="30"
+          fill="none" stroke="#000" d="M 10,10 L 190,10 L 190,290 L 10,290 z"/>
+        <path id="fs-2" data-text="hem" fill="none" stroke="#000" d="M 190,290 L 10,290"/>
+        <text x="100" y="150">Cut 2 mirrored from fabric</text>
+      </g>
+    </svg>"##;
+    let result = import_svg(svg.as_bytes(), Some("drafted.svg")).unwrap();
+    assert_eq!(result.pieces.len(), 1);
+    let piece = &result.pieces[0];
+    assert_eq!(piece.name, "Front");
+    assert_eq!(
+        piece.allowance.mode,
+        drapewright_pattern_core::AllowanceMode::Add
+    );
+    assert!((piece.allowance.seam - 10.0).abs() < 1e-9);
+    assert!(result.allowance.pieces.is_empty(), "{:?}", result.allowance);
+    assert_eq!(piece.cut[0].quantity, 2);
+    // Its hem, as the line along it says, with its own allowance.
+    let hems: Vec<_> = piece
+        .outline
+        .edges
+        .iter()
+        .filter(|e| e.kind == drapewright_pattern_core::EdgeKind::Hem)
+        .collect();
+    assert_eq!(hems.len(), 1, "{:?}", piece.outline.edges);
+    assert_eq!(piece.allowance.hem, Some(30.0));
+}

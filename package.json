@@ -34,5 +34,50 @@
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.1",
     "vitest": "^5.0.3"
+  },
+  "pnpm": {
+    "packageExtensions": {
+      "@freesewing/bella@4.10.2": {
+        "dependencies": {
+          "@freesewing/library": "4.10.2"
+        }
+      },
+      "@freesewing/core-plugins@4.10.2": {
+        "dependencies": {
+          "@freesewing/plugin-transform": "4.10.2"
+        }
+      },
+      "@freesewing/diana@4.10.2": {
+        "dependencies": {
+          "@freesewing/library": "4.10.2"
+        }
+      },
+      "@freesewing/models@4.10.2": {
+        "dependencies": {
+          "@freesewing/config": "4.10.2"
+        }
+      },
+      "@freesewing/plugin-annotations@4.10.2": {
+        "dependencies": {
+          "@freesewing/config": "4.10.2"
+        }
+      },
+      "@freesewing/sasha@4.10.2": {
+        "dependencies": {
+          "@freesewing/library": "4.10.2",
+          "@freesewing/noble": "4.10.2"
+        }
+      },
+      "@freesewing/simon@4.10.2": {
+        "dependencies": {
+          "@freesewing/library": "4.10.2"
+        }
+      },
+      "@freesewing/teagan@4.10.2": {
+        "dependencies": {
+          "@freesewing/library": "4.10.2"
+        }
+      }
+    }
   }
 }

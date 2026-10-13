@@ -142,6 +142,8 @@ export interface UiState {
   avatar: boolean
   /** Projecting the pieces onto fabric, full screen. */
   projector: boolean
+  /** Choosing a FreeSewing design to draft. */
+  drafting: boolean
   /** Whose measurements the avatar is fitted to: a measurement set's id. */
   avatarPerson: string | null
   /** The fabric the garment is draped on the avatar in: ready made, or one's own (by id). */
@@ -188,6 +190,7 @@ export class Session {
       sewing: null,
       avatar: false,
       projector: false,
+      drafting: false,
       avatarPerson: null,
       drapeFabric: 'poplin',
     })
@@ -394,6 +397,11 @@ export class Session {
   /** Projects the pieces onto fabric, full screen, or stops. */
   showProjector(open: boolean): void {
     this.ui.set((s) => ({ ...s, projector: open }))
+  }
+
+  /** Opens or closes the choice of a FreeSewing design to draft. */
+  showDrafting(open: boolean): void {
+    this.ui.set((s) => ({ ...s, drafting: open }))
   }
 
   /** Opens or closes the 3D view of the avatar. */

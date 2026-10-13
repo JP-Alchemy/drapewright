@@ -123,6 +123,39 @@ export const t = {
       })[why],
   },
 
+  drafting: {
+    heading: 'Draft a FreeSewing design',
+    open: 'Draft a FreeSewing design to these measurements',
+    intro:
+      'FreeSewing’s designs are drafted to each person’s measurements, not cut from standard sizes. Choose one: it is drafted here, on this device, and opened as a pattern to add.',
+    noPeople:
+      'Add someone’s measurements first (Measurements, at the top): the design is drafted to them.',
+    whose: 'Whose measurements',
+    which: 'Design',
+    designs: {
+      teagan: ['Teagan T-shirt', 'A T-shirt for knit fabrics'],
+      sasha: ['Sasha dress', 'A skater dress with princess seams and pockets'],
+      penelope: ['Penelope pencil skirt', 'A fitted pencil skirt with darts'],
+      sandy: ['Sandy circle skirt', 'A circle skirt with a waistband'],
+      cathrin: ['Cathrin corset', 'An underbust corset or waist trainer'],
+      bella: ['Bella bodice block', 'A womenswear bodice block, to design from'],
+      simone: ['Simone shirt', 'A button-down shirt for people with breasts'],
+      diana: ['Diana draped top', 'A top with a draped neck'],
+    } satisfies Record<string, [string, string]>,
+    uses: (name: string, used: string[]) =>
+      used.length > 0
+        ? `Drafted to ${name}’s ${new Intl.ListFormat('en', { type: 'conjunction' }).format(used)}.`
+        : `None of ${name}’s measurements are ones it uses.`,
+    guessed: (names: string[]) =>
+      `Estimated from FreeSewing’s standard sizes, in proportion: ${new Intl.ListFormat('en', { type: 'conjunction' }).format(names)}. Measure them for a closer fit.`,
+    forWhom: (name: string) => `for ${name}`,
+    credit: 'Designs by FreeSewing (Joost De Cock and contributors), shared under the MIT licence.',
+    cancel: 'Cancel',
+    draft: (design: string) => `Draft ${design}`,
+    drafting: 'Drafting…',
+    failed: (why: string) => `It couldn’t be drafted. ${why}`,
+  },
+
   feedback: {
     heading: 'Feedback',
     intro:
@@ -221,11 +254,13 @@ export const t = {
       blouse: 'A blouse, ready to drape',
       skirt: 'A skirt, ready to drape',
       dress: 'A dress from a PDF pattern',
+      freesewing: 'A FreeSewing design, drafted to measurements',
     },
     about: {
       blouse: 'Sewn already: see it on the figure, read where it pulls, alter it.',
       skirt: 'A front and a back, sewn at the sides, to drape in any fabric.',
       dress: 'FreeSewing’s Sasha dress as a copy-shop PDF: see it read, piece by piece.',
+      freesewing: 'A T-shirt, a dress, skirts, a corset: drafted to someone’s measurements.',
     },
     names: { blouse: 'Sample blouse', skirt: 'Sample skirt', dress: 'Sample dress' },
     opened: (name: string) =>

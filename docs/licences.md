@@ -60,6 +60,7 @@ Project licence: **not yet chosen** (see
 | ajv *(dev)* | MIT | Checking saved projects against the published JSON Schema in tests |
 | binaryen *(dev)* | Apache-2.0 | `wasm-opt`, shrinking the WebAssembly build |
 | eslint, typescript-eslint, prettier | MIT | Linting and formatting |
+| @freesewing/core, its plugins and designs (teagan, sasha, penelope, sandy, cathrin, bella, simone, diana, and those they build on), @freesewing/models | MIT | Drafting FreeSewing's designs to someone's measurements, in the browser, loaded only when one is drafted; © Joost De Cock and contributors, credited in the dialog with the licence at `/licences/freesewing.txt`. `hooks` (MIT, by Brian Noguchi), which FreeSewing's core uses, says so where pnpm doesn't read it, so the licence check knows it by hand. |
 
 ## Assets
 

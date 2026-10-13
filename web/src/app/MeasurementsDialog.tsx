@@ -132,6 +132,17 @@ function MeasurementsForm({ session, close }: { session: Session; close: () => v
         </>
       )}
       <div className="dialog-actions">
+        {sets.length > 0 && (
+          <Button
+            className="button"
+            onPress={() => {
+              close()
+              session.showDrafting(true)
+            }}
+          >
+            {t.drafting.open}
+          </Button>
+        )}
         <Button className="button primary" onPress={close}>
           {t.measure.done}
         </Button>

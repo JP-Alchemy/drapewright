@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use drapewright_pattern_core::{CutInstruction, NotchKind, SourceFormat};
+use drapewright_pattern_core::{AllowanceMode, CutInstruction, NotchKind, SourceFormat};
 use kurbo::{CubicBez, Line, ParamCurve, PathSeg, Point, QuadBez};
 use usvg::tiny_skia_path::PathSegment;
 
@@ -24,6 +24,19 @@ struct ElementInfo {
     text: Option<String>,
     /// How many to cut, from the text of the piece group the element is in.
     cut: Option<CutInstruction>,
+    /// A stitching line's allowance, mm, from `data-allowance` (and its
+    /// hems', from `data-hem-allowance`): Drapewright says so of the
+    /// patterns it drafts (FreeSewing's designs), whose allowance it adds
+    /// itself.
+    allowance: Option<f64>,
+    hem_allowance: Option<f64>,
+}
+
+/// An attribute that says a length in mm, if it does.
+fn mm_attribute(node: roxmltree::Node, name: &str) -> Option<f64> {
+    node.attribute(name)
+        .and_then(|a| a.trim().parse::<f64>().ok())
+        .filter(|a| a.is_finite() && *a >= 0.0)
 }
 
 /// All the text inside an element, its tspans joined.
@@ -75,6 +88,8 @@ fn element_infos(doc: &roxmltree::Document) -> HashMap<String, ElementInfo> {
                 group_label,
                 text: node.attribute("data-text").map(str::to_string),
                 cut,
+                allowance: mm_attribute(node, "data-allowance"),
+                hem_allowance: mm_attribute(node, "data-hem-allowance"),
             },
         );
     }
@@ -404,7 +419,7 @@ pub fn import_svg(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         &mut notches,
     );
     let sha256 = sha256_hex(data);
-    let (pieces, notes) = assemble(
+    let (mut pieces, notes) = assemble(
         raw,
         &notches,
         false,
@@ -413,8 +428,28 @@ pub fn import_svg(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
         file_name,
         &sha256,
     );
+    // Stitching lines that say their allowance: added, not asked about.
+    let mut said = Vec::new();
+    for piece in &mut pieces {
+        let info = piece
+            .source
+            .as_ref()
+            .and_then(|s| s.reference.as_deref())
+            .and_then(|r| infos.get(r));
+        if let Some(width) = info.and_then(|i| i.allowance) {
+            piece.allowance.mode = AllowanceMode::Add;
+            piece.allowance.seam = width;
+            piece.allowance.hem = info.and_then(|i| i.hem_allowance);
+            said.push(piece.id.clone());
+        }
+    }
+    let mut allowance = AllowanceQuestion::for_unmeasured(&pieces, &notes, None);
+    allowance.pieces.retain(|id| !said.contains(id));
+    if allowance.pieces.is_empty() {
+        allowance.suggested = None;
+    }
     Ok(ImportResult {
-        allowance: AllowanceQuestion::for_unmeasured(&pieces, &notes, None),
+        allowance,
         pieces,
         scale,
         sizes: Default::default(),

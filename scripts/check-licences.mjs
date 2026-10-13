@@ -15,6 +15,12 @@ const ALLOWED = new Set([
   'BSL-1.0',
 ])
 
+/**
+ * Packages whose licence pnpm can't read, checked by hand: `hooks` (used by
+ * FreeSewing's core) says MIT in the old `licenses` field and its README.
+ */
+const READ_BY_HAND = { hooks: 'MIT' }
+
 /** An SPDX expression such as "(MIT OR Apache-2.0)". */
 function allowed(expression) {
   const e = expression.replace(/[()]/g, '').trim()
@@ -27,7 +33,11 @@ const byLicence = JSON.parse(
   execFileSync('pnpm', ['licenses', 'list', '--prod', '--json'], { encoding: 'utf8' }),
 )
 const refused = Object.entries(byLicence)
-  .filter(([licence]) => !allowed(licence))
+  .map(([licence, pkgs]) => [
+    licence,
+    pkgs.filter((p) => !(p.name in READ_BY_HAND && allowed(READ_BY_HAND[p.name]))),
+  ])
+  .filter(([licence, pkgs]) => pkgs.length > 0 && !allowed(licence))
   .map(([licence, pkgs]) => `${licence}: ${[...new Set(pkgs.map((p) => p.name))].join(', ')}`)
 const count = new Set(Object.values(byLicence).flatMap((pkgs) => pkgs.map((p) => p.name))).size
 
