@@ -9,6 +9,7 @@ pub mod alter;
 pub mod blend;
 pub mod build;
 pub mod geom;
+pub mod lay;
 pub mod model;
 pub mod notches;
 pub mod ops;

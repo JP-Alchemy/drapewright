@@ -14,6 +14,7 @@ import init, {
   importDxf as importDxfRaw,
   importPdf as importPdfRaw,
   importSvg as importSvgRaw,
+  layOut as layOutRaw,
   measurementVocabulary as measurementVocabularyRaw,
   planPrint as planPrintRaw,
   previewAllowance as previewAllowanceRaw,
@@ -30,6 +31,8 @@ import type {
   Hit,
   ImportResult,
   Issue,
+  LayRequest,
+  Layout,
   MeasurementInfo,
   PdfTexts,
   Piece,
@@ -257,6 +260,10 @@ export const jobs = {
   },
   exportSvg(pieces: Piece[]): string {
     return exportSvgRaw(pieces)
+  },
+  /** The pieces cut from a fabric laid out on it, and how much fabric they take. */
+  layOut(request: LayRequest): Layout {
+    return layOutRaw(request) as Layout
   },
   /** How the document would print. Throws if its print settings cannot print. */
   planPrint(document: Document): PrintPlan {

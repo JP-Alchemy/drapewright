@@ -35,6 +35,7 @@ import { DeviceDialog } from './DeviceDialog.tsx'
 import { ImportDialog } from './ImportDialog.tsx'
 import { MeasurementsDialog } from './MeasurementsDialog.tsx'
 import { PrintDialog } from './PrintDialog.tsx'
+import { LayoutDialog } from './LayoutDialog.tsx'
 import { SidePanel } from './SidePanel.tsx'
 import { SAMPLES, type SampleName, isSampleName, sampleFile } from './samples.ts'
 import { useAvatarLayout } from './avatar-layout.ts'
@@ -118,6 +119,7 @@ function TopBar({
         <span className="button-label">{t.avatar.open}</span>
       </ToggleButton>
       <PrintDialog session={session} />
+      <LayoutDialog session={session} />
       <Button
         className="button"
         onPress={() => session.showProjector(true)}

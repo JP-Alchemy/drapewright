@@ -12,6 +12,36 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 43 — Cutting layout, and how much fabric to buy
+
+**Layout**, at the top, lays the pieces out on fabric as they would be
+cut, and says how much fabric they take.
+
+**Try it:** open the sample blouse (Step 38) and press **Layout**. On
+150 cm fabric folded in half lengthwise: "It takes 1.30 m of main fabric
+150 cm wide, folded, 38% of it cut into pieces." The front and back are
+on the fold, end to end; the sleeves are cut as a pair through both
+layers below them. Change the width (112, 140 or 150 cm, or 45, 54 or 60
+inches in inches; or another), open the fabric out, or keep every piece
+the same way up for a nap or a one-way print. A project with lining or
+interfacing lays out each fabric in turn. The choices are kept for next
+time.
+
+**How it works:** each piece's cutting line is turned so that its
+grainline runs along the fabric (either way, unless the fabric has a
+nap), the biggest first, and slid along the fabric as far back as it
+fits, nearest the fold or selvage, with 2 mm between pieces. The fabric
+is worked out in rows 2.5 mm deep: in each row, the spans pieces
+already take. Folded, a pair is cut at once through both layers, a piece
+cut on the fold has its fold edge on the fabric's fold, and a piece cut
+once (or the last of an odd number) is cut through the top layer only,
+which the layout says. Open, a piece cut on the fold is laid out whole,
+and pairs are laid one face down. A piece wider than the fabric is
+said, not laid. Lengths are rounded up to the next 5 cm (or eighth of a
+yard).
+
+---
+
 ## Step 42 — Fit advice, and altering to fit
 
 Once a garment has settled on the figure, the avatar says how it fits

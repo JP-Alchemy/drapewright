@@ -9,6 +9,7 @@ import type {
   EdgeKind,
   FabricPreset,
   ImportNote,
+  LayNote,
   MeasurementGroup,
   OneSize,
   Reason,
@@ -120,6 +121,34 @@ export const t = {
         notWorn: `“${piece}” isn’t worn round the body, so it is cut in ${size}, the ${top}’s size.`,
         notInEverySize: `“${piece}” isn’t in every size between, so it is cut in ${size}.`,
       })[why],
+  },
+
+  layout: {
+    open: 'Layout',
+    openHint: 'How the pieces lie on the fabric to cut, and how much fabric they take.',
+    heading: 'Cutting layout',
+    material: 'Fabric',
+    width: 'Fabric width',
+    otherWidth: 'Another width…',
+    ownWidth: 'Width',
+    folded: 'Folded in half lengthwise',
+    oneWay: 'Nap or one-way print',
+    takes: (length: string, width: string, material: string, folded: boolean, used: number) =>
+      `It takes ${length} of ${material} ${width} wide${folded ? ', folded' : ''}, ${used}% of it cut into pieces. Buy a little more to straighten its ends.`,
+    nothing: 'No piece is cut from this fabric.',
+    note: (kind: LayNote['kind'], piece: string) =>
+      ({
+        tooWide: `“${piece}” is wider than the fabric: it isn’t laid out. Open the fabric out, or choose a wider one.`,
+        oneLayer: `“${piece}” is cut through the top layer only: fold the bottom one back out of the way.`,
+        noGrain: `“${piece}” has no grainline: it is laid along the fabric as it is drawn.`,
+      })[kind],
+    how: 'Each piece is laid with its grainline along the fabric, the biggest first, each as far along as it fits. Folded, a pair is cut at once through both layers, and a piece cut on the fold goes on the fabric’s fold. Pieces marked face down are the other of a pair, cut with the pattern turned over.',
+    picture: (n: number) =>
+      plural(n, 'One piece laid out on the fabric', '# pieces laid out on the fabric'),
+    fold: 'Fold',
+    selvage: 'Selvages',
+    faceDown: '(face down)',
+    failed: (why: string) => `The pieces couldn’t be laid out. ${why}`,
   },
 
   fitting: {

@@ -214,7 +214,7 @@ h2 {
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1200px) {
   .topbar .button-label {
     position: absolute;
     width: 1px;
@@ -2320,4 +2320,65 @@ h2 {
   margin-right: 4px;
   vertical-align: -2px;
   color: var(--ok);
+}
+
+/* The cutting layout. */
+.layout-choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px 16px;
+}
+
+.layout-takes {
+  margin: 12px 0 4px;
+  font-weight: 600;
+}
+
+.layout-picture {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.layout-picture svg {
+  display: block;
+  width: 100%;
+  min-width: 480px;
+  height: auto;
+}
+
+.layout-fabric {
+  fill: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  stroke: var(--border);
+}
+
+.layout-fold {
+  stroke: var(--ink-muted);
+  stroke-width: 3;
+  stroke-dasharray: 12 8;
+}
+
+.layout-edge {
+  fill: var(--ink-muted);
+}
+
+.layout-piece polygon {
+  fill: var(--surface);
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.layout-piece.face-down polygon {
+  fill: color-mix(in srgb, var(--ink) 6%, var(--surface));
+}
+
+.layout-piece text {
+  fill: var(--ink);
+}
+
+.layout-grain {
+  stroke: var(--ink-muted);
+  stroke-width: 2;
 }

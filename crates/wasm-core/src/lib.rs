@@ -309,6 +309,14 @@ pub fn export_svg_js(pieces: JsValue) -> Result<String, JsError> {
     Ok(export_svg(&pieces, &SvgExportOptions::default()))
 }
 
+/// Pieces laid out on fabric to cut (a `LayRequest`), and how much fabric
+/// they take: a `Layout`.
+#[wasm_bindgen(js_name = layOut)]
+pub fn lay_out(request: JsValue) -> Result<JsValue, JsError> {
+    let request: drapewright_pattern_core::lay::LayRequest = from_js(request)?;
+    to_js(&drapewright_pattern_core::lay::lay(&request))
+}
+
 /// How a document would print: the layout, the page grid and which pages
 /// print.
 #[wasm_bindgen(js_name = planPrint)]
