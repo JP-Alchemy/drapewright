@@ -447,3 +447,86 @@ fn a_bust_dart_is_found_where_tapped_and_pivoted_to_the_waist() {
     e.undo().unwrap();
     assert_eq!(e.document().pieces[0].darts.len(), 1);
 }
+
+fn stretch(pattern: f64, fabric: f64, both_ways: bool) -> Alteration {
+    Alteration {
+        id: String::new(),
+        on: true,
+        change: Change::Stretch {
+            pattern,
+            fabric,
+            both_ways,
+        },
+    }
+}
+
+#[test]
+fn a_piece_is_narrowed_for_a_fabric_that_stretches_more() {
+    let (mut e, piece, edges) = project();
+    // On the fold down its left side, a notch 100 mm along its top.
+    e.dispatch(
+        Command::SetEdgeKind {
+            piece: piece.clone(),
+            edge: edges[3].clone(),
+            kind: EdgeKind::Fold,
+        },
+        Default::default(),
+    )
+    .unwrap();
+    e.dispatch(
+        Command::AddNotch {
+            piece: piece.clone(),
+            edge: edges[0].clone(),
+            at: 100.0,
+            from: NotchFrom::Start,
+            kind: NotchKind::Single,
+        },
+        Default::default(),
+    )
+    .unwrap();
+    // Made for 20% stretch, cut from a fabric that stretches 50%: 1.2/1.5
+    // as wide, as long.
+    e.dispatch(
+        Command::AddAlteration {
+            piece: piece.clone(),
+            alteration: stretch(20.0, 50.0, false),
+        },
+        Default::default(),
+    )
+    .unwrap();
+    let p = &e.document().pieces[0];
+    let b = p.outline.bounds();
+    assert!((b.width() - 160.0).abs() < 1e-6, "{b:?}");
+    assert!((b.height() - 500.0).abs() < 1e-6, "{b:?}");
+    // The fold where it was; the notch as far across its narrower top.
+    assert!(b.x0.abs() < 1e-6, "{b:?}");
+    assert!((p.notches[0].at - 80.0).abs() < 1e-6, "{:?}", p.notches);
+    // Four-way stretch: shorter too.
+    let step = p.alterations[0].clone();
+    e.dispatch(
+        Command::SetAlteration {
+            piece: piece.clone(),
+            alteration: Alteration {
+                change: Change::Stretch {
+                    pattern: 20.0,
+                    fabric: 50.0,
+                    both_ways: true,
+                },
+                ..step
+            },
+        },
+        Default::default(),
+    )
+    .unwrap();
+    let b = e.document().pieces[0].outline.bounds();
+    assert!((b.height() - 400.0).abs() < 1e-6, "{b:?}");
+    // A stretch no fabric has is refused.
+    let refused = e.dispatch(
+        Command::AddAlteration {
+            piece,
+            alteration: stretch(20.0, 1000.0, false),
+        },
+        Default::default(),
+    );
+    assert!(matches!(refused, Err(CommandError::Rejected { .. })));
+}

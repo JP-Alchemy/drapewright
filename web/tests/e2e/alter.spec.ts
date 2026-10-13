@@ -254,3 +254,45 @@ test('a swayback and a waist are adjusted on a skirt', async ({ page }) => {
   })
   expect(waistEnd[0]).toBeGreaterThan(193)
 })
+
+test('a knit cut from a fabric that stretches more is made smaller, on every piece', async ({
+  page,
+}) => {
+  await page.goto('/app/')
+  await page.getByTestId('pattern-file').setInputFiles(fixture('blouse.drapewright'))
+  const pieces = page.getByRole('listbox', { name: 'Pieces' })
+  const front = pieces.getByRole('option', { name: /Blouse front/ })
+  const back = pieces.getByRole('option', { name: /Blouse back/ })
+  await front.click()
+
+  // Made for a fabric that stretches 20%, cut from one that stretches 20%: as drawn.
+  await addStep(page, 'Fabric stretch')
+  await expect(
+    page.getByRole('switch', { name: /As drawn: the fabric stretches as the pattern’s does/ }),
+  ).toBeChecked()
+  await expect(front).toContainText('25.5 cm × 60.0 cm')
+
+  // A fabric that stretches 50%: a fifth narrower across the grain.
+  const fabric = page.getByRole('textbox', { name: 'This fabric stretches' })
+  await fabric.fill('50')
+  await fabric.press('Enter')
+  await expect(
+    page.getByRole('switch', { name: 'Narrowed 20% across the grain for the fabric’s stretch' }),
+  ).toBeChecked()
+  await expect(front).toContainText('20.4 cm × 60.0 cm')
+
+  // Four-way stretch: shorter too.
+  await page.getByText('Both ways (four-way stretch)').click()
+  await expect(front).toContainText('20.4 cm × 48.0 cm')
+
+  // The same on the back and the sleeve, in one undo step.
+  await page.getByRole('button', { name: 'The same on the 2 other pieces of this fabric' }).click()
+  await expect(page.getByText('Added to 2 more pieces.')).toBeVisible()
+  await expect(back).not.toContainText('60.0 cm')
+  await back.click()
+  await expect(
+    page.getByRole('switch', { name: 'Narrowed 20% both ways for the fabric’s stretch' }),
+  ).toBeChecked()
+  await page.getByRole('button', { name: /^Undo/ }).click()
+  await expect(back).toContainText('60.0 cm')
+})

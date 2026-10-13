@@ -12,6 +12,8 @@ export const FITS = {
   fitted: { bust: 60, waist: 40, hip: 60 },
   relaxed: { bust: 120, waist: 120, hip: 120 },
   close: { bust: -20, waist: -60, hip: -20 },
+  // A knit's negative ease: about 5% smaller than the body all round.
+  stretch: { bust: -40, waist: -30, hip: -40 },
 } as const
 export type Fit = keyof typeof FITS
 

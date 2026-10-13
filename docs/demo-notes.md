@@ -12,6 +12,37 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 50 — Knits: a fabric that stretches more or less
+
+A knit pattern drawn for a fabric with some stretch can be cut from one
+that stretches more or less, with the pieces made to suit; and sizes can
+be chosen, and a draped garment judged, for a stretch fit.
+
+**Try it:**
+
+1. Open a pattern, pick a piece and choose **Add a step → Fabric
+   stretch**. Set **Made for a fabric that stretches** to what the pattern
+   says (20% to start with) and **This fabric stretches** to yours (mark
+   10 cm across the grain, stretch it gently as far as it goes: to 13 cm
+   is 30%). For 20% and 50% the step reads "Narrowed 20% across the grain
+   for the fabric's stretch", and the piece is a fifth narrower; switch on
+   **Both ways** for a four-way stretch and it is shorter too.
+2. Press **The same on the other pieces of this fabric**: every other piece
+   cut from it gets the same step, in one undo.
+3. In the size finder, or under a draped garment's fit, choose **Stretch
+   (knits, smaller than the body)**: about 4 cm smaller than the body round
+   the bust and hip and 3 cm at the waist, as a knit worn close is.
+
+**How it works:** a piece made for a fabric that stretches by p % is
+meant to be worn stretched to (1 + p/100) of its width; cut from one
+that stretches by f %, it is scaled across the grain by (1 + p/100) /
+(1 + f/100), so it stretches as far on the body. It is scaled about its
+fold (which stays where it is), or else its grainline, as a step kept on
+the piece like the others; switched off, the piece is as drawn. The old
+**Close** fit is now for corsets only.
+
+---
+
 ## Step 49 — Trousers on the avatar
 
 Trousers drape with a leg round each leg, and Find seams sews their

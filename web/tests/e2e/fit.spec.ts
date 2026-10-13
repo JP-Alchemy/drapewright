@@ -45,6 +45,6 @@ test('a draped skirt says how it fits, and is altered at its side seams to fit',
   })
   // Close-fitting, the same skirt is too loose.
   await fit.getByRole('button', { name: /Fitted/ }).click()
-  await page.getByRole('option', { name: 'Close (corsets, stretch)' }).click()
+  await page.getByRole('option', { name: 'Close (corsets)' }).click()
   await expect(said).toHaveText(/too loose at the waist/)
 })

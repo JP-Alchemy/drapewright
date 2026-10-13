@@ -152,6 +152,18 @@ pub enum Change {
     /// out by `by` mm at `at` (at the hip) and beyond (down to the hem),
     /// tapering to nothing at `to` (at the waist).
     Hip { at: Pt, to: Pt, by: f64 },
+    /// Made for a fabric that stretches `pattern` % across the grain, cut
+    /// from one that stretches `fabric` %: narrower across the grain where
+    /// the fabric stretches more (wider where it stretches less), so that
+    /// stretched as far it is as wide; along the grain too where it
+    /// stretches `both_ways` (a four-way stretch). Scaled about the piece's
+    /// fold, or else its grainline, which stay where they are.
+    Stretch {
+        pattern: f64,
+        fabric: f64,
+        #[serde(default)]
+        both_ways: bool,
+    },
     /// An edge trued, after other steps left jogs or corners in it: each
     /// part of it between its darts redrawn as a straight line where
     /// `straight`; otherwise each jog and corner along it (not at its ends
@@ -209,7 +221,7 @@ impl Change {
                 *at = f(*at);
                 *to = f(*to);
             }
-            Change::TrueUp { .. } => {}
+            Change::TrueUp { .. } | Change::Stretch { .. } => {}
         }
     }
 
@@ -360,6 +372,11 @@ pub fn alter(drawn: &Drawn, alterations: &[Alteration]) -> Result<Drawn, AlterEr
             | Change::Waist { at, to, by }
             | Change::Hip { at, to, by } => widen(&shape, (*at).into(), (*to).into(), *by)?,
             Change::TrueUp { edge, straight } => true_up(&shape, edge, *straight)?,
+            Change::Stretch {
+                pattern,
+                fabric,
+                both_ways,
+            } => for_stretch(&shape, *pattern, *fabric, *both_ways),
         };
     }
     Ok(shape)
@@ -1254,6 +1271,51 @@ fn down_the_grain(shape: &Drawn) -> Vec2 {
             if d.y < 0.0 { -d } else { d }
         })
         .unwrap_or(Vec2::new(0.0, 1.0))
+}
+
+// ── Stretch ──────────────────────────────────────────────────────────────
+
+/// The whole piece scaled, about a line: nothing cut.
+struct Scaled(Affine);
+
+impl Cut for Scaled {
+    fn crossings(&self, _seg: &PathSeg) -> Vec<f64> {
+        Vec::new()
+    }
+    fn part(&self, _at: Point) -> Affine {
+        self.0
+    }
+}
+
+/// How much a piece made for a fabric stretching `pattern` % is scaled cut
+/// from one stretching `fabric` %: as wide stretched as far.
+pub fn stretch_factor(pattern: f64, fabric: f64) -> f64 {
+    (1.0 + pattern.max(0.0) / 100.0) / (1.0 + fabric.max(0.0) / 100.0)
+}
+
+fn for_stretch(shape: &Drawn, pattern: f64, fabric: f64, both_ways: bool) -> Drawn {
+    let factor = stretch_factor(pattern, fabric);
+    let down = down_the_grain(shape);
+    let across = Vec2::new(-down.y, down.x);
+    // About the fold, or else the grainline, or else the piece's middle.
+    let outline = &shape.outline;
+    let origin: Point = outline
+        .edges
+        .iter()
+        .position(|e| e.kind == EdgeKind::Fold)
+        .map(|i| Point::from(outline.edge_start(i)))
+        .or_else(|| shape.grainline.map(|g| Point::from(g.from)))
+        .unwrap_or_else(|| outline.bounds().center());
+    let along = if both_ways { factor } else { 1.0 };
+    // across·factor·acrossᵀ + down·along·downᵀ, about `origin`.
+    let m = |a: f64, b: f64| across.x * across.x * a + down.x * down.x * b;
+    let m00 = m(factor, along);
+    let m11 = across.y * across.y * factor + down.y * down.y * along;
+    let m01 = across.x * across.y * factor + down.x * down.y * along;
+    let linear = Affine::new([m00, m01, m01, m11, 0.0, 0.0]);
+    let moved = linear * origin;
+    let affine = Affine::translate(origin - moved) * linear;
+    cut_shape(&Scaled(affine), shape)
 }
 
 /// The edge nearest to `p` (by index).

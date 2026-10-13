@@ -82,6 +82,7 @@ function alteredPaths(piece: Piece): { drawn: Path2D | null; alterLines: Path2D 
       case 'waist':
       case 'hip':
       case 'trueUp':
+      case 'stretch':
         break
     }
   }

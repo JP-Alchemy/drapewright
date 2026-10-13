@@ -86,7 +86,8 @@ export const t = {
     fits: {
       fitted: 'Fitted',
       relaxed: 'Relaxed',
-      close: 'Close (corsets, stretch)',
+      close: 'Close (corsets)',
+      stretch: 'Stretch (knits, smaller than the body)',
     } as Record<string, string>,
     measure: (name: string) => `Sew and measure every size on ${name}`,
     measuring: 'Sewing and measuring every size…',
@@ -221,10 +222,12 @@ export const t = {
   fitting: {
     heading: 'Fit',
     /** How each fit is named in a sentence. */
-    fitNames: { fitted: 'fitted', relaxed: 'relaxed', close: 'close-fitting' } as Record<
-      string,
-      string
-    >,
+    fitNames: {
+      fitted: 'fitted',
+      relaxed: 'relaxed',
+      close: 'close-fitting',
+      stretch: 'a stretch fit',
+    } as Record<string, string>,
     fits: (fit: string, levels: string[]) =>
       `It fits as ${fit} should at the ${new Intl.ListFormat('en', { type: 'conjunction' }).format(levels)}.`,
     tight: (by: string, level: string) => `${by} too tight at the ${level}`,
@@ -475,6 +478,7 @@ export const t = {
       hip: ['Hip', 'At a side seam, from the hip down'],
       pivot: ['Move a dart', 'Closed where it is, opened elsewhere'],
       trueUp: ['True up an edge', 'Its jogs and corners smoothed, or made straight'],
+      stretch: ['Fabric stretch', 'For a fabric that stretches more or less than the pattern’s'],
     } as Record<string, [string, string]>,
     none: 'None yet. Each change is kept as a step that can be switched off: the piece as drawn is kept too.',
     lengthen: 'Lengthen or shorten',
@@ -506,6 +510,23 @@ export const t = {
     broader: 'Broader',
     narrower: 'Narrower',
     shoulderHint: 'How far the end of the shoulder seam moves along it.',
+    stretchStep: (percent: number, bothWays: boolean) =>
+      percent === 0
+        ? 'As drawn: the fabric stretches as the pattern’s does'
+        : `${percent < 0 ? 'Narrowed' : 'Widened'} ${Math.abs(percent)}% ${bothWays ? 'both ways' : 'across the grain'} for the fabric’s stretch`,
+    patternStretch: 'Made for a fabric that stretches',
+    patternStretchHint: 'As the pattern says: “for fabrics with 20% stretch”.',
+    fabricStretch: 'This fabric stretches',
+    fabricStretchHint:
+      'Mark 10 cm across the grain and stretch it gently as far as it goes: to 13 cm is 30%.',
+    bothWays: 'Both ways (four-way stretch)',
+    everyPiece: (n: number) =>
+      plural(
+        n,
+        'The same on the other piece of this fabric',
+        'The same on the # other pieces of this fabric',
+      ),
+    everyPieceDone: (n: number) => plural(n, 'Added to one more piece.', 'Added to # more pieces.'),
     bustSideStep: (larger: boolean, by: string) =>
       `Bust ${larger ? 'let out' : 'taken in'} ${by} at the side`,
     waistStep: (larger: boolean, by: string) =>

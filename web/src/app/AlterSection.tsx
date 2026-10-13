@@ -12,18 +12,22 @@ import type {
 import { ChevronDown, Plus, Trash2 } from 'lucide-react'
 import {
   Button,
+  Group,
+  Input,
   Label,
   ListBox,
   ListBoxItem,
   Menu,
   MenuItem,
   MenuTrigger,
+  NumberField,
   Popover,
   Radio,
   RadioGroup,
   Select,
   SelectValue,
   Switch,
+  Text,
 } from 'react-aria-components'
 import type { PickFor, Session } from '../state/session.ts'
 import { formatLength, t } from '../strings/en.ts'
@@ -59,6 +63,16 @@ export function AlterSection({
   view: PieceView
 }) {
   const own = piece.lines.filter((l) => l.kind === 'lengthenShorten')
+  const stretch = () =>
+    session.dispatch({
+      type: 'addAlteration',
+      piece: piece.id,
+      alteration: {
+        id: '',
+        on: true,
+        change: { type: 'stretch', pattern: 20, fabric: 20, bothWays: false },
+      },
+    })
   const lengthen = () => {
     const line: AlterLine = own[0] ? { type: 'own', line: own[0].id } : across(view, middle(view))
     session.dispatch({
@@ -89,6 +103,7 @@ export function AlterSection({
             className="menu"
             onAction={(key) => {
               if (key === 'lengthen') lengthen()
+              else if (key === 'stretch') stretch()
               else session.startPicking(piece.id, key as PickFor)
             }}
           >
@@ -127,10 +142,11 @@ const KINDS = [
   'hip',
   'pivot',
   'trueUp',
+  'stretch',
 ] as const
 
 /** What a step that changes by an amount says it does, and the two ways it can go (more, or less). */
-function wording(change: Exclude<Change, { type: 'pivot' | 'trueUp' }>, by: string) {
+function wording(change: Exclude<Change, { type: 'pivot' | 'trueUp' | 'stretch' }>, by: string) {
   const more = change.by >= 0
   switch (change.type) {
     case 'swayback':
@@ -210,7 +226,12 @@ function AlterStep({
       ? t.alter.pivotStep(change.share)
       : change.type === 'trueUp'
         ? t.alter.trueStep(edgeLabel(piece, change.edge), change.straight)
-        : wording(change, formatLength(Math.abs(change.by), units)).said
+        : change.type === 'stretch'
+          ? t.alter.stretchStep(
+              Math.round((stretchFactor(change.pattern, change.fabric) - 1) * 100),
+              change.bothWays,
+            )
+          : wording(change, formatLength(Math.abs(change.by), units)).said
   return (
     <div className="alter-step">
       <div className="alter-step-head">
@@ -272,6 +293,14 @@ function AlterStep({
           </div>
           <p className="muted small">{t.alter.trueHint}</p>
         </RadioGroup>
+      ) : change.type === 'stretch' ? (
+        <StretchFields
+          session={session}
+          piece={piece}
+          alteration={alteration}
+          change={change}
+          withChange={withChange}
+        />
       ) : (
         <Amount change={change} units={units} withChange={withChange} id={alteration.id} />
       )}
@@ -292,6 +321,100 @@ function AlterStep({
   )
 }
 
+/** As the engine has it: a piece made for `pattern` % stretch, cut from a fabric of `fabric` %. */
+export function stretchFactor(pattern: number, fabric: number): number {
+  return (1 + Math.max(pattern, 0) / 100) / (1 + Math.max(fabric, 0) / 100)
+}
+
+/**
+ * A fabric stretch step: how far the pattern's fabric and this one
+ * stretch, and whether both ways; and the same on every piece cut from
+ * this fabric.
+ */
+function StretchFields({
+  session,
+  piece,
+  alteration,
+  change,
+  withChange,
+}: {
+  session: Session
+  piece: Piece
+  alteration: Alteration
+  change: Extract<Change, { type: 'stretch' }>
+  withChange: (next: Change, coalesce?: string) => void
+}) {
+  const doc = session.engine.document()
+  // A piece without cutting instructions is cut once from the main fabric.
+  const materials = (p: Piece) => (p.cut.length > 0 ? p.cut.map((c) => c.material) : ['main'])
+  const material = materials(piece)[0]
+  // The other pieces cut from this fabric without a stretch step.
+  const others = doc.pieces.filter(
+    (p) =>
+      p.id !== piece.id &&
+      materials(p).includes(material!) &&
+      !p.alterations.some((a) => a.change.type === 'stretch'),
+  )
+  const percent = (label: string, value: number, onChange: (v: number) => void, hint?: string) => (
+    <NumberField
+      className="field"
+      value={value}
+      minValue={0}
+      maxValue={300}
+      formatOptions={{ maximumFractionDigits: 0 }}
+      onChange={(v) => Number.isFinite(v) && onChange(v)}
+    >
+      <Label>{label}</Label>
+      <Group className="number-group with-unit">
+        <Input className="number-input" />
+        <span className="number-unit">%</span>
+      </Group>
+      {hint && (
+        <Text slot="description" className="muted small">
+          {hint}
+        </Text>
+      )}
+    </NumberField>
+  )
+  return (
+    <>
+      {percent(
+        t.alter.patternStretch,
+        change.pattern,
+        (pattern) => withChange({ ...change, pattern }, `alter:${alteration.id}`),
+        t.alter.patternStretchHint,
+      )}
+      {percent(
+        t.alter.fabricStretch,
+        change.fabric,
+        (fabric) => withChange({ ...change, fabric }, `alter:${alteration.id}`),
+        t.alter.fabricStretchHint,
+      )}
+      <Switch
+        className="switch"
+        isSelected={change.bothWays}
+        onChange={(bothWays) => withChange({ ...change, bothWays })}
+      >
+        <span className="switch-track" aria-hidden="true" />
+        {t.alter.bothWays}
+      </Switch>
+      {others.length > 0 && (
+        <Button
+          className="link-button"
+          onPress={() =>
+            session.alterEach(
+              others.map((p) => p.id),
+              change,
+            )
+          }
+        >
+          {t.alter.everyPiece(others.length)}
+        </Button>
+      )}
+    </>
+  )
+}
+
 /** How much a step changes the piece, and which way. */
 function Amount({
   change,
@@ -299,7 +422,7 @@ function Amount({
   withChange,
   id,
 }: {
-  change: Exclude<Change, { type: 'pivot' | 'trueUp' }>
+  change: Exclude<Change, { type: 'pivot' | 'trueUp' | 'stretch' }>
   units: DisplayUnits
   withChange: (next: Change, coalesce?: string) => void
   id: string

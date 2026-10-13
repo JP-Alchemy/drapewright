@@ -394,6 +394,8 @@ fn realter(piece: &mut Piece, drawn: Drawn) -> Result<(), CommandError> {
 
 /// The longest an alteration may lengthen or shorten, mm.
 const MOST_ALTERED: f64 = 1000.0;
+/// The most a fabric stretches, %.
+const MOST_STRETCH: f64 = 300.0;
 
 fn checked_alteration(alteration: &Alteration) -> Result<(), CommandError> {
     match &alteration.change {
@@ -419,6 +421,16 @@ fn checked_alteration(alteration: &Alteration) -> Result<(), CommandError> {
             }
         }
         Change::TrueUp { .. } => {}
+        Change::Stretch {
+            pattern, fabric, ..
+        } => {
+            let fine = |s: &f64| s.is_finite() && (0.0..=MOST_STRETCH).contains(s);
+            if !fine(pattern) || !fine(fabric) {
+                return Err(CommandError::Rejected {
+                    message: "A fabric's stretch is a share of its length, from 0 to 300%.".into(),
+                });
+            }
+        }
     }
     Ok(())
 }

@@ -420,6 +420,15 @@ underarm) and `to` at the waist; for the waist, `at` is at the waist and
 there down to the hem) and `to` at the waist. The three kinds differ only
 in what they are called.
 
+**Change** `stretch` — `{ "type": "stretch", "pattern": percent,
+"fabric": percent, "bothWays": boolean }`: a piece drawn for a fabric that
+stretches `pattern` % (across the grain), cut from one that stretches
+`fabric` %, both 0 to 300. The piece is scaled across the grain by (1 +
+`pattern`/100) / (1 + `fabric`/100), and down it too where `bothWays`,
+about the start of its fold edge, or else the start of its grainline, or
+else its middle. A fabric that stretches more makes the piece smaller; its
+notches, marks and lines move with it. `bothWays` defaults to false.
+
 **Change** `trueUp` — `{ "type": "trueUp", "edge": id, "straight":
 boolean }`: an edge trued, after other steps left jogs or corners in it.
 Straight, each part of it between its darts is redrawn as a straight line

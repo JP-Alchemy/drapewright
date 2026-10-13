@@ -3,6 +3,7 @@
 
 import type {
   AllowanceAnswer,
+  Change,
   Command,
   CutInstruction,
   DispatchOptions,
@@ -421,6 +422,21 @@ export class Session {
 
   notify(notice: Notice | null): void {
     this.ui.set((s) => ({ ...s, notice }))
+  }
+
+  /**
+   * Adds the same alteration to each of `pieces`, in one undo step, and
+   * says so.
+   */
+  alterEach(pieces: string[], change: Change): void {
+    const step = { coalesce: `alter-each:${Date.now()}` }
+    for (const piece of pieces) {
+      this.dispatch(
+        { type: 'addAlteration', piece, alteration: { id: '', on: true, change } },
+        step,
+      )
+    }
+    this.toast(t.alter.everyPieceDone(pieces.length))
   }
 
   /**

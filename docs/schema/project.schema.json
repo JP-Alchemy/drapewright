@@ -457,6 +457,33 @@
           ]
         },
         {
+          "description": "Made for a fabric that stretches `pattern` % across the grain, cut\nfrom one that stretches `fabric` %: narrower across the grain where\nthe fabric stretches more (wider where it stretches less), so that\nstretched as far it is as wide; along the grain too where it\nstretches `both_ways` (a four-way stretch). Scaled about the piece's\nfold, or else its grainline, which stay where they are.",
+          "type": "object",
+          "properties": {
+            "bothWays": {
+              "type": "boolean",
+              "default": false
+            },
+            "fabric": {
+              "type": "number",
+              "format": "double"
+            },
+            "pattern": {
+              "type": "number",
+              "format": "double"
+            },
+            "type": {
+              "type": "string",
+              "const": "stretch"
+            }
+          },
+          "required": [
+            "type",
+            "pattern",
+            "fabric"
+          ]
+        },
+        {
           "description": "An edge trued, after other steps left jogs or corners in it: each\npart of it between its darts redrawn as a straight line where\n`straight`; otherwise each jog and corner along it (not at its ends\nor its darts) blended into a curve, the rest of it kept.",
           "type": "object",
           "properties": {
