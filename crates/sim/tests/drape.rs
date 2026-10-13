@@ -551,3 +551,51 @@ fn tube() -> (
         ],
     )
 }
+
+#[test]
+fn trousers_go_round_each_leg_below_the_crotch() {
+    use drapewright_pattern_core::testing::garments::trousers;
+    let pieces = trousers();
+    let seams = found(&pieces);
+    let draped = draped_pieces(&pieces, &seams);
+    let garment = assemble(&draped.sewn, &seams, 20.0).unwrap();
+    let model = avatar();
+    let body = model.shape(&Shape::default());
+    let figure = Figure::of(&model, &body);
+    assert_eq!(figure.legs.len(), 2);
+    let starts = place(&garment, &figure);
+    // Well below the crotch, each panel all on one side: two legs, not one
+    // tube round both; and each side with a front and a back on it.
+    let below = figure.crotch - 150.0;
+    // Which side each panel is on below the crotch: the figure's left (+x).
+    let mut sides: Vec<(bool, String)> = Vec::new();
+    for (k, panel) in garment.panels.iter().enumerate() {
+        let xs: Vec<f64> = starts[k]
+            .iter()
+            .filter(|p| p[1] < below)
+            .map(|p| p[0])
+            .collect();
+        assert!(!xs.is_empty(), "{}", panel.name);
+        let (low, high) = xs
+            .iter()
+            .fold((f64::MAX, f64::MIN), |(l, h), &x| (l.min(x), h.max(x)));
+        assert!(
+            low > 0.0 || high < 0.0,
+            "{} {:?}: {low}..{high}",
+            panel.name,
+            panel.copy
+        );
+        sides.push((low > 0.0, panel.name.clone()));
+    }
+    for side in [true, false] {
+        let names: Vec<&str> = sides
+            .iter()
+            .filter(|(s, _)| *s == side)
+            .map(|(_, n)| n.as_str())
+            .collect();
+        assert!(
+            names.contains(&"Trouser front") && names.contains(&"Trouser back"),
+            "{side}: {names:?}"
+        );
+    }
+}

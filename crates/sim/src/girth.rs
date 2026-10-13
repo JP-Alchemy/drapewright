@@ -144,6 +144,7 @@ mod tests {
                 })
                 .collect(),
             crotch: 850.0,
+            legs: Vec::new(),
             arms: vec![Arm {
                 line: heights.iter().rev().map(|&y| [230.0, y, 0.0]).collect(),
                 up: vec![[1.0, 0.0, 0.0]; heights.len()],

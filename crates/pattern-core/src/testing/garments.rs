@@ -433,6 +433,60 @@ pub fn yoked_blouse(sideways: bool) -> Vec<Piece> {
     vec![back, yoke, right, left, sleeve, cuff, facing]
 }
 
+/// Trousers, cut as pairs: a front and a back for each leg, each drawn as
+/// the left leg is, its outseam on the left and its centre and inseam on
+/// the right. The centre runs down from the waist and curves out to the
+/// crotch point, 60 mm out on the front and 90 on the back; the inseam runs
+/// down from there to the hem. The back is a little wider, and rises a
+/// little higher at the centre back. The fronts are notched where the
+/// inseam meets the hem, and so are the backs; each piece's grain runs down
+/// its middle.
+pub fn trousers() -> Vec<Piece> {
+    let half = |id: &str, name: &str, waist: f64, rise: f64, out: f64, hem: f64| {
+        // Clockwise on screen from the outseam's top: along the waist,
+        // down the centre and round to the crotch point, down the inseam,
+        // back along the hem, up the outseam.
+        let (crotch, length) = (260.0, 1000.0);
+        let mut p = piece(
+            id,
+            name,
+            [0.0, 0.0],
+            vec![
+                edge(&format!("{id}w"), line([waist, -rise])),
+                edge(
+                    &format!("{id}c"),
+                    vec![
+                        Segment::line([waist, 170.0]),
+                        Segment::cubic(
+                            [waist, crotch - 30.0],
+                            [waist + out * 0.6, crotch],
+                            [waist + out, crotch],
+                        ),
+                    ],
+                ),
+                edge(
+                    &format!("{id}i"),
+                    line([waist + out - (waist + out - hem) / 2.0, length]),
+                ),
+                edge(&format!("{id}h"), line([(waist + out - hem) / 2.0, length])),
+                edge(&format!("{id}o"), line([0.0, 0.0])),
+            ],
+            2,
+        );
+        grain(
+            &mut p,
+            [(waist + out) / 2.0, 200.0],
+            [(waist + out) / 2.0, 800.0],
+        );
+        notch(&mut p, &format!("{id}i"), 0.0, NotchFrom::End);
+        p
+    };
+    vec![
+        half("tf", "Trouser front", 190.0, 0.0, 60.0, 220.0),
+        half("tb", "Trouser back", 210.0, 30.0, 90.0, 260.0),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

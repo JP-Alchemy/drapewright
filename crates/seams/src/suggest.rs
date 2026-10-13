@@ -1519,10 +1519,96 @@ pub fn suggest<P: Borrow<Piece>>(pieces: &[P], existing: &[Seam]) -> Vec<Suggest
             reasons: vec![Reason::CentreOfPair],
         });
     }
+    // Trousers: a front and a back sewn to each other twice, at the
+    // outseam and the inseam, are a leg; the edge left over from the waist
+    // to the inseam's top (the crotch curve) is sewn to its other half.
+    for (k, c) in cands.iter().enumerate() {
+        if used[k] || !c.pair {
+            continue;
+        }
+        // The piece's edges sewn to one other piece, by the seams taken.
+        let sewn_to = |other: usize| -> Vec<usize> {
+            accepted
+                .iter()
+                .filter_map(|t| {
+                    let (_, i, j, _, _) = t.pair;
+                    let (a, b) = (&cands[i], &cands[j]);
+                    if a.piece == c.piece && b.piece == other {
+                        Some(i)
+                    } else if b.piece == c.piece && a.piece == other {
+                        Some(j)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
+        let Some(tube) = cands
+            .iter()
+            .map(|o| o.piece)
+            .filter(|&o| o != c.piece)
+            .map(sewn_to)
+            .find(|edges| edges.len() >= 2)
+        else {
+            continue;
+        };
+        // How high (down the page) an edge's end is where it meets `c`, and
+        // its other end.
+        let meeting = |e: &Candidate| -> Option<(f64, f64)> {
+            let (first, last) = (e.points[0], e.points[e.points.len() - 1]);
+            if (c.edge + 1) % c.edges == e.edge {
+                Some((first.y, last.y))
+            } else if (e.edge + 1) % c.edges == c.edge {
+                Some((last.y, first.y))
+            } else {
+                None
+            }
+        };
+        // The tube's seam that `c` meets at its top end, the lower of the
+        // tube's tops (an inseam's, at the crotch, not an outseam's, at the
+        // waist).
+        let tops: Vec<f64> = tube
+            .iter()
+            .map(|&e| {
+                let p = &cands[e].points;
+                p[0].y.min(p[p.len() - 1].y)
+            })
+            .collect();
+        let at_inseam = tube.iter().any(|&e| {
+            meeting(&cands[e]).is_some_and(|(here, there)| {
+                here < there
+                    && tops.iter().all(|&t| here >= t - 1.0)
+                    && tops.iter().any(|&t| here > t + 1.0)
+            })
+        });
+        let chord = c.points[c.points.len() - 1] - c.points[0];
+        let down = chord.y.abs() / chord.hypot().max(1e-9);
+        if !at_inseam || down < CROTCH_DOWN {
+            continue;
+        }
+        let centre = seam(whole(c, false), whole(c, true), false);
+        let parts = garment.parts(&centre, &place);
+        if !garment.sew(&parts) {
+            continue;
+        }
+        used[k] = true;
+        out.push(Suggestion {
+            seam: Seam {
+                name: sentence(&c.name),
+                ..centre
+            },
+            confidence: 0.5,
+            reasons: vec![Reason::CentreOfPair],
+        });
+    }
     out.extend(round_openings(&cands, pieces, &mut garment));
     out.extend(along_openings(&cands, pieces, &mut garment, &used));
     out
 }
+
+/// A trouser's crotch curve runs at least this much down the page (the
+/// cosine, over its chord): more down than across.
+const CROTCH_DOWN: f64 = 0.8;
 
 /// An edge this much longer or shorter than a run of an opening's edges
 /// is not sewn along them, mm.

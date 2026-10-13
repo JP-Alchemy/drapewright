@@ -640,3 +640,18 @@ fn a_crotch_in_two_pieces_is_sewn_to_itself_never_to_a_top() {
     let crotch_to_top = |s: &String| s.contains('c') && (s.contains(".ft") || s.contains(".bt"));
     assert!(!found.iter().any(crotch_to_top), "{found:?}");
 }
+
+#[test]
+fn trousers_are_sewn_at_their_inseams_outseams_and_centres() {
+    // Each leg's front and back at the outseam and the inseam; each crotch
+    // curve to the other leg's.
+    assert_eq!(
+        pairs(&drapewright_pattern_core::testing::garments::trousers()),
+        [
+            "tb.tbc-tb.tbc*",
+            "tb.tbi-tf.tfi",
+            "tb.tbo-tf.tfo",
+            "tf.tfc-tf.tfc*"
+        ]
+    );
+}

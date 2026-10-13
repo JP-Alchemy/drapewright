@@ -3,13 +3,14 @@
 //!
 //!     cargo run --release -p drapewright-sim --example drape_picture -- \
 //!         assets/body/adult.dwbody out [fabric] \
-//!         [skirt|blouse|long|bust|armhole|yoked|<project file> [suggest]]
+//!         [skirt|blouse|long|bust|armhole|yoked|trousers|<project file> [suggest]]
 //!
 //! writes out-placed.png, out-sewn.png and out-settled.png, draping a
 //! skirt, a blouse, a blouse with long sleeves, or one with a full bust
 //! adjustment (its dart in the side seam, or pivoted into the armhole),
 //! cut for the standard figure, or a long blouse with yokes, gathers and
-//! cuffs laid out on its side, sewn by the seams suggested for it; or a
+//! cuffs laid out on its side, or trousers, sewn by the seams suggested
+//! for them; or a
 //! project (a `.drapewright` file or its
 //! `project.json`) sewn by its confirmed seams, or with `suggest` by the
 //! seams suggested for it.
@@ -240,6 +241,7 @@ fn main() {
             let pieces = drapewright_pattern_core::testing::garments::yoked_blouse(true);
             sewn_as_found(pieces)
         }
+        "trousers" => sewn_as_found(drapewright_pattern_core::testing::garments::trousers()),
         path => project(path, rest.get(2).is_some_and(|s| s == "suggest")),
     };
     let garment = assemble(&pieces, &seams, 20.0).expect("a garment");

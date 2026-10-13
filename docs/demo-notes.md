@@ -12,6 +12,29 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 49 — Trousers on the avatar
+
+Trousers drape with a leg round each leg, and Find seams sews their
+crotch.
+
+**Try it:** open a trouser pattern (a front and a back, each cut as a
+pair), press **Find seams** and drape it. The inseams and outseams are
+sewn, and each crotch curve to the other leg's; on the figure each trouser
+leg goes round its own leg from just above the crotch down.
+
+**How it works:** the figure has legs now, as it has arms: a line down
+each from the hip through the knee to the ankle, and how far the leg
+reaches from it. A garment with a panel sewn to another on both its sides
+(a front to its back, at the outseam and the inseam) is trousers: round
+the hips its panels go round the trunk as a skirt's do; from 4 cm above
+the crotch down, each half of it (from the centre front round one side to
+the centre back) goes round that leg instead, from the inner side round
+the front, each panel wholly on its leg. Find seams, once a front and a
+back are sewn into a tube, sews the edge left over from the waist down to
+the inseam's top (the crotch curve) to its other half.
+
+---
+
 ## Step 48 — Bodysuits: the crotch between the legs
 
 A bodysuit's crotch piece (a corset bunnysuit's, a leotard's gusset) is
@@ -46,8 +69,7 @@ draped top.
 **Try it:**
 
 1. Add someone's measurements (**Measurements**).
-2. On an empty table, press **A FreeSewing design, drafted to
-   measurements** (or **Draft a FreeSewing design to these measurements**
+2. On an empty table, press **A FreeSewing design, made to measure** (or **Draft a FreeSewing design to these measurements**
    in the Measurements dialog). Choose whose measurements and a design.
    It says which of their measurements it drafts to, and which it
    estimates ("Estimated from FreeSewing's standard sizes, in proportion:

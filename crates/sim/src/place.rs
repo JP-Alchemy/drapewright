@@ -26,6 +26,9 @@ pub struct Figure {
     pub sections: Vec<Section>,
     /// The arms, left and right, for sleeves.
     pub arms: Vec<Arm>,
+    /// The legs, left and right, for trousers: lines down them as for the
+    /// arms, the front of each leg as their tops.
+    pub legs: Vec<Arm>,
     /// How high the crotch is: where a bodysuit's crotch piece goes under.
     pub crotch: f64,
     /// Where the body is measured round (bust, waist, hip), and how big it
@@ -73,7 +76,16 @@ impl Figure {
             ),
         ]
         .into_iter()
-        .filter_map(|(joints, regions)| Arm::of(model, body, joints, regions))
+        .filter_map(|(joints, regions)| Arm::of(model, body, joints, regions, [0.0, 1.0, 0.0]))
+        .collect();
+        let legs = [
+            (["l-upper-leg", "l-knee", "l-ankle"], Region::LegLeft),
+            (["r-upper-leg", "r-knee", "r-ankle"], Region::LegRight),
+        ]
+        .into_iter()
+        .filter_map(|(joints, region)| {
+            Arm::of(model, body, joints, [region, region], [0.0, 0.0, 1.0])
+        })
         .collect();
         let levels = ["bust", "waist", "hip"]
             .into_iter()
@@ -90,6 +102,7 @@ impl Figure {
             shoulders,
             sections,
             arms,
+            legs,
             crotch: marks.points["crotch"][1],
             levels,
         }
@@ -191,7 +204,14 @@ pub struct Arm {
 impl Arm {
     /// The arm through joints `[shoulder, elbow, wrist]`, its surface the
     /// body's in `regions`.
-    fn of(model: &BodyModel, body: &Body, joints: [&str; 3], regions: [Region; 2]) -> Option<Arm> {
+    /// `reference`: which way its tops are, as near as can be square to it.
+    fn of(
+        model: &BodyModel,
+        body: &Body,
+        joints: [&str; 3],
+        regions: [Region; 2],
+        reference: V3,
+    ) -> Option<Arm> {
         let [s, e, w] = [
             model.joint(body, joints[0])?,
             model.joint(body, joints[1])?,
@@ -236,7 +256,7 @@ impl Arm {
         let tangent = |k: usize| unit3(sub3(line[(k + 1).min(n - 1)], line[k.saturating_sub(1)]));
         let mut up = Vec::with_capacity(n);
         let mut side = Vec::with_capacity(n);
-        let mut last_up = [0.0, 1.0, 0.0];
+        let mut last_up = reference;
         for k in 0..n {
             let t = tangent(k);
             last_up = unit3(sub3(last_up, scale3(t, dot3(last_up, t))));
@@ -281,6 +301,21 @@ impl Arm {
         })
     }
 
+    /// Where the line is at height `y`, and how far the limb reaches from
+    /// it there: for a leg, which runs down.
+    fn at_height(&self, y: f64) -> Option<(V3, f64)> {
+        (0..self.line.len() - 1).find_map(|k| {
+            let (a, b) = (self.line[k], self.line[k + 1]);
+            ((a[1] - y) * (b[1] - y) <= 0.0 && (a[1] - b[1]).abs() > 1e-9).then(|| {
+                let t = (y - a[1]) / (b[1] - a[1]);
+                (
+                    lerp3(a, b, t),
+                    self.radius[k] + (self.radius[k + 1] - self.radius[k]) * t,
+                )
+            })
+        })
+    }
+
     /// `along` mm down the line: the point, the ways to the top of the arm
     /// and its side, and the arm's radius.
     fn at(&self, along: f64) -> (V3, V3, V3, f64) {
@@ -296,6 +331,9 @@ impl Arm {
         )
     }
 }
+
+/// Trousers go round each leg from this far above the crotch down, mm.
+const INTO_LEGS: f64 = 40.0;
 
 /// A garment no larger than the body is placed this much larger round,
 /// to start clear of it (stretched, it draws in onto the body).
@@ -734,6 +772,20 @@ fn trace(g: &Garment) -> Traced {
             level.push((*pa, sa.1, *pb, sb.1));
         }
     }
+    // On a side joined to more than one panel, the highest first: a trouser
+    // front's crotch (to the other front, round the hips) before its inseam
+    // (to its back, round the leg).
+    for (p, links) in beside.iter_mut().enumerate() {
+        let height = |e: usize| {
+            let points = &g.panels[p].edges[e].points;
+            points
+                .iter()
+                .map(|&i| g.panels[p].mesh.points[i as usize][1])
+                .sum::<f64>()
+                / points.len().max(1) as f64
+        };
+        links.sort_by(|a, b| height(b.3).total_cmp(&height(a.3)));
+    }
     // Rings: panels joined side by side, in order round the body, each
     // turned over if its seams run the other way.
     let mut ring_of = vec![usize::MAX; n];
@@ -936,10 +988,22 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
     // height); where a side has no seam, the outline's.
     let between_seams = |p: usize, v: f64| -> Option<(f64, f64)> {
         let outline_span = span(&outlines[p], v);
+        // Of the seams on that side, the one there at that height (a
+        // trouser front's crotch above the crotch, its inseam below), or
+        // else the nearest.
         let seam = |side: Side| {
+            let off = |e: usize| {
+                let points = &g.panels[p].edges[e].points;
+                let ys = points
+                    .iter()
+                    .map(|&i| g.panels[p].mesh.points[i as usize][1]);
+                let (low, high) = ys.fold((f64::MAX, f64::MIN), |(l, h), y| (l.min(y), h.max(y)));
+                (low - v).max(v - high).max(0.0)
+            };
             beside[p]
                 .iter()
-                .find(|b| b.0 == side)
+                .filter(|b| b.0 == side)
+                .min_by(|a, b| off(a.3).total_cmp(&off(b.3)))
                 .map(|b| edge_u(g, p, b.3, v))
         };
         let left = seam(Side::Left).or(outline_span.map(|s| s.0))?;
@@ -958,8 +1022,21 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
             _ => ring.iter().map(|&(p, _)| top - boxes[p].1[1]).collect(),
         }
     };
+    // Trousers: rings with a panel joined to another on both its sides (a
+    // front to its back, at the outseam and the inseam).
+    let legged = |ring: &[(usize, bool)]| {
+        ring.iter().any(|&(p, _)| {
+            beside[p].iter().any(|&(side, q, _, _)| {
+                side == Side::Left
+                    && beside[p]
+                        .iter()
+                        .any(|&(s, o, _, _)| s == Side::Right && o == q)
+            })
+        })
+    };
     let wrap_trunk =
         |ring: &[(usize, bool)], round: bool, top: f64, by_waist: bool| -> Vec<Vec<[f64; 3]>> {
+            let legs = legged(ring) && figure.legs.len() == 2;
             let raised = raise(ring, top, by_waist);
             // In front: the seam between a front's two halves, where they
             // are sewn at its centre (a pair's copies side by side), else a
@@ -1030,11 +1107,49 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
                     // stretched, to close onto the body.
                     let around: f64 = (0..ring.len()).map(width).sum();
                     let stretch = (perimeter / around.max(1.0)).max(1.0);
-                    let s = (offset + u - middle) * stretch
-                        + if behind { perimeter / 2.0 } else { 0.0 };
+                    // Round the garment from the centre front, mm.
+                    let from_front = offset + u - middle;
+                    let s = from_front * stretch + if behind { perimeter / 2.0 } else { 0.0 };
                     let [x, z] = oval.at(s);
                     let middle = figure.smoothed(y).middle;
-                    points.push([x + middle[0], y, z + middle[1]]);
+                    let trunk = [x + middle[0], y, z + middle[1]];
+                    // Trousers below the crotch: round each leg, the left
+                    // half of the ring (from the centre front round the left
+                    // to the centre back) round the left leg, from its inner
+                    // side round the front; taking over from round the trunk
+                    // just above the crotch.
+                    let share = ((figure.crotch + INTO_LEGS - y) / INTO_LEGS).clamp(0.0, 1.0);
+                    if !legs || share <= 0.0 {
+                        points.push(trunk);
+                        continue;
+                    }
+                    // Which leg: the panel's, by the middle of its span (so
+                    // that a panel isn't torn between the legs at a centre
+                    // seam); how far round from the inner side, from the
+                    // front.
+                    let behind_by = if behind { around / 2.0 } else { 0.0 };
+                    let wrap = |s: f64| s.rem_euclid(around.max(1.0));
+                    let panel_middle = wrap(from_front - u + width(k) / 2.0 + behind_by);
+                    let mut beyond = from_front + behind_by - panel_middle;
+                    beyond -= around * (beyond / around.max(1.0)).round();
+                    let half = around / 2.0;
+                    let (leg, from_inside, inward) = if panel_middle < half {
+                        (&figure.legs[0], panel_middle + beyond, -1.0)
+                    } else {
+                        (&figure.legs[1], around - panel_middle - beyond, 1.0)
+                    };
+                    let Some((centre, reach)) = leg.at_height(y) else {
+                        points.push(trunk);
+                        continue;
+                    };
+                    let r = (half / TAU).max(reach * CLEAR);
+                    let angle = TAU * from_inside / half.max(1.0);
+                    let on_leg = [
+                        centre[0] + inward * r * angle.cos(),
+                        y,
+                        centre[2] + r * angle.sin(),
+                    ];
+                    points.push(lerp3(trunk, on_leg, share));
                 }
                 placed.push(points);
             }
