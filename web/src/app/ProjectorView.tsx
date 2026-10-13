@@ -1,11 +1,24 @@
 // Projector mode: the pieces projected true size onto fabric on the
-// cutting table, from a projector above it. The projector is calibrated
-// first: four corners dragged onto a rectangle marked on the mat, which
-// gives the scale and straightens a projector that is not square on. Kept
-// for this device and this screen size.
+// cutting table, from a projector above it, as they lie on the table or
+// as the cutting layout lays them on the fabric, all of them or one at a
+// time. The projector is calibrated first: four corners dragged onto a
+// rectangle marked on the mat, which gives the scale and straightens a
+// projector that is not square on. Kept for this device and this screen
+// size.
 
+import type { Layout } from '@drapewright/engine'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Button, Group, Input, Label, NumberField, Switch } from 'react-aria-components'
+import {
+  Button,
+  Group,
+  Input,
+  Label,
+  NumberField,
+  Radio,
+  RadioGroup,
+  Switch,
+} from 'react-aria-components'
 import {
   type Homography,
   type Pt,
@@ -13,11 +26,13 @@ import {
   mapPoint,
   solveHomography,
 } from '../canvas/homography.ts'
-import { drawCalibration, drawProjection } from '../canvas/projector.ts'
-import { sceneBounds } from '../canvas/renderer.ts'
+import { drawCalibration, drawLayout, drawProjection } from '../canvas/projector.ts'
+import { type ScenePiece, sceneBounds } from '../canvas/renderer.ts'
+import { remember, remembered } from '../platform/remember.ts'
 import { useEngineState } from '../state/hooks.ts'
 import type { Session } from '../state/session.ts'
 import { t } from '../strings/en.ts'
+import { keptChoice, mainMaterial, widthName } from './LayoutDialog.tsx'
 
 /** A rectangle on the mat (mm), and where its corners show on the screen. */
 interface Calibration {
@@ -30,6 +45,35 @@ interface Calibration {
 }
 
 const STORAGE = 'drapewright.projector'
+/** What is projected, and how. */
+const SHOWS = 'drapewright.projector.shows'
+const THICK = 'drapewright.projector.thick'
+
+type Shows = 'table' | 'layout'
+
+/** A piece's extent on the table, mm. */
+function onTable(sp: ScenePiece): [number, number, number, number] {
+  const { x, y, rotation } = sp.piece.placement
+  const m = new DOMMatrix().translateSelf(x, y).rotateSelf(rotation)
+  const [x0, y0, x1, y1] = sp.view.outlineBounds
+  const corners = [
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y1],
+  ].map(([px, py]) => m.transformPoint(new DOMPoint(px, py)))
+  const xs = corners.map((p) => p.x)
+  const ys = corners.map((p) => p.y)
+  return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]
+}
+
+/** A laid out piece's extent on the fabric, mm. */
+function onFabric(layout: Layout, k: number): [number, number, number, number] {
+  const points = layout.placed[k]!.rings.flat()
+  const xs = points.map((p) => p[0])
+  const ys = points.map((p) => p[1])
+  return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]
+}
 /** A corner within this of a press is the one dragged, CSS px. */
 const GRAB = 48
 
@@ -101,6 +145,13 @@ export function ProjectorView({ session }: { session: Session }) {
     return b ? [b.x0, b.y0] : [0, 0]
   })
   const [stitching, setStitching] = useState(true)
+  const [thick, setThick] = useState(() => remembered(THICK, false))
+  const [shows, setShows] = useState<Shows>(() =>
+    remembered<Shows>(SHOWS, 'table') === 'layout' ? 'layout' : 'table',
+  )
+  const [layout, setLayout] = useState<Layout | null>(null)
+  // The piece being cut, picked out of the rest; none: all of them.
+  const [focus, setFocus] = useState<number | null>(null)
   const drag = useRef<Drag | null>(null)
   const map = mapOf(cal)
 
@@ -147,9 +198,70 @@ export function ProjectorView({ session }: { session: Session }) {
     c.width = Math.round(size[0] * dpr)
     c.height = Math.round(size[1] * dpr)
     const box = { width: size[0], height: size[1], dpr }
+    const look = { stitching, thick, focus }
     if (calibrating) drawCalibration(ctx, box, map, cal, cal.corners)
-    else drawProjection(ctx, box, session.scene(), { map, offset }, { stitching })
-  }, [size, cal, map, calibrating, offset, stitching, revision, session])
+    else if (shows === 'layout' && layout)
+      drawLayout(ctx, box, layout, { map, offset }, look, t.layout.faceDown)
+    else drawProjection(ctx, box, session.scene(), { map, offset }, look)
+  }, [
+    size,
+    cal,
+    map,
+    calibrating,
+    offset,
+    stitching,
+    thick,
+    focus,
+    shows,
+    layout,
+    revision,
+    session,
+  ])
+
+  // The cutting layout, on the fabric last chosen for it, as the pattern
+  // changes.
+  useEffect(() => {
+    if (shows !== 'layout') return
+    let current = true
+    const doc = session.engine.document()
+    const choice = keptChoice(doc.settings.displayUnits)
+    const materials = [...new Set(doc.pieces.flatMap((p) => p.cut.map((c) => c.material)))]
+    void session.io
+      .call('layOut', { pieces: doc.pieces, material: mainMaterial(materials), ...choice })
+      .then(
+        (l) => current && setLayout(l),
+        () => current && setLayout(null),
+      )
+    return () => {
+      current = false
+    }
+  }, [shows, revision, session])
+
+  const count = shows === 'layout' ? (layout?.placed.length ?? 0) : session.scene().length
+  const extent = (k: number) =>
+    shows === 'layout' && layout ? onFabric(layout, k) : onTable(session.scene()[k]!)
+  /** Picks out the next (or previous) piece, slid to the middle of the rectangle. */
+  const step = (by: number) => {
+    if (count === 0) return
+    const k = focus === null ? (by > 0 ? 0 : count - 1) : (focus + by + count) % count
+    setFocus(k)
+    const [x0, y0, x1, y1] = extent(k)
+    setOffset([(x0 + x1) / 2 - cal.width / 2, (y0 + y1) / 2 - cal.height / 2])
+  }
+  const showAs = (next: Shows) => {
+    setShows(next)
+    remember(SHOWS, next)
+    setFocus(null)
+    // The fabric's corner a little in from the rectangle's; or the pieces'.
+    const b = sceneBounds(session.scene())
+    setOffset(next === 'layout' ? [-50, -50] : b ? [b.x0, b.y0] : [0, 0])
+  }
+  const focusName =
+    focus === null
+      ? null
+      : shows === 'layout'
+        ? layout?.placed[focus]?.name
+        : session.scene()[focus]?.piece.name
 
   const point = (e: React.PointerEvent): Pt => [e.clientX, e.clientY]
   const down = (e: React.PointerEvent) => {
@@ -240,9 +352,64 @@ export function ProjectorView({ session }: { session: Session }) {
         ) : (
           <>
             <p>{text.slide}</p>
-            <Switch className="switch" isSelected={stitching} onChange={setStitching}>
+            <RadioGroup
+              className="segmented"
+              orientation="horizontal"
+              aria-label={text.shows}
+              value={shows}
+              onChange={(v) => showAs(v as Shows)}
+            >
+              <div className="segments">
+                <Radio value="table" className="segment">
+                  {text.asOnTable}
+                </Radio>
+                <Radio value="layout" className="segment">
+                  {text.asLaidOut}
+                </Radio>
+              </div>
+            </RadioGroup>
+            {shows === 'layout' && layout && (
+              <p>
+                {text.layFabric(
+                  layout.folded,
+                  widthName(layout.width, session.engine.document().settings.displayUnits),
+                )}
+              </p>
+            )}
+            <div className="projector-pieces" role="group" aria-label={text.pieces}>
+              <Button className="icon-button" aria-label={text.previous} onPress={() => step(-1)}>
+                <ChevronLeft size={20} aria-hidden="true" />
+              </Button>
+              <span className="projector-piece" aria-live="polite">
+                {focusName && focus !== null
+                  ? text.onePiece(focusName, focus + 1, count)
+                  : text.allPieces}
+              </span>
+              <Button className="icon-button" aria-label={text.next} onPress={() => step(1)}>
+                <ChevronRight size={20} aria-hidden="true" />
+              </Button>
+              {focus !== null && (
+                <Button className="button" onPress={() => setFocus(null)}>
+                  {text.showAll}
+                </Button>
+              )}
+            </div>
+            {shows === 'table' && (
+              <Switch className="switch" isSelected={stitching} onChange={setStitching}>
+                <span className="switch-track" aria-hidden="true" />
+                {text.stitching}
+              </Switch>
+            )}
+            <Switch
+              className="switch"
+              isSelected={thick}
+              onChange={(on) => {
+                setThick(on)
+                remember(THICK, on)
+              }}
+            >
               <span className="switch-track" aria-hidden="true" />
-              {text.stitching}
+              {text.thick}
             </Switch>
             <div className="projector-actions">
               <Button className="button" onPress={() => setCalibrating(true)}>

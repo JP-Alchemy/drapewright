@@ -956,6 +956,17 @@ h2 {
   margin: 0;
 }
 
+.projector-pieces {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.projector-piece {
+  flex: 1;
+  text-align: center;
+}
+
 .projector-size,
 .projector-actions {
   display: flex;

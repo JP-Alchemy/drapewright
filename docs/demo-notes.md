@@ -12,6 +12,27 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 44 — Projecting the cutting layout, piece by piece
+
+The projector (Step 30) can now project the cutting layout onto the
+fabric, and pick out one piece at a time.
+
+**Try it:** open the sample skirt, press **Projector** and calibrate.
+Then:
+
+- **Cutting layout** projects the pieces as **Layout** lays them out
+  (Step 43), on the fabric last chosen there, with the fabric's fold
+  dashed along the top, its selvages along the bottom, and a line across
+  where its end goes: lay the fabric along those lines. **As on the
+  table** projects the pieces where they lie on the table, as before.
+- **Next piece** and **Previous piece** pick out one piece at a time,
+  bright, the rest dimmed, and slide it to the middle; **All** shows them
+  all again.
+- **Thick lines** doubles every line and the names, to see them on dark
+  fabric. It is kept for next time, as is the choice of what to project.
+
+---
+
 ## Step 43 — Cutting layout, and how much fabric to buy
 
 **Layout**, at the top, lays the pieces out on fabric as they would be

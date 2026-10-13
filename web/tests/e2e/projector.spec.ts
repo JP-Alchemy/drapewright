@@ -49,6 +49,26 @@ test('the pieces are projected true size once the projector is calibrated', asyn
   await page.mouse.move(box.x + w / 2 + 300, box.y + h / 2, { steps: 5 })
   await page.mouse.up()
   await expect.poll(() => lit(page)).not.toBe(before)
+
+  // One piece at a time, slid to the middle; the rest dimmed.
+  const pieces = projector.getByRole('group', { name: 'Piece by piece' })
+  await pieces.getByRole('button', { name: 'Next piece' }).click()
+  await expect(pieces).toContainText(/^.*Skirt (front|back) \(1 of 2\)/)
+  await pieces.getByRole('button', { name: 'Next piece' }).click()
+  await expect(pieces).toContainText('(2 of 2)')
+  await pieces.getByRole('button', { name: 'All' }).click()
+  await expect(pieces).toContainText('All pieces')
+  // Thick lines light more of the fabric.
+  const thin = await lit(page)
+  await projector.getByText('Thick lines (for dark fabric)').click()
+  await expect.poll(() => lit(page)).toBeGreaterThan(thin)
+
+  // The cutting layout: the fabric's fold and selvages to lay it along.
+  await projector.getByText('Cutting layout', { exact: true }).click()
+  await expect(projector.getByText(/^Fabric 150 cm wide, folded: lay its fold/)).toBeVisible()
+  await expect.poll(() => lit(page)).toBeGreaterThan(500)
+  await pieces.getByRole('button', { name: 'Next piece' }).click()
+  await expect(pieces).toContainText('(1 of 2)')
   await projector.getByRole('button', { name: 'Close' }).click()
   await expect(projector).toHaveCount(0)
 

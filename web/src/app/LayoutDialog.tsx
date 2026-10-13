@@ -37,10 +37,28 @@ const WIDTHS: Record<'metric' | 'imperial', number[]> = {
   imperial: [45 * 25.4, 54 * 25.4, 60 * 25.4],
 }
 
-interface Choice {
+export interface Choice {
   width: number
   folded: boolean
   oneWay: boolean
+}
+
+/** The fabric last chosen for the layout, or 150 cm (60″) folded. */
+export function keptChoice(units: DisplayUnits): Choice {
+  const kept = remembered<Partial<Choice>>(KEPT, {})
+  return {
+    width:
+      typeof kept.width === 'number' && kept.width > 0
+        ? kept.width
+        : WIDTHS[units === 'in' ? 'imperial' : 'metric'][2]!,
+    folded: kept.folded ?? true,
+    oneWay: kept.oneWay ?? false,
+  }
+}
+
+/** The fabric a project's pieces are mostly cut from: its main fabric, if any. */
+export function mainMaterial(materials: string[]): string {
+  return materials.includes('main') ? 'main' : (materials[0] ?? 'main')
 }
 
 /** The Layout button, and behind it the cutting layout. */
@@ -76,7 +94,7 @@ export function fabricLength(mm: number, units: DisplayUnits): string {
 }
 
 /** A fabric width as sold: whole centimetres, or inches. */
-function widthName(mm: number, units: DisplayUnits): string {
+export function widthName(mm: number, units: DisplayUnits): string {
   return units === 'in' ? `${Math.round(mm / 25.4)}″` : `${Math.round(mm / 10)} cm`
 }
 
@@ -86,17 +104,8 @@ function LayoutForm({ session, close }: { session: Session; close: () => void })
   const units = doc.settings.displayUnits
   const sold = WIDTHS[units === 'in' ? 'imperial' : 'metric']
   const materials = [...new Set(doc.pieces.flatMap((p) => p.cut.map((c) => c.material)))]
-  const [material, setMaterial] = useState(() =>
-    materials.includes('main') ? 'main' : (materials[0] ?? 'main'),
-  )
-  const [choice, setChoice] = useState<Choice>(() => {
-    const kept = remembered<Partial<Choice>>(KEPT, {})
-    return {
-      width: typeof kept.width === 'number' && kept.width > 0 ? kept.width : sold[2]!,
-      folded: kept.folded ?? true,
-      oneWay: kept.oneWay ?? false,
-    }
-  })
+  const [material, setMaterial] = useState(() => mainMaterial(materials))
+  const [choice, setChoice] = useState<Choice>(() => keptChoice(units))
   const choose = (change: Partial<Choice>) => {
     const next = { ...choice, ...change }
     setChoice(next)

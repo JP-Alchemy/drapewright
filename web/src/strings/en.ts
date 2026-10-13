@@ -350,6 +350,20 @@ export const t = {
     recalibrate: 'Calibrate',
     slide: 'Drag to slide the pattern across the fabric.',
     stitching: 'Stitching lines',
+    thick: 'Thick lines (for dark fabric)',
+    shows: 'What to project',
+    asOnTable: 'As on the table',
+    asLaidOut: 'Cutting layout',
+    layFabric: (folded: boolean, width: string) =>
+      folded
+        ? `Fabric ${width} wide, folded: lay its fold along the dashed line, its selvages along the other, its end at the line across.`
+        : `Fabric ${width} wide: lay its selvages along the two lines, its end at the line across.`,
+    pieces: 'Piece by piece',
+    previous: 'Previous piece',
+    next: 'Next piece',
+    allPieces: 'All pieces',
+    onePiece: (name: string, k: number, n: number) => `${name} (${k} of ${n})`,
+    showAll: 'All',
     calibrationLabel: 'The rectangle to calibrate by, with its corners to drag.',
     projectionLabel: 'The pieces, true size.',
   },
