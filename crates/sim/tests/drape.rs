@@ -978,3 +978,107 @@ fn cuffs_stay_sewn_on_as_the_arms_reach_forward() {
     assert!(reaching < 0.005, "a seam {} mm open", reaching * 1000.0);
     assert!(inside(&drape) < 0.01);
 }
+
+#[test]
+fn a_cape_coat_drapes_done_up_its_cape_outside_and_its_collar_standing() {
+    // Sewn as its seams are found: its cape sewn into the princess seams,
+    // its collar round the neckline; done up down its centre front line.
+    let pieces = drapewright_pattern_core::testing::garments::cape_coat();
+    let seams: Vec<drapewright_seams::Seam> = drapewright_seams::suggest(&pieces, &[])
+        .into_iter()
+        .enumerate()
+        .map(|(k, s)| drapewright_seams::Seam {
+            id: format!("s{k}"),
+            confirmed: true,
+            ..s.seam
+        })
+        .collect();
+    let model = avatar();
+    let body = model.shape(&Shape::default());
+    let figure = Figure::of(&model, &body);
+    let garment = assemble(&pieces, &seams, 20.0).unwrap();
+    for panel in &garment.panels {
+        assert_eq!(
+            panel.outside,
+            panel.name.contains("Cape"),
+            "{} outside",
+            panel.name
+        );
+    }
+    assert!(
+        garment.buttons >= 5,
+        "done up at {} places",
+        garment.buttons
+    );
+    let starts = place(&garment, &figure);
+    let mut drape = Drape::new(
+        &garment,
+        &starts,
+        preset("woolSuiting").unwrap(),
+        (&body.vertices, &model.skin()),
+    );
+    let mut frames = 0;
+    while !drape.settled() && frames < 60 * 8 {
+        drape.step(1.0 / 60.0);
+        frames += 1;
+    }
+    assert!(
+        drape.settled(),
+        "still moving at {} m/s",
+        drape.cloth.mean_speed()
+    );
+    let gap = drape.cloth.widest_stitch();
+    assert!(gap < 0.008, "a seam is {gap} m open");
+    let x = &drape.cloth.x;
+    let deepest = x
+        .iter()
+        .map(|&p| drape.clearance(p))
+        .fold(f32::MAX, f32::min);
+    assert!(deepest > -0.002, "cloth {deepest} m inside the body");
+    // Each panel's points as draped.
+    let mut first = 0;
+    let mut points: Vec<(&str, &[[f32; 3]])> = Vec::new();
+    for panel in &garment.panels {
+        let n = panel.mesh.points.len();
+        points.push((panel.name.as_str(), &x[first..first + n]));
+        first += n;
+    }
+    let of = |name: &str| -> Vec<[f32; 3]> {
+        points
+            .iter()
+            .filter(|(n, _)| *n == name)
+            .flat_map(|(_, p)| p.iter().copied())
+            .collect()
+    };
+    let mean = |p: &[[f32; 3]], f: &dyn Fn([f32; 3]) -> f32| {
+        p.iter().map(|&q| f(q)).sum::<f32>() / p.len() as f32
+    };
+    // The cape lies over the coat: further off the body than the coat
+    // under it.
+    let cape = [of("Front Cape"), of("Back Cape")].concat();
+    let low = cape.iter().map(|p| p[1]).fold(f32::MAX, f32::min);
+    let under: Vec<[f32; 3]> = [of("Side Front"), of("Side Back")]
+        .concat()
+        .into_iter()
+        .filter(|p| p[1] >= low)
+        .collect();
+    let off = |p: [f32; 3]| drape.clearance(p);
+    assert!(
+        mean(&cape, &off) > mean(&under, &off) + 0.005,
+        "the cape {} m off the body, the coat under it {} m",
+        mean(&cape, &off),
+        mean(&under, &off)
+    );
+    // The collar stands above the neckline it is sewn to.
+    let collar = of("Collar");
+    let shoulders = [of("Side Front"), of("Side Back")]
+        .concat()
+        .iter()
+        .map(|p| p[1])
+        .fold(f32::MIN, f32::max);
+    let collar_top = collar.iter().map(|p| p[1]).fold(f32::MIN, f32::max);
+    assert!(
+        collar_top > shoulders + 0.02,
+        "the collar's top {collar_top} m, the shoulders' {shoulders} m"
+    );
+}

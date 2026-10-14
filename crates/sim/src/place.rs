@@ -8,7 +8,7 @@
 //! it) goes round that arm, its top over the shoulder.
 
 use std::collections::HashMap;
-use std::f64::consts::TAU;
+use std::f64::consts::{PI, TAU};
 
 use drapewright_body::measure::trunk_sections;
 use drapewright_body::{Body, BodyModel, Region, measure};
@@ -332,6 +332,11 @@ impl Arm {
     }
 }
 
+/// Cloth outside the garment (a cape) starts this far clear of the arms, mm.
+const ARM_CLEAR: f64 = 25.0;
+/// …bowed out from where it is sewn at most this far, mm.
+const MOST_BOW: f64 = 600.0;
+
 /// Trousers go round each leg from this far above the crotch down, mm.
 const INTO_LEGS: f64 = 40.0;
 
@@ -608,6 +613,118 @@ fn spanned(g: &Garment, p: usize, partners: &[(usize, u32, [f64; 3])]) -> Vec<[f
     x
 }
 
+/// A panel sewn by one edge along the tops of panels placed (`hung`
+/// says which): a collar, standing up from the neckline. Each point goes
+/// as far up from where its edge is sewn as it is from that edge flat,
+/// above the point of the neckline as far along. None unless every point
+/// sewn is on one edge, sewn to the tops of hung panels.
+fn stood_on(
+    g: &Garment,
+    p: usize,
+    partners: &[(usize, u32, [f64; 3])],
+    hung: &dyn Fn(usize) -> bool,
+) -> Option<Vec<[f64; 3]>> {
+    let panel = &g.panels[p];
+    let flat = |i: u32| panel.mesh.points[i as usize];
+    // Each sewn point, and where what it is sewn to is.
+    let sewn: Vec<([f64; 2], [f64; 3])> = partners
+        .iter()
+        .filter(|a| a.0 == p)
+        .map(|&(_, i, at)| (flat(i), at))
+        .collect();
+    if sewn.len() < 4 {
+        return None;
+    }
+    let on_edge = |i: u32| panel.edges.iter().position(|e| e.points.contains(&i));
+    let edges: Vec<Option<usize>> = partners
+        .iter()
+        .filter(|a| a.0 == p)
+        .map(|a| on_edge(a.1))
+        .collect();
+    if edges.iter().any(|e| *e != edges[0]) || edges[0].is_none() {
+        return None;
+    }
+    // Sewn to the tops of what it hangs from: each stitch's other end in
+    // the top quarter of a hung panel.
+    let tops = g
+        .stitches
+        .iter()
+        .flat_map(|&[a, b]| [(a, b), (b, a)])
+        .filter(|&((x, _), _)| x == p)
+        .all(|(_, (q, j))| hung(q) && near_end(g, q, g.panels[q].mesh.points[j as usize][1]).0);
+    if !tops {
+        return None;
+    }
+    // The sewn edge as a straight line flat: along it, and up from it
+    // into the panel.
+    let n = sewn.len() as f64;
+    let mid = [
+        sewn.iter().map(|s| s.0[0]).sum::<f64>() / n,
+        sewn.iter().map(|s| s.0[1]).sum::<f64>() / n,
+    ];
+    // The way along: the two sewn points furthest apart.
+    let mut far = (sewn[0].0, sewn[0].0, 0.0);
+    for a in &sewn {
+        for b in &sewn {
+            let d = (a.0[0] - b.0[0]).hypot(a.0[1] - b.0[1]);
+            if d > far.2 {
+                far = (a.0, b.0, d);
+            }
+        }
+    }
+    if far.2 < 1.0 {
+        return None;
+    }
+    let along = [(far.1[0] - far.0[0]) / far.2, (far.1[1] - far.0[1]) / far.2];
+    let mut up = [-along[1], along[0]];
+    // Up into the panel: where most of its points are.
+    let into: f64 = panel
+        .mesh
+        .points
+        .iter()
+        .map(|q| (q[0] - mid[0]) * up[0] + (q[1] - mid[1]) * up[1])
+        .sum();
+    if into < 0.0 {
+        up = [-up[0], -up[1]];
+    }
+    // A flat point's way along and up.
+    let place = |q: [f64; 2]| {
+        let d = [q[0] - far.0[0], q[1] - far.0[1]];
+        (
+            d[0] * along[0] + d[1] * along[1],
+            d[0] * up[0] + d[1] * up[1],
+        )
+    };
+    // At each way along, the sewn edge's height flat and where the
+    // neckline is, from the points sewn.
+    let mut line: Vec<(f64, f64, [f64; 3])> = sewn
+        .iter()
+        .map(|(q, at)| {
+            let (u, v) = place(*q);
+            (u, v, *at)
+        })
+        .collect();
+    line.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let at = |u: f64| -> (f64, [f64; 3]) {
+        let k = line.partition_point(|l| l.0 < u).clamp(1, line.len() - 1);
+        let (a, b) = (line[k - 1], line[k]);
+        let t = (u - a.0) / (b.0 - a.0).max(1e-9);
+        (a.1 + (b.1 - a.1) * t, lerp3(a.2, b.2, t))
+    };
+    Some(
+        panel
+            .mesh
+            .points
+            .iter()
+            .map(|&q| {
+                let (u, v) = place(q);
+                let (edge, base) = at(u);
+                [base[0], base[1] + (v - edge).max(0.0), base[2]]
+            })
+            .collect(),
+    )
+}
+
 /// Whether a panel goes between the legs (a bodysuit's crotch, a gusset),
 /// by its name.
 fn between_legs(name: &str) -> bool {
@@ -720,6 +837,12 @@ fn under_the_crotch(
 /// mean height there), and its rings: panels joined side by side in order
 /// round the body (each turned over or not), whether each closes, and each
 /// panel's ring.
+/// Whether a link joins panels of one layer: not a cape to the garment
+/// it is sewn into, which goes outside it, not round the body with it.
+fn same_layer(g: &Garment, link: &crate::garment::Link) -> bool {
+    g.panels[link.a.0].outside == g.panels[link.b.0].outside
+}
+
 struct Traced {
     boxes: Vec<([f64; 2], [f64; 2])>,
     beside: Vec<Vec<(Side, usize, Side, usize)>>,
@@ -746,7 +869,7 @@ fn trace(g: &Garment) -> Traced {
     };
     // Level links: (panel, its edge's mean height there) for each side.
     let mut level: Vec<(usize, f64, usize, f64)> = Vec::new();
-    for link in &g.links {
+    for link in g.links.iter().filter(|l| same_layer(g, l)) {
         let (pa, ea, ha) = (&link.a.0, &link.a.1, link.a.2);
         let (pb, eb, hb) = (&link.b.0, &link.b.1, link.b.2);
         let (Some(sa), Some(sb)) = (edge_shape(g, *pa, ea, ha), edge_shape(g, *pb, eb, hb)) else {
@@ -899,7 +1022,7 @@ fn hanging(
     // more of its edges to others (a yoke, between a front and a back over
     // the shoulder) goes between them once they are placed.
     let mut sewn_by: Vec<Vec<(String, usize, f64)>> = vec![Vec::new(); n];
-    for link in &g.links {
+    for link in g.links.iter().filter(|l| same_layer(g, l)) {
         let (pa, pb) = (link.a.0, link.b.0);
         if pa == pb {
             continue;
@@ -1026,14 +1149,15 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
             .fold(0.0, f64::max)
     };
     let mut tops: Vec<Option<f64>> = vec![None; rings.len()];
+    let outside = |r: usize| rings[r].iter().any(|&(p, _)| g.panels[p].outside);
     for (r, ring) in rings.iter().enumerate() {
-        if ring.iter().any(|&(p, _)| shoulders[p]) {
+        if ring.iter().any(|&(p, _)| shoulders[p]) && !outside(r) {
             tops[r] = Some(figure.shoulders + 30.0);
         }
     }
     for _ in 0..rings.len() {
         for (r, ring) in rings.iter().enumerate() {
-            if tops[r].is_some() {
+            if tops[r].is_some() || outside(r) {
                 continue;
             }
             if let Some(over) = ring.iter().find_map(|&(p, _)| under[p])
@@ -1358,6 +1482,191 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
             })
             .collect()
     };
+    // Panels sewn into the garment's seams, outside it (a cape, its front
+    // sewn into a front's princess seam and its back into a back's, the two
+    // sewn together over the shoulder), in order from one end sewn into the
+    // garment to the other: at each height, from where the first is sewn
+    // round the side to where the last is, bowed out as far as they are
+    // wide there and clear of the body and the arms; the first from its
+    // end, the last from its, any between in turn. None unless both ends
+    // are sewn.
+    let hang_outside = |chain: &[usize],
+                        partners: &[(usize, u32, [f64; 3])]|
+     -> Option<Vec<Vec<[f64; 3]>>> {
+        let flat = |p: usize, i: u32| g.panels[p].mesh.points[i as usize];
+        let held = |p: usize| partners.iter().filter(move |a| a.0 == p);
+        // Where each end is sewn into the garment: its points, flat, and
+        // where they are sewn to. A panel alone, sewn both sides: its left
+        // side first.
+        let sewn = |p: usize, side: Option<bool>| -> Vec<([f64; 2], [f64; 3])> {
+            let middle = (boxes[p].0[0] + boxes[p].1[0]) / 2.0;
+            held(p)
+                .map(|&(_, i, at)| (flat(p, i), at))
+                .filter(|(q, _)| side.is_none_or(|left| (q[0] < middle) == left))
+                .collect()
+        };
+        let last = chain.len() - 1;
+        let ends = if last == 0 {
+            [sewn(chain[0], Some(true)), sewn(chain[0], Some(false))]
+        } else {
+            [sewn(chain[0], None), sewn(chain[last], None)]
+        };
+        if ends.iter().any(Vec::is_empty) {
+            return None;
+        }
+        // Each panel as high as where it is sewn puts it, or as its seam to
+        // the one before.
+        let mut raised = vec![0.0; chain.len()];
+        for (k, &p) in chain.iter().enumerate() {
+            let own: Vec<f64> = held(p).map(|&(_, i, at)| at[1] - flat(p, i)[1]).collect();
+            raised[k] = if !own.is_empty() {
+                own.iter().sum::<f64>() / own.len() as f64
+            } else if k > 0 {
+                raised[k - 1] + level(chain[k - 1], p)?
+            } else {
+                return None;
+            };
+        }
+        // An end's sewn side at height y: its flat x there, and where it is
+        // sewn to (x, z), from the points sewn nearest that height.
+        let end_at = |e: usize, y: f64| -> (f64, [f64; 2]) {
+            let k = if e == 0 { 0 } else { last };
+            let near = ends[e]
+                .iter()
+                .map(|(q, _)| (q[1] + raised[k] - y).abs())
+                .fold(f64::MAX, f64::min);
+            let (mut sum, mut n) = ((0.0, [0.0; 2]), 0.0);
+            for (q, at) in ends[e]
+                .iter()
+                .filter(|(q, _)| (q[1] + raised[k] - y).abs() <= near + 5.0)
+            {
+                sum = (sum.0 + q[0], [sum.1[0] + at[0], sum.1[1] + at[2]]);
+                n += 1.0;
+            }
+            (sum.0 / n, [sum.1[0] / n, sum.1[1] / n])
+        };
+        // How far out the body is at an angle round from the front.
+        let body_reach = |section: &Section, angle: f64| {
+            let (a, b) = (section.half[0], section.half[1].max(1.0));
+            1.0 / ((angle.sin() / a).powi(2) + (angle.cos() / b).powi(2)).sqrt()
+        };
+        // Each panel's width at height y.
+        let width =
+            |k: usize, y: f64| span(&outlines[chain[k]], y - raised[k]).map_or(0.0, |(a, b)| b - a);
+        // Row by row (5 mm): the curve round, and how far along it each of
+        // its points is.
+        type Curve = (Vec<[f64; 2]>, Vec<f64>);
+        let key = |y: f64| (y / 5.0).round() as i64;
+        let mut rows: HashMap<i64, Curve> = HashMap::new();
+        let mut row = |y: f64| -> Curve {
+            rows.entry(key(y))
+                .or_insert_with(|| {
+                    let around: f64 = (0..chain.len()).map(|k| width(k, y)).sum();
+                    let section = figure.smoothed(y);
+                    let m = section.middle;
+                    let polar = |p: [f64; 2]| {
+                        let (dx, dz) = (p[0] - m[0], p[1] - m[1]);
+                        (dx.atan2(dz), dx.hypot(dz))
+                    };
+                    let (a0, r0) = polar(end_at(0, y).1);
+                    let (mut a1, r1) = polar(end_at(1, y).1);
+                    // Round the shorter way, by the side.
+                    if a1 - a0 > PI {
+                        a1 -= TAU;
+                    } else if a0 - a1 > PI {
+                        a1 += TAU;
+                    }
+                    // The arms where they hang clear of the trunk (at the
+                    // shoulder they are in it).
+                    let arms: Vec<(V3, f64)> = figure
+                        .arms
+                        .iter()
+                        .filter_map(|arm| arm.at_height(y))
+                        .filter(|(centre, reach)| {
+                            let (angle, r) = polar([centre[0], centre[2]]);
+                            r - reach > CLEAR * body_reach(&section, angle)
+                        })
+                        .collect();
+                    // The curve round, bowed out by `bow`.
+                    let curve = |bow: f64| -> Vec<[f64; 2]> {
+                        (0..=64)
+                            .map(|k| {
+                                let t = f64::from(k) / 64.0;
+                                let angle = a0 + (a1 - a0) * t;
+                                let r = (r0 + (r1 - r0) * t + bow * (PI * t).sin())
+                                    .max(CLEAR * body_reach(&section, angle));
+                                [m[0] + r * angle.sin(), m[1] + r * angle.cos()]
+                            })
+                            .collect()
+                    };
+                    let clear_of_arms = |c: &[[f64; 2]]| {
+                        c.iter().all(|p| {
+                            arms.iter().all(|(centre, reach)| {
+                                (p[0] - centre[0]).hypot(p[1] - centre[2]) >= reach + ARM_CLEAR
+                            })
+                        })
+                    };
+                    let along = |c: &[[f64; 2]]| {
+                        let mut v = vec![0.0];
+                        for w in c.windows(2) {
+                            let last = v[v.len() - 1];
+                            v.push(last + (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1]));
+                        }
+                        v
+                    };
+                    let mut bow = 0.0;
+                    let mut c = curve(bow);
+                    while bow < MOST_BOW && (along(&c)[64] < around || !clear_of_arms(&c)) {
+                        bow += 5.0;
+                        c = curve(bow);
+                    }
+                    let a = along(&c);
+                    (c, a)
+                })
+                .clone()
+        };
+        let at = |(c, along): &Curve, s: f64| -> [f64; 2] {
+            let s = s.clamp(0.0, along[along.len() - 1]);
+            let j = along.partition_point(|&v| v < s).clamp(1, c.len() - 1);
+            let f = (s - along[j - 1]) / (along[j] - along[j - 1]).max(1e-9);
+            [
+                c[j - 1][0] + (c[j][0] - c[j - 1][0]) * f,
+                c[j - 1][1] + (c[j][1] - c[j - 1][1]) * f,
+            ]
+        };
+        Some(
+            chain
+                .iter()
+                .enumerate()
+                .map(|(k, &p)| {
+                    g.panels[p]
+                        .mesh
+                        .points
+                        .iter()
+                        .map(|&q| {
+                            let y = q[1] + raised[k];
+                            let curve = row(y);
+                            let total = curve.1[curve.1.len() - 1];
+                            // From the first end's sewn side, or back from
+                            // the last's; one between from the widths before
+                            // it.
+                            let s = if k == 0 {
+                                (q[0] - end_at(0, y).0).abs()
+                            } else if k == last {
+                                total - (q[0] - end_at(1, y).0).abs()
+                            } else {
+                                let before: f64 = (0..k).map(|j| width(j, y)).sum();
+                                let left = span(&outlines[p], q[1]).map_or(q[0], |s| s.0);
+                                before + q[0] - left
+                            };
+                            let [x, z] = at(&curve, s);
+                            [x, y, z]
+                        })
+                        .collect()
+                })
+                .collect(),
+        )
+    };
     let mut out: Vec<Vec<[f64; 3]>> = vec![Vec::new(); n];
     // The trunk's rings first: those hanging from the shoulders, or under
     // another.
@@ -1368,10 +1677,85 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
             }
         }
     }
+    // Then what is sewn into the garment's seams, outside it: each chain of
+    // such panels sewn to each other, from one end to the other.
+    let mut chained = vec![false; n];
+    for start in 0..n {
+        if !g.panels[start].outside || chained[start] {
+            continue;
+        }
+        let joined = |p: usize| -> Vec<usize> {
+            g.links
+                .iter()
+                .filter_map(|l| {
+                    let (a, b) = (l.a.0, l.b.0);
+                    (a != b && g.panels[a].outside && g.panels[b].outside)
+                        .then_some(if a == p {
+                            Some(b)
+                        } else if b == p {
+                            Some(a)
+                        } else {
+                            None
+                        })
+                        .flatten()
+                })
+                .collect()
+        };
+        // The panels joined to it, then from one end.
+        let mut group = vec![start];
+        let mut k = 0;
+        while k < group.len() {
+            for q in joined(group[k]) {
+                if !group.contains(&q) {
+                    group.push(q);
+                }
+            }
+            k += 1;
+        }
+        let end = group
+            .iter()
+            .copied()
+            .find(|&p| {
+                let mut j = joined(p);
+                j.sort_unstable();
+                j.dedup();
+                j.len() <= 1
+            })
+            .unwrap_or(start);
+        let mut chain = vec![end];
+        while let Some(next) = joined(chain[chain.len() - 1])
+            .into_iter()
+            .find(|q| !chain.contains(q))
+        {
+            chain.push(next);
+        }
+        for &p in &group {
+            chained[p] = true;
+        }
+        if chain.len() != group.len() {
+            continue;
+        }
+        let found: Vec<(usize, u32, [f64; 3])> = g
+            .stitches
+            .iter()
+            .flat_map(|&[a, b]| [(a, b), (b, a)])
+            .filter(|&((p, _), (q, j))| {
+                chain.contains(&p) && !chain.contains(&q) && (j as usize) < out[q].len()
+            })
+            .map(|((p, i), (q, j))| (p, i, out[q][j as usize]))
+            .collect();
+        if let Some(placed) = hang_outside(&chain, &found) {
+            for (&p, points) in chain.iter().zip(placed) {
+                out[p] = points;
+            }
+        }
+    }
     // Then the rest, each once what it is sewn to is placed: a bridge
     // between what it joins; a ring sewn to cloth by a shoulder or a wrist
     // round that arm; another from the waist.
-    let mut waiting: Vec<usize> = (0..rings.len()).filter(|&r| tops[r].is_none()).collect();
+    let mut waiting: Vec<usize> = (0..rings.len())
+        .filter(|&r| tops[r].is_none() && rings[r].iter().all(|&(p, _)| out[p].is_empty()))
+        .collect();
     while !waiting.is_empty() {
         // Each waiting ring's points sewn to cloth placed: (its panel, its
         // point, where what it is sewn to is).
@@ -1436,6 +1820,17 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
             out[ring[0].0] = spanned(g, ring[0].0, &found);
             continue;
         }
+        // A collar: one panel sewn by one edge along the tops of panels hung
+        // from the shoulders, standing up from them.
+        if ring.len() == 1
+            && let Some(points) = stood_on(g, ring[0].0, &found, &|q| {
+                tops[ring_of[q]].is_some() && ring.iter().all(|&(p, _)| p != q)
+            })
+        {
+            out[ring[0].0] = points;
+            continue;
+        }
+
         let arm = (!found.is_empty())
             .then(|| {
                 let count = found.len() as f64;

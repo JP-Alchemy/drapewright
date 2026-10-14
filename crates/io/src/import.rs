@@ -115,6 +115,9 @@ pub enum ImportNote {
     /// pattern programs print through plotter drivers): read for the
     /// pieces' names and cutting as well as strokes can be, and left out.
     LetteringIgnored { count: u32 },
+    /// Boxes holding a picture of the garment and a key to the pattern's
+    /// lines (a title block), and everything in them: no pieces.
+    KeysIgnored { count: u32 },
 }
 
 impl ImportNote {

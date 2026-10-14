@@ -2,8 +2,8 @@
 
 use crate::Pt;
 use crate::model::{
-    Allowance, AllowanceMode, CutInstruction, Edge, Grainline, InternalLine, LineKind, Mark,
-    MarkKind, Notch, NotchFrom, NotchKind, Outline, Piece, Segment,
+    Allowance, AllowanceMode, CutInstruction, Edge, EdgeKind, Grainline, InternalLine, LineKind,
+    Mark, MarkKind, Notch, NotchFrom, NotchKind, Outline, Piece, Segment,
 };
 
 fn edge(id: &str, segments: Vec<Segment>) -> Edge {
@@ -484,6 +484,208 @@ pub fn trousers() -> Vec<Piece> {
     vec![
         half("tf", "Trouser front", 190.0, 0.0, 60.0, 220.0),
         half("tb", "Trouser back", 210.0, 30.0, 90.0, 260.0),
+    ]
+}
+
+/// A cape coat, as a designer's pattern draws one, every piece cut as a
+/// pair but the centre back (on the fold): an A-line coat in princess
+/// panels, the centre front crossing 20 mm past its centre (done up with
+/// snaps, which the pattern leaves to the instructions) with its centre
+/// line drawn; a cape in a front and a back, each sewn by its front (or
+/// back) edge into a princess seam from the neck, the two sewn together
+/// over the shoulder; and a stand collar, a little longer than the
+/// neckline (to button over), cut twice, inside and outside. Drawn as
+/// seen from the front (from the back for the back pieces), x out from
+/// the centre and y down from the shoulders; waist and hip lines across
+/// every panel; 12 mm seams, 40 mm hems.
+pub fn cape_coat() -> Vec<Piece> {
+    let pair = |mut p: Piece| {
+        p.allowance.seam = 12.0;
+        p.cut = vec![CutInstruction {
+            quantity: 2,
+            mirrored: Some(true),
+            ..Default::default()
+        }];
+        p
+    };
+    let hem = |p: &mut Piece, id: &str| {
+        let e = p
+            .outline
+            .edges
+            .iter_mut()
+            .find(|e| e.id == id)
+            .expect("the hem");
+        e.allowance = Some(40.0);
+    };
+    // Where a straight edge from `a` to `b` is at height y.
+    let at = |a: [f64; 2], b: [f64; 2], y: f64| a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]);
+    // Lines across every panel: (name, height), lower the further back each
+    // meets a seam (at the front's edge, its princess seam, the side seam,
+    // the back's princess seam and its centre), so each meets its own only.
+    const LEVELS: [(&str, f64); 2] = [("Waist", 400.0), ("Hip", 600.0)];
+    let (front_edge, front_seam, side_seam, back_seam, centre_back) = (-5.0, 0.0, 10.0, 20.0, 25.0);
+    // The princess seam, from the neckline down; the side seam, from the
+    // underarm down.
+    let (princess_top, princess_hem) = ([55.0, 20.0], [110.0, 860.0]);
+    let (underarm, side_hem) = ([200.0, 230.0], [260.0, 860.0]);
+    let mut front = pair(piece(
+        "cf",
+        "Center Front",
+        [-20.0, 80.0],
+        vec![
+            edge("cfn", cubic([10.0, 80.0], [40.0, 50.0], princess_top)),
+            edge("cfp", line(princess_hem)),
+            edge("cfh", line([-20.0, 860.0])),
+            edge("cfe", line([-20.0, 80.0])),
+        ],
+        2,
+    ));
+    hem(&mut front, "cfh");
+    grain(&mut front, [-20.0, 150.0], [-20.0, 750.0]);
+    for (name, y) in LEVELS {
+        let (y0, y1) = (y + front_edge, y + front_seam);
+        level(
+            &mut front,
+            name,
+            [-20.0, y0],
+            [at(princess_top, princess_hem, y1), y1],
+        );
+    }
+    let centre = format!("{}l{}", front.id, front.lines.len());
+    front.lines.push(InternalLine {
+        id: centre,
+        kind: LineKind::Line,
+        start: Pt::new(0.0, 120.0),
+        segments: vec![Segment::line([0.0, 800.0])],
+        label: Some("Centre front".into()),
+    });
+    // The back's princess seam, nearer the centre; its neckline higher, its
+    // armhole fuller.
+    let (back_top, back_hem) = ([35.0, 12.0], [120.0, 860.0]);
+    // The side panels, from the princess seam round to the side seam.
+    let side =
+        |id: &str, name: &str, top: [f64; 2], hem_at: [f64; 2], arm: [[f64; 2]; 2], seam: f64| {
+            let mut p = pair(piece(
+                id,
+                name,
+                top,
+                vec![
+                    edge(&format!("{id}n"), line([75.0, 0.0])),
+                    edge(&format!("{id}s"), line([180.0, 30.0])),
+                    edge(&format!("{id}a"), cubic(arm[0], arm[1], underarm)),
+                    edge(&format!("{id}d"), line(side_hem)),
+                    edge(&format!("{id}h"), line(hem_at)),
+                    edge(&format!("{id}p"), line(top)),
+                ],
+                2,
+            ));
+            hem(&mut p, &format!("{id}h"));
+            grain(&mut p, [150.0, 300.0], [150.0, 700.0]);
+            for (name, y) in LEVELS {
+                let (y0, y1) = (y + seam, y + side_seam);
+                level(
+                    &mut p,
+                    name,
+                    [at(hem_at, top, y0), y0],
+                    [at(underarm, side_hem, y1), y1],
+                );
+            }
+            p
+        };
+    let side_front = side(
+        "sf",
+        "Side Front",
+        princess_top,
+        princess_hem,
+        [[170.0, 110.0], [175.0, 200.0]],
+        front_seam,
+    );
+    let side_back = side(
+        "sb",
+        "Side Back",
+        back_top,
+        back_hem,
+        [[178.0, 100.0], [182.0, 190.0]],
+        back_seam,
+    );
+    let mut back = piece(
+        "cb",
+        "Center Back",
+        [0.0, 20.0],
+        vec![
+            edge("cbn", cubic([12.0, 20.0], [25.0, 16.0], back_top)),
+            edge("cbp", line(back_hem)),
+            edge("cbh", line([0.0, 860.0])),
+            Edge {
+                kind: EdgeKind::Fold,
+                ..edge("cbf", line([0.0, 20.0]))
+            },
+        ],
+        1,
+    );
+    back.allowance.seam = 12.0;
+    back.cut[0].on_fold = Some(true);
+    hem(&mut back, "cbh");
+    grain(&mut back, [40.0, 150.0], [40.0, 750.0]);
+    for (name, y) in LEVELS {
+        let (y0, y1) = (y + centre_back, y + back_seam);
+        level(&mut back, name, [0.0, y0], [at(back_top, back_hem, y1), y1]);
+    }
+    // The cape's front and back: each from the neck down the princess seam
+    // `along` mm, out over the shoulder and arm, and round its hem.
+    let cape = |id: &str, name: &str, top: [f64; 2], hem_at: [f64; 2], along: f64| {
+        let (dx, dy) = (hem_at[0] - top[0], hem_at[1] - top[1]);
+        let l = dx.hypot(dy);
+        let down = [top[0] + dx / l * along, top[1] + dy / l * along];
+        let mut p = pair(piece(
+            id,
+            name,
+            top,
+            vec![
+                edge(&format!("{id}n"), line([75.0, 0.0])),
+                edge(
+                    &format!("{id}s"),
+                    cubic([250.0, 60.0], [400.0, 180.0], [480.0, 330.0]),
+                ),
+                edge(
+                    &format!("{id}h"),
+                    cubic([380.0, 400.0], [200.0, 420.0], down),
+                ),
+                edge(&format!("{id}e"), line(top)),
+            ],
+            2,
+        ));
+        p.outline.edges[2].allowance = Some(35.0);
+        grain(&mut p, [150.0, 100.0], [150.0, 350.0]);
+        p
+    };
+    let front_cape = cape("fc", "Front Cape", princess_top, princess_hem, 390.0);
+    let back_cape = cape("bc", "Back Cape", back_top, back_hem, 430.0);
+    // The collar: round the neckline and 8% more, 50 mm deep, its corners
+    // square; cut twice, outside and inside.
+    let neckline: f64 = 2.0
+        * [&front, &side_front, &side_back, &back]
+            .iter()
+            .map(|p| p.outline.edge_geom(0).length())
+            .sum::<f64>();
+    let long = 1.08 * neckline;
+    let mut collar = piece(
+        "co",
+        "Collar",
+        [0.0, 0.0],
+        vec![
+            edge("cot", line([long, 0.0])),
+            edge("coe", line([long, 50.0])),
+            edge("con", line([0.0, 50.0])),
+            edge("cos", line([0.0, 0.0])),
+        ],
+        2,
+    );
+    collar.allowance.seam = 12.0;
+    collar.cut[0].mirrored = Some(false);
+    grain(&mut collar, [long / 2.0, 5.0], [long / 2.0, 45.0]);
+    vec![
+        front, side_front, side_back, back, front_cape, back_cape, collar,
     ]
 }
 

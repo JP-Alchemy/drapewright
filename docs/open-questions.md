@@ -202,3 +202,22 @@ matters.
     draping a piece partly worn outside and partly inside isn't possible
     yet. *Provisional (2026-10-14): Sasha is drafted without its pockets,
     and the sample dress is that.* Should pockets be sewn in, and shown?
+37. ☐ **Fronts done up with nothing marked.** A coat done up with snaps
+    often marks neither snaps nor buttonholes: the instructions say how
+    many, and the centre front line drawn on each front says where.
+    *Provisional (2026-10-14): fronts that cross past a centre front line
+    drawn on them, with no buttons marked, are done up on that line every
+    10 cm down two thirds of the opening; **Buttons done up** shows it
+    open.* Should she mark her snaps herself instead (and where they go)?
+38. ☐ **Facings with nothing to lie on.** A coat's neck and front facings
+    are sewn to each other at the shoulders, then to the collar and the
+    front edges, between the coat and its lining. Find seams sews them to
+    each other only, so they have nowhere to go inside. *Provisional
+    (2026-10-14): left off the drape (with the armhole facings, which
+    can't yet be draped without them), and the status line says they are
+    sewn but have nothing to lie on.*
+39. ☐ **Two pieces drawn as one.** A pocket's two bags are often drawn on
+    one outline, one bag a little longer (each named, with "front" and
+    "back" marking its line). *Provisional: imported as the shorter bag and
+    a narrow strip, the difference, which can be deleted.* Should both bags
+    be made?

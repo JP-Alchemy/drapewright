@@ -426,6 +426,13 @@ impl Corner {
                     _ => self.round(),
                 }
             }
+            // Beside an edge with no allowance (a fold), the other's
+            // cutting line runs to that edge's line, a hair behind the
+            // corner when it turns past square: no rounding past the fold.
+            _ if self.a.min(self.b) <= 1e-9 => CornerPieces {
+                add: vec![c, a1, b1],
+                cut: None,
+            },
             _ => self.round(),
         }
     }

@@ -11,7 +11,7 @@ use drapewright_pattern_core::geom::{
     unit_tangent,
 };
 use drapewright_pattern_core::{
-    CutInstruction, Mark, MarkKind, Piece, Pt, ScaleBasis, SourceFormat,
+    CutInstruction, Grainline, Mark, MarkKind, Piece, Pt, ScaleBasis, SourceFormat,
 };
 use drapewright_pdf_import::{Document, Page, Shape, TextRun};
 use kurbo::{
@@ -62,6 +62,8 @@ const STRAIGHT_ON_LONG: f64 = 10.0;
 /// A line closing an outline drawn in another style is at most this part
 /// of the outline's own line.
 const CLOSER_SHORTER: f64 = 0.6;
+/// A line whose ends are this part of its length apart is straight.
+const STRAIGHT: f64 = 0.999;
 /// The sizes of a nest each end a hair apart at a corner they share: an
 /// outline drawn partly in another style is closed across gaps up to
 /// this, mm.
@@ -174,13 +176,37 @@ fn subpaths(path: &BezPath, to_mm: Affine) -> Vec<(Vec<PathSeg>, bool)> {
 }
 
 /// How a shape is drawn, to keep lines of one kind together.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub(crate) struct Style {
     pub stroke: Option<[u8; 3]>,
     /// Line width in twentieths of a millimetre.
     pub width: i64,
     pub dashed: bool,
     pub layers: Vec<u32>,
+    /// A dashed line's dash and gap together, mm (0 for a solid line).
+    /// Drawing programs stretch the dashes a little to fit each line, so
+    /// lines of one style differ in this; it is no part of the style.
+    pub period: f64,
+}
+
+impl PartialEq for Style {
+    fn eq(&self, other: &Self) -> bool {
+        self.stroke == other.stroke
+            && self.width == other.width
+            && self.dashed == other.dashed
+            && self.layers == other.layers
+    }
+}
+
+/// A dash pattern's length, dashes and gaps together: an odd number of
+/// lengths is gone through twice.
+fn dash_period(dash: &[f64]) -> f64 {
+    let once: f64 = dash.iter().sum();
+    if dash.len() % 2 == 1 {
+        2.0 * once
+    } else {
+        once
+    }
 }
 
 fn rgb8(c: [f32; 3]) -> [u8; 3] {
@@ -233,6 +259,7 @@ fn page_paths(
         width: (shape.line_width * MM_PER_POINT * 20.0).round() as i64,
         dashed: !shape.dash.is_empty(),
         layers: shape.layers.clone(),
+        period: dash_period(&shape.dash) * MM_PER_POINT,
     };
     let hint = shape
         .layers
@@ -343,6 +370,41 @@ fn is_instruction(text: &str) -> bool {
         || (t.len() <= 4 && t.chars().next().is_some_and(char::is_alphabetic) && t[1..].chars().all(|c| c.is_ascii_digit()))
 }
 
+/// A name set on several lines ("Armhole / Front / Facing"): the lines
+/// under its first in the same type, lined up with it, read on, three
+/// lines at most.
+fn name_read_on(first: &Label, inside: &[&Label]) -> String {
+    // Half a line's width, about.
+    let half = |l: &Label| 0.28 * l.size * l.text.chars().count() as f64;
+    let mut text = first.text.trim().to_string();
+    let mut last = first;
+    for _ in 0..2 {
+        let down = Vec2::new(-last.dir.y, last.dir.x);
+        let next = inside
+            .iter()
+            .filter(|l| {
+                l.naming != Naming::Never
+                    && !is_instruction(&l.text)
+                    && (l.size - last.size).abs() <= 0.1 * last.size
+                    && l.dir.dot(last.dir) >= 0.99
+            })
+            .filter_map(|l| {
+                let d = l.at - last.at;
+                let (below, along) = (d.dot(down), d.dot(last.dir).abs());
+                (below >= 0.6 * last.size
+                    && below <= 1.8 * last.size
+                    && along <= half(l) + half(last))
+                .then_some((below, *l))
+            })
+            .min_by(|a, b| a.0.total_cmp(&b.0));
+        let Some((_, line)) = next else { break };
+        text.push(' ');
+        text.push_str(line.text.trim());
+        last = line;
+    }
+    text
+}
+
 /// Whether a label is a piece's number set out in big type: "- 4 -", "#12",
 /// "No. 3", "- MP -".
 fn is_piece_number(text: &str) -> bool {
@@ -403,10 +465,16 @@ pub(crate) fn cuts_from_label(text: &str) -> Vec<CutInstruction> {
         } else {
             "main"
         };
+        // Two alike, one over the other: an outer collar and its inner.
+        let layers = (has("inside") && has("outside")) || (has("inner") && has("outer"));
         out.push(CutInstruction {
             material: material.to_string(),
             quantity,
-            mirrored: (pair || has("mirror")).then_some(true),
+            mirrored: if layers {
+                Some(false)
+            } else {
+                (pair || has("mirror")).then_some(true)
+            },
             on_fold: has("fold").then_some(true),
         });
     }
@@ -449,32 +517,55 @@ pub(crate) fn read_labels(pieces: &mut [Piece], labels: &[Label]) {
             .map(|(l, _)| l)
             .collect();
         let named = |l: &&&Label| l.naming != Naming::Never && !is_instruction(&l.text);
-        // A piece numbered in big type ("- 4 -", "#4") is named on the
-        // line just under its number.
+        // A piece numbered in big type ("- 4 -", "#4") is named beside its
+        // number, on its line ("7 Collar"), or else on the line just under
+        // it.
         let biggest = inside.iter().max_by(|a, b| a.size.total_cmp(&b.size));
-        let under_number = biggest.filter(|n| is_piece_number(&n.text)).and_then(|n| {
+        let by_number = biggest.filter(|n| is_piece_number(&n.text)).and_then(|n| {
             let down = Vec2::new(-n.dir.y, n.dir.x);
-            inside
+            let place = |l: &Label| {
+                let d = l.at - n.at;
+                (d.dot(down), d.dot(n.dir))
+            };
+            fn nearest(found: Vec<(f64, &Label)>) -> Option<&Label> {
+                found
+                    .into_iter()
+                    .min_by(|a, b| a.0.total_cmp(&b.0))
+                    .map(|(_, l)| l)
+            }
+            let smaller: Vec<&&Label> = inside
                 .iter()
                 .filter(named)
                 .filter(|l| l.size < n.size)
+                .collect();
+            let beside = smaller
+                .iter()
                 .filter_map(|l| {
-                    let d = l.at - n.at;
-                    let (below, across) = (d.dot(down), d.dot(n.dir).abs());
-                    (below > 0.0 && below <= 2.5 * n.size && across <= 3.0 * n.size)
-                        .then_some((below, l))
+                    let (below, along) = place(l);
+                    (below.abs() <= 0.3 * n.size && along > 0.0 && along <= 6.0 * n.size)
+                        .then_some((along, **l))
                 })
-                .min_by(|a, b| a.0.total_cmp(&b.0))
-                .and_then(|(_, l)| meaningful_name(&l.text))
+                .collect();
+            let under = smaller
+                .iter()
+                .filter_map(|l| {
+                    let (below, along) = place(l);
+                    (below > 0.0 && below <= 2.5 * n.size && along.abs() <= 3.0 * n.size)
+                        .then_some((below, **l))
+                })
+                .collect();
+            nearest(beside).or_else(|| nearest(under))
+        });
+        let name_label = by_number.or_else(|| {
+            inside
+                .iter()
+                .filter(named)
+                .filter(|l| meaningful_name(&l.text).is_some())
+                .max_by(|a, b| a.naming.cmp(&b.naming).then(a.size.total_cmp(&b.size)))
+                .copied()
         });
         if piece.name.starts_with("Piece ")
-            && let Some(name) = under_number.or_else(|| {
-                inside
-                    .iter()
-                    .filter(named)
-                    .max_by(|a, b| a.naming.cmp(&b.naming).then(a.size.total_cmp(&b.size)))
-                    .and_then(|l| meaningful_name(&l.text))
-            })
+            && let Some(name) = name_label.and_then(|l| meaningful_name(&name_read_on(l, &inside)))
         {
             piece.name = sentence_case(&name);
         }
@@ -604,23 +695,38 @@ fn despike(segs: &mut Vec<PathSeg>, closed: bool) {
         let seg = segs[k];
         let back = (k > 0 || closed).then(|| segs[(k + n - 1) % n]);
         let on = (k + 1 < n || closed).then(|| segs[(k + 1) % n]);
+        // The ways the neighbours run at this hair: straight or curved.
+        let arriving = back.map(|b| unit_tangent(&b, 1.0));
+        let leaving = on.map(|o| unit_tangent(&o, 0.0));
         let doubles_back = matches!(seg, PathSeg::Line(_))
             && seg.start().distance(seg.end()) < SHORT
-            && [back, on]
+            && [arriving, leaving]
                 .iter()
                 .flatten()
-                .any(|o| matches!(o, PathSeg::Line(_)) && way(o).dot(way(&seg)) < -0.5);
+                .any(|w| w.dot(way(&seg)) < -0.5);
         if !doubles_back {
             k += 1;
             continue;
         }
         let mid = seg.start().midpoint(seg.end());
         let (prev, next) = ((k + n - 1) % n, (k + 1) % n);
+        // A curve's handle moves with its end.
         let moved = |s: PathSeg, start: Option<Point>, end: Option<Point>| match s {
             PathSeg::Line(mut l) => {
                 l.p0 = start.unwrap_or(l.p0);
                 l.p1 = end.unwrap_or(l.p1);
                 PathSeg::Line(l)
+            }
+            PathSeg::Cubic(mut c) => {
+                if let Some(start) = start {
+                    c.p1 += start - c.p0;
+                    c.p0 = start;
+                }
+                if let Some(end) = end {
+                    c.p2 += end - c.p3;
+                    c.p3 = end;
+                }
+                PathSeg::Cubic(c)
             }
             other => other,
         };
@@ -886,7 +992,7 @@ pub fn import_pdf_pages(
     // left out unless chosen.
     let prose: Vec<bool> = pages
         .iter()
-        .map(|p| choice.is_none() && is_prose(&p.labels))
+        .map(|p| choice.is_none() && is_prose(p))
         .collect();
     // Pages labelled for putting together ("1B") go where their labels
     // say; the labels are not the pattern's.
@@ -1103,15 +1209,19 @@ pub fn import_pdf_pages(
     let mut groups: Vec<(Style, RawPath, Vec<Vec<PathSeg>>)> = Vec::new();
     for (r, style) in open {
         match groups.iter_mut().find(|(s, _, _)| *s == style) {
-            Some((_, _, paths)) => paths.push(r.segs),
+            Some((s, _, paths)) => {
+                s.period = s.period.max(style.period);
+                paths.push(r.segs);
+            }
             None => {
                 let segs = r.segs.clone();
                 groups.push((style, r, vec![segs]));
             }
         }
     }
-    // A dashed outline's corners: solid stubs of its colour, a dash's gap
-    // from its lines' ends. They go with the dashed lines.
+    // A dashed outline's corners: solid stubs of its colour (a dash long
+    // at most, turning the corner or not), a dash's gap from its lines'
+    // ends. They go with the dashed lines.
     let ends = |p: &[PathSeg]| [p[0].start(), p[p.len() - 1].end()];
     let length = |p: &[PathSeg]| p.iter().map(|s| s.arclen(0.01)).sum::<f64>();
     for d in 0..groups.len() {
@@ -1125,13 +1235,17 @@ pub fn import_pdf_pages(
         let Some(s) = groups.iter().position(|(st, _, _)| *st == solid) else {
             continue;
         };
+        let period = groups[d].0.period;
+        let reach = DASH_GAP.max(period);
         let dashed_ends: Vec<Point> = groups[d].2.iter().flat_map(|p| ends(p)).collect();
-        let near_dash = |p: Point| dashed_ends.iter().any(|e| e.distance(p) <= DASH_GAP);
-        let (stubs, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut groups[s].2)
-            .into_iter()
-            .partition(|p| length(p) <= DASH_STUB && ends(p).into_iter().any(near_dash));
+        let near_dash = |p: Point| dashed_ends.iter().any(|e| e.distance(p) <= reach);
+        let (stubs, mut rest): (Vec<_>, Vec<_>) =
+            std::mem::take(&mut groups[s].2).into_iter().partition(|p| {
+                length(p) <= DASH_STUB.max(period) && ends(p).into_iter().any(near_dash)
+            });
+        let (carried, unused) = continue_dashes(&groups[d].2, stubs, reach);
+        rest.extend(unused);
         groups[s].2 = rest;
-        let carried = continue_dashes(&groups[d].2, stubs);
         groups[d].2.extend(carried);
     }
     groups.retain(|(_, _, paths)| !paths.is_empty());
@@ -1167,8 +1281,9 @@ pub fn import_pdf_pages(
             // A line drawn in two long pieces that run straight on into
             // each other, overlapping a little or a little apart (a panel's
             // side drawn from each end to the middle), is one line; the
-            // hair where they overlap goes with the other spikes.
-            let straight_on = Some((STRAIGHT_ON, STRAIGHT_ON_LONG));
+            // hair where they overlap goes with the other spikes. Dashed,
+            // each piece may stop up to a dash and its gap short.
+            let straight_on = Some((STRAIGHT_ON.max(2.0 * style.period), STRAIGHT_ON_LONG));
             let (loops, open): (Vec<_>, Vec<_>) =
                 bridge_crowded(chained, reach, &crowded, straight_on)
                     .into_iter()
@@ -1206,6 +1321,18 @@ pub fn import_pdf_pages(
     // page frames come together only now, and lettering and logos are
     // lines too.
     raw.retain(|(r, _)| !(r.closed && page_areas.iter().any(|p| is_page_frame(&r.segs, *p))));
+    // A page's frame drawn off the pages read (a cover's, beside its tiles):
+    // a box just as big as a page.
+    let page_sizes: Vec<(f64, f64)> = pages.iter().map(|p| (p.width, p.height)).collect();
+    raw.retain(|(r, _)| {
+        let pts = flatten_segs(&r.segs, 0.1);
+        let b = bounds(&pts);
+        let boxed = r.closed && pts.len() <= 6 && polygon_area(&pts).abs() >= 0.99 * b.area();
+        !(boxed
+            && page_sizes
+                .iter()
+                .any(|&(w, h)| (b.width() - w).abs() <= 1.0 && (b.height() - h).abs() <= 1.0))
+    });
     let plain: Vec<RawPath> = raw.iter().map(|(r, _)| r.clone()).collect();
     // Arrowheads are left for the grainlines they belong to.
     let heads = arrowheads(&plain);
@@ -1334,6 +1461,7 @@ pub fn import_pdf_pages(
         );
         read_labels(&mut found, &labels);
         name_lines(&mut found, &labels);
+        grain_from_labels(&mut found, &labels);
         add_crosses(&mut found, &crosses);
         // Lines drawn once for all the sizes reach the largest size's
         // outline: each size's stop at its own.
@@ -1473,10 +1601,13 @@ fn close_across_styles(joined: &mut [Joined]) {
         near.dedup();
         for m in near {
             let q = line(m);
-            if length(q) > CLOSER_SHORTER * long {
+            let (qa, qb) = ends(q);
+            // A straight closer (a fold, a centre line) is no other size's
+            // outline: it closes however long it is.
+            let straight = qa.distance(qb) >= STRAIGHT * length(q);
+            if !straight && length(q) > CLOSER_SHORTER * long {
                 continue;
             }
-            let (qa, qb) = ends(q);
             for (reversed, from, to) in [(false, qa, qb), (true, qb, qa)] {
                 if from.distance(b) <= ACROSS && to.distance(a) <= ACROSS {
                     fits.push((from.distance(b) + to.distance(a), n, m, reversed));
@@ -1568,7 +1699,11 @@ fn close_across_styles(joined: &mut [Joined]) {
 /// a stub straight on from a line's end, a dash's gap away, carries it on
 /// (a stub between two lines carries both). The stubs, and the gaps
 /// across to the lines they carry on, to be joined with the lines.
-fn continue_dashes(dashed: &[Vec<PathSeg>], stubs: Vec<Vec<PathSeg>>) -> Vec<Vec<PathSeg>> {
+fn continue_dashes(
+    dashed: &[Vec<PathSeg>],
+    stubs: Vec<Vec<PathSeg>>,
+    reach: f64,
+) -> (Vec<Vec<PathSeg>>, Vec<Vec<PathSeg>>) {
     // Each dashed line's ends: (point, heading on).
     let mut ends: Vec<(Point, Vec2)> = Vec::new();
     for p in dashed {
@@ -1581,11 +1716,16 @@ fn continue_dashes(dashed: &[Vec<PathSeg>], stubs: Vec<Vec<PathSeg>>) -> Vec<Vec
     for (e, &(at, on)) in ends.iter().enumerate() {
         for (k, stub) in stubs.iter().enumerate() {
             let (a, b) = (stub[0].start(), stub[stub.len() - 1].end());
+            // Which way the stub leaves each end: at a corner it turns.
+            let leaving = [
+                unit_tangent(&stub[0], 0.0),
+                -unit_tangent(&stub[stub.len() - 1], 1.0),
+            ];
             for (near, far, end) in [(a, b, 2 * k), (b, a, 2 * k + 1)] {
                 let gap = near - at;
                 let along = far - near;
-                let straight_on = along.hypot() < 1e-6 || along.dot(on) >= 0.95 * along.hypot();
-                if gap.hypot() <= DASH_GAP
+                let straight_on = along.hypot() < 1e-6 || leaving[end % 2].dot(on) >= 0.95;
+                if gap.hypot() <= reach
                     && gap.dot(on) >= -JOIN
                     && gap.cross(on).abs() <= 0.15
                     && straight_on
@@ -1616,9 +1756,19 @@ fn continue_dashes(dashed: &[Vec<PathSeg>], stubs: Vec<Vec<PathSeg>>) -> Vec<Vec
             gaps.push(vec![PathSeg::Line(Line::new(ends[e].0, near))]);
         }
     }
-    let mut out = stubs;
-    out.extend(gaps);
-    out
+    // A stub that carries no line on is still a dashed line's, when short
+    // enough for half a dash; longer, it is some other mark (a notch).
+    let carries = |k: usize| stub_end_taken[2 * k] || stub_end_taken[2 * k + 1];
+    let length = |p: &[PathSeg]| p.iter().map(|s| s.arclen(0.01)).sum::<f64>();
+    let (mut out, unused): (Vec<_>, Vec<_>) = stubs
+        .into_iter()
+        .enumerate()
+        .partition(|(k, stub)| carries(*k) || length(stub) <= DASH_STUB);
+    out.extend(gaps.into_iter().map(|g| (usize::MAX, g)));
+    (
+        out.into_iter().map(|(_, p)| p).collect(),
+        unused.into_iter().map(|(_, p)| p).collect(),
+    )
 }
 
 /// Words printed several times over on most pages (a watermark, "FREE",
@@ -1661,14 +1811,19 @@ fn remove_watermarks(pages: &mut [PageContent]) {
 }
 
 /// Lines of prose this many, of `PROSE_WORDS` words or more, make a page of
-/// instructions.
+/// instructions; on a page bigger than A4, this many to each A4 of it (a
+/// copy shop sheet's copyright notice and "lengthen shorten guide line"s
+/// are a few lines over a square metre of pattern).
 const PROSE_LINES: usize = 5;
 const PROSE_WORDS: usize = 4;
+const A4_AREA: f64 = 210.0 * 297.0;
 
 /// Whether a page's words are mostly prose to read: instructions, a
 /// warning, not a pattern's labels.
-fn is_prose(labels: &[Label]) -> bool {
-    labels
+fn is_prose(page: &PageContent) -> bool {
+    let a4s = (page.width * page.height / A4_AREA).max(1.0);
+    let lines = page
+        .labels
         .iter()
         .filter(|l| {
             l.text
@@ -1677,8 +1832,8 @@ fn is_prose(labels: &[Label]) -> bool {
                 .count()
                 >= PROSE_WORDS
         })
-        .count()
-        >= PROSE_LINES
+        .count();
+    lines as f64 >= PROSE_LINES as f64 * a4s
 }
 
 /// A piece's lines, and its grainline, cut back to its outline: of a line
@@ -1775,12 +1930,33 @@ const BODY_LEVELS: [&str; 10] = [
     "low hip",
 ];
 
+/// A label naming a piece's centre line ("Center Front", "CB", "Centre
+/// front fabric grain"): the line's name.
+fn centre_line(text: &str) -> Option<&'static str> {
+    let t = text.trim().to_lowercase();
+    let words: Vec<&str> = t.split_whitespace().collect();
+    match words.as_slice() {
+        ["centre" | "center", "front", ..] | ["cf", ..] => Some("Centre front"),
+        ["centre" | "center", "back", ..] | ["cb", ..] => Some("Centre back"),
+        _ => None,
+    }
+}
+
 /// Lines across pieces named by the body level printed along them
-/// ("WAIST" just above a line): "Waist".
+/// ("WAIST" just above a line): "Waist"; and a centre line by its label
+/// ("Center Front" along it): "Centre front".
 fn name_lines(pieces: &mut [Piece], labels: &[Label]) {
-    let levels: Vec<&Label> = labels
+    let level = |l: &Label| {
+        let t = l.text.trim().to_lowercase();
+        BODY_LEVELS
+            .iter()
+            .find(|name| **name == t)
+            .map(|_| sentence_case(l.text.trim()))
+            .or_else(|| centre_line(&l.text).map(str::to_string))
+    };
+    let levels: Vec<(&Label, String)> = labels
         .iter()
-        .filter(|l| BODY_LEVELS.contains(&l.text.trim().to_lowercase().as_str()))
+        .filter_map(|l| level(l).map(|name| (l, name)))
         .collect();
     if levels.is_empty() {
         return;
@@ -1800,8 +1976,8 @@ fn name_lines(pieces: &mut [Piece], labels: &[Label]) {
             }
             let unit = along / along.hypot();
             // The nearest label naming a level, printed along it.
-            let mut named: Option<(f64, &Label)> = None;
-            for &l in &levels {
+            let mut named: Option<(f64, &String)> = None;
+            for (l, name) in &levels {
                 if l.dir.dot(unit).abs() < 0.95 {
                     continue;
                 }
@@ -1810,15 +1986,60 @@ fn name_lines(pieces: &mut [Piece], labels: &[Label]) {
                     && (0.0..=along.hypot()).contains(&(l.at - a).dot(unit))
                     && named.is_none_or(|(nearest, _)| d < nearest)
                 {
-                    named = Some((d, l));
+                    named = Some((d, name));
                 }
             }
-            if let Some((_, l)) = named {
-                line.label = Some(sentence_case(l.text.trim()));
+            if let Some((_, name)) = named {
+                line.label = Some(name.clone());
             }
         }
     }
 }
+
+/// A piece with no grainline found by its arrows: the straight line inside
+/// it labelled for the grain along it ("Fabric grain", "Center Front
+/// Fabric grain" along a centre line drawn with no arrows, or beside a
+/// collar's arrow too short to read).
+fn grain_from_labels(pieces: &mut [Piece], labels: &[Label]) {
+    let grain: Vec<&Label> = labels
+        .iter()
+        .filter(|l| l.text.to_lowercase().contains("grain"))
+        .collect();
+    for piece in pieces.iter_mut().filter(|p| p.grainline.is_none()) {
+        let mut best: Option<(f64, Point, Point)> = None;
+        for line in &piece.lines {
+            let pts = flatten_segs(&segs_of(line.start, &line.segments), 0.5);
+            let (Some(&a), Some(&b)) = (pts.first(), pts.last()) else {
+                continue;
+            };
+            if a.distance(b) < GRAIN_FROM_LABEL || !is_straight(&pts) {
+                continue;
+            }
+            let unit = (b - a) / a.distance(b);
+            for l in &grain {
+                let d = distance_to_polyline(l.at, &pts, false);
+                let along = (l.at - a).dot(unit);
+                if l.dir.dot(unit).abs() >= 0.95
+                    && d <= (2.5 * l.size).max(4.0)
+                    && (0.0..=a.distance(b)).contains(&along)
+                    && best.is_none_or(|(nearest, ..)| d < nearest)
+                {
+                    best = Some((d, a, b));
+                }
+            }
+        }
+        if let Some((_, a, b)) = best {
+            piece.grainline = Some(Grainline {
+                from: Pt::from(a),
+                to: Pt::from(b),
+                one_way: false,
+            });
+        }
+    }
+}
+
+/// A line labelled for the grain is a grainline this long at least, mm.
+const GRAIN_FROM_LABEL: f64 = 20.0;
 
 /// "+" marks on the pieces they sit inside.
 fn add_crosses(pieces: &mut [Piece], crosses: &[(Point, f64)]) {
@@ -1846,6 +2067,7 @@ fn count(note: &ImportNote) -> u32 {
     match note {
         ImportNote::SmallShapesIgnored { count }
         | ImportNote::LooseLinesIgnored { count }
+        | ImportNote::KeysIgnored { count }
         | ImportNote::LinesOnOutlineIgnored { count }
         | ImportNote::UnsupportedEntities { count }
         | ImportNote::CurvesTraced { count } => *count,
@@ -1876,6 +2098,22 @@ mod tests {
         assert_eq!(c.len(), 2);
         assert_eq!(c[1].material, "interfacing");
         assert!(one("Cutting layout").is_empty());
+        // Two alike, one over the other: a collar and its inner collar,
+        // not a left and a right.
+        let c = one("cut 2 (Inside & Outside)");
+        assert_eq!((c[0].quantity, c[0].mirrored), (2, Some(false)));
+    }
+
+    #[test]
+    fn centre_lines_by_their_labels() {
+        assert_eq!(
+            centre_line("Center Front      Fabric grain"),
+            Some("Centre front")
+        );
+        assert_eq!(centre_line("CB"), Some("Centre back"));
+        assert_eq!(centre_line("Centre back fold"), Some("Centre back"));
+        assert_eq!(centre_line("Front"), None);
+        assert_eq!(centre_line("Centrepiece"), None);
     }
 
     #[test]

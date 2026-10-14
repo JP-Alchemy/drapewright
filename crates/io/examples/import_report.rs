@@ -6,7 +6,9 @@
 //!
 //! Folders are searched for .svg, .dxf and .pdf files. `-v` also lists each piece:
 //! its edges (folds marked), allowance, notches, internal lines, grainline
-//! and cutting; `-s` the seams Drapewright would suggest. Nothing is written.
+//! and cutting; `-s` the seams Drapewright would suggest; `--size 38` keeps
+//! one size of a pattern in several (with what the sizes share). Nothing is
+//! written.
 
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -51,6 +53,7 @@ fn note(n: &ImportNote) -> String {
         ImportNote::PagesLeftOut { count } => format!("{count} pages left out"),
         ImportNote::TestSquareFound { size } => format!("test square {size} mm"),
         ImportNote::LetteringIgnored { count } => format!("{count} lettering left out"),
+        ImportNote::KeysIgnored { count } => format!("{count} title blocks left out"),
     }
 }
 
@@ -75,11 +78,15 @@ fn main() {
     let mut files = Vec::new();
     let mut verbose = false;
     let mut seams = false;
-    for arg in std::env::args().skip(1) {
+    let mut size: Option<String> = None;
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
         if arg == "-v" {
             verbose = true;
         } else if arg == "-s" {
             seams = true;
+        } else if arg == "--size" {
+            size = args.next();
         } else {
             collect(Path::new(&arg), &mut files);
         }
@@ -111,7 +118,12 @@ fn main() {
                 println!("ERROR  {name}: {e}");
                 failed += 1;
             }
-            Ok(r) => {
+            Ok(mut r) => {
+                if let Some(size) = &size {
+                    let sizes = r.sizes.clone();
+                    r.pieces
+                        .retain(|p| sizes.of(&p.id).is_none_or(|s| s.eq_ignore_ascii_case(size)));
+                }
                 if r.pieces.is_empty() {
                     empty += 1;
                 } else {
@@ -206,8 +218,12 @@ fn main() {
                             )
                         });
                         let b = p.outline.bounds();
+                        let sized = r
+                            .sizes
+                            .of(&p.id)
+                            .map_or(String::new(), |s| format!(" [{s}]"));
                         println!(
-                            "         - {} @{:.0},{:.0}: {} edges ({folds} fold), {:?} {} mm, {} notches, {} lines, grain {}, {cut}",
+                            "         - {}{sized} @{:.0},{:.0}: {} edges ({folds} fold), {:?} {} mm, {} notches, {} lines, grain {}, {cut}",
                             p.name,
                             b.x0,
                             b.y0,

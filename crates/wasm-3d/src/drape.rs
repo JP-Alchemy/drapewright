@@ -178,6 +178,9 @@ pub struct Draping {
     /// The facings and linings sewn to nothing, by id: left out, as they
     /// go inside.
     pub inside: Vec<String>,
+    /// The facings and linings sewn but not placed inside the rest (one
+    /// sewn only to another, with nothing to lie on), by id: left out.
+    pub unplaced: Vec<String>,
     /// The facings and linings draped inside the rest, by id.
     pub lined: Vec<String>,
     /// How many buttons it has, done up or not.
@@ -260,14 +263,10 @@ impl Draping {
         // Its facings and linings inside it, or, if they can't be placed
         // there, left out.
         let ids = |pieces: &[Piece]| pieces.iter().map(|p| p.id.clone()).collect::<Vec<_>>();
-        let mut inside = draped.inside;
-        let (garment, starts, lined) =
+        let (garment, starts, lined, unplaced) =
             match with_inside(&shell, &starts, (&sewn, &draped.lined), &seams, spacing) {
-                Some((whole, starts)) => (whole, starts, ids(&draped.lined)),
-                None => {
-                    inside.extend(ids(&draped.lined));
-                    (shell.clone(), starts, Vec::new())
-                }
+                Some((whole, starts)) => (whole, starts, ids(&draped.lined), Vec::new()),
+                None => (shell.clone(), starts, Vec::new(), ids(&draped.lined)),
             };
         let buttons = garment.buttons;
         let garment = if request.open == Some(true) {
@@ -295,7 +294,8 @@ impl Draping {
         Ok(Draping {
             drape,
             left_out: draped.alone,
-            inside,
+            inside: draped.inside,
+            unplaced,
             lined,
             buttons,
             girths,

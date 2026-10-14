@@ -245,8 +245,25 @@ pub(crate) fn ascending(keys: &[f64]) -> Vec<usize> {
 /// corner where a 40 mm hem meets a fold, the fold's cutting line is closer
 /// than the hem's.
 pub(crate) fn measure_allowances(piece: &Piece, outer: &[Point]) -> Option<Vec<f64>> {
-    measure_allowances_avoiding(piece, outer, &[])
+    measure_allowances_avoiding(piece, outer, &[], Agreeing::All)
 }
+
+/// How many of an edge's measurements must agree on its allowance.
+#[derive(Clone, Copy, PartialEq)]
+enum Agreeing {
+    /// All but those nearest its corners.
+    All,
+    /// Most of them: a cutting line shaped at the corners for a deep hem
+    /// (turned back on itself so the hem folds up flat), a stray reading.
+    Most,
+}
+
+/// Of an edge's measurements, this part must agree when most must: a
+/// short edge by a deep hem is shaped for nearly half its length.
+const MOST: f64 = 0.5;
+/// An edge shorter than this, mm, has its allowance from the edge before
+/// it when most measurements must agree: it has no room for any.
+const TOO_SHORT_TO_MEASURE: f64 = 5.0;
 
 /// Distance from stitching line `inner` at `along` on one of its edges
 /// straight out to cutting line `outer`. None where that way slips past a
@@ -271,9 +288,10 @@ fn measure_allowances_avoiding(
     piece: &Piece,
     outer: &[Point],
     avoid: &[(Point, f64)],
+    agreeing: Agreeing,
 ) -> Option<Vec<f64>> {
     let inner = flatten_segs(&piece.outline.path_segs(), 0.05);
-    let mut widths = Vec::new();
+    let mut widths: Vec<f64> = Vec::new();
     for i in 0..piece.outline.edges.len() {
         let geom: EdgeGeom = piece.outline.edge_geom(i);
         let len = geom.length();
@@ -288,6 +306,10 @@ fn measure_allowances_avoiding(
             .filter_map(|along| allowance_at(&geom, along, &inner, outer))
             .collect();
         if samples.len() < 3 {
+            if agreeing == Agreeing::Most && len < TOO_SHORT_TO_MEASURE {
+                widths.push(f64::NAN);
+                continue;
+            }
             return None;
         }
         // The samples nearest the corners may be pulled by them on a short
@@ -300,11 +322,36 @@ fn measure_allowances_avoiding(
         let (lo, hi) = core
             .iter()
             .fold((f64::MAX, f64::MIN), |(lo, hi), d| (lo.min(*d), hi.max(*d)));
-        let mid = median(samples);
-        if mid > MAX_DETECTED_ALLOWANCE || hi - lo > 0.5 + 0.05 * mid {
+        // Most agreeing: on the middle of the core, the corners' readings
+        // left aside.
+        let mid = match agreeing {
+            Agreeing::All => median(samples.clone()),
+            Agreeing::Most => median(core.to_vec()),
+        };
+        let tolerance = 0.5 + 0.05 * mid;
+        let agree = match agreeing {
+            Agreeing::All => hi - lo <= tolerance,
+            Agreeing::Most => {
+                let near = core
+                    .iter()
+                    .filter(|d| (**d - mid).abs() <= tolerance / 2.0)
+                    .count();
+                near as f64 >= MOST * core.len() as f64
+            }
+        };
+        if mid > MAX_DETECTED_ALLOWANCE || !agree {
             return None;
         }
         widths.push(snap_allowance(mid));
+    }
+    // Edges too short to measure: as the edge before them.
+    let measured = widths.iter().position(|w| !w.is_nan())?;
+    let n = widths.len();
+    for k in 1..=n {
+        let i = (measured + k) % n;
+        if widths[i].is_nan() {
+            widths[i] = widths[(i + n - 1) % n];
+        }
     }
     Some(widths)
 }
@@ -489,6 +536,40 @@ pub(crate) fn hausdorff(a: &[Point], b: &[Point]) -> f64 {
 
 pub(crate) fn to_segments(segs: &[PathSeg]) -> Vec<Segment> {
     segs.iter().map(|s| Segment::from_path_seg(*s)).collect()
+}
+
+/// A title block holds at least this many drawings…
+const KEY_DRAWINGS: usize = 3;
+/// …each smaller than this part of it (a nest of sizes is about as big as
+/// its largest).
+const KEY_PART: f64 = 0.25;
+
+/// Whether a closed path is a box: four straight sides, along the page.
+fn is_box(segs: &[PathSeg]) -> bool {
+    let mut corners: Vec<Point> = Vec::new();
+    for seg in segs {
+        let PathSeg::Line(line) = seg else {
+            return false;
+        };
+        if line.p0.distance(line.p1) < 0.1 {
+            continue;
+        }
+        let along = (line.p0.x - line.p1.x).abs() < 0.5 || (line.p0.y - line.p1.y).abs() < 0.5;
+        if !along {
+            return false;
+        }
+        if corners.last().is_none_or(|c| c.distance(line.p0) > 0.1) {
+            corners.push(line.p0);
+        }
+    }
+    // Sides drawn in several strokes still make four corners.
+    let turns = corners
+        .iter()
+        .zip(corners.iter().cycle().skip(1))
+        .zip(corners.iter().cycle().skip(2))
+        .filter(|((a, b), c)| (**b - **a).cross(**c - **b).abs() > 1.0)
+        .count();
+    turns == 4
 }
 
 pub(crate) fn is_straight(points: &[Point]) -> bool {
@@ -1165,6 +1246,25 @@ pub(crate) fn assemble(
         }
         i
     };
+    // A box drawn round a picture of the garment, a layout and a key to the
+    // lines (a pattern's title block): three or more drawings much smaller
+    // than it inside it. It is no piece, nor is anything in it.
+    let keys: Vec<usize> = (0..candidates.len())
+        .filter(|&c| candidates[c].parent.is_none() && is_box(&raw[candidates[c].raw].segs))
+        .filter(|&c| {
+            (0..candidates.len())
+                .filter(|&k| {
+                    k != c && top(k) == c && candidates[k].area < KEY_PART * candidates[c].area
+                })
+                .count()
+                >= KEY_DRAWINGS
+        })
+        .collect();
+    if !keys.is_empty() {
+        notes.push(ImportNote::KeysIgnored {
+            count: u32::try_from(keys.len()).unwrap_or(u32::MAX),
+        });
+    }
 
     let mut ids = counter("");
     let mut pieces: Vec<Piece> = Vec::new();
@@ -1184,7 +1284,8 @@ pub(crate) fn assemble(
 
     // Open paths that became stitching lines.
     let mut used_open: Vec<usize> = Vec::new();
-    for c in (0..candidates.len()).filter(|&c| candidates[c].parent.is_none()) {
+    for c in (0..candidates.len()).filter(|&c| candidates[c].parent.is_none() && !keys.contains(&c))
+    {
         let outer = &raw[candidates[c].raw];
         let children: Vec<usize> = (0..candidates.len())
             .filter(|&k| candidates[k].parent == Some(c))
@@ -1195,32 +1296,46 @@ pub(crate) fn assemble(
             .unwrap_or_else(|| format!("Piece {}", pieces.len() + 1));
 
         // Try each direct child, largest first, as this piece's stitching line.
+        // Every measurement along each edge agreeing first, for each child;
+        // then, failing that, most of them.
         let mut paired = None;
         let mut by_size = children.clone();
         by_size.sort_by(|&a, &b| candidates[b].area.total_cmp(&candidates[a].area));
-        for &k in &by_size {
-            let Some(outline) =
-                outline_from_path(&raw[candidates[k].raw].segs, DEFAULT_CORNER_ANGLE, &mut ids)
-            else {
-                continue;
-            };
-            let mut piece = Piece::new(ids("p"), name.clone(), outline);
-            normalize_orientation(&mut piece);
-            let cutting = &candidates[c].polyline;
-            if let Some(widths) = measure_allowances(&piece, cutting) {
-                paired = Some((candidates[k].raw, Some(k), piece, widths));
-                break;
-            }
-            // An allowance that changes partway along an edge: the edge is
-            // broken where it changes, each part with its own allowance.
-            if let Some(steps) = allowance_steps(&piece, cutting)
-                && let Some(outline) = break_edges(&piece, &steps, &mut ids)
-            {
+        'agreeing: for agreeing in [Agreeing::All, Agreeing::Most] {
+            for &k in &by_size {
+                let Some(outline) =
+                    outline_from_path(&raw[candidates[k].raw].segs, DEFAULT_CORNER_ANGLE, &mut ids)
+                else {
+                    continue;
+                };
                 let mut piece = Piece::new(ids("p"), name.clone(), outline);
                 normalize_orientation(&mut piece);
-                if let Some(widths) = measure_allowances_avoiding(&piece, cutting, &steps) {
+                let cutting = &candidates[c].polyline;
+                // An allowance that changes partway along an edge: the edge
+                // is broken where it changes, each part with its own
+                // allowance.
+                let mut stepped = || {
+                    let steps = allowance_steps(&piece, cutting)?;
+                    let outline = break_edges(&piece, &steps, &mut ids)?;
+                    let mut piece = Piece::new(ids("p"), name.clone(), outline);
+                    normalize_orientation(&mut piece);
+                    let widths = measure_allowances_avoiding(&piece, cutting, &steps, agreeing)?;
+                    Some((piece, widths))
+                };
+                let found = match agreeing {
+                    Agreeing::All => measure_allowances(&piece, cutting)
+                        .map(|widths| (piece.clone(), widths))
+                        .or_else(stepped),
+                    // Most agreeing, an edge whose allowance changes along
+                    // it would pass as one allowance: steps first.
+                    Agreeing::Most => stepped().or_else(|| {
+                        measure_allowances_avoiding(&piece, cutting, &[], agreeing)
+                            .map(|widths| (piece.clone(), widths))
+                    }),
+                };
+                if let Some((piece, widths)) = found {
                     paired = Some((candidates[k].raw, Some(k), piece, widths));
-                    break;
+                    break 'agreeing;
                 }
             }
         }

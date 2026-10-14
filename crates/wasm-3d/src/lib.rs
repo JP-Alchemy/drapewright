@@ -217,6 +217,13 @@ impl Draping {
         self.0.inside.clone()
     }
 
+    /// The facings and linings sewn but with nothing to lie on inside the
+    /// rest (one sewn only to another), by id: left out.
+    #[wasm_bindgen(getter)]
+    pub fn unplaced(&self) -> Vec<String> {
+        self.0.unplaced.clone()
+    }
+
     /// The facings and linings draped inside the rest, by id.
     #[wasm_bindgen(getter)]
     pub fn lined(&self) -> Vec<String> {

@@ -23,6 +23,8 @@ export interface DrapeUpdate extends DrapeProgress {
   leftOut: string[]
   /** The facings and linings sewn to nothing, by id: left out, as they go inside. */
   inside: string[]
+  /** The facings and linings sewn, but with nothing to lie on inside the rest, by id: left out. */
+  unplaced: string[]
   /** The facings and linings draped inside the rest, by id. */
   lined: string[]
   /** How many buttons the garment has, done up or not. */

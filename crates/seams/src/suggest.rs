@@ -62,6 +62,10 @@ pub enum Reason {
     /// Along part of an opening, across the centre seam there (a crotch
     /// piece along a pair of fronts' lower edges), as long as it.
     FitsAlong,
+    /// Into a seam, along part of one of its sides from a corner where the
+    /// edges beside both are as long as each other (a cape's front edge
+    /// into a princess seam, from the neck).
+    SewnInto,
 }
 
 /// A seam Drapewright thinks likely, not yet confirmed.
@@ -840,6 +844,12 @@ fn score(a: &Candidate, b: &Candidate, reversed: bool) -> (f64, Vec<Reason>) {
         score += 0.9;
         reasons.push(Reason::LinesMeet);
     }
+    // A facing is shaped as the edge it faces: not a curve to a straight
+    // edge (a neck facing's lower edge to a hem).
+    let curved = |c: &Candidate| c.depth >= 3.0 * STRAIGHT;
+    if a.inside != b.inside && curved(a) != curved(b) {
+        score -= 1.0;
+    }
     // Shape says something only about curves.
     if a.depth >= 3.0 * STRAIGHT && b.depth >= 3.0 * STRAIGHT {
         let d = unlike(a, b, reversed);
@@ -1471,10 +1481,29 @@ pub fn suggest<P: Borrow<Piece>>(pieces: &[P], existing: &[Seam]) -> Vec<Suggest
             }
         }
     }
+    // The edges beside such a seam: a corset panel's top, its hem. A
+    // shoulder, apart from them, is no less likely for the lines across a
+    // coat's panels missing it.
+    let mut beside_marked = vec![false; cands.len()];
+    for ((_, i, j, _, reasons), _) in &pairs {
+        if reasons.contains(&Reason::LinesMeet) {
+            for c in [&cands[*i], &cands[*j]] {
+                for (k, other) in cands.iter().enumerate() {
+                    let n = c.edges;
+                    if other.piece == c.piece
+                        && (other.edge == (c.edge + 1) % n || (other.edge + 1) % n == c.edge)
+                    {
+                        beside_marked[k] = true;
+                    }
+                }
+            }
+        }
+    }
     let likely = |((score, i, j, _, reasons), _): &(Pair, bool)| {
         let (a, b) = (&cands[*i], &cands[*j]);
         !(panelled[a.piece]
             && panelled[b.piece]
+            && (beside_marked[*i] || beside_marked[*j])
             && !reasons.contains(&Reason::LinesMeet)
             && *score < PANELLED)
     };
@@ -1575,12 +1604,28 @@ pub fn suggest<P: Borrow<Piece>>(pieces: &[P], existing: &[Seam]) -> Vec<Suggest
                 .any(|&((pa, ea), (pb, eb))| pa == p && pb == p && ea == eb)
         })
         .collect();
+    // A pattern with a piece named for the centre front (or back) has the
+    // front's centre on it: another front (a front cape) is not sewn to
+    // itself.
+    let centre_piece = |side: Side| {
+        let word = match side {
+            Side::Front => "front",
+            Side::Back => "back",
+            Side::Neither => return None,
+        };
+        (0..pieces.len()).find(|&p| {
+            let name = pieces[p].borrow().name.to_lowercase();
+            name.contains(word) && (name.contains("centre") || name.contains("center"))
+        })
+    };
     for (k, c) in cands.iter().enumerate() {
         let named = named_centre(c);
         if used[k]
             || centred[c.piece]
             || !c.pair
             || !(named || c.with_grain && c.side != Side::Neither)
+            || (!named && centre_piece(c.side).is_some_and(|p| p != c.piece))
+            || past_centre(pieces[c.piece].borrow(), c)
         {
             continue;
         }
@@ -1636,12 +1681,22 @@ pub fn suggest<P: Borrow<Piece>>(pieces: &[P], existing: &[Seam]) -> Vec<Suggest
                 })
                 .collect()
         };
+        // Both of a leg's seams run most of its length: a shoulder and a
+        // side seam (a bodice's front and back) make no leg.
+        let tall = |e: usize| {
+            let p = &cands[e].points;
+            let (low, high) = p
+                .iter()
+                .fold((f64::MAX, f64::MIN), |(l, h), q| (l.min(q.y), h.max(q.y)));
+            let piece = pieces[cands[e].piece].borrow().outline.bounds();
+            high - low >= LEG_SEAM * piece.height()
+        };
         let Some(tube) = cands
             .iter()
             .map(|o| o.piece)
             .filter(|&o| o != c.piece)
             .map(sewn_to)
-            .find(|edges| edges.len() >= 2)
+            .find(|edges| edges.len() >= 2 && edges.iter().all(|&e| tall(e)))
         else {
             continue;
         };
@@ -1696,8 +1751,204 @@ pub fn suggest<P: Borrow<Piece>>(pieces: &[P], existing: &[Seam]) -> Vec<Suggest
     }
     out.extend(round_openings(&cands, pieces, &mut garment));
     out.extend(along_openings(&cands, pieces, &mut garment, &used));
+    let taken_by: Vec<(Id, Id)> = out
+        .iter()
+        .flat_map(|s| [&s.seam.a, &s.seam.b])
+        .map(|side| (side.piece.clone(), side.edge.clone()))
+        .collect();
+    out.extend(collars(&cands, pieces, &mut garment, &taken_by));
+    let into = sewn_into(&cands, pieces, &out, existing);
+    out.extend(into);
     out
 }
+
+/// An edge sewn into a seam this much shorter than the edge it goes along,
+/// at least, mm…
+const INTO_SHORTER: f64 = 20.0;
+/// …and at least this part of it.
+const INTO_SHARE: f64 = 0.25;
+/// A corner's angle is taken this far along its edges, mm…
+const CORNER_REACH: f64 = 10.0;
+/// …and two laid one on the other differ by this many degrees at most.
+const CORNER_ALIKE: f64 = 12.0;
+
+/// Pieces sewn into a seam, between its two sides, by an edge along part
+/// of one of them from a corner: a cape's front edge into a front's
+/// princess seam from the neck. They begin together where the edges beside
+/// them at that corner are as long as each other (the cape's neckline as
+/// the side front's, the two sewn to a collar as one). Of the edges sewn
+/// to nothing, each into the edge sewn already (or suggested) whose corner
+/// fits it best.
+fn sewn_into<P: Borrow<Piece>>(
+    cands: &[Candidate],
+    pieces: &[P],
+    suggested: &[Suggestion],
+    existing: &[Seam],
+) -> Vec<Suggestion> {
+    let all = candidates(pieces, &[], true);
+    let sides: Vec<&SeamSide> = suggested
+        .iter()
+        .map(|s| &s.seam)
+        .chain(existing)
+        .flat_map(|s| [&s.a, &s.b])
+        .collect();
+    let on = |c: &Candidate| {
+        sides
+            .iter()
+            .any(|s| s.piece == c.piece_id && s.edge == c.edge_id)
+    };
+    // The whole of an edge sewn to the shell (not to a facing): a seam to
+    // sew into.
+    let shell = |side: &SeamSide| {
+        pieces
+            .iter()
+            .map(Borrow::borrow)
+            .find(|p| p.id == side.piece)
+            .is_some_and(|p| !inside(p))
+    };
+    let sewn_whole = |c: &Candidate| {
+        suggested
+            .iter()
+            .map(|s| &s.seam)
+            .chain(existing)
+            .flat_map(|s| [(&s.a, &s.b), (&s.b, &s.a)])
+            .any(|(s, other)| {
+                s.piece == c.piece_id
+                    && s.edge == c.edge_id
+                    && s.from.is_none()
+                    && s.to.is_none()
+                    && shell(other)
+            })
+    };
+    // A hem, by its kind or its allowance: sewn into no seam.
+    let hem = |c: &Candidate| {
+        let piece = pieces[c.piece].borrow();
+        piece.outline.edges[c.edge].kind == EdgeKind::Hem || deeper(piece, c.edge)
+    };
+    // The edge beside one at its start or its end, where it is sewn to
+    // nothing (a neckline, both finished as one later): how long it is, and
+    // the corner's angle there, degrees.
+    let beside = |c: &Candidate, at_end: bool, free: bool| -> Option<(f64, f64, &Candidate)> {
+        let e = if at_end {
+            (c.edge + 1) % c.edges
+        } else {
+            (c.edge + c.edges - 1) % c.edges
+        };
+        let o = all
+            .iter()
+            .find(|o| o.piece == c.piece && o.edge == e && !(free && on(o)) && !hem(o))?;
+        // Each way from the corner, a little along.
+        let (corner, along_c, along_o) = if at_end {
+            (
+                point_along(&c.points, c.length),
+                point_along(&c.points, c.length - CORNER_REACH),
+                point_along(&o.points, CORNER_REACH),
+            )
+        } else {
+            (
+                point_along(&c.points, 0.0),
+                point_along(&c.points, CORNER_REACH),
+                point_along(&o.points, o.length - CORNER_REACH),
+            )
+        };
+        let (u, v) = (along_c - corner, along_o - corner);
+        let angle = (u.dot(v) / (u.hypot() * v.hypot()).max(1e-9))
+            .clamp(-1.0, 1.0)
+            .acos()
+            .to_degrees();
+        Some((o.length, angle, o))
+    };
+    let mut out: Vec<((Id, Id, Id), Vec<Suggestion>)> = Vec::new();
+    for c in cands
+        .iter()
+        .filter(|c| !on(c) && !c.strip && !c.inside && !hem(c))
+    {
+        // (how far the edges beside differ, target, its end, c's end there).
+        let mut best: Option<(f64, &Candidate, bool, bool)> = None;
+        for t in all.iter().filter(|t| {
+            t.piece != c.piece
+                && t.stem != c.stem
+                && sewn_whole(t)
+                && !t.inside
+                && !hem(t)
+                && t.length >= c.length + INTO_SHORTER
+                && c.length >= INTO_SHARE * t.length
+                // A front's into a front's seam, a back's into a back's.
+                && (c.side == t.side || c.side == Side::Neither || t.side == Side::Neither)
+        }) {
+            for (c_end, t_end) in [(false, false), (false, true), (true, false), (true, true)] {
+                // The edge beside `c` sewn to nothing yet; beside `t`, it
+                // may be (a neckline sewn to its collar).
+                let (Some(x), Some(y)) = (beside(c, c_end, true), beside(t, t_end, false)) else {
+                    continue;
+                };
+                // Laid one on the other there: as long, at the same angle.
+                let off = (x.0 - y.0).abs();
+                if off <= SAME_LENGTH
+                    && (x.1 - y.1).abs() <= CORNER_ALIKE
+                    && best.is_none_or(|b| off < b.0)
+                {
+                    best = Some((off, t, t_end, c_end));
+                }
+            }
+        }
+        let Some((_, t, t_end, c_end)) = best else {
+            continue;
+        };
+        let reversed = c_end != t_end;
+        // Along `t` from the end they share, as far as `c` is long; `c`'s
+        // start sewn to that stretch's end where their ends cross.
+        let (from, to) = if t_end {
+            (t.length - c.length, t.length)
+        } else {
+            (0.0, c.length)
+        };
+        let into = |a: SeamSide, b: SeamSide, name: &str| Suggestion {
+            seam: Seam {
+                id: String::new(),
+                name: sentence(name),
+                a,
+                b,
+                reversed,
+                ease: Ease::default(),
+                confirmed: false,
+            },
+            confidence: 0.5,
+            reasons: vec![Reason::SewnInto],
+        };
+        let mut seams = vec![into(
+            whole(c, false),
+            SeamSide {
+                from: Some(from),
+                to: Some(to),
+                ..whole(t, false)
+            },
+            &c.name,
+        )];
+        // The edges beside them at that corner, as long as each other, laid
+        // one on the other: sewn as one too (a cape's neckline with the
+        // front's, into its collar).
+        if let (Some((_, _, x)), Some((_, _, y))) =
+            (beside(c, c_end, true), beside(t, t_end, false))
+        {
+            seams.push(into(whole(x, false), whole(y, false), &x.name));
+        }
+        out.push((
+            (t.piece_id.clone(), t.edge_id.clone(), c.piece_id.clone()),
+            seams,
+        ));
+    }
+    // Only where one edge fits: two of a piece's edges into one stretch (a
+    // panel's two sides, alike) say neither is.
+    let keys: Vec<_> = out.iter().map(|(key, _)| key.clone()).collect();
+    out.into_iter()
+        .filter(|(key, _)| keys.iter().filter(|k| *k == key).count() == 1)
+        .flat_map(|(_, seams)| seams)
+        .collect()
+}
+
+/// A trouser leg's seams each run at least this part of the way down it.
+const LEG_SEAM: f64 = 0.4;
 
 /// A trouser's crotch curve runs at least this much down the page (the
 /// cosine, over its chord): more down than across.
@@ -1833,6 +2084,134 @@ fn along_openings<P: Borrow<Piece>>(
                 for i in 0..m {
                     taken.push(run(i).0);
                 }
+                for part in these {
+                    parts.push((part, 0.6));
+                }
+                break;
+            }
+        }
+    }
+    as_seams(&parts, pieces, cands, garment, Reason::FitsAlong)
+}
+
+/// An edge of a run round an opening: the copy edge, whether it runs
+/// forwards, and how long it is.
+type RunEdge = (CopyEdge, bool, f64);
+
+/// A collar runs past the neckline's ends (to button over) by up to this
+/// part of it.
+const COLLAR_PAST: f64 = 0.15;
+
+/// A collar (so named) sewn along the neckline: a run of the garment's
+/// opening, no hem in it, across its centre (both halves of a pair, or of
+/// a piece cut on the fold), as long as one of the collar's edges or a
+/// little shorter (the longest such: the whole neckline); by the collar's
+/// edge of those nearest its length, its middle at the neckline's, so that
+/// its ends stand past the neckline's alike (to button over).
+fn collars<P: Borrow<Piece>>(
+    cands: &[Candidate],
+    pieces: &[P],
+    garment: &mut Assembly,
+    taken: &[(Id, Id)],
+) -> Vec<Suggestion> {
+    let free = |c: &Candidate| {
+        !taken
+            .iter()
+            .any(|(p, e)| *p == c.piece_id && *e == c.edge_id)
+    };
+    let find = |e: CopyEdge| {
+        cands
+            .iter()
+            .find(|c| c.piece == e.piece && c.edge == e.edge)
+    };
+    let hem = |c: &Candidate| {
+        let piece = pieces[c.piece].borrow();
+        piece.outline.edges[c.edge].kind == EdgeKind::Hem || deeper(piece, c.edge)
+    };
+    // The collars' edges, as long as a neckline may be.
+    let collar_edges: Vec<&Candidate> = cands
+        .iter()
+        .filter(|c| {
+            pieces[c.piece]
+                .borrow()
+                .name
+                .to_lowercase()
+                .contains("collar")
+                && !c.inside
+                && free(c)
+        })
+        .collect();
+    let fits = |total: f64| {
+        collar_edges
+            .iter()
+            .any(|c| c.length >= total && c.length <= total * (1.0 + COLLAR_PAST))
+    };
+    // The neckline: every run across a centre, from each opening.
+    let mut necklines: Vec<(f64, Vec<RunEdge>)> = Vec::new();
+    for (run, round) in garment.runs() {
+        let opening = Opening::new(run, cands, garment);
+        let n = opening.edges.len();
+        for first in 0..n {
+            let most = if round { n - 1 } else { n - first };
+            let mut edges: Vec<RunEdge> = Vec::new();
+            for m in 0..most {
+                let at = (first + m) % n;
+                let (e, forwards) = opening.edges[at];
+                if !find(e).is_some_and(|c| free(c) && !hem(c) && !c.inside) {
+                    break;
+                }
+                edges.push((e, forwards, opening.lengths[at]));
+                let total: f64 = edges.iter().map(|e| e.2).sum();
+                let across = edges.iter().any(|(x, ..)| {
+                    x.mirror && edges.iter().any(|(y, ..)| !y.mirror && y.piece == x.piece)
+                });
+                if edges.len() >= 2 && across && fits(total) {
+                    necklines.push((total, edges.clone()));
+                }
+            }
+        }
+    }
+    // The longest: the whole neckline, not part of it.
+    let Some((total, neckline)) = necklines.into_iter().max_by(|a, b| a.0.total_cmp(&b.0)) else {
+        return Vec::new();
+    };
+    let mut parts: Vec<(Part, f64)> = Vec::new();
+    let collar_pieces: std::collections::BTreeSet<usize> =
+        collar_edges.iter().map(|c| c.piece).collect();
+    for piece in collar_pieces {
+        let Some(c) = collar_edges
+            .iter()
+            .filter(|c| c.piece == piece)
+            .filter(|c| c.length >= total && c.length <= total * (1.0 + COLLAR_PAST))
+            .min_by(|a, b| a.length.total_cmp(&b.length))
+        else {
+            continue;
+        };
+        let edge = CopyEdge {
+            piece: c.piece,
+            edge: c.edge,
+            mirror: false,
+        };
+        let past = (c.length - total) / 2.0;
+        // Either way along the neckline, as the garment will have it.
+        for along in [true, false] {
+            let mut walked = past;
+            let mut these: Vec<Part> = Vec::new();
+            for &(e, forwards, length) in &neckline {
+                if length < 1.0 {
+                    continue;
+                }
+                let (lo, hi) = (walked, walked + length);
+                walked = hi;
+                let (from, to) = if along {
+                    (lo, hi)
+                } else {
+                    (c.length - hi, c.length - lo)
+                };
+                these.push((edge, (from, to), e, (0.0, length), along != forwards));
+            }
+            let sewn = garment.sew(&these);
+            if sewn {
                 for part in these {
                     parts.push((part, 0.6));
                 }
@@ -2139,6 +2518,41 @@ fn as_seams<P: Borrow<Piece>>(
 }
 
 /// An edge named for the centre: "centre back", "CF".
+/// A centre line drawn alongside an edge, this far inside it at most, mm:
+/// the piece crosses past its centre there (to button over).
+const PAST_CENTRE: f64 = 80.0;
+
+/// Whether the piece's centre line (named so) runs alongside the edge,
+/// inside it: the edge is an opening's, past the centre, not the centre.
+fn past_centre(piece: &Piece, c: &Candidate) -> bool {
+    let (Some(&a), Some(&b)) = (c.points.first(), c.points.last()) else {
+        return false;
+    };
+    let length = a.distance(b);
+    if length < 1.0 {
+        return false;
+    }
+    let along = (b - a) / length;
+    piece.lines.iter().any(|line| {
+        let named = line
+            .label
+            .as_deref()
+            .is_some_and(|l| l.to_lowercase().starts_with("centre"));
+        let pts = flatten_segs(&segs_of(line.start, &line.segments), 0.5);
+        let (Some(&p), Some(&q)) = (pts.first(), pts.last()) else {
+            return false;
+        };
+        let d = q - p;
+        named
+            && d.hypot() > 1.0
+            && (d / d.hypot()).dot(along).abs() >= 0.98
+            && [p, q].iter().all(|x| {
+                let off = (*x - a).cross(along).abs();
+                off > 1.0 && off <= PAST_CENTRE
+            })
+    })
+}
+
 fn named_centre(c: &Candidate) -> bool {
     ["centre", "center", "cb", "cf"]
         .iter()

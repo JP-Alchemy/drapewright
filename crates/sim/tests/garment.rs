@@ -386,3 +386,78 @@ fn facings_go_inside_and_fronts_are_buttoned() {
     assert_eq!(open.stitches.len(), g.stitches.len() - 5);
     assert_eq!(open.stitches[..], g.stitches[..open.stitches.len()]);
 }
+
+#[test]
+fn a_piece_sewn_into_a_seam_is_sewn_to_the_same_points() {
+    // A flap (a cape's edge, say) sewn into the top half of the skirt's side
+    // seam, between the front and the back: three layers in one seam.
+    use drapewright_pattern_core::{Edge, EdgeKind, Outline, Piece, Pt, Segment};
+    use drapewright_seams::{Seam, SeamSide};
+    let (mut pieces, mut seams) = skirt();
+    let edge = |id: &str, kind: EdgeKind, to: [f64; 2]| Edge {
+        kind,
+        ..Edge::new(id, vec![Segment::line(to)])
+    };
+    let mut flap = Piece::new(
+        "flap",
+        "Flap",
+        Outline {
+            start: Pt::new(0.0, 0.0),
+            edges: vec![
+                edge("ft", EdgeKind::Seam, [100.0, 0.0]),
+                edge("fr", EdgeKind::Hem, [100.0, 300.0]),
+                edge("fb", EdgeKind::Hem, [0.0, 300.0]),
+                edge("fe", EdgeKind::Seam, [0.0, 0.0]),
+            ],
+        },
+    );
+    flap.cut = pieces[1].cut.clone();
+    flap.grainline = pieces[1].grainline;
+    pieces.push(flap);
+    seams.push(Seam {
+        id: "s3".into(),
+        name: String::new(),
+        a: SeamSide::whole("flap", "fe"),
+        b: SeamSide {
+            from: Some(0.0),
+            to: Some(300.0),
+            ..SeamSide::whole("back", "bs")
+        },
+        reversed: true,
+        ease: Default::default(),
+        confirmed: true,
+    });
+    let g = assemble(&pieces, &seams, 20.0).unwrap();
+    let flaps: HashSet<usize> = (0..g.panels.len())
+        .filter(|&p| g.panels[p].piece == "flap")
+        .collect();
+    let fronts: HashSet<usize> = (0..g.panels.len())
+        .filter(|&p| g.panels[p].piece == "front")
+        .collect();
+    assert_eq!(flaps.len(), 2, "a flap each side");
+    // The back's points each flap point is sewn to.
+    let mut to_flap = Vec::new();
+    for [x, y] in &g.stitches {
+        for (f, other) in [(x, y), (y, x)] {
+            if flaps.contains(&f.0) {
+                to_flap.push(*other);
+            }
+        }
+    }
+    let flap_points = 300.0 / 20.0 + 1.0;
+    assert_eq!(to_flap.len(), 2 * flap_points as usize);
+    // Each is sewn to the front too: the same point, not one beside it.
+    let to_front: HashSet<(usize, u32)> = g
+        .stitches
+        .iter()
+        .flat_map(|[x, y]| [(x, y), (y, x)])
+        .filter(|(f, _)| fronts.contains(&f.0))
+        .map(|(_, other)| *other)
+        .collect();
+    for point in &to_flap {
+        assert!(
+            to_front.contains(point),
+            "{point:?} is sewn to a flap, not to the front"
+        );
+    }
+}

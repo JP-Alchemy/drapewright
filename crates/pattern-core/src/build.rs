@@ -28,7 +28,124 @@ pub fn outline_from_path(
         return None;
     }
     let corners = corners_by_angle(&segs, corner_angle);
+    // An outline with no corners turns at its rounded ones (a collar's).
+    let (segs, corners) = if corners.iter().filter(|&&c| c).count() < 2 {
+        at_bends(segs, corners)
+    } else {
+        (segs, corners)
+    };
     Some(group_edges(&segs, &corners, next_id))
+}
+
+/// An angle brought within half a turn either way, radians.
+fn wrap(angle: f64) -> f64 {
+    use std::f64::consts::{PI, TAU};
+    (angle + PI).rem_euclid(TAU) - PI
+}
+
+/// An outline turning this many degrees…
+const BEND: f64 = 60.0;
+/// …within this far along it turns a corner, rounded though it is, mm.
+const BEND_REACH: f64 = 30.0;
+
+/// An outline's rounded corners (a collar's ends): where it turns by
+/// `BEND` within `BEND_REACH`, each at the middle of its bend, a curve cut
+/// there (the outline the same) to start an edge.
+fn at_bends(segs: Vec<PathSeg>, corners: Vec<bool>) -> (Vec<PathSeg>, Vec<bool>) {
+    // Samples about a millimetre apart: (way along, heading, segment, t).
+    let mut samples: Vec<(f64, f64, usize, f64)> = Vec::new();
+    let mut along = 0.0;
+    let mut heading: Option<f64> = None;
+    let mut turned = 0.0;
+    for (k, seg) in segs.iter().enumerate() {
+        let length = seg.arclen(ARCLEN_ACCURACY);
+        let n = (length.ceil() as usize).max(1);
+        for i in 0..n {
+            let t = i as f64 / n as f64;
+            let d = unit_tangent(seg, t);
+            let angle = d.y.atan2(d.x);
+            if let Some(h) = heading {
+                turned += wrap(angle - h);
+            }
+            heading = Some(angle);
+            samples.push((along + length * t, turned, k, t));
+        }
+        along += length;
+    }
+    let total = along;
+    let m = samples.len();
+    if m < 3 || total < 3.0 * BEND_REACH {
+        return (segs, corners);
+    }
+    // How far the outline turns over the reach centred on each sample, round
+    // past its start: once round, it has turned by its last heading's turn
+    // back to its first more than at its last sample.
+    let back = {
+        let d = unit_tangent(&segs[0], 0.0);
+        wrap(d.y.atan2(d.x) - heading.unwrap_or(0.0))
+    };
+    let full = samples[m - 1].1 + back;
+    let at = |i: isize| -> (f64, f64) {
+        let wraps = i.div_euclid(m as isize) as f64;
+        let s = &samples[i.rem_euclid(m as isize) as usize];
+        (s.0 + wraps * total, s.1 + wraps * full)
+    };
+    let turn_round = |i: usize| -> f64 {
+        let (s, _) = at(i as isize);
+        let (mut lo, mut hi) = (i as isize, i as isize);
+        while at(lo - 1).0 >= s - BEND_REACH / 2.0 && (i as isize - lo) < m as isize {
+            lo -= 1;
+        }
+        while at(hi + 1).0 <= s + BEND_REACH / 2.0 && (hi - i as isize) < m as isize {
+            hi += 1;
+        }
+        (at(hi).1 - at(lo).1).abs()
+    };
+    let turns: Vec<f64> = (0..m).map(turn_round).collect();
+    let bend = BEND.to_radians();
+    // Each run of samples turning that much: its sharpest.
+    let mut bends: Vec<usize> = Vec::new();
+    let start = (0..m).find(|&i| turns[i] < bend);
+    let Some(start) = start else {
+        return (segs, corners);
+    };
+    let mut best: Option<usize> = None;
+    for step in 1..=m {
+        let i = (start + step) % m;
+        if turns[i] >= bend {
+            if best.is_none_or(|b| turns[i] > turns[b]) {
+                best = Some(i);
+            }
+        } else if let Some(b) = best.take() {
+            bends.push(b);
+        }
+    }
+    if bends.len() < 2 {
+        return (segs, corners);
+    }
+    // Cut the curves there, and start edges.
+    let mut cuts: Vec<Vec<f64>> = vec![Vec::new(); segs.len()];
+    for &b in &bends {
+        let (_, _, k, t) = samples[b];
+        cuts[k].push(t);
+    }
+    let mut out_segs = Vec::new();
+    let mut out_corners = Vec::new();
+    for (k, seg) in segs.iter().enumerate() {
+        let mut ts = cuts[k].clone();
+        ts.sort_by(f64::total_cmp);
+        let mut from = 0.0;
+        let mut corner = corners[k] || ts.first().is_some_and(|t| *t <= 1e-9);
+        for t in ts.into_iter().filter(|t| *t > 1e-9) {
+            out_segs.push(seg.subsegment(from..t));
+            out_corners.push(corner);
+            from = t;
+            corner = true;
+        }
+        out_segs.push(seg.subsegment(from..1.0));
+        out_corners.push(corner);
+    }
+    (out_segs, out_corners)
 }
 
 /// Like [`outline_from_path`], but the edges break where the file says the
@@ -67,14 +184,41 @@ fn usable(segs: &[PathSeg]) -> Vec<PathSeg> {
         .collect()
 }
 
+/// Segments shorter than this neither start an edge nor turn a corner (a
+/// hair where two strokes were joined, a dash's stub), mm: they go with the
+/// edge before them.
+const SPECK: f64 = 0.5;
+
 /// For each segment, whether the joint before it turns by more than
 /// `corner_angle` degrees.
 fn corners_by_angle(segs: &[PathSeg], corner_angle: f64) -> Vec<bool> {
     let n = segs.len();
     let threshold = corner_angle.to_radians().cos();
+    let long: Vec<bool> = segs
+        .iter()
+        .map(|s| s.arclen(ARCLEN_ACCURACY) >= SPECK)
+        .collect();
+    if !long.contains(&true) {
+        return (0..n)
+            .map(|k| {
+                let a = unit_tangent(&segs[(k + n - 1) % n], 1.0);
+                let b = unit_tangent(&segs[k], 0.0);
+                a.dot(b) < threshold
+            })
+            .collect();
+    }
     (0..n)
         .map(|k| {
-            let a = unit_tangent(&segs[(k + n - 1) % n], 1.0);
+            if !long[k] {
+                return false;
+            }
+            // The way the outline came in: along the last segment before
+            // this one that is no speck.
+            let mut j = (k + n - 1) % n;
+            while !long[j] {
+                j = (j + n - 1) % n;
+            }
+            let a = unit_tangent(&segs[j], 1.0);
             let b = unit_tangent(&segs[k], 0.0);
             a.dot(b) < threshold
         })
@@ -222,6 +366,60 @@ mod tests {
         assert_eq!(o.edges.len(), 4);
         assert_eq!(o.edges[0].segments.len(), 2);
         assert!(o.closure_gap() < 1e-12);
+    }
+
+    #[test]
+    fn a_hair_where_strokes_meet_starts_no_edge() {
+        // A rectangle whose side was drawn in two strokes overlapping by a
+        // fraction of a millimetre: a hair jutting off sideways.
+        let segs = [
+            line((0.0, 0.0), (100.0, 0.0)),
+            line((100.0, 0.0), (100.0, 25.0)),
+            line((100.0, 25.0), (100.3, 25.1)),
+            line((100.3, 25.1), (100.0, 25.2)),
+            line((100.0, 25.2), (100.0, 50.0)),
+            line((100.0, 50.0), (0.0, 50.0)),
+            line((0.0, 50.0), (0.0, 0.0)),
+        ];
+        let mut ids = counter("");
+        let o = outline_from_path(&segs, DEFAULT_CORNER_ANGLE, &mut ids).unwrap();
+        assert_eq!(o.edges.len(), 4);
+    }
+
+    #[test]
+    fn rounded_corners_split_an_outline_with_no_sharp_ones() {
+        // A stand collar 500 by 50 mm, every corner rounded (a quarter
+        // circle 12 mm round): no corner turns at a point, but its edges
+        // are its four sides.
+        let (w, h, r) = (500.0, 50.0, 12.0);
+        let k = 0.552_284_749_830_793_4 * r;
+        let arc = |from: (f64, f64), c1: (f64, f64), c2: (f64, f64), to: (f64, f64)| {
+            PathSeg::Cubic(CubicBez::new(from, c1, c2, to))
+        };
+        let segs = [
+            line((r, 0.0), (w - r, 0.0)),
+            arc((w - r, 0.0), (w - r + k, 0.0), (w, r - k), (w, r)),
+            line((w, r), (w, h - r)),
+            arc((w, h - r), (w, h - r + k), (w - r + k, h), (w - r, h)),
+            line((w - r, h), (r, h)),
+            arc((r, h), (r - k, h), (0.0, h - r + k), (0.0, h - r)),
+            line((0.0, h - r), (0.0, r)),
+            arc((0.0, r), (0.0, r - k), (r - k, 0.0), (r, 0.0)),
+        ];
+        let mut ids = counter("");
+        let o = outline_from_path(&segs, DEFAULT_CORNER_ANGLE, &mut ids).unwrap();
+        assert_eq!(o.edges.len(), 4);
+        // Each corner at its rounding's middle: the long sides as long as
+        // the side and two halves of a rounding.
+        let quarter = std::f64::consts::FRAC_PI_2 * r;
+        let mut long: Vec<f64> = (0..4).map(|i| o.edge_geom(i).length()).collect();
+        long.sort_by(f64::total_cmp);
+        for side in &long[2..] {
+            assert!((side - (w - 2.0 * r + quarter)).abs() < 1.0, "{long:?}");
+        }
+        // The outline is the same: as long round.
+        let round: f64 = long.iter().sum();
+        assert!((round - (2.0 * (w + h) - 8.0 * r + 4.0 * quarter)).abs() < 0.5);
     }
 
     #[test]

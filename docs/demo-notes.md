@@ -12,6 +12,73 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 58 — A cape coat from a layered PDF, sewn and draped as worn
+
+A lined cape coat from an independent designer's PDF (JP's test pattern,
+not in the repo: a copy-shop sheet and A4 tiles, each of its eight sizes
+on a layer of its own) now imports, sews and drapes as the coat is worn:
+an A-line coat in princess panels done up down the front, a stand collar,
+and a circular cape over the shoulders, its front and back sewn into the
+princess seams.
+
+**Try it:** open the coat's copy-shop PDF (or its A4 file), choose size 38
+only, say the seam allowance is included, and **Add 13 pieces**. Then
+**Find seams**, **Sew all** (22 seams), open the avatar and **Drape**.
+Under the avatar the coat measures about 98 cm at the bust, 8 cm more
+than the figure (the pattern's finished bust for size 38 is 100 cm).
+**Buttons done up** off shows it open. To see the made-up coat the tests
+use: `cargo run --release -p drapewright-sim --example drape_picture --
+assets/body/adult.dwbody cape woolSuiting cape pose=arms-down`.
+
+**What changed:**
+
+* **Reading the PDF.** A copy-shop sheet was taken for a page of
+  instructions (its copyright notice is a few lines of prose); a big page
+  now needs as much prose for its size as an A4 page. Sizes drawn in
+  dashes stretched to fit each side (each side stopping a little short,
+  a solid stub turning each corner) now join up: five of the eight sizes
+  were lost. A piece open along its fold is closed by the fold line drawn
+  apart, however long. The box holding the pattern's key (a picture of the
+  coat, the layout, the lines) is no longer a piece, nor is a page-sized
+  frame beside the A4 tiles. Names set beside their number ("7 Collar") or
+  on several lines ("Armhole / Front / Facing") are read whole; a line
+  labelled "Center Front … Fabric grain" is the centre front line and the
+  grainline; "cut 2 (Inside & Outside)" is two layers, not a left and a
+  right.
+* **Seam allowance.** The stitching line's corners, drawn as hairs and
+  hooks where its dashes meet, no longer make edges of their own or point
+  the wrong way. Where a deep hem's corners are shaped (turned back on the
+  flare), the allowance is read from most of each edge, and the
+  difference is noted. An allowance meeting a fold just past square no
+  longer rounds out 4 cm past the fold. A collar's rounded corners now
+  split its outline into its edges.
+* **Find seams** finds the shoulders though the lines across the panels
+  (waist, lengthen-shorten) meet their other seams; leaves out the
+  armholes' facings when judging where the coat closes into a point; sews
+  a cape's front (back) edge into the princess seam from the neck, with
+  its neckline laid on the panel's (**sewn into the seam**), where the
+  edges beside them match in length and angle; sews a collar along the
+  neckline across the centre back, centred, standing past the fronts to
+  button over; never sews a front's edge to its other half where a centre
+  front line is drawn inside it, nor a cape's when another piece is the
+  centre front, nor treats a front and back sewn at shoulder and side as a
+  trouser leg.
+* **The drape** sews three layers in one seam (the cape between the side
+  front and the centre front) to the same points; hangs the cape outside
+  the coat, round the side from its front seam to its back seam and clear
+  of the arms; stands the collar up from the neckline; and does up fronts
+  that cross past their centre front line where nothing is marked (open
+  question 37). Facings sewn but with nothing to lie on are left off, and
+  the status line now says so rather than that they aren't sewn (open
+  question 38).
+* `import_report` takes `--size 38` to list one size.
+
+Known: the pocket's two bags come in as one bag and a 12 mm strip (open
+question 39); the GPU drape of the lined skirt sometimes sinks into the
+body, before this change too (a separate task).
+
+---
+
 ## Step 57 — The sample dress sewn by Find seams, and draped
 
 The sample dress (**A dress from a PDF pattern**) now opens, sews and

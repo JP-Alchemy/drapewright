@@ -121,6 +121,11 @@ export class Draping {
     return drapings.get(this)!.inside
   }
 
+  /** The facings and linings sewn, but with nothing to lie on inside the rest, by id: left out. */
+  get unplaced(): string[] {
+    return drapings.get(this)!.unplaced
+  }
+
   /** The facings and linings draped inside the rest, by id. */
   get lined(): string[] {
     return drapings.get(this)!.lined

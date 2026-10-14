@@ -3,7 +3,7 @@
 //!
 //!     cargo run --release -p drapewright-sim --example drape_picture -- \
 //!         assets/body/adult.dwbody out [fabric] \
-//!         [skirt|lined|blouse|long|bust|armhole|yoked|trousers|<project file> [suggest]] \
+//!         [skirt|lined|blouse|long|bust|armhole|yoked|trousers|cape|<project file> [suggest]] \
 //!         [pose=arms-down|reaching|arms-up|stepping|sitting]
 //!
 //! writes out-placed.png, out-sewn.png and out-settled.png (and with a
@@ -13,8 +13,8 @@
 //! skirt, a lined skirt, a blouse, a blouse with long sleeves, or one with a full bust
 //! adjustment (its dart in the side seam, or pivoted into the armhole),
 //! cut for the standard figure, or a long blouse with yokes, gathers and
-//! cuffs laid out on its side, or trousers, sewn by the seams suggested
-//! for them; or a
+//! cuffs laid out on its side, or trousers, or a cape coat, sewn by the
+//! seams suggested for them; or a
 //! project (a `.drapewright` file or its
 //! `project.json`) sewn by its confirmed seams, or with `suggest` by the
 //! seams suggested for it.
@@ -244,7 +244,7 @@ fn main() {
     let [asset, out, rest @ ..] = args.as_slice() else {
         eprintln!(
             "usage: drape_picture <body file> <out> [fabric] \
-             [skirt|blouse|long|bust|armhole|yoked|<project file> [suggest]]"
+             [skirt|blouse|long|bust|armhole|yoked|trousers|cape|<project file> [suggest]]"
         );
         std::process::exit(2);
     };
@@ -266,6 +266,7 @@ fn main() {
             sewn_as_found(pieces)
         }
         "trousers" => sewn_as_found(drapewright_pattern_core::testing::garments::trousers()),
+        "cape" => sewn_as_found(drapewright_pattern_core::testing::garments::cape_coat()),
         path => project(path, rest.get(2).is_some_and(|s| s == "suggest")),
     };
     let draped = draped_pieces(&pieces, &seams);

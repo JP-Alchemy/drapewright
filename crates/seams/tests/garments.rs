@@ -687,3 +687,115 @@ fn trousers_are_sewn_at_their_inseams_outseams_and_centres() {
         ]
     );
 }
+
+#[test]
+fn a_cape_coat_is_put_together_with_its_cape_and_collar() {
+    use drapewright_pattern_core::testing::garments::cape_coat;
+    let (suggested, pairs) = listed(&cape_coat(), &[]);
+    assert_eq!(
+        pairs,
+        [
+            // The back cape into the back's princess seam from the neck, its
+            // neckline on the side back's.
+            "bc.bce-sb.sbp[422..852]",
+            "bc.bcn-sb.sbn",
+            // The cape's front and back over the shoulder.
+            "bc.bcs-fc.fcs",
+            // The collar round the neckline, centred, both halves.
+            "cb.cbn*-co.cot[223..259]",
+            "cb.cbn-co.cot[187..223]",
+            "cb.cbp-sb.sbp",
+            "cf.cfn*-co.cot[329..430]",
+            "cf.cfn-co.cot[17..117]",
+            "cf.cfp-sf.sfp",
+            "co.cot[117..145]-sf.sfn",
+            "co.cot[145..187]-sb.sbn",
+            "co.cot[259..301]-sb.sbn*",
+            "co.cot[301..329]-sf.sfn*",
+            // The front cape into the front's princess seam, likewise.
+            "fc.fce-sf.sfp[452..842]",
+            "fc.fcn-sf.sfn",
+            // The side seams and shoulders: the shoulders though the lines
+            // across the panels meet their other seams and miss them. Not
+            // the centre front's edge to its other half: it crosses past
+            // the centre line drawn on it, to button.
+            "sb.sbd-sf.sfd",
+            "sb.sbs-sf.sfs",
+        ]
+    );
+    let why = |edge: &str| -> Vec<Reason> {
+        suggested
+            .iter()
+            .filter(|s| s.seam.a.edge == edge || s.seam.b.edge == edge)
+            .flat_map(|s| s.reasons.clone())
+            .collect()
+    };
+    for edge in ["fce", "bce", "fcn", "bcn"] {
+        assert_eq!(why(edge), [Reason::SewnInto], "{edge}");
+    }
+}
+
+#[test]
+fn armholes_faced_still_leave_the_side_seams_and_shoulders_sewn() {
+    use drapewright_pattern_core::testing::garments::cape_coat;
+    // A facing round each armhole, 40 mm deep: its outer edge the
+    // armhole's, its ends sewn to each other's at the shoulder and the
+    // side. Faced, the armholes are still openings of the coat.
+    let mut pieces = cape_coat();
+    for (id, name, from) in [
+        ("af", "Armhole Front Facing", "sf"),
+        ("ab", "Armhole Back Facing", "sb"),
+    ] {
+        let panel = pieces.iter().find(|p| p.id == from).unwrap();
+        let armhole = panel
+            .outline
+            .edges
+            .iter()
+            .find(|e| e.id == format!("{from}a"))
+            .unwrap()
+            .clone();
+        let (start, end) = ([180.0, 30.0], [200.0, 230.0]);
+        let mut facing = piece(
+            id,
+            name,
+            start,
+            vec![
+                Edge::new(format!("{id}o"), armhole.segments.clone()),
+                edge(
+                    &format!("{id}s"),
+                    EdgeKind::Seam,
+                    Segment::line([end[0] - 40.0, end[1]]),
+                ),
+                edge(
+                    &format!("{id}i"),
+                    EdgeKind::Seam,
+                    Segment::cubic(
+                        [140.0, 190.0],
+                        [130.0, 110.0],
+                        [start[0] - 40.0, start[1] + 10.0],
+                    ),
+                ),
+                edge(&format!("{id}t"), EdgeKind::Seam, Segment::line(start)),
+            ],
+            2,
+        );
+        facing.allowance.seam = 12.0;
+        pieces.push(facing);
+    }
+    let (_, pairs) = listed(&pieces, &[]);
+    for seam in [
+        "sb.sbd-sf.sfd",
+        "sb.sbs-sf.sfs",
+        "af.afo-sf.sfa",
+        "ab.abo-sb.sba",
+    ] {
+        assert!(pairs.contains(&seam.to_string()), "{seam} in {pairs:#?}");
+    }
+    // No armhole sewn to its other half, as a trouser leg's crotch would be.
+    assert!(
+        !pairs
+            .iter()
+            .any(|p| p.contains("sfa*") || p.contains("sba*")),
+        "{pairs:#?}"
+    );
+}

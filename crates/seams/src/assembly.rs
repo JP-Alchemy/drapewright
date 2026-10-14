@@ -148,6 +148,9 @@ pub(crate) struct Assembly {
     halves: HashMap<(usize, usize), bool>,
     /// Each copy edge's sewn stretches, mm along it.
     sewn: HashMap<CopyEdge, Vec<(f64, f64)>>,
+    /// Those sewn to the shell, not to a facing or a lining (an armhole
+    /// faced is an opening of the shell still).
+    shell_sewn: HashMap<CopyEdge, Vec<(f64, f64)>>,
     /// Copies sewn to themselves: tubes (a sleeve, by its underarm).
     tubes: Vec<bool>,
     /// Edges sewn from end to end: their ends may meet (a cuff sewn round
@@ -261,6 +264,7 @@ impl Assembly {
             faces: Sets::new(copies),
             halves: HashMap::new(),
             sewn: HashMap::new(),
+            shell_sewn: HashMap::new(),
             tubes: vec![false; copies],
             wrapped: Vec::new(),
             graph: None,
@@ -466,6 +470,10 @@ impl Assembly {
             }
             next.sewn.entry(a).or_default().push(sa);
             next.sewn.entry(b).or_default().push(sb);
+            if !layered {
+                next.shell_sewn.entry(a).or_default().push(sa);
+                next.shell_sewn.entry(b).or_default().push(sb);
+            }
         }
         if !next.whole(&touched) {
             return false;
@@ -543,7 +551,7 @@ impl Assembly {
                         continue;
                     }
                     let length = self.length(e);
-                    let stretches = self.sewn.get(&e).map(Vec::as_slice).unwrap_or(&[]);
+                    let stretches = self.shell_sewn.get(&e).map(Vec::as_slice).unwrap_or(&[]);
                     let at_start = stretches.iter().any(|s| s.0.min(s.1) <= END);
                     let at_end = stretches.iter().any(|s| s.0.max(s.1) >= length - END);
                     for (c, sewn) in [(self.start(e), at_start), (self.end(e), at_end)] {

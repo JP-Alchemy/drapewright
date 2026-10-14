@@ -66,6 +66,9 @@ pub struct Panel {
     pub inside: bool,
     /// Inside: the panel it lies on, if known.
     pub over: Option<usize>,
+    /// Sewn into the garment's seams, joined to it only so (a cape sewn
+    /// into the princess seams): it hangs outside the rest.
+    pub outside: bool,
 }
 
 impl Panel {
@@ -174,6 +177,8 @@ struct Layout {
     marks: Vec<(MarkKind, P2)>,
     /// How high its line named for the waist is.
     waist: Option<f64>,
+    /// Its line named for the centre front, where it is on the panel.
+    centre: Option<Vec<P2>>,
 }
 
 fn reflect(p: P2, a: P2, b: P2) -> P2 {
@@ -348,6 +353,21 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                     .sum::<f64>()
                     / pts.len().max(1) as f64
             });
+        // Its centre front line, if drawn.
+        let centre: Option<Vec<P2>> = piece
+            .lines
+            .iter()
+            .find(|l| {
+                l.label
+                    .as_deref()
+                    .is_some_and(|t| t.to_lowercase() == "centre front")
+            })
+            .map(|l| {
+                flatten_segs(&segs_of(l.start, &l.segments), 0.5)
+                    .iter()
+                    .map(|p| quarter_turned([p.x, -p.y], quarters))
+                    .collect()
+            });
         let fold = kinds.iter().position(|(_, kind)| *kind == EdgeKind::Fold);
         let on_fold = cut.on_fold.unwrap_or(fold.is_some()) && fold.is_some();
         let pair = cut.quantity >= 2 && cut.mirrored.unwrap_or(true);
@@ -384,6 +404,7 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                 darts,
                 marks: marks.clone(),
                 waist,
+                centre: None,
             });
             continue;
         }
@@ -416,6 +437,9 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                     .map(|&(k, m)| (k, [flip * m[0], m[1]]))
                     .collect(),
                 waist,
+                centre: centre
+                    .as_ref()
+                    .map(|c| c.iter().map(|m| [flip * m[0], m[1]]).collect()),
             });
         }
     }
@@ -610,6 +634,150 @@ fn tip_along(line: &[P2], from: f64, to: f64) -> f64 {
 /// sewn to split where that dart closes, as sewn: the parts before and
 /// after the dart (along `x`) that are left, each pair sewn as `x` and `y`
 /// were. None without such a dart.
+/// Two stretches of an edge this near each other's ends, mm, are one
+/// stretch sewn in layers.
+const LAYERED: f64 = 0.5;
+
+/// Whether two seams sew the same stretch of an edge: layers sewn as one.
+fn shares(x: &(Side, Side, bool, String), y: &(Side, Side, bool, String)) -> bool {
+    let span = |s: &Side| (s.from.min(s.to), s.from.max(s.to));
+    [&x.0, &x.1].iter().any(|s| {
+        [&y.0, &y.1].iter().any(|t| {
+            let ((a, b), (c, d)) = (span(s), span(t));
+            s.panel == t.panel
+                && s.edge == t.edge
+                && (a - c).abs() <= LAYERED
+                && (b - d).abs() <= LAYERED
+        })
+    })
+}
+
+/// Which panels are sewn into the garment's seams (a cape, its front edge
+/// sewn into a princess seam): those sewn along part of an edge that
+/// another seam sews more of, and the panels sewn to them but not to the
+/// garment (the cape's back): not the garment itself (the most panels
+/// sewn together otherwise), facings and linings apart.
+fn outside_layers(
+    layouts: &[Layout],
+    pieces: &[Piece],
+    seams: &[(Side, Side, bool, String)],
+) -> Vec<bool> {
+    let n = layouts.len();
+    let lined: Vec<bool> = layouts.iter().map(|l| inside(&pieces[l.piece])).collect();
+    let span = |s: &Side| (s.from.min(s.to), s.from.max(s.to));
+    // Sewn in: the other side of a seam whose side on an edge lies within
+    // another's there, shorter.
+    let mut sewn_in = vec![false; n];
+    for (k, (a, b, ..)) in seams.iter().enumerate() {
+        for (x, other) in [(a, b), (b, a)] {
+            let (lo, hi) = span(x);
+            let within = seams.iter().enumerate().any(|(j, (c, d, ..))| {
+                j != k
+                    && [c, d].iter().any(|y| {
+                        let (ylo, yhi) = span(y);
+                        y.panel == x.panel
+                            && y.edge == x.edge
+                            && ylo <= lo + LAYERED
+                            && yhi >= hi - LAYERED
+                            && yhi - ylo > hi - lo + LAYERED
+                    })
+            });
+            if within && !lined[other.panel] {
+                sewn_in[other.panel] = true;
+            }
+        }
+    }
+    // Groups of panels sewn together, those sewn in apart from the rest.
+    let mut group: Vec<usize> = (0..n).collect();
+    let find = |group: &mut Vec<usize>, mut p: usize| {
+        while group[p] != p {
+            group[p] = group[group[p]];
+            p = group[p];
+        }
+        p
+    };
+    for (a, b, ..) in seams {
+        if sewn_in[a.panel] == sewn_in[b.panel] && !lined[a.panel] && !lined[b.panel] {
+            let (x, y) = (find(&mut group, a.panel), find(&mut group, b.panel));
+            group[x] = y;
+        }
+    }
+    let of: Vec<usize> = (0..n).map(|p| find(&mut group, p)).collect();
+    let mut sizes = vec![0usize; n];
+    for p in (0..n).filter(|&p| !lined[p]) {
+        sizes[of[p]] += 1;
+    }
+    let Some(garment) = (0..n).max_by_key(|&g| (sizes[g], std::cmp::Reverse(g))) else {
+        return vec![false; n];
+    };
+    (0..n)
+        .map(|p| !lined[p] && of[p] != garment && (0..n).any(|q| sewn_in[q] && of[q] == of[p]))
+        .collect()
+}
+
+/// Seams sewing a piece into another seam, between its two sides (a cape's
+/// edge into a princess seam, a collar between a neckline and its facing):
+/// where one seam's side runs over part of another's on the same edge, the
+/// longer is split where the shorter begins and ends, at the same place on
+/// its other side as sewn. The stretch they share is then sewn once, all
+/// its layers to the same points.
+fn layered(mut seams: Vec<(Side, Side, bool, String)>) -> Vec<(Side, Side, bool, String)> {
+    let span = |s: &Side| (s.from.min(s.to), s.from.max(s.to));
+    // Each split makes two stretches' ends meet; there are only so many.
+    for _ in 0..4 * seams.len() * seams.len() + 1 {
+        let mut cut = None;
+        'find: for (k, (a, b, ..)) in seams.iter().enumerate() {
+            for (second, x) in [(false, a), (true, b)] {
+                let (lo, hi) = span(x);
+                for (j, (c, d, ..)) in seams.iter().enumerate() {
+                    for y in [c, d]
+                        .into_iter()
+                        .filter(|y| j != k && y.panel == x.panel && y.edge == x.edge)
+                    {
+                        let (ylo, yhi) = span(y);
+                        if ylo >= hi - LAYERED || yhi <= lo + LAYERED {
+                            continue;
+                        }
+                        if let Some(v) = [ylo, yhi]
+                            .into_iter()
+                            .find(|v| *v > lo + LAYERED && *v < hi - LAYERED)
+                        {
+                            cut = Some((k, second, v));
+                            break 'find;
+                        }
+                    }
+                }
+            }
+        }
+        let Some((k, second, v)) = cut else {
+            break;
+        };
+        let (a, b, reversed, name) = seams.remove(k);
+        let (x, y) = if second { (b, a) } else { (a, b) };
+        // As far along `y`, as sewn: its start sewn to `x`'s start, or to
+        // its end where the seam is reversed.
+        let f = (v - x.from) / (x.to - x.from);
+        let g = if reversed { 1.0 - f } else { f };
+        let w = y.from + g * (y.to - y.from);
+        let part = |s: &Side, from: f64, to: f64| Side {
+            from,
+            to,
+            ..s.clone()
+        };
+        let (x1, x2) = (part(&x, x.from, v), part(&x, v, x.to));
+        let (y1, y2) = if reversed {
+            (part(&y, w, y.to), part(&y, y.from, w))
+        } else {
+            (part(&y, y.from, w), part(&y, w, y.to))
+        };
+        for (xp, yp) in [(x2, y2), (x1, y1)] {
+            let (a, b) = if second { (yp, xp) } else { (xp, yp) };
+            seams.insert(k, (a, b, reversed, name.clone()));
+        }
+    }
+    seams
+}
+
 fn past_dart(layouts: &[Layout], x: &Side, y: &Side, reversed: bool) -> Option<Vec<(Side, Side)>> {
     const SHORT: f64 = 1e-6;
     let spans = &layouts[x.panel].darts[x.edge];
@@ -802,7 +970,11 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             }
         }
     }
-    let mut sewn = split;
+    // Pieces sewn into the garment's seams hang outside it.
+    let outside = outside_layers(&layouts, pieces, &split);
+    // A piece sewn into a seam, between its two sides (a cape's edge into
+    // a princess seam): its layers are sewn as one.
+    let mut sewn = layered(split);
     // Seams, then darts: only seams join panels.
     let seams_sewn = sewn.len();
     // Darts sewn closed, leg to leg, from the mouth to the tip.
@@ -821,12 +993,34 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             }
         }
     }
-    // Each edge's stretches sewn to others, with as many steps on both sides.
+    // Each seam's steps, as many on both sides; layers sewn as one, as
+    // many as each other.
+    let mut steps_of: Vec<usize> = sewn
+        .iter()
+        .map(|(a, b, _, _)| {
+            ((a.to - a.from).abs().max((b.to - b.from).abs()) / spacing)
+                .round()
+                .max(1.0) as usize
+        })
+        .collect();
+    loop {
+        let mut changed = false;
+        for k in 0..sewn.len() {
+            for j in 0..sewn.len() {
+                if j != k && shares(&sewn[k], &sewn[j]) && steps_of[j] > steps_of[k] {
+                    steps_of[k] = steps_of[j];
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    // Each edge's stretches sewn to others.
     let mut wanted: HashMap<(usize, usize), Vec<Stretch>> = HashMap::new();
     for (k, (a, b, _, _)) in sewn.iter().enumerate() {
-        let n = ((a.to - a.from).abs().max((b.to - b.from).abs()) / spacing)
-            .round()
-            .max(1.0) as usize;
+        let n = steps_of[k];
         wanted
             .entry((a.panel, a.edge))
             .or_default()
@@ -847,6 +1041,8 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             asked.sort_by(|x, y| x.0.min(x.1).total_cmp(&y.0.min(y.1)));
             let mut points: Vec<P2> = vec![line[0]];
             let mut at = 0.0;
+            // The stretches sampled: (low end, high end, first point).
+            let mut done: Vec<(f64, f64, usize)> = Vec::new();
             let free = |points: &mut Vec<P2>, from: f64, to: f64| {
                 if to - from > 1e-6 {
                     let n = ((to - from) / spacing).round().max(1.0) as usize;
@@ -855,6 +1051,16 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             };
             for (from, to, n, k, second) in asked {
                 let (lo, hi) = (from.min(to), from.max(to));
+                // Recorded from its `from` to its `to`.
+                let way = if from <= to { 0 } else { 1 };
+                // Another layer of a stretch sewn already: its points.
+                if let Some(&(_, _, start)) = done
+                    .iter()
+                    .find(|(l, h, _)| (l - lo).abs() <= LAYERED && (h - hi).abs() <= LAYERED)
+                {
+                    runs.insert((k, second), (p, e, start, way));
+                    continue;
+                }
                 if lo < at - 1e-6 {
                     // Overlaps a stretch already sewn: left out.
                     continue;
@@ -862,8 +1068,8 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
                 free(&mut points, at, lo);
                 let start = points.len() - 1;
                 points.extend(steps(line, lo, hi, n).into_iter().skip(1));
-                // Recorded from its `from` to its `to`.
-                runs.insert((k, second), (p, e, start, if from <= to { 0 } else { 1 }));
+                runs.insert((k, second), (p, e, start, way));
+                done.push((lo, hi, start));
                 at = hi;
             }
             free(&mut points, at, total);
@@ -922,6 +1128,7 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             waist: layout.waist,
             inside: inside(&pieces[layout.piece]),
             over: None,
+            outside: outside[p],
         });
     }
     // Stitches: the two runs of each seam, point for point.
@@ -931,9 +1138,7 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
         let (Some(&ra), Some(&rb)) = (runs.get(&(k, false)), runs.get(&(k, true))) else {
             continue;
         };
-        let n = ((a.to - a.from).abs().max((b.to - b.from).abs()) / spacing)
-            .round()
-            .max(1.0) as usize;
+        let n = steps_of[k];
         let run = |r: (usize, usize, usize, usize)| -> Vec<(usize, u32)> {
             let (p, e, start, backwards) = r;
             let points = &panels[p].edges[e].points;
@@ -1130,5 +1335,66 @@ fn buttons(
             out.push([(p, nearest(p, b)), (q, to)]);
         }
     }
+    // Fronts with no buttons marked that cross past the centre front line
+    // drawn on them (a coat done up with snaps, which patterns leave to
+    // the instructions): held together on that line from the top of the
+    // opening down two thirds of it, every `FASTENED` mm.
+    let unmarked = |p: usize| {
+        openings[p]
+            .as_ref()
+            .is_some_and(|(_, b, h)| b.is_empty() && h.is_empty())
+    };
+    // The centre line, as far as it goes on, at height y.
+    let centre_at = |p: usize, y: f64| -> Option<P2> {
+        let c = layouts[p].centre.as_ref()?;
+        let (a, b) = (c[0], c[c.len() - 1]);
+        ((b[1] - a[1]).abs() > 1.0).then(|| {
+            let t = (y - a[1]) / (b[1] - a[1]);
+            [a[0] + t * (b[0] - a[0]), y]
+        })
+    };
+    for p in (0..layouts.len()).filter(|&p| unmarked(p)) {
+        let Some(q) = (p + 1..layouts.len()).find(|&q| {
+            unmarked(q)
+                && stem(&pieces[layouts[q].piece].name) == stem(&pieces[layouts[p].piece].name)
+        }) else {
+            continue;
+        };
+        let (Some(edge), Some(centre)) = (
+            openings[p].as_ref().map(|o| o.0),
+            layouts[p].centre.as_ref(),
+        ) else {
+            continue;
+        };
+        // Along the opening, near it: the front crosses past its centre.
+        let line = &layouts[p].edges[edge].3;
+        let (a, b) = (line[0], line[line.len() - 1]);
+        let (c0, c1) = (centre[0], centre[centre.len() - 1]);
+        let way = |u: P2, v: P2| {
+            let d = [v[0] - u[0], v[1] - u[1]];
+            let l = d[0].hypot(d[1]).max(1e-9);
+            [d[0] / l, d[1] / l]
+        };
+        let (e, c) = (way(a, b), way(c0, c1));
+        let off = ((c0[0] - a[0]) * e[1] - (c0[1] - a[1]) * e[0]).abs();
+        if (e[0] * c[0] + e[1] * c[1]).abs() < 0.98 || off > BUTTON_STAND {
+            continue;
+        }
+        let (bottom, top) = (a[1].min(b[1]), a[1].max(b[1]));
+        let mut y = top - FIRST_FASTENING;
+        while y >= top - FASTENED_SHARE * (top - bottom) {
+            if let (Some(x), Some(z)) = (centre_at(p, y), centre_at(q, y)) {
+                out.push([(p, nearest(p, x)), (q, nearest(q, z))]);
+            }
+            y -= FASTENED;
+        }
+    }
     out
 }
+
+/// Fronts done up at their centre front line: the first fastening this far
+/// below the top of the opening, the rest this far apart, down this share
+/// of it, mm.
+const FIRST_FASTENING: f64 = 15.0;
+const FASTENED: f64 = 100.0;
+const FASTENED_SHARE: f64 = 2.0 / 3.0;

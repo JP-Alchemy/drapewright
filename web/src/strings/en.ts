@@ -800,6 +800,12 @@ export const t = {
             'Left out 1 small shape (an arrowhead, notch or logo).',
             'Left out # small shapes (arrowheads, notches or logos).',
           )
+        case 'keysIgnored':
+          return plural(
+            n.count,
+            'Left out 1 box holding a picture of the garment and a key to the lines (a title block); it is no piece.',
+            'Left out # boxes holding pictures of the garment and keys to the lines (title blocks); they are no pieces.',
+          )
         case 'looseLinesIgnored':
           return plural(
             n.count,
@@ -1015,6 +1021,7 @@ export const t = {
       continues: 'goes on from a seam',
       fitsOpening: 'fits round the opening',
       fitsAlong: 'fits along the opening',
+      sewnInto: 'sewn into the seam',
     } satisfies Record<Reason, string>,
     sewTo: 'Sew to another edge…',
     sewingHint: (edge: string) =>
@@ -1245,6 +1252,12 @@ export const t = {
         n,
         'A facing or lining isn’t sewn to anything, so it’s left off.',
         '# facings and linings aren’t sewn to anything, so they’re left off.',
+      ),
+    unplaced: (n: number) =>
+      plural(
+        n,
+        'A facing or lining is sewn, but has nothing to lie on inside the garment yet, so it’s left off.',
+        '# facings and linings are sewn, but have nothing to lie on inside the garment yet, so they’re left off.',
       ),
     lined: (names: string[]) =>
       `Inside, shown paler: ${new Intl.ListFormat('en', { type: 'conjunction' }).format(names)}.`,

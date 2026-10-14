@@ -128,6 +128,30 @@ fn fold_edges_get_no_allowance_and_meet_the_fold_line() {
 }
 
 #[test]
+fn an_allowance_meeting_a_fold_past_square_stops_at_the_fold() {
+    // A centre back cut on the fold: its 40 mm hem meets the fold a little
+    // past square (the hem tilted a hair). Its cutting line runs to the
+    // fold line, not round past it (rounded, it went 40 mm past); the
+    // hem's band ends a hair past it.
+    let outline = Outline {
+        start: Pt::new(0.0, 0.0),
+        edges: vec![
+            Edge::new("top", vec![Segment::line([150.0, 0.0])]),
+            Edge::new("hem", vec![Segment::line([148.0, 600.0])]),
+            Edge::new("fold", vec![Segment::line([0.0, 600.0])]),
+            Edge::new("neck", vec![Segment::line([0.0, 0.0])]),
+        ],
+    };
+    let mut p = Piece::new("p1", "Centre back", outline);
+    p.allowance.seam = 12.0;
+    p.outline.edges[1].allowance = Some(40.0);
+    p.outline.edges[2].kind = EdgeKind::Fold;
+    let lines = allowance_lines(&p);
+    let below = lines.cutting.iter().map(|q| q.y).fold(f64::MIN, f64::max);
+    assert!(below <= 601.0, "the cutting line reaches {below}");
+}
+
+#[test]
 fn hems_fold_back_to_match_a_flared_side_seam() {
     // A flared skirt panel: waist, side seam flaring out, straight hem,
     // centre front on the fold. Clockwise with y down.

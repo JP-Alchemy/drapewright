@@ -124,6 +124,11 @@ pub fn note(n: &ImportNote, name: &dyn Fn(&str) -> String) -> String {
             "Left out 1 small shape (an arrowhead, notch or logo).",
             "Left out # small shapes (arrowheads, notches or logos).",
         ),
+        ImportNote::KeysIgnored { count: c } => count(
+            *c,
+            "Left out 1 box holding a picture of the garment and a key to the lines (a title block); it is no piece.",
+            "Left out # boxes holding pictures of the garment and keys to the lines (title blocks); they are no pieces.",
+        ),
         ImportNote::LooseLinesIgnored { count: c } => count(
             *c,
             "Left out 1 line outside the pieces (a title or border).",

@@ -50,6 +50,9 @@ pub fn segs_of(start: Pt, segments: &[Segment]) -> Vec<PathSeg> {
         .collect()
 }
 
+/// A curve's handle shorter than this, mm, bends it too little to see.
+const HAIR: f64 = 0.05;
+
 /// Unit tangent of `seg` at `t`, well defined even where a cubic's control
 /// point coincides with its end point. Zero only for a zero-length segment.
 pub fn unit_tangent(seg: &PathSeg, t: f64) -> Vec2 {
@@ -61,14 +64,25 @@ pub fn unit_tangent(seg: &PathSeg, t: f64) -> Vec2 {
             .find(|v| v.hypot2() > TINY)
             .map_or(Vec2::ZERO, Vec2::normalize)
     };
+    // A curve's end handle too short to show (a hair of a hook where a
+    // drawing program rounded a dash round a corner): the curve heads for
+    // its next control point.
+    let showing = |ways: &[Vec2]| {
+        let shown: Vec<Vec2> = ways.iter().copied().filter(|v| v.hypot() >= HAIR).collect();
+        if shown.is_empty() {
+            first_nonzero(ways)
+        } else {
+            first_nonzero(&shown)
+        }
+    };
     match seg {
         PathSeg::Line(l) => first_nonzero(&[l.p1 - l.p0]),
         PathSeg::Quad(q) => unit_tangent(&PathSeg::Cubic(q.raise()), t),
         PathSeg::Cubic(c) => {
             if t <= 1e-9 {
-                first_nonzero(&[c.p1 - c.p0, c.p2 - c.p0, c.p3 - c.p0])
+                showing(&[c.p1 - c.p0, c.p2 - c.p0, c.p3 - c.p0])
             } else if t >= 1.0 - 1e-9 {
-                first_nonzero(&[c.p3 - c.p2, c.p3 - c.p1, c.p3 - c.p0])
+                showing(&[c.p3 - c.p2, c.p3 - c.p1, c.p3 - c.p0])
             } else {
                 let d = c.deriv().eval(t).to_vec2();
                 if d.hypot2() > TINY {
@@ -473,6 +487,28 @@ mod tests {
                 Edge::new("e4", vec![Segment::line([0.0, 0.0])]),
             ],
         }
+    }
+
+    #[test]
+    fn a_curve_heads_past_a_handle_too_short_to_show() {
+        // A dash's corner stub: its first handle a fiftieth of a millimetre
+        // back the way it came, the curve then heading down.
+        let c = PathSeg::Cubic(kurbo::CubicBez::new(
+            (0.0, 0.0),
+            (0.0, -0.02),
+            (0.08, 0.86),
+            (0.23, 2.47),
+        ));
+        let t = unit_tangent(&c, 0.0);
+        assert!(t.y > 0.9, "{t:?}");
+        // A handle as long as the curve is taken as it is.
+        let c = PathSeg::Cubic(kurbo::CubicBez::new(
+            (0.0, 0.0),
+            (5.0, 0.0),
+            (10.0, 5.0),
+            (10.0, 10.0),
+        ));
+        assert!((unit_tangent(&c, 0.0).x - 1.0).abs() < 1e-12);
     }
 
     #[test]
