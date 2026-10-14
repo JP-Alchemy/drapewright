@@ -1,5 +1,14 @@
 import { expect, test } from './fixtures.ts'
-import { fixture, modKey, multiTap, openWithFixture, pieceCentre, placementOf } from './helpers.ts'
+import {
+  fingerDrag,
+  fixture,
+  modKey,
+  multiTap,
+  openWithFixture,
+  pieceCentre,
+  placementOf,
+  tablePoint,
+} from './helpers.ts'
 
 test.describe('moving pieces', () => {
   test('dragging a piece moves it as one undo step', async ({ page }, info) => {
@@ -27,6 +36,80 @@ test.describe('moving pieces', () => {
     expect(nudged).toMatchObject({ x: 3, y: 10 })
     await page.getByRole('button', { name: 'Undo move' }).click()
     expect(await placementOf(page, 1)).toMatchObject({ x: 0, y: 0 })
+  })
+})
+
+// The test pieces lie side by side: the skirt front from x −5 to 327 mm,
+// the waistband from 345 to 455 (both from y 5 down).
+test.describe('choosing pieces with a box', () => {
+  test('a box dragged across the table chooses what it touches; they turn and go together', async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name === 'ipad-webkit', 'mouse drag')
+    await openWithFixture(page, 'inkscape-mm.svg', 'Add 2 pieces')
+    const drag = async (from: [number, number], to: [number, number], shift = false) => {
+      const a = await tablePoint(page, ...from)
+      const b = await tablePoint(page, ...to)
+      if (shift) await page.keyboard.down('Shift')
+      await page.mouse.move(a.x, a.y)
+      await page.mouse.down()
+      await page.mouse.move(b.x, b.y, { steps: 6 })
+      await page.mouse.up()
+      if (shift) await page.keyboard.up('Shift')
+    }
+    const name = page.getByRole('textbox', { name: 'Name' })
+
+    // Into the skirt front only, from the table above it.
+    await drag([-20, -20], [150, 200])
+    await expect(page.getByRole('heading', { name: 'Piece', exact: true })).toBeVisible()
+    await expect(name).toHaveValue('Skirt front')
+    // On across to the waistband: both, though neither is wholly in the box.
+    await drag([-20, -20], [400, 200])
+    await expect(page.getByRole('heading', { name: '2 pieces' })).toBeVisible()
+    // A tap on the table chooses nothing; Shift adds a box to what is chosen.
+    const empty = await tablePoint(page, 336, -20)
+    await page.mouse.click(empty.x, empty.y)
+    await expect(page.getByText(/Tap a piece to see its details/)).toBeVisible()
+    await drag([440, -20], [420, 100])
+    await expect(name).toHaveValue('Waistband')
+    await drag([-20, -20], [100, 100], true)
+    await expect(page.getByRole('heading', { name: '2 pieces' })).toBeVisible()
+
+    // The menu on one of them is for both: both turn, as one undo step.
+    const at = await pieceCentre(page, 1)
+    await page.mouse.click(at.x, at.y, { button: 'right' })
+    await expect(page.getByRole('menuitem', { name: 'Delete 2 pieces' })).toBeVisible()
+    await page.getByRole('menuitem', { name: 'Turn 90° clockwise' }).click()
+    expect((await placementOf(page, 0)).rotation).toBe(90)
+    expect((await placementOf(page, 1)).rotation).toBe(90)
+    await expect(page.getByRole('heading', { name: '2 pieces' })).toBeVisible()
+    await page.keyboard.press(`${await modKey(page)}+z`)
+    expect((await placementOf(page, 0)).rotation).toBe(0)
+    expect((await placementOf(page, 1)).rotation).toBe(0)
+
+    // The details turn them back, and Delete takes both away, as one undo step.
+    await page.getByRole('button', { name: 'Turn anticlockwise' }).click()
+    expect((await placementOf(page, 0)).rotation).toBe(270)
+    expect((await placementOf(page, 1)).rotation).toBe(270)
+    await page.locator('canvas').focus()
+    await page.keyboard.press('Delete')
+    await expect(page.getByText('No pieces yet.')).toBeVisible()
+    await page.getByRole('button', { name: 'Undo delete pieces' }).click()
+    await expect(page.getByRole('option')).toHaveCount(2)
+
+    // The table's own menu chooses them all.
+    await page.mouse.click(empty.x, empty.y)
+    await page.mouse.click(empty.x, empty.y, { button: 'right' })
+    await page.getByRole('menuitem', { name: 'Select all' }).click()
+    await expect(page.getByRole('heading', { name: '2 pieces' })).toBeVisible()
+  })
+
+  test('a finger drags a box too, and the details delete what it chose', async ({ page }) => {
+    await openWithFixture(page, 'inkscape-mm.svg', 'Add 2 pieces')
+    await fingerDrag(page, await tablePoint(page, -20, -20), await tablePoint(page, 400, 200))
+    await expect(page.getByRole('heading', { name: '2 pieces' })).toBeVisible()
+    await page.getByRole('button', { name: 'Delete 2 pieces' }).click()
+    await expect(page.getByText('No pieces yet.')).toBeVisible()
   })
 })
 

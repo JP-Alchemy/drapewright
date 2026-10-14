@@ -104,6 +104,12 @@ export interface MovePreview {
   dy: number
 }
 
+/** A box dragged across the table to choose the pieces it touches, mm. */
+export interface Marquee {
+  from: { x: number; y: number }
+  to: { x: number; y: number }
+}
+
 /** A short measurement shown next to the pointer, screen px. */
 export interface Tip {
   x: number
@@ -115,6 +121,8 @@ export interface MenuState {
   x: number
   y: number
   hit: Hit | null
+  /** Pressed on one of several chosen pieces: the menu is for all of them. */
+  pieces?: string[]
 }
 
 export interface UiState {
@@ -124,6 +132,7 @@ export interface UiState {
   part: PartRef | null
   hover: Hit | null
   preview: MovePreview | null
+  marquee: Marquee | null
   grainPreview: GrainPreview | null
   /** Points being tapped for an alteration, with the pick tool. */
   picking: Picking | null
@@ -181,6 +190,7 @@ export class Session {
       part: null,
       hover: null,
       preview: null,
+      marquee: null,
       grainPreview: null,
       picking: null,
       viewport: { ...initialViewport, pxPerMm: screenScale ?? NOMINAL_PX_PER_MM },
@@ -299,6 +309,7 @@ export class Session {
       ...s,
       tool,
       preview: null,
+      marquee: null,
       grainPreview: null,
       hover: null,
       tip: null,
@@ -377,6 +388,10 @@ export class Session {
 
   setPreview(preview: MovePreview | null): void {
     this.ui.set((s) => ({ ...s, preview }))
+  }
+
+  setMarquee(marquee: Marquee | null): void {
+    this.ui.set((s) => ({ ...s, marquee }))
   }
 
   showTip(tip: Tip | null): void {
@@ -486,6 +501,16 @@ export class Session {
     return true
   }
 
+  /** Several commands as one undo step; if any is rejected, none is done. */
+  dispatchAll(commands: Command[]): boolean {
+    const result = this.engine.dispatchAll(commands)
+    if (result.status === 'rejected') {
+      this.notify({ kind: 'error', text: result.error.message })
+      return false
+    }
+    return true
+  }
+
   undo(feedback = false): void {
     const label = this.engine.state.undoLabel
     if (this.engine.undo() && feedback && label) this.toast(t.actions.undoThing(label))
@@ -506,6 +531,14 @@ export class Session {
   deleteSelection(): void {
     const ids = [...this.ui.get().selection]
     if (ids.length > 0) this.dispatch({ type: 'deletePieces', ids })
+  }
+
+  /** Turns each chosen piece about its own middle, together as one undo step. */
+  turnSelection(degrees: number): void {
+    const ids = [...this.ui.get().selection].sort()
+    if (ids.length > 0) {
+      this.dispatchAll(ids.map((piece) => ({ type: 'rotatePiece', piece, degrees })))
+    }
   }
 
   async openPatternFile(file: File): Promise<void> {

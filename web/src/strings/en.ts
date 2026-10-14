@@ -286,8 +286,10 @@ export const t = {
   inspector: {
     heading: 'Piece',
     nothing:
-      'Tap a piece to see its details. Tap an edge or a corner to adjust it. To set several pieces at once, press Select above the list.',
+      'Tap a piece to see its details. Tap an edge or a corner to adjust it. To set several pieces at once, drag across them on the table, or press Select above the list.',
     manyHeading: (n: number) => `${n} pieces`,
+    turn: 'Turn clockwise',
+    turnBack: 'Turn anticlockwise',
     manyHint: (names: string[]) =>
       `Changes here apply to all of them: ${namesList(names)}. Drag one on the table to move them together.`,
     mixed: 'Mixed',
@@ -329,7 +331,8 @@ export const t = {
     notch: 'Notches (N)',
     grainline: 'Grainline (G)',
     hints: {
-      select: 'Tap a piece, edge or corner. Drag to move a piece.',
+      select:
+        'Tap a piece, edge or corner. Drag a piece to move it, or across the table to choose several.',
       notch: 'Tap an edge to add a notch. Drag a notch to slide it; tap it for double or triple.',
       grainline: 'Drag inside a piece to draw its grainline. Hold Shift for any angle.',
     },
@@ -621,6 +624,7 @@ export const t = {
     turn: 'Turn 90° clockwise',
     turnBack: 'Turn 90° anticlockwise',
     deletePiece: 'Delete piece',
+    deletePieces: (n: number) => `Delete ${n} pieces`,
     addCorner: 'Add a corner here',
     removeCorner: 'Remove this corner',
     makeSeam: 'Make this edge a seam',

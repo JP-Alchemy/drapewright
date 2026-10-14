@@ -1,5 +1,5 @@
 import type { DisplayUnits, EdgeKind, Piece, PieceView } from '@drapewright/engine'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, RotateCcw, RotateCw, Trash2 } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import {
   Button,
@@ -244,6 +244,20 @@ function ManyPiecesSection({ session, pieces }: { session: Session; pieces: Piec
     <section className="panel-section inspector" aria-labelledby="inspector-heading">
       <h2 id="inspector-heading">{t.inspector.manyHeading(pieces.length)}</h2>
       <p className="muted small">{t.inspector.manyHint(pieces.map((p) => p.name))}</p>
+      <div className="button-row">
+        <Button className="button" onPress={() => session.turnSelection(90)}>
+          <RotateCw size={18} aria-hidden="true" />
+          {t.inspector.turn}
+        </Button>
+        <Button className="button" onPress={() => session.turnSelection(-90)}>
+          <RotateCcw size={18} aria-hidden="true" />
+          {t.inspector.turnBack}
+        </Button>
+        <Button className="button danger" onPress={() => session.deleteSelection()}>
+          <Trash2 size={18} aria-hidden="true" />
+          {t.menu.deletePieces(pieces.length)}
+        </Button>
+      </div>
       <ManyCutSection session={session} pieces={pieces} />
       <DetailsPart
         id="allowance"

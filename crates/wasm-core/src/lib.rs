@@ -117,6 +117,23 @@ impl EngineHandle {
         to_js(&result)
     }
 
+    /// Applies several commands as one undo step (turning every chosen
+    /// piece, say); if any is rejected, nothing changes.
+    #[wasm_bindgen(js_name = dispatchAll)]
+    pub fn dispatch_all(&mut self, commands: JsValue) -> Result<JsValue, JsError> {
+        let commands: Vec<Command> = from_js(commands)?;
+        let result = match self.engine.dispatch_all(commands) {
+            Ok(changes) => DispatchResult::Ok { changes },
+            Err(error) => DispatchResult::Rejected {
+                error: RejectedError {
+                    message: error.to_string(),
+                    error,
+                },
+            },
+        };
+        to_js(&result)
+    }
+
     /// Returns the change set, or `null` when there is nothing to undo.
     pub fn undo(&mut self) -> Result<JsValue, JsError> {
         to_js(&self.engine.undo())

@@ -44,11 +44,18 @@ export function rawPointer(phase: RawPointer['phase'], e: PointerEvent, box: DOM
   }
 }
 
-/** Opens the context menu for whatever is at a screen point. */
+/**
+ * Opens the context menu for whatever is at a screen point. On one of
+ * several chosen pieces, the menu is for all of them, as in a folder.
+ */
 export function openMenuAt(session: Session, x: number, y: number, kind: PointerKind): void {
-  const v = session.ui.get().viewport
+  const { viewport: v, selection } = session.ui.get()
   const w = toWorld(v, { x, y })
   const hit = session.engine.hitTest(w.x, w.y, hitRadius(kind) / scaleOf(v))
+  if (hit && selection.size > 1 && selection.has(hit.piece)) {
+    session.openMenu({ x, y, hit, pieces: [...selection] })
+    return
+  }
   if (hit) {
     const part: PartRef | null =
       hit.kind === 'edge' || hit.kind === 'corner'

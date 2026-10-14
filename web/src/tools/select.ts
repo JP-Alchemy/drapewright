@@ -1,8 +1,11 @@
 // The select tool: tap to select a piece or one of its edges; drag to move
-// pieces on the table; hold an edge to see its length.
+// pieces on the table; drag across the table from where there is no piece
+// to choose every piece the box touches, as files in a folder; hold an edge
+// to see its length. Shift (or Command, or Ctrl) adds to what is chosen.
 
 import type { ToolPointer } from '@drapewright/input'
 import { TUNING } from '@drapewright/input'
+import { piecesTouching } from '../canvas/marquee.ts'
 import type { Point } from '../canvas/viewport.ts'
 import { formatLength } from '../strings/en.ts'
 import type { Tool, ToolContext } from './tool.ts'
@@ -19,6 +22,24 @@ type State =
       narrowTo: string | null
     }
   | { kind: 'drag'; start: Point; ids: string[] }
+  | {
+      kind: 'table'
+      start: Point
+      screen: Point
+      pointer: ToolPointer['kind']
+      /** Chosen before the press, to go back to if it is called off. */
+      before: string[]
+      /** Kept chosen whatever the box touches (adding to them). */
+      base: string[]
+      /** Dragging the box (past a tap's slop). */
+      boxing: boolean
+    }
+
+/** Shift, Command or Ctrl held: add to what is chosen rather than replace it. */
+const adding = (p: ToolPointer) => p.modifiers.shift || p.modifiers.meta || p.modifiers.ctrl
+
+const same = (a: ReadonlySet<string>, b: ReadonlySet<string>) =>
+  a.size === b.size && [...a].every((id) => b.has(id))
 
 export function selectTool(): Tool {
   let state: State = { kind: 'idle' }
@@ -39,13 +60,23 @@ export function selectTool(): Tool {
       const ui = session.ui.get()
       session.showTip(null)
       if (!hit) {
-        if (!p.modifiers.shift) session.select([])
-        state = { kind: 'idle' }
+        const before = [...ui.selection]
+        const base = adding(p) ? before : []
+        if (!adding(p)) session.select([])
+        state = {
+          kind: 'table',
+          start: ctx.world(p),
+          screen: { x: p.x, y: p.y },
+          pointer: p.kind,
+          before,
+          base,
+          boxing: false,
+        }
         return
       }
       const piece = hit.piece
       let ids: string[]
-      if (p.modifiers.shift) {
+      if (adding(p)) {
         const next = new Set(ui.selection)
         if (next.has(piece)) next.delete(piece)
         else next.add(piece)
@@ -69,11 +100,22 @@ export function selectTool(): Tool {
         screen: { x: p.x, y: p.y },
         ids,
         pointer: p.kind,
-        narrowTo: ids.length > 1 && !p.modifiers.shift ? piece : null,
+        narrowTo: ids.length > 1 && !adding(p) ? piece : null,
       }
     },
 
     move(p, ctx) {
+      if (state.kind === 'table') {
+        const travel = Math.hypot(p.x - state.screen.x, p.y - state.screen.y)
+        if (!state.boxing && travel <= TUNING.dragSlop[state.pointer]) return
+        state.boxing = true
+        const { session } = ctx
+        const to = ctx.world(p)
+        session.setMarquee({ from: state.start, to })
+        const chosen = new Set([...state.base, ...piecesTouching(session.scene(), state.start, to)])
+        if (!same(chosen, session.ui.get().selection)) session.select(chosen)
+        return
+      }
       if (state.kind === 'press') {
         const travel = Math.hypot(p.x - state.screen.x, p.y - state.screen.y)
         if (travel <= TUNING.dragSlop[state.pointer] || state.ids.length === 0) return
@@ -90,13 +132,19 @@ export function selectTool(): Tool {
     },
 
     up(p, ctx) {
-      if (state.kind === 'drag') finishDrag(ctx, ctx.world(p))
+      if (state.kind === 'table') ctx.session.setMarquee(null)
+      else if (state.kind === 'drag') finishDrag(ctx, ctx.world(p))
       // A tap (no drag) on one piece of a group selects just that piece.
       else if (state.kind === 'press' && state.narrowTo) ctx.session.select([state.narrowTo])
       state = { kind: 'idle' }
     },
 
     cancel(ctx) {
+      // A box called off (a second finger down, say) leaves the choice as it was.
+      if (state.kind === 'table') {
+        ctx.session.setMarquee(null)
+        ctx.session.select(state.before)
+      }
       finishDrag(ctx, null)
       state = { kind: 'idle' }
     },

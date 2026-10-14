@@ -12,6 +12,26 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 55 — Choosing pieces with a box
+
+Drag across the table from where there is no piece, and a box follows the
+pointer: every piece it touches is chosen, as files are in a folder, whether
+or not the box takes in all of it (it goes by the piece's outline, so a
+box past a slanted side chooses nothing). Shift, Command or Ctrl adds the
+box (or a tapped piece) to what is already chosen.
+
+**Try it:** open a pattern with several pieces and drag a box over some of
+them. The details say how many, with **Turn clockwise**, **Turn
+anticlockwise** and **Delete** for all of them; right-click (or hold a
+finger on) any one of them for the same in the menu. Delete or Backspace
+deletes them too, and arrow keys nudge them. Turning or deleting them is
+one undo step. A finger draws the box on an iPad until a Pencil is used
+(then the Pencil does, and fingers pan); a second finger calls the box
+off, leaving the choice as it was. Holding a finger or right-clicking on
+the empty table now offers **Select all**.
+
+---
+
 ## Step 54 — The drape on the graphics card (WebGPU)
 
 Where the browser has WebGPU (Safari on iPadOS 26, Chrome, Edge), the

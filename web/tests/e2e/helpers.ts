@@ -44,6 +44,61 @@ export async function pieceCentre(page: Page, index: number): Promise<{ x: numbe
   }, index)
 }
 
+/** Page coordinates of a point on the work table, mm. */
+export async function tablePoint(
+  page: Page,
+  x: number,
+  y: number,
+): Promise<{ x: number; y: number }> {
+  return page.evaluate(
+    ({ x, y }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const v = (window as any).drapewright.ui.get().viewport
+      const scale = v.pxPerMm * v.zoom
+      const r = document.querySelector('canvas')!.getBoundingClientRect()
+      return {
+        x: r.left + (x - v.cx) * scale + v.width / 2,
+        y: r.top + (y - v.cy) * scale + v.height / 2,
+      }
+    },
+    { x, y },
+  )
+}
+
+/** A one-finger drag, as synthetic pointer events (fingers edit until a Pencil is seen). */
+export async function fingerDrag(
+  page: Page,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+) {
+  await page.evaluate(
+    async ({ from, to }) => {
+      const canvas = document.querySelector('canvas')!
+      const send = (type: string, at: { x: number; y: number }) =>
+        canvas.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            pointerId: 200,
+            pointerType: 'touch',
+            isPrimary: true,
+            clientX: at.x,
+            clientY: at.y,
+          }),
+        )
+      send('pointerdown', from)
+      for (let k = 1; k <= 8; k++) {
+        await new Promise((r) => setTimeout(r, 16))
+        send('pointermove', {
+          x: from.x + ((to.x - from.x) * k) / 8,
+          y: from.y + ((to.y - from.y) * k) / 8,
+        })
+      }
+      send('pointerup', to)
+    },
+    { from, to },
+  )
+}
+
 export async function placementOf(page: Page, index: number) {
   return page.evaluate(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

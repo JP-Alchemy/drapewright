@@ -11,6 +11,7 @@ type Action =
   | 'delete'
   | 'open'
   | 'fit'
+  | 'selectAll'
   | 'addCorner'
   | 'removeCorner'
   | 'seam'
@@ -25,11 +26,16 @@ const KIND_LABEL: Record<EdgeKind, string> = {
   fold: t.menu.makeFold,
 }
 
-/** Long-press or right-click menu for whatever is under the pointer. */
+/**
+ * Long-press or right-click menu for whatever is under the pointer; on one
+ * of several chosen pieces, for all of them.
+ */
 export function ContextMenu({ session, onOpen }: { session: Session; onOpen: () => void }) {
   const { menu } = useStore(session.ui)
   const anchor = useRef<HTMLDivElement>(null)
   const hit = menu?.hit ?? null
+  const many = menu?.pieces ?? null
+  const anyPieces = session.engine.document().pieces.length > 0
   const piece = hit ? session.engine.document().pieces.find((p) => p.id === hit.piece) : undefined
   const edge =
     hit && (hit.kind === 'edge' || hit.kind === 'corner')
@@ -41,6 +47,15 @@ export function ContextMenu({ session, onOpen }: { session: Session; onOpen: () 
     if (!hit) {
       if (action === 'open') onOpen()
       if (action === 'fit') session.fitAll()
+      if (action === 'selectAll') session.select(session.engine.document().pieces.map((p) => p.id))
+      return
+    }
+    if (many) {
+      session.select(many)
+      if (action === 'turn' || action === 'turnBack') {
+        session.turnSelection(action === 'turn' ? 90 : -90)
+      }
+      if (action === 'delete') session.deleteSelection()
       return
     }
     switch (action) {
@@ -103,7 +118,7 @@ export function ContextMenu({ session, onOpen }: { session: Session; onOpen: () 
         {t.menu.turnBack}
       </MenuItem>
       <MenuItem id="delete" className="menu-item danger">
-        {t.menu.deletePiece}
+        {many ? t.menu.deletePieces(many.length) : t.menu.deletePiece}
       </MenuItem>
     </>
   )
@@ -126,7 +141,7 @@ export function ContextMenu({ session, onOpen }: { session: Session; onOpen: () 
         <Menu
           // Each kind of menu has different items: give each its own
           // collection rather than swapping items in place while closing.
-          key={`${hit?.kind ?? 'table'}:${edge?.kind ?? ''}`}
+          key={many ? `many:${many.length}` : `${hit?.kind ?? 'table'}:${edge?.kind ?? ''}`}
           className="menu"
           aria-label={t.menu.label}
           onAction={(key) => run(key as Action)}
@@ -140,9 +155,14 @@ export function ContextMenu({ session, onOpen }: { session: Session; onOpen: () 
               <MenuItem id="fit" className="menu-item">
                 {t.actions.fitAll}
               </MenuItem>
+              {anyPieces && (
+                <MenuItem id="selectAll" className="menu-item">
+                  {t.pieces.selectAll}
+                </MenuItem>
+              )}
             </>
           )}
-          {hit?.kind === 'edge' && edge && (
+          {!many && hit?.kind === 'edge' && edge && (
             <>
               <MenuItem id="addNotch" className="menu-item">
                 {t.menu.addNotch}
@@ -160,7 +180,7 @@ export function ContextMenu({ session, onOpen }: { session: Session; onOpen: () 
               <Separator className="menu-separator" />
             </>
           )}
-          {hit?.kind === 'notch' && (
+          {!many && hit?.kind === 'notch' && (
             <>
               <MenuItem id="deleteNotch" className="menu-item danger">
                 {t.menu.deleteNotch}
@@ -168,7 +188,7 @@ export function ContextMenu({ session, onOpen }: { session: Session; onOpen: () 
               <Separator className="menu-separator" />
             </>
           )}
-          {hit?.kind === 'corner' && (
+          {!many && hit?.kind === 'corner' && (
             <>
               <MenuItem id="removeCorner" className="menu-item">
                 {t.menu.removeCorner}

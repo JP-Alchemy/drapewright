@@ -43,6 +43,7 @@ export function PatternCanvas({ session }: { session: Session }) {
           units: session.engine.document().settings.displayUnits,
           hover: ui.hover,
           preview: ui.preview,
+          marquee: ui.marquee,
           grainPreview: ui.grainPreview,
           picking: ui.picking,
           seams: seamMarks(session.engine.document().seams, ui.seam, ui.sewing),

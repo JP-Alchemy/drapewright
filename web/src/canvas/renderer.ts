@@ -3,7 +3,7 @@
 
 import type { Hit, Piece, PieceView, Seam } from '@drapewright/engine'
 import type { DisplayUnits } from '@drapewright/engine'
-import type { GrainPreview, MovePreview, PartRef, Picking } from '../state/session.ts'
+import type { GrainPreview, Marquee, MovePreview, PartRef, Picking } from '../state/session.ts'
 import { cutSummary } from '../app/PieceDetails.tsx'
 import { formatLength } from '../strings/en.ts'
 import { edgePoints, stretch } from './edges.ts'
@@ -23,6 +23,8 @@ export interface Scene {
   units?: DisplayUnits
   hover?: Hit | null
   preview?: MovePreview | null
+  /** A box being dragged across the table to choose pieces. */
+  marquee?: Marquee | null
   grainPreview?: GrainPreview | null
   /** Points tapped so far to place an alteration. */
   picking?: Picking | null
@@ -452,6 +454,23 @@ export function draw(
       ctx.strokeText(summary, p.x, p.y + 17, widthPx - 8)
       ctx.fillText(summary, p.x, p.y + 17, widthPx - 8)
     }
+  }
+
+  // The box being dragged to choose pieces, over everything.
+  if (scene.marquee) {
+    const a = toScreen(v, scene.marquee.from)
+    const b = toScreen(v, scene.marquee.to)
+    const x = Math.round(Math.min(a.x, b.x)) + 0.5
+    const y = Math.round(Math.min(a.y, b.y)) + 0.5
+    const w = Math.round(Math.abs(b.x - a.x))
+    const h = Math.round(Math.abs(b.y - a.y))
+    ctx.fillStyle = theme.select
+    ctx.globalAlpha = 0.15
+    ctx.fillRect(x, y, w, h)
+    ctx.globalAlpha = 1
+    ctx.strokeStyle = theme.select
+    ctx.lineWidth = 1
+    ctx.strokeRect(x, y, w, h)
   }
 }
 

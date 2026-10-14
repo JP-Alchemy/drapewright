@@ -117,6 +117,13 @@ export class Engine {
     return result
   }
 
+  /** Several commands as one undo step; if any is rejected, nothing changes. */
+  dispatchAll(commands: Command[]): DispatchResult {
+    const result = this.#handle.dispatchAll(commands) as DispatchResult
+    if (result.status === 'ok') this.#changed(result.changes)
+    return result
+  }
+
   undo(): ChangeSet | null {
     const changes = this.#handle.undo() as ChangeSet | null
     if (changes) this.#changed(changes)
