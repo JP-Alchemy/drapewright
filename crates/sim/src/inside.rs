@@ -168,7 +168,9 @@ fn nearest_in(p: P2, t: [P2; 3]) -> (f64, [f64; 3]) {
 /// garment seen from outside, as placed; the rest (its facings and
 /// linings) where the cloth they lie against is. None if one can't be
 /// told how it lies: sewn to nothing placed, or only at a point.
-pub fn place_inside(g: &Garment, starts: &[Vec<V3>]) -> Option<Vec<Vec<V3>>> {
+///
+/// Also gives the panel each of the rest lies on.
+pub fn place_inside(g: &Garment, starts: &[Vec<V3>]) -> Option<(Vec<Vec<V3>>, Vec<usize>)> {
     let n = g.panels.len();
     let placed = starts.len();
     // Where each pair of panels is stitched together, flat.
@@ -246,8 +248,10 @@ pub fn place_inside(g: &Garment, starts: &[Vec<V3>]) -> Option<Vec<Vec<V3>>> {
         }
     }
     let mut out = starts.to_vec();
+    let mut over = Vec::new();
     for slot in on.iter().skip(placed) {
         let (base, flat) = (*slot)?;
+        over.push(base);
         let q = out.len();
         let mesh = &g.panels[base].mesh;
         let tris: Vec<[P2; 3]> = mesh
@@ -275,7 +279,7 @@ pub fn place_inside(g: &Garment, starts: &[Vec<V3>]) -> Option<Vec<Vec<V3>>> {
             .collect();
         out.push(at);
     }
-    Some(out)
+    Some((out, over))
 }
 
 /// The garment `shell` (made of `sewn`, placed at `starts`) with its
@@ -302,7 +306,11 @@ pub fn with_inside(
     if !same {
         return None;
     }
-    let starts = place_inside(&whole, starts)?;
+    let (starts, over) = place_inside(&whole, starts)?;
+    let mut whole = whole;
+    for (panel, base) in whole.panels[shell.panels.len()..].iter_mut().zip(over) {
+        panel.over = Some(base);
+    }
     Some((whole, starts))
 }
 

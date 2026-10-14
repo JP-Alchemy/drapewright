@@ -142,13 +142,23 @@ function redraw() {
   })
 }
 
-/** Moves the drape on for this frame and shows its cloth. */
+/**
+ * Moves the drape on for this frame and shows its cloth. On the graphics
+ * card, as many frames as it can take ahead of what has come back.
+ */
 function moveDrape(d: Drape) {
   const start = performance.now()
   const budget = d.quietly ? QUIET_BUDGET : DRAPE_BUDGET
-  let progress: DrapeProgress
-  do progress = d.draping.step()
-  while (!done(progress) && performance.now() - start < budget)
+  let progress: DrapeProgress | null = null
+  while (d.draping.ready() && performance.now() - start < budget) {
+    progress = d.draping.step()
+    if (done(progress)) break
+  }
+  // Waiting for the graphics card: again next frame.
+  if (!progress) {
+    redraw()
+    return
+  }
   if (!d.quietly || done(progress)) view?.showCloth(d.draping)
   const update: DrapeUpdate = {
     ...progress,
@@ -156,6 +166,7 @@ function moveDrape(d: Drape) {
     inside: d.inside,
     lined: d.lined,
     buttons: d.buttons,
+    card: d.draping.onCard,
     girths: d.girths,
   }
   const now = performance.now()

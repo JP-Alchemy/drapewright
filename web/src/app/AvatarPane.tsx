@@ -627,7 +627,13 @@ export function AvatarPane({ session }: { session: Session }) {
         >
           <span className="avatar-cloth-swatch" aria-hidden="true" />
           {viewFailed && <p className="avatar-cannot">{viewFailed}</p>}
-          {backend && <span className="avatar-backend muted small">{text.drawnWith(backend)}</span>}
+          {backend && (
+            <span className="avatar-backend muted small">
+              {'update' in drape && drape.update?.card
+                ? text.drapedWith(backend)
+                : text.drawnWith(backend)}
+            </span>
+          )}
         </div>
         {backend && (
           // Over the view (taps go through to it), so that the view keeps

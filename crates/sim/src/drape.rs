@@ -50,6 +50,59 @@ const SEAT_RISE: f32 = 0.35;
 /// Moves of any drape's body, counted: each shown body told apart.
 static MOVES: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
 
+/// What the cloth feels in a step: the body; moving, the body on its way
+/// from one field to the next; and a seat it sits on.
+#[derive(Clone, Copy, Debug)]
+pub struct Felt<'a> {
+    pub body: &'a BodyField,
+    /// Moving: on its way to this field, this share of the way.
+    pub towards: Option<(&'a BodyField, f32)>,
+    pub seat: Option<Seat>,
+}
+
+/// Moves the cloth on elsewhere than here: on the graphics card. Its
+/// points here are brought up to date as they come back, a step or two
+/// behind.
+pub trait Stepper: std::fmt::Debug {
+    /// Whether another step can be taken now, without running too far
+    /// ahead of what has come back.
+    fn ready(&mut self) -> bool;
+    /// Moves `cloth` on by `dt` seconds in `substeps`, feeling `felt`.
+    fn step(&mut self, cloth: &mut Cloth, dt: f32, substeps: u32, felt: &Felt<'_>);
+    /// Moves the whole cloth by `by`, m.
+    fn shift(&mut self, cloth: &mut Cloth, by: V3);
+    /// Waits until the cloth here is as far on as it is there.
+    fn catch_up(&mut self, cloth: &mut Cloth);
+}
+
+/// Moves `cloth` on by `dt`, feeling `felt`: by `stepper`, or here.
+fn advance(cloth: &mut Cloth, stepper: &mut Option<Box<dyn Stepper>>, dt: f32, felt: &Felt<'_>) {
+    if let Some(s) = stepper {
+        s.step(cloth, dt, SUBSTEPS, felt);
+        return;
+    }
+    let between;
+    let body: &dyn crate::cloth::Collider = match felt.towards {
+        Some((to, share)) => {
+            between = Between {
+                from: felt.body,
+                to,
+                share,
+            };
+            &between
+        }
+        None => felt.body,
+    };
+    cloth.step(
+        dt,
+        SUBSTEPS,
+        &Seated {
+            body,
+            seat: felt.seat,
+        },
+    );
+}
+
 /// The figure a drape is on, ready to pose.
 #[derive(Debug)]
 pub struct Posable {
@@ -151,6 +204,8 @@ pub struct Drape {
     moved: Option<(u32, Vec<[f32; 3]>)>,
     /// The seat the figure sits on, if it sits.
     seat: Option<Seat>,
+    /// Where the cloth is moved on, if not here.
+    stepper: Option<Box<dyn Stepper>>,
 }
 
 impl Drape {
@@ -185,12 +240,20 @@ impl Drape {
         for [(pa, a), (pb, b)] in &garment.stitches {
             builder.stitch(firsts[*pa] + a, firsts[*pb] + b);
         }
-        // Facings and linings, the last panels, go inside the rest.
+        // Facings and linings, the last panels, go inside the rest, each
+        // behind the panel it lies on.
         if let Some(p) = garment.panels.iter().position(|p| p.inside)
             && garment.panels[p..].iter().all(|q| q.inside)
             && p > 0
         {
             builder.inside_from(firsts[p]);
+            let points =
+                |k: usize| firsts[k]..firsts[k] + garment.panels[k].mesh.points.len() as u32;
+            for (k, panel) in garment.panels.iter().enumerate().skip(p) {
+                if let Some(base) = panel.over {
+                    builder.lies_on(points(k), points(base));
+                }
+            }
         }
         let mut cloth = builder.build();
         cloth.damping = 6.0;
@@ -215,6 +278,30 @@ impl Drape {
             still_since: 0.0,
             moved: None,
             seat: None,
+            stepper: None,
+        }
+    }
+
+    /// Moves the cloth on by `stepper` from now on (on the graphics card).
+    pub fn use_stepper(&mut self, stepper: Box<dyn Stepper>) {
+        self.stepper = Some(stepper);
+    }
+
+    /// Whether the cloth is moved on elsewhere than here.
+    pub fn stepped_elsewhere(&self) -> bool {
+        self.stepper.is_some()
+    }
+
+    /// Whether another frame can be taken now: one moved on elsewhere
+    /// waits for what has come back.
+    pub fn ready(&mut self) -> bool {
+        self.stepper.as_mut().is_none_or(|s| s.ready())
+    }
+
+    /// Brings the cloth here up to date with where it is elsewhere.
+    pub fn catch_up(&mut self) {
+        if let Some(s) = &mut self.stepper {
+            s.catch_up(&mut self.cloth);
         }
     }
 
@@ -371,24 +458,27 @@ impl Drape {
             )),
         };
         if let Some((_, from, to)) = &motion.fields {
-            let between = Between {
-                from,
-                to,
-                share: at - key as f32,
-            };
-            let seated = Seated {
-                body: &between,
+            let felt = Felt {
+                body: from,
+                towards: Some((to, at - key as f32)),
                 seat: motion.seat(share),
             };
-            self.cloth.step(dt, SUBSTEPS, &seated);
+            advance(&mut self.cloth, &mut self.stepper, dt, &felt);
         }
         self.time += dt;
         let now = motion.share(self.time);
         let stance = motion.from.towards(&motion.to, f64::from(now));
         // The figure lowered (sitting down), the cloth goes down with it.
         let was = motion.from.towards(&motion.to, f64::from(share));
-        let lowered = (stance.lowered() - was.lowered()) / 1000.0;
-        self.cloth.shift([0.0, -lowered as f32, 0.0]);
+        let lowered = [
+            0.0,
+            -((stance.lowered() - was.lowered()) / 1000.0) as f32,
+            0.0,
+        ];
+        match &mut self.stepper {
+            Some(s) => s.shift(&mut self.cloth, lowered),
+            None => self.cloth.shift(lowered),
+        }
         let shown: Vec<[f32; 3]> = posable
             .points(&stance)
             .iter()
@@ -413,8 +503,11 @@ impl Drape {
         self.time < SEWING.iter().map(|s| s.0).sum::<f32>()
     }
 
-    /// Moves on a frame of `dt` seconds.
+    /// Moves on a frame of `dt` seconds; nothing if not `ready`.
     pub fn step(&mut self, dt: f32) {
+        if !self.ready() {
+            return;
+        }
         if self.motion.is_some() {
             self.step_moving(dt);
             return;
@@ -435,11 +528,12 @@ impl Drape {
                 self.cloth.stitch_compliance = 1e-8;
             }
         }
-        let seated = Seated {
+        let felt = Felt {
             body: &self.body,
+            towards: None,
             seat: self.seat,
         };
-        self.cloth.step(dt, SUBSTEPS, &seated);
+        advance(&mut self.cloth, &mut self.stepper, dt, &felt);
         self.time += dt;
     }
 

@@ -307,11 +307,12 @@ pub struct Rig {
 const BAND: f64 = 20.0;
 
 /// A seat, mm: half as wide, reaching behind the figure and short of its
-/// knees by these; and this far under it, room for cloth between.
+/// knees by these; and this far under it, room for cloth between (two
+/// layers of it, a skirt and its lining).
 const SEAT_HALF: f64 = 250.0;
 const SEAT_BEHIND: f64 = 60.0;
 const SEAT_SHORT: f64 = 80.0;
-const SEAT_GAP: f64 = 8.0;
+const SEAT_GAP: f64 = 16.0;
 
 impl Rig {
     /// The rig of `body`, shaped from `model`; none if its joints are

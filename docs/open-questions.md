@@ -171,6 +171,9 @@ matters.
     starts laid on the piece it was traced from and is kept behind the
     cloth over it. Those sewn to nothing are still left off. Lining is
     draped as the main fabric for now: should it have a fabric of its own?
+    Known shortcoming: sitting in a lined skirt, the skirt rides up round
+    the waist (each layer pushed out along its own slant, step by step);
+    standing, walking and reaching are right.
 31. ☐ **Buttoning on the avatar.** Buttons marked along a front are done
     up when it is draped: to the other front's buttonholes, or to its edge
     where it has loops instead. *Provisional (2026-10-14): done up, with a

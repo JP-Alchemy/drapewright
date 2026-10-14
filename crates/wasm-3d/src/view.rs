@@ -112,15 +112,23 @@ impl View {
             wgpu::Backend::BrowserWebGpu => "WebGPU",
             _ => "WebGL2",
         };
+        // With WebGPU, enough to compute with: the drape is moved on on the
+        // graphics card too.
+        let gpu = backend == "WebGPU";
+        let limits = if gpu {
+            wgpu::Limits::default()
+        } else {
+            wgpu::Limits::downlevel_webgl2_defaults()
+        };
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("3D view"),
-                required_limits: wgpu::Limits::downlevel_webgl2_defaults()
-                    .using_resolution(adapter.limits()),
+                required_limits: limits.using_resolution(adapter.limits()),
                 ..Default::default()
             })
             .await
             .map_err(error)?;
+        crate::drape::use_card(gpu.then(|| (device.clone(), queue.clone())));
         let mut config = surface
             .get_default_config(&adapter, width, height)
             .ok_or_else(|| JsError::new("the canvas cannot be drawn on"))?;

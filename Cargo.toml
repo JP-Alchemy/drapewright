@@ -21,6 +21,7 @@ drapewright-body = { path = "crates/body" }
 drapewright-wasm-3d = { path = "crates/wasm-3d" }
 drapewright-render = { path = "crates/render" }
 drapewright-sim = { path = "crates/sim" }
+drapewright-sim-gpu = { path = "crates/sim-gpu" }
 drapewright-fabric = { path = "crates/fabric" }
 
 # Geometry

@@ -15,8 +15,27 @@ use ts_rs::TS;
 
 use crate::AvatarSettings;
 
-/// How far apart the cloth's points are, mm.
+/// How far apart the cloth's points are, mm: and on the graphics card,
+/// which moves four times as many on as fast, finer.
 pub(crate) const SPACING: f64 = 20.0;
+const CARD_SPACING: f64 = 12.0;
+
+/// A graphics card to drape on: the 3D view's, where it can compute.
+pub type Card = (wgpu::Device, wgpu::Queue);
+
+thread_local! {
+    static CARD: std::cell::RefCell<Option<Card>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Drapes from now on on `card` (none: here).
+pub fn use_card(card: Option<Card>) {
+    CARD.with(|c| *c.borrow_mut() = card);
+}
+
+/// The graphics card drapes are made on, if any.
+pub fn card() -> Option<Card> {
+    CARD.with(|c| c.borrow().clone())
+}
 /// A frame of the drape, s.
 const FRAME: f32 = 1.0 / 60.0;
 /// The longest a drape is given to settle, s.
@@ -178,6 +197,21 @@ impl Draping {
     /// and linings and pieces between the legs, placed round the avatar and
     /// let go.
     pub fn start(model: &BodyModel, request: &DrapeRequest) -> Result<Draping, DrapeError> {
+        Draping::start_on(model, request, None)
+    }
+
+    /// Starts draping, moved on on `card` if one is given and it can (else
+    /// here, more coarsely).
+    pub fn start_on(
+        model: &BodyModel,
+        request: &DrapeRequest,
+        card: Option<&Card>,
+    ) -> Result<Draping, DrapeError> {
+        let spacing = if card.is_some() {
+            CARD_SPACING
+        } else {
+            SPACING
+        };
         let seams: Vec<Seam> = request
             .seams
             .iter()
@@ -189,7 +223,7 @@ impl Draping {
         if sewn.is_empty() {
             return Err(DrapeError::NothingSewn);
         }
-        let shell = assemble(&sewn, &seams, SPACING).map_err(DrapeError::Garment)?;
+        let shell = assemble(&sewn, &seams, spacing).map_err(DrapeError::Garment)?;
         if half_round(&shell) {
             return Err(DrapeError::HalfRound);
         }
@@ -210,7 +244,7 @@ impl Draping {
         let ids = |pieces: &[Piece]| pieces.iter().map(|p| p.id.clone()).collect::<Vec<_>>();
         let mut inside = draped.inside;
         let (garment, starts, lined) =
-            match with_inside(&shell, &starts, (&sewn, &draped.lined), &seams, SPACING) {
+            match with_inside(&shell, &starts, (&sewn, &draped.lined), &seams, spacing) {
                 Some((whole, starts)) => (whole, starts, ids(&draped.lined)),
                 None => {
                     inside.extend(ids(&draped.lined));
@@ -233,6 +267,12 @@ impl Draping {
         );
         if let Some(posable) = Posable::of(model, &body) {
             drape.posable(posable);
+        }
+        if let Some((device, queue)) = card {
+            match drapewright_sim_gpu::GpuCloth::new(device, queue, &drape.cloth) {
+                Ok(gpu) => drape.use_stepper(Box::new(gpu)),
+                Err(_) => return Draping::start_on(model, request, None),
+            }
         }
         Ok(Draping {
             drape,
@@ -278,9 +318,21 @@ impl Draping {
             .map(|s| (s.low.map(|c| c * 1000.0), s.high.map(|c| c * 1000.0)))
     }
 
-    /// Moves the drape on a frame, unless it is done.
+    /// Whether a frame can be taken now: on the graphics card, not until
+    /// it has caught up.
+    pub fn ready(&mut self) -> bool {
+        self.done.is_some() || self.drape.ready()
+    }
+
+    /// Whether the cloth is moved on on the graphics card.
+    pub fn on_card(&self) -> bool {
+        self.drape.stepped_elsewhere()
+    }
+
+    /// Moves the drape on a frame, unless it is done (or the graphics card
+    /// is busy).
     pub fn step(&mut self) -> DrapeProgress {
-        if self.done.is_none() {
+        if self.done.is_none() && self.drape.ready() {
             self.drape.step(FRAME);
             if self.drape.settled() {
                 if self.wanted == self.posed {

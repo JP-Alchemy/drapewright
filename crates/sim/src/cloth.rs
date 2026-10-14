@@ -42,6 +42,10 @@ const LAYER_REACH: f32 = 0.015;
 const LAYER_AIR: f32 = 0.001;
 /// Cloth this near the body (m) tells which way it faces out.
 const LAYER_NEAR: f32 = 0.02;
+/// Inside cloth and the cloth near it are found again once any of it has
+/// moved this far (m): they are looked for twice as far off as they are
+/// kept apart, so as not to be missed meanwhile.
+const LAYER_REFRESH: f32 = 0.005;
 
 /// Keeps cloth off a body.
 pub trait Collider {
@@ -91,6 +95,7 @@ pub struct ClothBuilder {
     bends: Vec<Bend>,
     stitches: Vec<[u32; 2]>,
     inside_from: Option<u32>,
+    over: Vec<(std::ops::Range<u32>, std::ops::Range<u32>)>,
 }
 
 fn cot(a: [f32; 2], b: [f32; 2]) -> f32 {
@@ -115,6 +120,7 @@ impl ClothBuilder {
             bends: Vec::new(),
             stitches: Vec::new(),
             inside_from: None,
+            over: Vec::new(),
         }
     }
 
@@ -186,6 +192,12 @@ impl ClothBuilder {
         self.inside_from = Some(first);
     }
 
+    /// The inside points `inside` lie on the points `over` (a lining on
+    /// the piece it was traced from), and are kept behind those only.
+    pub fn lies_on(&mut self, inside: std::ops::Range<u32>, over: std::ops::Range<u32>) {
+        self.over.push((inside, over));
+    }
+
     pub fn build(mut self) -> Cloth {
         let n = self.x.len();
         // Solved from the top down, a band at a time: a garment hangs from
@@ -219,8 +231,11 @@ impl ClothBuilder {
             }
         }
         Cloth {
+            over: self.over,
             facing: vec![1.0; self.triangles.len()],
             layer_pairs: Vec::new(),
+            layers_found_at: Vec::new(),
+            layer_finds: 0,
             inside_from,
             at_seam,
             p: self.x.clone(),
@@ -260,6 +275,32 @@ fn scramble(points: &[u32]) -> u64 {
         z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
         z ^ (z >> 31)
     })
+}
+
+/// The cloth as a solver elsewhere (on the graphics card) needs it: its
+/// points, constraints and fabric, as they are now.
+#[derive(Clone, Debug)]
+pub struct Parts {
+    pub x: Vec<V3>,
+    pub v: Vec<V3>,
+    /// Inverse masses, 1/kg.
+    pub w: Vec<f32>,
+    pub triangles: Vec<[u32; 3]>,
+    /// Which way each triangle faces out (1 or -1).
+    pub facing: Vec<f32>,
+    /// Edges: their points, length flat (m) and compliance (m/N).
+    pub edges: Vec<(u32, u32, f32, f32)>,
+    /// Bends: their four points, weights and compliance.
+    pub bends: Vec<([u32; 4], [f32; 4], f32)>,
+    pub stitches: Vec<[u32; 2]>,
+    /// The points from this one on go inside the rest.
+    pub inside_from: usize,
+    /// Kept this far off the body, m.
+    pub gap: f32,
+    pub friction: f32,
+    /// Inside cloth kept this far behind the cloth over it, within `reach`, m.
+    pub apart: f32,
+    pub reach: f32,
 }
 
 /// How the cloth is pulled, point by point: each point's value the mean of
@@ -312,9 +353,88 @@ pub struct Cloth {
     facing: Vec<f32>,
     /// Inside points and outside ones near them, this step.
     layer_pairs: Vec<(u32, u32)>,
+    /// Inside points, and the outside points they lie on.
+    over: Vec<(std::ops::Range<u32>, std::ops::Range<u32>)>,
+    /// Where the points were when `layer_pairs` were found, and how many
+    /// times they have been.
+    layers_found_at: Vec<V3>,
+    layer_finds: u64,
 }
 
 impl Cloth {
+    /// The cloth's parts, for a solver elsewhere.
+    pub fn parts(&self) -> Parts {
+        Parts {
+            x: self.x.clone(),
+            v: self.v.clone(),
+            w: self.w.clone(),
+            triangles: self.triangles.clone(),
+            facing: self.facing.clone(),
+            edges: self
+                .edges
+                .iter()
+                .map(|e| (e.i, e.j, e.rest, e.compliance))
+                .collect(),
+            bends: self
+                .bends
+                .iter()
+                .map(|b| (b.i, b.k, b.compliance))
+                .collect(),
+            stitches: self.stitches.clone(),
+            inside_from: self.inside_from,
+            gap: self.fabric.thickness + AIR,
+            friction: self.fabric.friction,
+            apart: self.fabric.thickness + LAYER_AIR,
+            reach: LAYER_REACH,
+        }
+    }
+
+    /// Where the points have got to, worked out elsewhere, `elapsed`
+    /// seconds after they were last here.
+    pub fn moved_to(&mut self, x: Vec<V3>, elapsed: f32) {
+        if x.len() != self.x.len() {
+            return;
+        }
+        self.stepped = if elapsed > 0.0 {
+            self.x
+                .iter()
+                .zip(&x)
+                .map(|(&a, &b)| length(sub(a, b)))
+                .sum::<f32>()
+                / (elapsed * x.len().max(1) as f32)
+        } else {
+            0.0
+        };
+        self.x = x;
+    }
+
+    /// The inside points and the outside ones near them, as they are now:
+    /// those kept apart (see `order_layers`); and how many times they have
+    /// been found, to tell when they are found afresh.
+    pub fn near_layers(&mut self) -> (u64, &[(u32, u32)]) {
+        self.refresh_layer_pairs();
+        (self.layer_finds, &self.layer_pairs)
+    }
+
+    /// Finds the inside points and the outside ones near them again, if
+    /// the cloth has moved far enough since they were last found.
+    fn refresh_layer_pairs(&mut self) {
+        if self.inside_from >= self.x.len() {
+            return;
+        }
+        let moved = self.layers_found_at.len() != self.x.len()
+            || self
+                .x
+                .iter()
+                .zip(&self.layers_found_at)
+                .any(|(&a, &b)| length(sub(a, b)) > LAYER_REFRESH);
+        if moved {
+            self.find_layer_pairs();
+            self.layers_found_at.clone_from(&self.x);
+            self.layer_finds += 1;
+        }
+    }
+
     /// Moves the whole cloth by `by` (m), as it is.
     pub fn shift(&mut self, by: V3) {
         for x in &mut self.x {
@@ -478,7 +598,7 @@ impl Cloth {
         let h = dt / substeps.max(1) as f32;
         let keep = (-self.damping * h).exp();
         let start = self.x.clone();
-        self.find_layer_pairs();
+        self.refresh_layer_pairs();
         for _ in 0..substeps.max(1) {
             for k in 0..self.x.len() {
                 self.p[k] = self.x[k];
@@ -662,6 +782,15 @@ impl Cloth {
             if self.w[i] == 0.0 || self.at_seam[i] {
                 continue;
             }
+            // Only the cloth it lies on, where that is known: where a
+            // garment folds (sitting, between the legs), its front and back
+            // come together, and a lining behind the front is not to be
+            // kept behind the back.
+            let lies_on = self
+                .over
+                .iter()
+                .find(|(inside, _)| inside.contains(&(i as u32)))
+                .map(|(_, over)| over.clone());
             let [a, b, c] = key(self.x[i]);
             for da in -1..=1 {
                 for db in -1..=1 {
@@ -670,7 +799,9 @@ impl Cloth {
                             continue;
                         };
                         for &j in near {
-                            if length(sub(self.x[i], self.x[j as usize])) < reach {
+                            if lies_on.as_ref().is_none_or(|over| over.contains(&j))
+                                && length(sub(self.x[i], self.x[j as usize])) < reach
+                            {
                                 self.layer_pairs.push((i as u32, j));
                             }
                         }
@@ -725,6 +856,20 @@ impl Cloth {
             let short = along + apart;
             axpy(&mut self.x[i], -short * wi / (wi + wj), normal);
             axpy(&mut self.x[j], short * wj / (wi + wj), normal);
+            // With friction, as on the body: their slide past each other this
+            // step cancelled if small for how hard they press, else cut down.
+            let moved = sub(sub(self.x[i], self.p[i]), sub(self.x[j], self.p[j]));
+            let slip = sub(moved, normal.map(|v| v * dot(moved, normal)));
+            let slide = length(slip);
+            if slide > 0.0 {
+                let held = (self.fabric.friction * short / slide).min(1.0);
+                axpy(&mut self.x[i], -held * wi / (wi + wj), slip);
+                axpy(&mut self.x[j], held * wj / (wi + wj), slip);
+            }
+            // Resting on each other, as on the body: being pushed apart is
+            // not speed.
+            self.contacts.push((i as u32, normal));
+            self.contacts.push((j as u32, normal));
         }
     }
 

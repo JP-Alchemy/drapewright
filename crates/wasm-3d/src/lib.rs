@@ -191,7 +191,7 @@ impl Avatar {
     pub fn drape(&self, request: JsValue) -> Result<Draping, JsError> {
         let request: DrapeRequest =
             serde_wasm_bindgen::from_value(request).map_err(|e| JsError::new(&e.to_string()))?;
-        drape::Draping::start(&self.model, &request)
+        drape::Draping::start_on(&self.model, &request, drape::card().as_ref())
             .map(Draping)
             .map_err(|e| JsError::new(&e.to_string()))
     }
@@ -246,6 +246,18 @@ impl Draping {
             serde_wasm_bindgen::from_value(pose).map_err(|e| JsError::new(&e.to_string()))?;
         self.0.pose(pose);
         Ok(())
+    }
+
+    /// Whether a frame can be taken now: on the graphics card, not until it
+    /// has caught up (it does as the page's frames go by).
+    pub fn ready(&mut self) -> bool {
+        self.0.ready()
+    }
+
+    /// Whether the cloth is moved on on the graphics card.
+    #[wasm_bindgen(getter, js_name = onCard)]
+    pub fn on_card(&self) -> bool {
+        self.0.on_card()
     }
 
     /// Moves the drape on a frame, giving a `DrapeProgress`.

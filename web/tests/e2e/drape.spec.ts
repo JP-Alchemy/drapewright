@@ -271,6 +271,10 @@ test('a shirt drapes with its facing inside, buttoned and then open', async ({ p
   await expect(status).toHaveText('Draped in poplin. Inside, shown paler: Back neck facing.', {
     timeout: 120_000,
   })
+  // With WebGPU, the cloth is moved on on the graphics card too.
+  if (await pane.getByText(/with WebGPU$/).isVisible()) {
+    await expect(pane.getByText('Drawn and draped with WebGPU')).toBeVisible()
+  }
   const buttoned = await view.screenshot()
   const doneUp = drape.getByRole('switch', { name: 'Buttons done up' })
   await expect(doneUp).toBeChecked()

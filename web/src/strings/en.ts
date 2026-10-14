@@ -1189,6 +1189,7 @@ export const t = {
         ? `The avatar in ${who}’s figure. Drag to turn it; pinch or scroll to zoom.`
         : 'A standard figure. Drag to turn it; pinch or scroll to zoom.',
     drawnWith: (backend: string) => `Drawn with ${backend}`,
+    drapedWith: (backend: string) => `Drawn and draped with ${backend}`,
     drapeGroup: 'Drape the garment',
     fabric: 'Fabric',
     yourFabrics: 'Your fabrics',

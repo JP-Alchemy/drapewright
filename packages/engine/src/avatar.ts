@@ -144,6 +144,19 @@ export class Draping {
     drapings.get(this)!.pose(pose)
   }
 
+  /**
+   * Whether a frame can be taken now: on the graphics card, not until it
+   * has caught up, as the page's frames go by.
+   */
+  ready(): boolean {
+    return drapings.get(this)!.ready()
+  }
+
+  /** Whether the cloth is moved on on the graphics card. */
+  get onCard(): boolean {
+    return drapings.get(this)!.onCard
+  }
+
   /** Moves the drape on a frame (1/60 s of the cloth's time). */
   step(): DrapeProgress {
     return drapings.get(this)!.step() as DrapeProgress

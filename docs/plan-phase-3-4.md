@@ -1,7 +1,7 @@
 # Phases 3 and 4 — see it on her, fit and edit
 
-Version 0.2 · 2026-10-12 · status: **done**, but for step 23 (the WebGPU
-drape), held back until the iPad shows it is needed. What each step does,
+Version 0.3 · 2026-10-14 · status: **done** (step 23, the WebGPU drape,
+last, on 2026-10-14). What each step does,
 and what it doesn't do yet, is in [demo-notes.md](demo-notes.md); the
 sewing choices waiting for the seamstress are in
 [open-questions.md](open-questions.md) (18 to 29).
@@ -51,7 +51,7 @@ Each step is one or a few commits, with tests and a demo note in
 | 20 | **3D view.** `render` and `wasm-3d` in the sim worker; see the avatar and turn it. | Renderer smoke test (WebGL2 in CI); worker protocol | See the avatar |
 | 21 | **Drape.** Meshing, placing pieces round the body, stitching seams, the CPU cloth, fabric presets. | Sim invariants (no stretch beyond limits, seams closed, nothing inside the body); a drape that settles | Drape a skirt and a blouse on the avatar |
 | 22 | **Heatmaps.** Strain (pulling) and ease (room between cloth and body), with numbers where tapped. | Strain on known stretched cases; ease against the distance field | See where it pulls |
-| 23 | **WebGPU drape.** The same cloth in compute shaders, for speed. Moved to just before step 28: the CPU drape already takes a second or two for a skirt or a blouse in the browser, and it is live re-draping that will need more speed. | CPU and GPU agree within tolerance | Drape in a second or two |
+| 23 | **WebGPU drape.** The same cloth in compute shaders, for speed, its points 12 mm apart instead of 20. Done 2026-10-14 (`crates/sim-gpu`). | CPU and GPU agree within tolerance (the test skirt's hem to the millimetre) | Drape in a second or two (a skirt 0.8 s, a shirt 1.3 s on a Mac's WebKit) |
 
 ### Phase 4
 
@@ -61,7 +61,7 @@ Each step is one or a few commits, with tests and a demo note in
 | 25 | Full and small bust adjustment; slash and spread; pivot |
 | 26 | Swayback; broad and narrow shoulders; waist and hip |
 | 27 | True up seams (walk and blend) |
-| (23) | WebGPU drape, if live re-draping needs the speed |
+| 23 | WebGPU drape (done 2026-10-14) |
 | 28 | Live re-drape after each 2D edit |
 | 29 | Fabric calibration |
 | 30 | Projector mode |

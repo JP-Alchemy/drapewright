@@ -27,6 +27,8 @@ export interface DrapeUpdate extends DrapeProgress {
   lined: string[]
   /** How many buttons the garment has, done up or not. */
   buttons: number
+  /** Whether the cloth is moved on on the graphics card. */
+  card: boolean
   /** The garment's size round the body at the figure's bust, waist and hip. */
   girths: Girth[]
 }

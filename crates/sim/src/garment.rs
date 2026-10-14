@@ -64,6 +64,8 @@ pub struct Panel {
     pub waist: Option<f64>,
     /// A facing or a lining: it goes inside the rest.
     pub inside: bool,
+    /// Inside: the panel it lies on, if known.
+    pub over: Option<usize>,
 }
 
 impl Panel {
@@ -919,6 +921,7 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             edges: by_layout.into_iter().flatten().collect(),
             waist: layout.waist,
             inside: inside(&pieces[layout.piece]),
+            over: None,
         });
     }
     // Stitches: the two runs of each seam, point for point.

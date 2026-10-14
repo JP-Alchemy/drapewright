@@ -12,6 +12,35 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 54 — The drape on the graphics card (WebGPU)
+
+Where the browser has WebGPU (Safari on iPadOS 26, Chrome, Edge), the
+drape is worked out on the graphics card: faster, with cloth more finely
+divided (points 12 mm apart instead of 20), so folds and gathers are
+softer and the fit truer at curves.
+
+**Try it:** open the avatar in Safari on the iPad and drape the test shirt
+or a skirt. Under the view it says **Drawn and draped with WebGPU**. On
+this Mac's WebKit a skirt drapes in about 0.8 s, the shirt in 1.3 s and
+the lined skirt in about 3 s, each with three times the points the
+processor drapes (which takes 3.4, 6 and 6.5 s). Poses move faster too.
+Where there is no WebGPU (the view says **Drawn with WebGL2**), the drape
+is worked out on the processor as before.
+
+**How it works:** the same small steps as on the processor (XPBD, thirty
+a frame), in compute shaders (`crates/sim-gpu/src/cloth.wgsl`). Edges,
+bends and stitches are each split into colours, no two constraints of a
+colour sharing a point, and a colour is solved at once; the cloth is kept
+off the body's distance field (blended between two as the body moves, and
+off the seat), with friction, and linings behind the cloth over them. The
+drape's own logic (sewing, settling, posing) stays on the processor, which
+hands each frame to the graphics card and gets the cloth's points back a
+frame or two later, to show and to tell when it has settled. The tests
+drape the test garments both ways and compare (on a Mac's graphics card,
+and in CI on Mesa's software one).
+
+---
+
 ## Step 53 — A paper pattern piece from a photo
 
 A paper pattern can be photographed and its pieces brought in one at a

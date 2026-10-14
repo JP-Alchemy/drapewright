@@ -16,6 +16,29 @@ pub struct BodyField {
     size: [usize; 3],
     /// Distance at each grid point, x fastest.
     d: Vec<f32>,
+    /// Each field made has a number of its own.
+    id: u64,
+}
+
+/// Fields made, counted.
+static FIELDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+fn next_id() -> u64 {
+    FIELDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
+/// A field's grid, as a solver elsewhere reads it.
+#[derive(Clone, Copy, Debug)]
+pub struct Grid<'a> {
+    /// Its number: another field has another.
+    pub id: u64,
+    /// Its first grid point, m.
+    pub low: V3,
+    /// Between grid points, m.
+    pub cell: f32,
+    pub size: [usize; 3],
+    /// Distance at each grid point (m), x fastest.
+    pub values: &'a [f32],
 }
 
 fn sub(a: V3, b: V3) -> V3 {
@@ -380,7 +403,13 @@ impl BodyField {
                 -dist
             };
         }
-        BodyField { low, cell, size, d }
+        BodyField {
+            low,
+            cell,
+            size,
+            d,
+            id: next_id(),
+        }
     }
 
     /// The field of `surface` over `points` (m) in the box from `low` to
@@ -491,7 +520,24 @@ impl BodyField {
             let s = if *s == 0 { 1.0 } else { f32::from(*s) };
             *v = v.min(band) * s;
         }
-        BodyField { low, cell, size, d }
+        BodyField {
+            low,
+            cell,
+            size,
+            d,
+            id: next_id(),
+        }
+    }
+
+    /// The field's grid, for a solver elsewhere.
+    pub fn grid(&self) -> Grid<'_> {
+        Grid {
+            id: self.id,
+            low: self.low,
+            cell: self.cell,
+            size: self.size,
+            values: &self.d,
+        }
     }
 
     fn value(&self, i: usize, j: usize, k: usize) -> f32 {

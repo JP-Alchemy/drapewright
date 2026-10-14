@@ -15,17 +15,20 @@ drapewright-body.workspace = true
 drapewright-pattern-core.workspace = true
 drapewright-seams.workspace = true
 drapewright-sim.workspace = true
+# The drape moved on on the graphics card, where it can be.
+drapewright-sim-gpu.workspace = true
 drapewright-fabric.workspace = true
 wasm-bindgen.workspace = true
 serde.workspace = true
 serde-wasm-bindgen.workspace = true
 console_error_panic_hook.workspace = true
 ts-rs.workspace = true
+# The graphics card, for the view and the drape.
+wgpu.workspace = true
 
 # The 3D view, drawn in the browser only.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 drapewright-render.workspace = true
-wgpu.workspace = true
 web-sys = { workspace = true, features = ["OffscreenCanvas"] }
 wasm-bindgen-futures.workspace = true
 

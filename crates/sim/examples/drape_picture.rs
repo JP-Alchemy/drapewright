@@ -7,8 +7,9 @@
 //!         [pose=arms-down|reaching|arms-up|stepping|sitting]
 //!
 //! writes out-placed.png, out-sewn.png and out-settled.png (and with a
-//! pose, out-posed.png, the figure moved into it once settled; and with
-//! OPEN_STITCHES set, the stitches furthest apart once settled), draping a
+//! pose, out-posed.png, the figure moved into it once settled, and with
+//! SNAP set out-moving-*.png on the way; and with OPEN_STITCHES set, the
+//! stitches furthest apart once settled), draping a
 //! skirt, a lined skirt, a blouse, a blouse with long sleeves, or one with a full bust
 //! adjustment (its dart in the side seam, or pivoted into the armhole),
 //! cut for the standard figure, or a long blouse with yokes, gathers and
@@ -379,8 +380,27 @@ fn main() {
         drape.posable(Posable::of(&model, &body).expect("joints"));
         let start = drape.time;
         drape.pose(pose);
+        let mut frame = 0;
         while (drape.moving() || !drape.settled()) && drape.time - start < 10.0 {
             drape.step(1.0 / 60.0);
+            frame += 1;
+            // With SNAP set, a picture every quarter second on the way.
+            if std::env::var_os("SNAP").is_some() && frame % 15 == 0 && frame <= 120 {
+                let posed: Vec<[f64; 3]> = drape
+                    .body()
+                    .map(|(_, points)| points.iter().map(|p| p.map(f64::from)).collect())
+                    .unwrap_or_else(|| body.vertices.clone());
+                picture(
+                    &format!("{out}-moving-{frame:03}.png"),
+                    &posed,
+                    &triangles,
+                    &drape.cloth.x,
+                    &drape.cloth.triangles,
+                    (0..drape.cloth.x.len())
+                        .find(|&k| drape.cloth.inside(k))
+                        .unwrap_or(usize::MAX),
+                );
+            }
         }
         let inside = drape
             .cloth
