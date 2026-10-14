@@ -45,6 +45,7 @@ pub fn scale_reason(r: ScaleReason) -> &'static str {
         ScaleReason::AamaMetric => {
             "This garment CAD file says it is metric, which usually means millimetres. Check the size."
         }
+        ScaleReason::ReferenceSheet => "Measured against the sheet of paper in the photo.",
     }
 }
 

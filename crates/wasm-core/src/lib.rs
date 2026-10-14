@@ -263,6 +263,23 @@ pub fn import_dxf(data: &[u8], file_name: Option<String>) -> Result<JsValue, JsE
     to_js(&result)
 }
 
+/// Finds a paper pattern piece in a photo (`rgba`, `width` by `height`
+/// pixels; `file` the photo's bytes as read): a `PhotoRequest` says where
+/// the sheet of paper beside it and the piece are. Gives a `Traced`.
+#[wasm_bindgen(js_name = tracePhoto)]
+pub fn trace_photo(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    file: &[u8],
+    request: JsValue,
+) -> Result<JsValue, JsError> {
+    let request: drapewright_io::photo::PhotoRequest = from_js(request)?;
+    let traced = drapewright_io::photo::trace(rgba, (width, height), file, &request)
+        .map_err(|e| JsError::new(&e.to_string()))?;
+    to_js(&traced)
+}
+
 /// Reads pattern pieces from a PDF: one page or many (copy-shop sheets,
 /// or home-print tiles put back together), named from the words printed
 /// on them. With `pages` (numbered from 1), only those pages are read.

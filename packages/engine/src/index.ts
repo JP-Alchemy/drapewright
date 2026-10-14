@@ -12,6 +12,7 @@ import init, {
   exportSvg as exportSvgRaw,
   finishImport as finishImportRaw,
   importDxf as importDxfRaw,
+  tracePhoto as tracePhotoRaw,
   importPdf as importPdfRaw,
   importSvg as importSvgRaw,
   layOut as layOutRaw,
@@ -35,6 +36,7 @@ import type {
   Layout,
   MeasurementInfo,
   PdfTexts,
+  PhotoRequest,
   Piece,
   PieceView,
   PrintPlan,
@@ -42,6 +44,7 @@ import type {
   SeamReport,
   SeamSide,
   Suggestion,
+  Traced,
   ViewState,
 } from './types'
 
@@ -233,6 +236,20 @@ export const jobs = {
   },
   importDxf(bytes: Uint8Array, fileName: string | null): ImportResult {
     return importDxfRaw(bytes, fileName ?? undefined) as ImportResult
+  },
+  /**
+   * Finds a paper pattern piece in a photo: its pixels (RGBA, `width` by
+   * `height`), the file as read, and where the sheet beside it and the
+   * piece are.
+   */
+  tracePhoto(
+    rgba: Uint8Array,
+    width: number,
+    height: number,
+    file: Uint8Array,
+    request: PhotoRequest,
+  ): Traced {
+    return tracePhotoRaw(rgba, width, height, file, request) as Traced
   },
   /** With `pages` (numbered from 1), only those pages are read. */
   importPdf(

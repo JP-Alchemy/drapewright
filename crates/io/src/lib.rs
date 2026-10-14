@@ -9,6 +9,7 @@ mod assemble;
 pub mod dxf;
 pub mod import;
 pub mod pdf;
+pub mod photo;
 pub mod svg;
 
 pub use import::{

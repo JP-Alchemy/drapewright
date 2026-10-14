@@ -306,7 +306,7 @@ changes a piece's shape or its printed result.
 
 | Field | Notes |
 |---|---|
-| `format` | `svg`, `dxf`, `pdf`, `project` (taken from another project), `drafted`. |
+| `format` | `svg`, `dxf`, `pdf`, `project` (taken from another project), `drafted`, `photo` (a paper pattern piece photographed, measured against a sheet of paper of known size beside it). |
 | `file`, `sha256` | Original file name and hash; the file itself is in `sources/`. |
 | `ref` | Element id, layer or block name inside the source. |
 | `scale.mmPerUnit` | Millimetres per source unit used at import. |

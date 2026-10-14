@@ -404,6 +404,8 @@ pub enum SourceFormat {
     /// Pieces taken from another project file.
     Project,
     Drafted,
+    /// A paper pattern piece, photographed.
+    Photo,
 }
 
 /// How the import scale was established.

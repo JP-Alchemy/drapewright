@@ -1706,6 +1706,11 @@
           "description": "Pieces taken from another project file.",
           "type": "string",
           "const": "project"
+        },
+        {
+          "description": "A paper pattern piece, photographed.",
+          "type": "string",
+          "const": "photo"
         }
       ]
     },

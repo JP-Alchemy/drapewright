@@ -38,6 +38,7 @@ import { ImportDialog } from './ImportDialog.tsx'
 import { MeasurementsDialog } from './MeasurementsDialog.tsx'
 import { PrintDialog } from './PrintDialog.tsx'
 import { LayoutDialog } from './LayoutDialog.tsx'
+import { PhotoDialog } from './PhotoDialog.tsx'
 import { SidePanel } from './SidePanel.tsx'
 import { SAMPLES, type SampleName, isSampleName, sampleFile } from './samples.ts'
 import { useAvatarLayout } from './avatar-layout.ts'
@@ -224,7 +225,7 @@ function Workspace({
       <input
         ref={fileInput}
         type="file"
-        accept={`${PATTERN_FILE_TYPES},${PROJECT_FILE_TYPES}`}
+        accept={`${PATTERN_FILE_TYPES},${PROJECT_FILE_TYPES},image/*`}
         hidden
         data-testid="pattern-file"
         onChange={(e) => {
@@ -232,9 +233,10 @@ function Workspace({
           e.currentTarget.value = ''
           // A backup opens as a project of its own; anything else is imported.
           if (file && isProjectFile(file)) void actions.restore(file)
-          else if (file) void session.openPatternFile(file)
+          else if (file) session.openFile(file)
         }}
       />
+      <PhotoDialog session={session} />
       <div
         className={docked ? 'workspace with-avatar' : 'workspace'}
         style={

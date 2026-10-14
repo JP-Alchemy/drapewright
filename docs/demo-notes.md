@@ -12,6 +12,40 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 53 — A paper pattern piece from a photo
+
+A paper pattern can be photographed and its pieces brought in one at a
+time, at their true size.
+
+**Try it:**
+
+1. Lay a pattern piece flat on a table or floor of another colour (a
+   green cutting mat is ideal), with a sheet of A4 or Letter paper beside
+   it, not touching, and photograph them from above (a slant is fine).
+2. **Open pattern** and choose the photo (on an iPad you can take it
+   there and then). Tap the sheet's four corners; drag one to adjust it.
+3. Tap the piece. Its outline appears in orange; if it strays onto the
+   table or stops short, move **How alike the paper is**, or tap another
+   part of it.
+4. Name it and press **Use this piece**: it is imported as a file would
+   be. Say whether its seam allowance is included (a printed pattern's
+   cutting line usually includes it), and add it.
+
+To try without a camera: `fixtures/photo/piece-and-a4.png`, its sheet's
+corners at the top left.
+
+**How it works:** the sheet's corners, tapped, and its size fix how the
+table lies in the photo (a homography), so the photo is read as the
+table seen from above, a millimetre a pixel. From the point tapped, the
+paper is followed as far as its colour goes (in CIE Lab, lightness
+counting half, as shade falls unevenly); lines printed on it and holes in
+it are filled in, and gaps narrower than 2 mm closed. Its outline is
+traced, smoothed, split at its corners into edges, and drawn with
+curves within 0.8 mm (Schneider's fitting). Everything happens on the
+device; the photo is kept with the project, as a pattern file is.
+
+---
+
 ## Step 52 — Facings and linings inside; buttons undone
 
 Facings and linings are draped inside the garment instead of being left

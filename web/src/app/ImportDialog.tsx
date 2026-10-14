@@ -393,7 +393,11 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
 
           {pieces.length > 0 &&
             (scale.certain ? (
-              <p className="muted">{t.importing.sizeCertain}</p>
+              <p className="muted">
+                {scale.reason === 'referenceSheet'
+                  ? t.importing.reason(scale.reason)
+                  : t.importing.sizeCertain}
+              </p>
             ) : (
               <RadioGroup className="scale-choice" value={chosen.basis} onChange={setChoice}>
                 <Label className="group-label">{t.importing.scaleQuestion}</Label>

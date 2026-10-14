@@ -278,7 +278,7 @@ export const t = {
   table: {
     empty: 'Open a sewing pattern to lay it out here.',
     emptyHint:
-      'PDF patterns work, both copy-shop sheets and home-print pages (the pages are put back together for you), as do SVG files from Inkscape, Illustrator, FreeSewing and most pattern apps, and DXF files from CAD and garment pattern systems.',
+      'PDF patterns work, both copy-shop sheets and home-print pages (the pages are put back together for you), as do SVG files from Inkscape, Illustrator, FreeSewing and most pattern apps, and DXF files from CAD and garment pattern systems. A paper pattern can be photographed: open the photo, or take one.',
     zoomLabel: (zoom: number) => `${Math.round(zoom * 100)}%`,
     notCalibrated: 'Screen not measured yet: 100% is approximate.',
   },
@@ -644,10 +644,38 @@ export const t = {
     size: (w: string, h: string) => `${w} × ${h}`,
   },
 
+  photo: {
+    heading: 'A pattern piece from a photo',
+    intro:
+      'Lay the piece flat on a plain table or floor of another colour, with a sheet of printer paper beside it (not touching), and photograph them from above. The sheet says how big the piece is.',
+    photoLabel: (name: string) => `The photo ${name}`,
+    unreadable: (why: string) => `The photo couldn’t be read: ${why}`,
+    tapCorners: (left: number) =>
+      left === 4
+        ? 'Tap the four corners of the sheet of paper.'
+        : plural(left, 'Tap the last corner of the sheet.', 'Tap # more corners of the sheet.'),
+    tapPiece: 'Now tap the pattern piece. Drag a corner to move it.',
+    finding: 'Finding the piece…',
+    found:
+      'The piece’s outline is shown in orange. If it strays onto the table, or stops short, change how alike the paper is, or tap another part of the piece.',
+    cutOff:
+      'The piece seems to run off the photo, or onto the table: change how alike the paper is, or take the photo again with all of the piece in it.',
+    sheet: 'Sheet of paper',
+    sheets: { a4: 'A4 (21 × 29.7 cm)', letter: 'US Letter (8½ × 11 in)' } as Record<string, string>,
+    tolerance: 'How alike the paper is',
+    toleranceSays: (v: number) =>
+      v < 0.18 ? 'Very alike' : v < 0.32 ? 'Alike' : v < 0.45 ? 'Varied' : 'Very varied',
+    name: 'Name',
+    untitled: 'Photographed piece',
+    again: 'Start again',
+    cancel: 'Cancel',
+    use: 'Use this piece',
+  },
+
   importing: {
     reading: (name: string) => `Reading ${name}…`,
     unsupported: (name: string) =>
-      `Drapewright opens SVG, DXF and PDF patterns; “${name}” is none of these.`,
+      `Drapewright opens SVG, DXF and PDF patterns, and photos of paper patterns; “${name}” is none of these.`,
     failed: (message: string) => `This file could not be opened. ${message}`,
     found: (n: number) => plural(n, 'Found 1 piece', 'Found # pieces'),
     foundSized: (pieces: number, sizes: number) =>
@@ -704,6 +732,7 @@ export const t = {
           'The drawing does not say which unit it was drawn in. Pick the reading where a piece has the size you expect.',
         aamaMetric:
           'This garment CAD file says it is metric, which usually means millimetres. Please check the size below.',
+        referenceSheet: 'Measured against the sheet of paper in the photo.',
       })[r],
     basis: (b: ScaleBasis): string =>
       ({

@@ -11,8 +11,10 @@ import type {
   FabricPreset,
   Hit,
   ImportResult,
+  PhotoRequest,
   Piece,
   ScaleOption,
+  Traced,
 } from '@drapewright/engine'
 import { buildPaths } from '../canvas/paths.ts'
 import { type ScenePiece, sceneBounds } from '../canvas/renderer.ts'
@@ -127,6 +129,8 @@ export interface UiState {
   picking: Picking | null
   viewport: ViewportState
   pendingImport: PendingImport | null
+  /** A photo of a paper pattern being read. */
+  photo: File | null
   busy: string | null
   notice: Notice | null
   menu: MenuState | null
@@ -181,6 +185,7 @@ export class Session {
       picking: null,
       viewport: { ...initialViewport, pxPerMm: screenScale ?? NOMINAL_PX_PER_MM },
       pendingImport: null,
+      photo: null,
       busy: null,
       notice: null,
       menu: null,
@@ -525,6 +530,51 @@ export class Session {
     } finally {
       this.ui.set((s) => ({ ...s, busy: null }))
     }
+  }
+
+  /**
+   * Opens a pattern file, or a photo of a paper pattern (an image that is
+   * not a pattern file: an SVG is both).
+   */
+  openFile(file: File): void {
+    if (!importerFor(file) && file.type.startsWith('image/')) this.openPhoto(file)
+    else void this.openPatternFile(file)
+  }
+
+  /** Opens a photo of a paper pattern piece, to find the piece in it. */
+  openPhoto(file: File): void {
+    this.ui.set((s) => ({ ...s, photo: file, notice: null }))
+  }
+
+  closePhoto(): void {
+    this.ui.set((s) => ({ ...s, photo: null }))
+  }
+
+  /** Finds a pattern piece in a photo's pixels (RGBA). */
+  tracePhoto(
+    rgba: Uint8Array,
+    width: number,
+    height: number,
+    bytes: Uint8Array,
+    request: PhotoRequest,
+  ): Promise<Traced> {
+    return this.io.call('tracePhoto', rgba, width, height, bytes, request)
+  }
+
+  /**
+   * Imports the piece found in a photo, as any pattern file is imported,
+   * called `name` (if any).
+   */
+  usePhoto(traced: Traced, name: string, fileName: string, bytes: Uint8Array): void {
+    const result = {
+      ...traced.result,
+      pieces: traced.result.pieces.map((p) => (name ? { ...p, name } : p)),
+    }
+    this.ui.set((s) => ({
+      ...s,
+      photo: null,
+      pendingImport: { fileName, result, bytes, pages: null },
+    }))
   }
 
   cancelImport(): void {

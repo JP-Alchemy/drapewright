@@ -22,6 +22,8 @@ pdf-writer.workspace = true
 flate2.workspace = true
 
 [dev-dependencies]
+# The photo of a paper pattern the app's tests open, written as a PNG.
+tiny-skia.workspace = true
 drapewright-pattern-core = { workspace = true, features = ["testing"] }
 # The import report can list the seams it would suggest.
 drapewright-seams.workspace = true

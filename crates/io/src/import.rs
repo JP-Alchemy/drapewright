@@ -19,6 +19,9 @@ pub enum ImportError {
         "Compressed SVG files (.svgz) are not supported yet. Save it as a plain SVG and try again."
     )]
     CompressedSvg,
+    /// A photographed piece could not be found: why.
+    #[error("The piece couldn’t be found in the photo: {0}.")]
+    Photo(String),
 }
 
 /// One way of reading the size of a file.
@@ -50,6 +53,8 @@ pub enum ScaleReason {
     NoDrawingUnits,
     /// A garment CAD (AAMA/ASTM) file marked METRIC, usually millimetres.
     AamaMetric,
+    /// A photo, measured against a sheet of paper of known size in it.
+    ReferenceSheet,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
