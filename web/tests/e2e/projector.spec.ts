@@ -1,5 +1,5 @@
 import { expect, type Page, test } from './fixtures.ts'
-import { fixture } from './helpers.ts'
+import { openBackup } from './helpers.ts'
 
 /** How many of the projection's pixels are lit (not black). */
 async function lit(page: Page): Promise<number> {
@@ -20,7 +20,7 @@ async function lit(page: Page): Promise<number> {
 
 test('the pieces are projected true size once the projector is calibrated', async ({ page }) => {
   await page.goto('/app/')
-  await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
+  await openBackup(page, 'skirt.drapewright', 2)
   await page.getByRole('button', { name: 'Projector', exact: true }).click()
   const projector = page.getByRole('dialog', { name: 'Projector' })
   await expect(projector.getByText('Calibrate the projector')).toBeVisible()

@@ -1,5 +1,5 @@
 import { expect, type Page, test } from './fixtures.ts'
-import { drawnInTheMiddle, fixture, openWithFixture } from './helpers.ts'
+import { drawnInTheMiddle, openBackup, openWithFixture } from './helpers.ts'
 
 /** The share of two screenshots' pixels that differ, 0 to 1. */
 async function differing(page: Page, a: Buffer, b: Buffer): Promise<number> {
@@ -46,8 +46,7 @@ test('the skirt is draped, read where it pulls, draped in another fabric, and ta
   test.setTimeout(240_000)
   await page.goto('/app/')
   // A backup of the test skirt: a front and a back, their seams sewn.
-  await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
-  await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(2)
+  await openBackup(page, 'skirt.drapewright', 2)
   test.skip(!(await openTheAvatar(page)), 'Draping is seen in the 3D view')
 
   const pane = page.getByRole('region', { name: 'Avatar' })
@@ -175,7 +174,7 @@ test('nothing is draped until something is sewn', async ({ page }) => {
 test('a draped garment follows changes to its pattern', async ({ page }) => {
   test.setTimeout(240_000)
   await page.goto('/app/')
-  await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
+  await openBackup(page, 'skirt.drapewright', 2)
   test.skip(!(await openTheAvatar(page)), 'Draping is seen in the 3D view')
   const pane = page.getByRole('region', { name: 'Avatar' })
   const view = pane.getByRole('img', { name: /standard figure/ })
@@ -211,7 +210,7 @@ test('a draped garment follows changes to its pattern', async ({ page }) => {
 test('a fabric of one’s own is measured, draped in, and changed', async ({ page }) => {
   test.setTimeout(240_000)
   await page.goto('/app/?debug')
-  await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
+  await openBackup(page, 'skirt.drapewright', 2)
   test.skip(!(await openTheAvatar(page)), 'Draping is seen in the 3D view')
   const pane = page.getByRole('region', { name: 'Avatar' })
   const drape = pane.getByRole('group', { name: 'Drape the garment' })
@@ -262,7 +261,7 @@ test('a fabric of one’s own is measured, draped in, and changed', async ({ pag
 test('the figure takes a pose, and a skirt draped on it moves with it', async ({ page }) => {
   test.setTimeout(240_000)
   await page.goto('/app/')
-  await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
+  await openBackup(page, 'skirt.drapewright', 2)
   test.skip(!(await openTheAvatar(page)), 'Poses are seen in the 3D view')
   const pane = page.getByRole('region', { name: 'Avatar' })
   const view = pane.getByRole('img', { name: /standard figure/ })
@@ -308,7 +307,7 @@ test('a shirt drapes with its facing inside, buttoned and then open', async ({ p
   test.setTimeout(240_000)
   await page.goto('/app/')
   // The test shirt: buttoned down the front, a facing at the back of its neck.
-  await page.getByTestId('pattern-file').setInputFiles(fixture('shirt.drapewright'))
+  await openBackup(page, 'shirt.drapewright', 7)
   test.skip(!(await openTheAvatar(page)), 'Draping is seen in the 3D view')
   const pane = page.getByRole('region', { name: 'Avatar' })
   const view = pane.getByRole('img', { name: /standard figure/ })
@@ -343,7 +342,7 @@ test('a shirt drapes with its facing inside, buttoned and then open', async ({ p
 test('a lined skirt drapes with its lining inside', async ({ page }) => {
   test.setTimeout(240_000)
   await page.goto('/app/')
-  await page.getByTestId('pattern-file').setInputFiles(fixture('lined-skirt.drapewright'))
+  await openBackup(page, 'lined-skirt.drapewright', 4)
   test.skip(!(await openTheAvatar(page)), 'Draping is seen in the 3D view')
   const pane = page.getByRole('region', { name: 'Avatar' })
   const drape = pane.getByRole('group', { name: 'Drape the garment' })

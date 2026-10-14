@@ -1,9 +1,22 @@
 import { fileURLToPath } from 'node:url'
-import type { Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 
 /** A file in `fixtures/svg`, `fixtures/dxf` or `fixtures/pdf`, by its extension. */
 export const fixture = (name: string) =>
   fileURLToPath(new URL(`../../../fixtures/${name.split('.').pop()}/${name}`, import.meta.url))
+
+/**
+ * Opens a backup in `fixtures/drapewright` as the project, and waits for
+ * its `pieces` pieces. A project opened replaces the one shown, closing
+ * whatever was opened while it was read (the avatar, the projector): on a
+ * slow machine, the restore can take a second.
+ */
+export async function openBackup(page: Page, name: string, pieces: number): Promise<void> {
+  await page.getByTestId('pattern-file').setInputFiles(fixture(name))
+  await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(
+    pieces,
+  )
+}
 
 /**
  * Opens the app with the debug handle and imports a fixture. When the
