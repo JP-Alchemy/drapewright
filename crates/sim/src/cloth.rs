@@ -20,6 +20,14 @@ fn length(a: V3) -> f32 {
     dot(a, a).sqrt()
 }
 
+fn cross(a: V3, b: V3) -> V3 {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
 fn axpy(x: &mut V3, a: f32, y: V3) {
     x[0] += a * y[0];
     x[1] += a * y[1];
@@ -28,6 +36,12 @@ fn axpy(x: &mut V3, a: f32, y: V3) {
 
 /// Kept between the cloth and the body, besides the cloth's thickness, m.
 const AIR: f32 = 0.003;
+/// Cloth inside (a facing, a lining) is kept behind the cloth over it within
+/// this, m, by its thickness and this much more.
+const LAYER_REACH: f32 = 0.015;
+const LAYER_AIR: f32 = 0.001;
+/// Cloth this near the body (m) tells which way it faces out.
+const LAYER_NEAR: f32 = 0.02;
 
 /// Keeps cloth off a body.
 pub trait Collider {
@@ -76,6 +90,7 @@ pub struct ClothBuilder {
     edges: Vec<Edge>,
     bends: Vec<Bend>,
     stitches: Vec<[u32; 2]>,
+    inside_from: Option<u32>,
 }
 
 fn cot(a: [f32; 2], b: [f32; 2]) -> f32 {
@@ -99,6 +114,7 @@ impl ClothBuilder {
             edges: Vec::new(),
             bends: Vec::new(),
             stitches: Vec::new(),
+            inside_from: None,
         }
     }
 
@@ -164,6 +180,12 @@ impl ClothBuilder {
         self.stitches.push([i, j]);
     }
 
+    /// The points from `first` on go inside the rest (facings, linings):
+    /// they are kept nearer the body than the cloth over them.
+    pub fn inside_from(&mut self, first: u32) {
+        self.inside_from = Some(first);
+    }
+
     pub fn build(mut self) -> Cloth {
         let n = self.x.len();
         // Solved from the top down, a band at a time: a garment hangs from
@@ -187,7 +209,20 @@ impl ClothBuilder {
                 scramble(&b.i),
             )
         });
+        let inside_from = self.inside_from.map_or(n, |f| f as usize);
+        // Where inside and outside are sewn together, they are one.
+        let mut at_seam = vec![false; n];
+        for &[i, j] in &self.stitches {
+            if (i as usize >= inside_from) != (j as usize >= inside_from) {
+                at_seam[i as usize] = true;
+                at_seam[j as usize] = true;
+            }
+        }
         Cloth {
+            facing: vec![1.0; self.triangles.len()],
+            layer_pairs: Vec::new(),
+            inside_from,
+            at_seam,
             p: self.x.clone(),
             x: self.x,
             v: vec![[0.0; 3]; n],
@@ -269,6 +304,14 @@ pub struct Cloth {
     contacts: Vec<(u32, V3)>,
     /// How fast the points moved over the last step, on average, m/s.
     stepped: f32,
+    /// The points from this one on go inside the rest (facings, linings).
+    inside_from: usize,
+    /// Points sewn to the other layer.
+    at_seam: Vec<bool>,
+    /// Which way each triangle faces out (see `face_out`).
+    facing: Vec<f32>,
+    /// Inside points and outside ones near them, this step.
+    layer_pairs: Vec<(u32, u32)>,
 }
 
 impl Cloth {
@@ -435,6 +478,7 @@ impl Cloth {
         let h = dt / substeps.max(1) as f32;
         let keep = (-self.damping * h).exp();
         let start = self.x.clone();
+        self.find_layer_pairs();
         for _ in 0..substeps.max(1) {
             for k in 0..self.x.len() {
                 self.p[k] = self.x[k];
@@ -450,6 +494,7 @@ impl Cloth {
             self.solve_bends(h);
             self.solve_stitches(h);
             self.collide(body);
+            self.order_layers();
             for k in 0..self.x.len() {
                 let d = sub(self.x[k], self.p[k]);
                 self.v[k] = d.map(|c| c / h);
@@ -539,6 +584,147 @@ impl Cloth {
             let dl = -l / (wi + wj + alpha);
             axpy(&mut x[i], wi * dl, n);
             axpy(&mut x[j], -wj * dl, n);
+        }
+    }
+
+    /// Which points go inside the rest (facings, linings).
+    pub fn inside(&self, k: usize) -> bool {
+        k >= self.inside_from
+    }
+
+    /// Which way each triangle faces out, away from the body: the side its
+    /// corners run anticlockwise round, or (-1) the other. Each panel (each
+    /// piece of cloth joined by its triangles) faces one way, as most of it
+    /// near the body faces.
+    pub fn face_out(&mut self, body: &dyn Collider) {
+        let n = self.x.len();
+        let mut group: Vec<usize> = (0..n).collect();
+        fn root(group: &mut [usize], mut k: usize) -> usize {
+            while group[k] != k {
+                group[k] = group[group[k]];
+                k = group[k];
+            }
+            k
+        }
+        for t in &self.triangles {
+            for (a, b) in [(t[0], t[1]), (t[1], t[2])] {
+                let (ra, rb) = (root(&mut group, a as usize), root(&mut group, b as usize));
+                group[ra.max(rb)] = ra.min(rb);
+            }
+        }
+        let mut votes = vec![0f32; n];
+        let normals: Vec<V3> = self.triangles.iter().map(|t| self.normal(t)).collect();
+        for (t, normal) in self.triangles.iter().zip(&normals) {
+            let middle =
+                [0, 1, 2].map(|k| t.iter().map(|&i| self.x[i as usize][k]).sum::<f32>() / 3.0);
+            let (d, out) = body.distance(middle);
+            if d < LAYER_NEAR {
+                let r = root(&mut group, t[0] as usize);
+                votes[r] += dot(*normal, out);
+            }
+        }
+        self.facing = self
+            .triangles
+            .iter()
+            .map(|t| {
+                let r = root(&mut group, t[0] as usize);
+                if votes[r] < 0.0 { -1.0 } else { 1.0 }
+            })
+            .collect();
+    }
+
+    /// A triangle's normal by its corners' order, as long as twice its area.
+    fn normal(&self, t: &[u32; 3]) -> V3 {
+        let [a, b, c] = t.map(|i| self.x[i as usize]);
+        cross(sub(b, a), sub(c, a))
+    }
+
+    /// The inside points and the outside ones near them (within
+    /// `LAYER_REACH` and as far again as they move in a step), found once
+    /// a step for `order_layers`.
+    fn find_layer_pairs(&mut self) {
+        let first = self.inside_from;
+        let n = self.x.len();
+        self.layer_pairs.clear();
+        if first >= n {
+            return;
+        }
+        let reach = 2.0 * LAYER_REACH;
+        let key = |p: V3| p.map(|c| (c / reach).floor() as i32);
+        let mut cells: std::collections::HashMap<[i32; 3], Vec<u32>> =
+            std::collections::HashMap::new();
+        for j in 0..first {
+            if !self.at_seam[j] && self.w[j] > 0.0 {
+                cells.entry(key(self.x[j])).or_default().push(j as u32);
+            }
+        }
+        for i in first..n {
+            if self.w[i] == 0.0 || self.at_seam[i] {
+                continue;
+            }
+            let [a, b, c] = key(self.x[i]);
+            for da in -1..=1 {
+                for db in -1..=1 {
+                    for dc in -1..=1 {
+                        let Some(near) = cells.get(&[a + da, b + db, c + dc]) else {
+                            continue;
+                        };
+                        for &j in near {
+                            if length(sub(self.x[i], self.x[j as usize])) < reach {
+                                self.layer_pairs.push((i as u32, j));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Cloth inside (a facing, a lining) kept behind the cloth over it, as
+    /// it would rest against it: each inside point and each outside one
+    /// near it (within `LAYER_REACH` across the outside cloth) pushed apart
+    /// along the outside cloth's outward normal until the inside one is
+    /// behind it by its thickness and a little air. There is no cloth
+    /// resting on cloth otherwise.
+    fn order_layers(&mut self) {
+        let first = self.inside_from;
+        if self.layer_pairs.is_empty() {
+            return;
+        }
+        let apart = self.fabric.thickness + LAYER_AIR;
+        // The outside cloth's outward normals, point by point.
+        let mut out = vec![[0f32; 3]; first];
+        for (t, &facing) in self.triangles.iter().zip(&self.facing) {
+            if t.iter().any(|&i| i as usize >= first) {
+                continue;
+            }
+            let normal = self.normal(t);
+            for &i in t {
+                axpy(&mut out[i as usize], facing, normal);
+            }
+        }
+        for o in &mut out {
+            let l = length(*o);
+            if l > 0.0 {
+                *o = o.map(|c| c / l);
+            }
+        }
+        for &(i, j) in &self.layer_pairs {
+            let (i, j) = (i as usize, j as usize);
+            let normal = out[j];
+            let off = sub(self.x[i], self.x[j]);
+            let along = dot(off, normal);
+            if along < -apart || along > LAYER_REACH {
+                continue;
+            }
+            let across = length(sub(off, normal.map(|v| v * along)));
+            if across > LAYER_REACH {
+                continue;
+            }
+            let (wi, wj) = (self.w[i], self.w[j]);
+            let short = along + apart;
+            axpy(&mut self.x[i], -short * wi / (wi + wj), normal);
+            axpy(&mut self.x[j], short * wj / (wi + wj), normal);
         }
     }
 

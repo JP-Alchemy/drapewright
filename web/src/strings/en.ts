@@ -1208,9 +1208,12 @@ export const t = {
     inside: (n: number) =>
       plural(
         n,
-        'A facing or lining is left off: it goes inside.',
-        '# facings and linings are left off: they go inside.',
+        'A facing or lining isn’t sewn to anything, so it’s left off.',
+        '# facings and linings aren’t sewn to anything, so they’re left off.',
       ),
+    lined: (names: string[]) =>
+      `Inside, shown paler: ${new Intl.ListFormat('en', { type: 'conjunction' }).format(names)}.`,
+    doneUp: 'Buttons done up',
     cannotDrape: (why: string) => `This can’t be draped yet: ${why}.`,
     shows: 'Show the cloth as',
     showsAs: { fabric: 'Fabric', pull: 'Pulling', room: 'Room' } satisfies Record<

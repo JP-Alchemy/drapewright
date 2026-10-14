@@ -8,6 +8,7 @@ use drapewright_seams::Seam;
 use drapewright_sim::drape::{Drape, Posable};
 use drapewright_sim::garment::{GarmentError, assemble, draped_pieces};
 use drapewright_sim::girth::girths;
+use drapewright_sim::inside::with_inside;
 use drapewright_sim::place::{Figure, half_round, place};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -40,6 +41,10 @@ pub struct DrapeRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub pose: Option<AvatarPose>,
+    /// Worn open: its buttons undone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub open: Option<bool>,
 }
 
 /// How the avatar stands.
@@ -151,8 +156,13 @@ pub struct Draping {
     drape: Drape,
     /// The pieces sewn to nothing, by id: left out.
     pub left_out: Vec<String>,
-    /// The facings and linings, by id: left out, as they go inside.
+    /// The facings and linings sewn to nothing, by id: left out, as they
+    /// go inside.
     pub inside: Vec<String>,
+    /// The facings and linings draped inside the rest, by id.
+    pub lined: Vec<String>,
+    /// How many buttons it has, done up or not.
+    pub buttons: usize,
     /// The garment's size round the body at its bust, waist and hip.
     pub girths: Vec<Girth>,
     done: Option<DrapeStage>,
@@ -179,14 +189,14 @@ impl Draping {
         if sewn.is_empty() {
             return Err(DrapeError::NothingSewn);
         }
-        let garment = assemble(&sewn, &seams, SPACING).map_err(DrapeError::Garment)?;
-        if half_round(&garment) {
+        let shell = assemble(&sewn, &seams, SPACING).map_err(DrapeError::Garment)?;
+        if half_round(&shell) {
             return Err(DrapeError::HalfRound);
         }
         let body = model.shape(&Shape::from(request.settings.clone()));
         let figure = Figure::of(model, &body);
-        let starts = place(&garment, &figure);
-        let girths = girths(&garment, &starts, &figure)
+        let starts = place(&shell, &figure);
+        let girths = girths(&shell, &starts, &figure)
             .into_iter()
             .zip(&figure.levels)
             .map(|((level, garment), at)| Girth {
@@ -195,6 +205,24 @@ impl Draping {
                 body: at.girth,
             })
             .collect();
+        // Its facings and linings inside it, or, if they can't be placed
+        // there, left out.
+        let ids = |pieces: &[Piece]| pieces.iter().map(|p| p.id.clone()).collect::<Vec<_>>();
+        let mut inside = draped.inside;
+        let (garment, starts, lined) =
+            match with_inside(&shell, &starts, (&sewn, &draped.lined), &seams, SPACING) {
+                Some((whole, starts)) => (whole, starts, ids(&draped.lined)),
+                None => {
+                    inside.extend(ids(&draped.lined));
+                    (shell, starts, Vec::new())
+                }
+            };
+        let buttons = garment.buttons;
+        let garment = if request.open == Some(true) {
+            garment.unbuttoned()
+        } else {
+            garment
+        };
         let mut drape = Drape::new(
             &garment,
             &starts,
@@ -209,7 +237,9 @@ impl Draping {
         Ok(Draping {
             drape,
             left_out: draped.alone,
-            inside: draped.inside,
+            inside,
+            lined,
+            buttons,
             girths,
             done: None,
             wanted: request.pose.unwrap_or_default(),
@@ -310,6 +340,10 @@ pub enum ClothShows {
     Room,
 }
 
+/// How much paler facings and linings are shown than the fabric, towards
+/// white.
+const INSIDE_PALER: f32 = 0.45;
+
 /// Pull shown at its strongest, N/m (as in the app's legend).
 pub const PULL_SCALE: f32 = 100.0;
 /// Room shown up to, mm (as in the app's legend).
@@ -376,6 +410,8 @@ pub struct ClothState {
     stretch: Vec<f32>,
     /// mm.
     room: Vec<f32>,
+    /// The points from this one on are inside (facings, linings), if any.
+    inside_from: Option<usize>,
 }
 
 impl Draping {
@@ -388,6 +424,7 @@ impl Draping {
             pull: strain.pull,
             stretch: strain.stretch,
             room: self.drape.room().iter().map(|r| r * 1000.0).collect(),
+            inside_from: (0..self.drape.cloth.x.len()).find(|&k| self.drape.cloth.inside(k)),
         }
     }
 }
@@ -397,7 +434,16 @@ impl ClothState {
     /// (sRGB, 0 to 1).
     pub fn colours(&self, shows: ClothShows, fabric: [f32; 3]) -> Vec<[f32; 3]> {
         match shows {
-            ClothShows::Fabric => vec![fabric; self.points.len()],
+            // Facings and linings paler: seen inside the garment.
+            ClothShows::Fabric => (0..self.points.len())
+                .map(|k| {
+                    if self.inside_from.is_some_and(|first| k >= first) {
+                        fabric.map(|c| c + (1.0 - c) * INSIDE_PALER)
+                    } else {
+                        fabric
+                    }
+                })
+                .collect(),
             ClothShows::Pull => self
                 .pull
                 .iter()

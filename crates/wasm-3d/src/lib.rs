@@ -210,10 +210,23 @@ impl Draping {
         self.0.left_out.clone()
     }
 
-    /// The facings and linings left out, as they go inside, by id.
+    /// The facings and linings sewn to nothing, by id: left out, as they go
+    /// inside.
     #[wasm_bindgen(getter)]
     pub fn inside(&self) -> Vec<String> {
         self.0.inside.clone()
+    }
+
+    /// The facings and linings draped inside the rest, by id.
+    #[wasm_bindgen(getter)]
+    pub fn lined(&self) -> Vec<String> {
+        self.0.lined.clone()
+    }
+
+    /// How many buttons the garment has, done up or not.
+    #[wasm_bindgen(getter)]
+    pub fn buttons(&self) -> usize {
+        self.0.buttons
     }
 
     /// The garment's size round the body at the figure's bust, waist and

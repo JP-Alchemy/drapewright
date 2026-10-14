@@ -166,13 +166,15 @@ matters.
 29. ☐ **Projector set-up.** Does she have, or want, a projector over her
     cutting table? Which size of rectangle can she mark on her mat?
     *Provisional: 40 × 30 cm to start, changeable.*
-30. ☐ **Facings and linings on the avatar.** They're left off the drape,
-    and the status line says so. *Provisional: left off. The alternative is
-    to drape them turned inside, which needs cloth that rests on cloth.*
+30. ☐ **Facings and linings on the avatar.** *Provisional (2026-10-14):
+    draped inside, shown paler, and the status line names them.* Each
+    starts laid on the piece it was traced from and is kept behind the
+    cloth over it. Those sewn to nothing are still left off. Lining is
+    draped as the main fabric for now: should it have a fabric of its own?
 31. ☐ **Buttoning on the avatar.** Buttons marked along a front are done
     up when it is draped: to the other front's buttonholes, or to its edge
-    where it has loops instead. *Provisional: always done up. Should she be
-    able to see it open?*
+    where it has loops instead. *Provisional (2026-10-14): done up, with a
+    **Buttons done up** switch under the avatar to see it worn open.*
 32. ☑ **Pieces drawn once, for one side.** Corset patterns often draw each
     panel once and don't print how many to cut. Should Drapewright set them
     itself? *Answered (JP, 2026-10-12): yes, and say so.* **Find seams**

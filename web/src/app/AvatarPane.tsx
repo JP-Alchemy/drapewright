@@ -32,6 +32,7 @@ import {
   Popover,
   Radio,
   RadioGroup,
+  Switch,
   Select,
   SelectValue,
 } from 'react-aria-components'
@@ -167,8 +168,11 @@ function garmentText(drape: Drape, units: DisplayUnits): string {
   return parts.length > 0 ? text.garmentSize(parts) : ''
 }
 
-/** What the drape bar says of the garment on the avatar. */
-function drapeText(drape: Drape): string {
+/**
+ * What the drape bar says of the garment on the avatar; `named`, the
+ * pieces' names by id.
+ */
+function drapeText(drape: Drape, named: (ids: string[]) => string[]): string {
   const text = t.avatar
   switch (drape.kind) {
     case 'off':
@@ -193,7 +197,13 @@ function drapeText(drape: Drape): string {
             : text.draped(fabric)
       const left = update?.leftOut.length ?? 0
       const inside = update?.inside.length ?? 0
-      return [said, left > 0 ? text.leftOut(left) : '', inside > 0 ? text.inside(inside) : '']
+      const lined = named(update?.lined ?? [])
+      return [
+        said,
+        left > 0 ? text.leftOut(left) : '',
+        inside > 0 ? text.inside(inside) : '',
+        lined.length > 0 ? text.lined(lined) : '',
+      ]
         .filter(Boolean)
         .join(' ')
     }
@@ -222,6 +232,9 @@ export function AvatarPane({ session }: { session: Session }) {
   // How the figure stands; any garment on it moves with it.
   const [pose, setPose] = useState<AvatarPose>('standing')
   const posed = useRef<AvatarPose>('standing')
+  // Worn open, its buttons undone.
+  const [open, setOpen] = useState(false)
+  const opened = useRef(false)
   // Counts drapes asked for: an answer for one overtaken is dropped.
   const drapes = useRef(0)
   // The garment last draped, to follow changes to it.
@@ -376,6 +389,7 @@ export function AvatarPane({ session }: { session: Session }) {
       ...(measured ? { measured } : {}),
       settings,
       pose: posed.current,
+      open: opened.current,
     }
     setDrape((was) =>
       quietly && (was.kind === 'draped' || was.kind === 'following')
@@ -473,7 +487,9 @@ export function AvatarPane({ session }: { session: Session }) {
   const ownChosen = doc.fabrics.find((f) => f.id === drapeFabric) ?? null
   const canDrape = backend !== null && (status.kind === 'standard' || status.kind === 'fitted')
   // What the drape is doing, or what was read where tapped.
-  const drapeSaid = on && reading ? readingText(reading, units) : drapeText(drape)
+  const named = (ids: string[]) =>
+    ids.flatMap((id) => doc.pieces.find((p) => p.id === id)?.name ?? [])
+  const drapeSaid = on && reading ? readingText(reading, units) : drapeText(drape, named)
   const garmentSaid = garmentText(drape, units)
 
   const text = t.avatar
@@ -716,6 +732,20 @@ export function AvatarPane({ session }: { session: Session }) {
               <Button className="button" onPress={takeOff}>
                 {text.takeOff}
               </Button>
+            )}
+            {on && (open || (drape.update?.buttons ?? 0) > 0) && (
+              <Switch
+                className="switch"
+                isSelected={!open}
+                onChange={(doneUp) => {
+                  setOpen(!doneUp)
+                  opened.current = !doneUp
+                  startDrape(drapeFabric)
+                }}
+              >
+                <span className="switch-track" aria-hidden="true" />
+                {text.doneUp}
+              </Switch>
             )}
           </div>
           {drape.kind === 'draped' && drape.update && (

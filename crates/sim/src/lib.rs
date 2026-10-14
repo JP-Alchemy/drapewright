@@ -8,6 +8,7 @@ pub mod fabric;
 pub mod garment;
 pub mod girth;
 pub mod heights;
+pub mod inside;
 pub mod mesh;
 pub mod place;
 

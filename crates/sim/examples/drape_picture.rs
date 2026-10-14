@@ -3,12 +3,13 @@
 //!
 //!     cargo run --release -p drapewright-sim --example drape_picture -- \
 //!         assets/body/adult.dwbody out [fabric] \
-//!         [skirt|blouse|long|bust|armhole|yoked|trousers|<project file> [suggest]] \
+//!         [skirt|lined|blouse|long|bust|armhole|yoked|trousers|<project file> [suggest]] \
 //!         [pose=arms-down|reaching|arms-up|stepping|sitting]
 //!
 //! writes out-placed.png, out-sewn.png and out-settled.png (and with a
-//! pose, out-posed.png, the figure moved into it once settled), draping a
-//! skirt, a blouse, a blouse with long sleeves, or one with a full bust
+//! pose, out-posed.png, the figure moved into it once settled; and with
+//! OPEN_STITCHES set, the stitches furthest apart once settled), draping a
+//! skirt, a lined skirt, a blouse, a blouse with long sleeves, or one with a full bust
 //! adjustment (its dart in the side seam, or pivoted into the armhole),
 //! cut for the standard figure, or a long blouse with yokes, gathers and
 //! cuffs laid out on its side, or trousers, sewn by the seams suggested
@@ -43,6 +44,7 @@ fn picture(
     body_triangles: &[[u32; 3]],
     cloth: &[[f32; 3]],
     cloth_triangles: &[[u32; 3]],
+    inside_from: usize,
 ) {
     let top = body.iter().map(|p| p[1]).fold(0.0, f64::max) as f32 + 60.0;
     let (w, h) = ((2000.0 * SCALE) as u32, (top * SCALE) as u32);
@@ -93,11 +95,13 @@ fn picture(
             let [a, b, c] = t.map(|i| cloth[i as usize].map(|v| v * 1000.0));
             if let Some(light) = shade(a, b, c, true) {
                 let (pa, pb, pc) = (project(a), project(b), project(c));
-                let colour = [
-                    (60.0 * light) as u8,
-                    (110.0 * light) as u8,
-                    (190.0 * light) as u8,
-                ];
+                // Facings and linings in orange.
+                let base = if t[0] as usize >= inside_from {
+                    [230.0, 140.0, 60.0]
+                } else {
+                    [60.0, 110.0, 190.0]
+                };
+                let colour = base.map(|c| (c * light) as u8);
                 tris.push((
                     (pa.2 + pb.2 + pc.2) / 3.0,
                     [(pa.0, pa.1), (pb.0, pb.1), (pc.0, pc.1)],
@@ -211,11 +215,12 @@ fn sewn(pieces: Vec<Piece>, seams: Vec<Seam>) -> (Vec<Piece>, Vec<Seam>) {
     }
     let draped = draped_pieces(&pieces, &seams);
     eprintln!(
-        "left out: {} sewn to nothing, {} inside",
+        "left out: {} sewn to nothing, {} inside; {} draped inside",
         draped.alone.len(),
-        draped.inside.len()
+        draped.inside.len(),
+        draped.lined.len()
     );
-    (draped.sewn, seams)
+    (draped.sewn.into_iter().chain(draped.lined).collect(), seams)
 }
 
 fn main() {
@@ -254,6 +259,7 @@ fn main() {
         "bust" => common::full_bust_blouse(),
         "armhole" => common::armhole_dart_blouse(),
         "skirt" => common::skirt(),
+        "lined" => common::lined_skirt(),
         "yoked" => {
             let pieces = drapewright_pattern_core::testing::garments::yoked_blouse(true);
             sewn_as_found(pieces)
@@ -261,11 +267,20 @@ fn main() {
         "trousers" => sewn_as_found(drapewright_pattern_core::testing::garments::trousers()),
         path => project(path, rest.get(2).is_some_and(|s| s == "suggest")),
     };
-    let garment = assemble(&pieces, &seams, 20.0).expect("a garment");
-    if drapewright_sim::place::half_round(&garment) {
+    let draped = draped_pieces(&pieces, &seams);
+    let shell = assemble(&draped.sewn, &seams, 20.0).expect("a garment");
+    if drapewright_sim::place::half_round(&shell) {
         eprintln!("only half way round: cut as pairs?");
     }
-    let starts = place(&garment, &figure);
+    let starts = place(&shell, &figure);
+    let (garment, starts) = drapewright_sim::inside::with_inside(
+        &shell,
+        &starts,
+        (&draped.sewn, &draped.lined),
+        &seams,
+        20.0,
+    )
+    .unwrap_or((shell, starts));
     let mut drape = Drape::new(&garment, &starts, fabric, (&body.vertices, &triangles));
     let draw = |name: &str, drape: &Drape| {
         picture(
@@ -274,6 +289,9 @@ fn main() {
             &triangles,
             &drape.cloth.x,
             &drape.cloth.triangles,
+            (0..drape.cloth.x.len())
+                .find(|&k| drape.cloth.inside(k))
+                .unwrap_or(usize::MAX),
         );
     };
     draw("placed", &drape);
@@ -332,6 +350,31 @@ fn main() {
         lowest(false)
     );
     draw("settled", &drape);
+    if std::env::var_os("OPEN_STITCHES").is_some() {
+        let mut open: Vec<(f32, String)> = garment
+            .stitches
+            .iter()
+            .map(|&[(pa, a), (pb, b)]| {
+                let (i, j) = (drape.firsts[pa] + a, drape.firsts[pb] + b);
+                let (p, q) = (drape.cloth.x[i as usize], drape.cloth.x[j as usize]);
+                let d = (0..3).map(|k| (p[k] - q[k]).powi(2)).sum::<f32>().sqrt();
+                (
+                    d,
+                    format!(
+                        "{} {:?} #{a} - {} {:?} #{b}",
+                        garment.panels[pa].name,
+                        garment.panels[pa].copy,
+                        garment.panels[pb].name,
+                        garment.panels[pb].copy
+                    ),
+                )
+            })
+            .collect();
+        open.sort_by(|x, y| y.0.total_cmp(&x.0));
+        for (d, s) in open.iter().take(8) {
+            eprintln!("open {:.1} mm: {s}", d * 1000.0);
+        }
+    }
     if let Some(pose) = pose {
         drape.posable(Posable::of(&model, &body).expect("joints"));
         let start = drape.time;
@@ -366,6 +409,9 @@ fn main() {
             &triangles,
             &drape.cloth.x,
             &drape.cloth.triangles,
+            (0..drape.cloth.x.len())
+                .find(|&k| drape.cloth.inside(k))
+                .unwrap_or(usize::MAX),
         );
     }
 }

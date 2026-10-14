@@ -252,3 +252,55 @@ test('the figure takes a pose, and a skirt draped on it moves with it', async ({
     .poll(async () => differing(page, sitting, await view.screenshot()), { timeout: 10_000 })
     .toBeGreaterThan(0.01)
 })
+
+test('a shirt drapes with its facing inside, buttoned and then open', async ({ page }) => {
+  test.setTimeout(240_000)
+  await page.goto('/app/')
+  // The test shirt: buttoned down the front, a facing at the back of its neck.
+  await page.getByTestId('pattern-file').setInputFiles(fixture('shirt.drapewright'))
+  test.skip(!(await openTheAvatar(page)), 'Draping is seen in the 3D view')
+  const pane = page.getByRole('region', { name: 'Avatar' })
+  const view = pane.getByRole('img', { name: /standard figure/ })
+  const drape = pane.getByRole('group', { name: 'Drape the garment' })
+  const status = pane.getByRole('status').last()
+  await expect(pane.getByRole('status').first()).toHaveText(
+    'A standard figure: add measurements to see someone’s.',
+    { timeout: 60_000 },
+  )
+  await drape.getByRole('button', { name: 'Drape', exact: true }).click()
+  await expect(status).toHaveText('Draped in poplin. Inside, shown paler: Back neck facing.', {
+    timeout: 120_000,
+  })
+  const buttoned = await view.screenshot()
+  const doneUp = drape.getByRole('switch', { name: 'Buttons done up' })
+  await expect(doneUp).toBeChecked()
+  await drape.getByText('Buttons done up').click()
+  await expect(doneUp).not.toBeChecked()
+  await expect(status).toHaveText(/Sewing the seams…|Letting it settle…/)
+  await expect(status).toHaveText('Draped in poplin. Inside, shown paler: Back neck facing.', {
+    timeout: 120_000,
+  })
+  await expect
+    .poll(async () => differing(page, buttoned, await view.screenshot()), { timeout: 10_000 })
+    .toBeGreaterThan(0.002)
+})
+
+test('a lined skirt drapes with its lining inside', async ({ page }) => {
+  test.setTimeout(240_000)
+  await page.goto('/app/')
+  await page.getByTestId('pattern-file').setInputFiles(fixture('lined-skirt.drapewright'))
+  test.skip(!(await openTheAvatar(page)), 'Draping is seen in the 3D view')
+  const pane = page.getByRole('region', { name: 'Avatar' })
+  const drape = pane.getByRole('group', { name: 'Drape the garment' })
+  const status = pane.getByRole('status').last()
+  await expect(pane.getByRole('status').first()).toHaveText(/standard figure/, {
+    timeout: 60_000,
+  })
+  await drape.getByRole('button', { name: 'Drape', exact: true }).click()
+  await expect(status).toHaveText(
+    'Draped in poplin. Inside, shown paler: Skirt front lining and Skirt back lining.',
+    { timeout: 120_000 },
+  )
+  // No buttons to undo.
+  await expect(drape.getByRole('switch', { name: 'Buttons done up' })).toHaveCount(0)
+})

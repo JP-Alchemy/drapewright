@@ -116,9 +116,19 @@ export class Draping {
     return drapings.get(this)!.leftOut
   }
 
-  /** The facings and linings left out, as they go inside, by id. */
+  /** The facings and linings sewn to nothing, by id: left out, as they go inside. */
   get inside(): string[] {
     return drapings.get(this)!.inside
+  }
+
+  /** The facings and linings draped inside the rest, by id. */
+  get lined(): string[] {
+    return drapings.get(this)!.lined
+  }
+
+  /** How many buttons the garment has, done up or not. */
+  get buttons(): number {
+    return drapings.get(this)!.buttons
   }
 
   /** The garment's size round the body at the figure's bust, waist and hip. */

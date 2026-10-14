@@ -12,6 +12,35 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 52 — Facings and linings inside; buttons undone
+
+Facings and linings are draped inside the garment instead of being left
+off, and a buttoned garment can be seen worn open.
+
+**Try it:**
+
+1. Open `fixtures/drapewright/lined-skirt.drapewright` and drape it. The
+   lining hangs inside the skirt, 3 cm shorter; the status line says
+   "Inside, shown paler: Skirt front lining and Skirt back lining." Turn
+   the view to look up under the hem to see it.
+2. Open `fixtures/drapewright/shirt.drapewright` (a yoked shirt buttoned
+   down the front, with a back neck facing) and drape it. Switch off
+   **Buttons done up**: it is draped again, its fronts hanging open; on
+   again, it is buttoned.
+3. Pose either: the lining and facing move with the garment.
+
+**How it works:** the garment as seen from outside is placed round the
+figure as before. Each facing or lining is then laid flat on the piece it
+was traced from (worked out from where their stitches meet, choosing the
+piece it lies on rather than beside), and starts where that piece is on
+the figure. While the cloth settles, each inside point near the cloth over
+it is kept behind it (along that cloth's outward side) by its thickness
+and a millimetre of air, except where the two are sewn together; there is
+otherwise no cloth resting on cloth. A garment worn open is the same drape
+without the stitches that hold its buttons.
+
+---
+
 ## Step 51 — Poses: the figure moves, the garment with it
 
 The avatar can take a pose (arms down, reaching forward, arms raised,

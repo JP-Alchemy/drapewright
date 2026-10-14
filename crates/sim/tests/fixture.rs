@@ -125,3 +125,39 @@ fn the_corset_project_is_up_to_date() {
     );
     write("corset.drapewright", &json);
 }
+
+#[test]
+fn the_lined_skirt_project_is_up_to_date() {
+    let (pieces, seams) = common::lined_skirt();
+    let (json, differences) = project(
+        ("lined-skirt", "Test lined skirt"),
+        pieces,
+        seams,
+        &[0.0, 400.0, 800.0, 1200.0],
+    );
+    assert!(differences.iter().all(|d| d.abs() < 1.0), "{differences:?}");
+    write("lined-skirt.drapewright", &json);
+}
+
+#[test]
+fn the_shirt_project_is_up_to_date() {
+    // The yoked blouse upright, sewn by the seams found for it: buttoned
+    // down the front, a facing at the back of its neck.
+    let pieces = drapewright_pattern_core::testing::garments::yoked_blouse(false);
+    let seams: Vec<Seam> = drapewright_seams::suggest(&pieces, &[])
+        .into_iter()
+        .enumerate()
+        .map(|(k, s)| Seam {
+            id: format!("s{k}"),
+            confirmed: true,
+            ..s.seam
+        })
+        .collect();
+    let (json, _) = project(
+        ("shirt", "Test shirt"),
+        pieces,
+        seams,
+        &[0.0, 650.0, 1100.0, 1500.0, 1900.0, 2500.0, 2800.0],
+    );
+    write("shirt.drapewright", &json);
+}

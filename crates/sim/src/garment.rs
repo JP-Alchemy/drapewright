@@ -62,6 +62,8 @@ pub struct Panel {
     /// How high its line named for the waist is, flat: where it goes on the
     /// body (a corset is put on by its waist, not hung from it).
     pub waist: Option<f64>,
+    /// A facing or a lining: it goes inside the rest.
+    pub inside: bool,
 }
 
 impl Panel {
@@ -83,9 +85,21 @@ pub struct Link {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Garment {
     pub panels: Vec<Panel>,
-    /// Pairs of (panel, point) sewn together.
+    /// Pairs of (panel, point) sewn together, the buttons done up last.
     pub stitches: Vec<[(usize, u32); 2]>,
     pub links: Vec<Link>,
+    /// How many of the stitches are buttons done up.
+    pub buttons: usize,
+}
+
+impl Garment {
+    /// The garment with its buttons undone: worn open.
+    pub fn unbuttoned(&self) -> Garment {
+        let mut open = self.clone();
+        open.stitches.truncate(self.stitches.len() - self.buttons);
+        open.buttons = 0;
+        open
+    }
 }
 
 /// Why a garment could not be made.
@@ -664,8 +678,7 @@ struct Side {
 }
 
 /// A facing or a lining: turned inside when the garment is made up, it
-/// lies against what it faces. Draped, with no cloth of its own to rest
-/// on, it would hang loose from its seams instead.
+/// lies against what it faces, between it and the body.
 pub fn inside(piece: &Piece) -> bool {
     let name = piece.name.to_lowercase();
     let lining = |material: &str| {
@@ -686,25 +699,28 @@ pub fn between_legs(piece: &Piece) -> bool {
 /// What a drape is made of, and what is left out of it (by id).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Draped {
-    /// The pieces sewn by confirmed seams, less those left out below.
+    /// The pieces sewn by confirmed seams, less those left out below: the
+    /// garment as seen from outside.
     pub sewn: Vec<Piece>,
+    /// Facings and linings sewn by confirmed seams: inside it.
+    pub lined: Vec<Piece>,
     /// Sewn to nothing.
     pub alone: Vec<Id>,
-    /// Facings and linings: they go inside.
+    /// Facings and linings sewn to nothing: left out, as they go inside.
     pub inside: Vec<Id>,
 }
 
-/// What a drape is made of: the pieces sewn by confirmed seams, less
-/// facings and linings; and those left out.
+/// What a drape is made of: the pieces sewn by confirmed seams, facings
+/// and linings apart; and those left out.
 pub fn draped_pieces(pieces: &[Piece], seams: &[Seam]) -> Draped {
     let mut out = Draped::default();
     for piece in pieces {
-        if inside(piece) {
-            out.inside.push(piece.id.clone());
-        } else if !seams.iter().any(|s| s.confirmed && s.touches(&piece.id)) {
-            out.alone.push(piece.id.clone());
-        } else {
-            out.sewn.push(piece.clone());
+        let sewn = seams.iter().any(|s| s.confirmed && s.touches(&piece.id));
+        match (inside(piece), sewn) {
+            (true, true) => out.lined.push(piece.clone()),
+            (true, false) => out.inside.push(piece.id.clone()),
+            (false, true) => out.sewn.push(piece.clone()),
+            (false, false) => out.alone.push(piece.id.clone()),
         }
     }
     out
@@ -902,6 +918,7 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             grain: layout.grain,
             edges: by_layout.into_iter().flatten().collect(),
             waist: layout.waist,
+            inside: inside(&pieces[layout.piece]),
         });
     }
     // Stitches: the two runs of each seam, point for point.
@@ -945,11 +962,14 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             links.push(link);
         }
     }
-    stitches.extend(buttons(&layouts, pieces, &panels, &sewn[..seams_sewn]));
+    let buttons = buttons(&layouts, pieces, &panels, &sewn[..seams_sewn]);
+    let done_up = buttons.len();
+    stitches.extend(buttons);
     Ok(Garment {
         panels,
         stitches,
         links,
+        buttons: done_up,
     })
 }
 
@@ -988,8 +1008,10 @@ fn buttons(
         .iter()
         .enumerate()
         .map(|(p, layout)| {
+            let piece = &pieces[layout.piece];
             if layout.copy == Copy::Unfolded
-                || !pieces[layout.piece].name.to_lowercase().contains("front")
+                || !piece.name.to_lowercase().contains("front")
+                || inside(piece)
             {
                 return None;
             }

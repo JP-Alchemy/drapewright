@@ -215,7 +215,7 @@ fn blouse_hangs(
 fn a_blouse_laid_out_on_its_side_drapes_sewn_as_its_seams_are_found() {
     // As pattern CAD lays it on the sheet: its back and fronts on their
     // sides, its cuffs upside down; sewn by the seams found for it, its
-    // fronts buttoned, its facing left inside.
+    // fronts buttoned (its facing goes inside: see below).
     let pieces = drapewright_pattern_core::testing::garments::yoked_blouse(true);
     let seams: Vec<drapewright_seams::Seam> = drapewright_seams::suggest(&pieces, &[])
         .into_iter()
@@ -229,7 +229,8 @@ fn a_blouse_laid_out_on_its_side_drapes_sewn_as_its_seams_are_found() {
     let draped = draped_pieces(&pieces, &seams);
     let sewn = draped.sewn;
     assert!(draped.alone.is_empty(), "{:?}", draped.alone);
-    assert_eq!(draped.inside, ["facing"]);
+    let lined: Vec<&str> = draped.lined.iter().map(|p| p.id.as_str()).collect();
+    assert_eq!(lined, ["facing"]);
     let model = avatar();
     let body = model.shape(&Shape::default());
     let figure = Figure::of(&model, &body);
@@ -727,4 +728,131 @@ fn a_skirt_sat_in_rests_on_the_seat() {
     // Standing again: no seat.
     pose(&mut drape, Pose::Standing, 8.0);
     assert!(drape.seat().is_none());
+}
+
+/// Drapes the pieces and their facings and linings, sewn by `seams`, until
+/// settled; and where the cloth inside starts.
+fn lined(
+    model: &BodyModel,
+    pieces: &[drapewright_pattern_core::Piece],
+    seams: &[drapewright_seams::Seam],
+) -> Drape {
+    let body = model.shape(&Shape::default());
+    let figure = Figure::of(model, &body);
+    let draped = draped_pieces(pieces, seams);
+    assert!(
+        draped.alone.is_empty() && draped.inside.is_empty(),
+        "{draped:?}"
+    );
+    let shell = assemble(&draped.sewn, seams, 20.0).unwrap();
+    let starts = place(&shell, &figure);
+    let (whole, starts) = drapewright_sim::inside::with_inside(
+        &shell,
+        &starts,
+        (&draped.sewn, &draped.lined),
+        seams,
+        20.0,
+    )
+    .expect("placed inside");
+    let mut drape = Drape::new(
+        &whole,
+        &starts,
+        preset("poplin").unwrap(),
+        (&body.vertices, &model.skin()),
+    );
+    let mut frames = 0;
+    while !drape.settled() && frames < 60 * 10 {
+        drape.step(1.0 / 60.0);
+        frames += 1;
+    }
+    assert!(drape.settled(), "still moving after {frames} frames");
+    drape
+}
+
+/// The share of the cloth inside that is further from the body than the
+/// outside cloth nearest it, where the body is near: through it.
+fn through(drape: &Drape) -> f32 {
+    let x = &drape.cloth.x;
+    let (outer, inner): (Vec<usize>, Vec<usize>) =
+        (0..x.len()).partition(|&k| !drape.cloth.inside(k));
+    let d = |p: [f32; 3], q: [f32; 3]| (0..3).map(|k| (p[k] - q[k]).powi(2)).sum::<f32>().sqrt();
+    let near: Vec<usize> = inner
+        .iter()
+        .copied()
+        .filter(|&i| drape.clearance(x[i]) < 0.02)
+        .collect();
+    let out = near
+        .iter()
+        .filter(|&&i| {
+            let j = *outer
+                .iter()
+                .min_by(|&&a, &&b| d(x[i], x[a]).total_cmp(&d(x[i], x[b])))
+                .expect("cloth outside");
+            drape.clearance(x[i]) > drape.clearance(x[j]) + 0.002
+        })
+        .count();
+    out as f32 / near.len().max(1) as f32
+}
+
+#[test]
+fn a_lining_drapes_inside_the_skirt() {
+    let model = avatar();
+    let (pieces, seams) = common::lined_skirt();
+    let drape = lined(&model, &pieces, &seams);
+    let x = &drape.cloth.x;
+    let inside = (0..x.len()).filter(|&k| drape.cloth.inside(k)).count();
+    assert!(inside > 100, "{inside} points inside");
+    // Hanging inside the skirt, shorter than it: none of it through it.
+    let lowest = |inner: bool| {
+        (0..x.len())
+            .filter(|&k| drape.cloth.inside(k) == inner)
+            .map(|k| x[k][1])
+            .fold(f32::MAX, f32::min)
+    };
+    eprintln!(
+        "skirt to {:.3} m, lining to {:.3} m; {:.4} of it through the skirt; widest stitch {:.1} mm",
+        lowest(false),
+        lowest(true),
+        through(&drape),
+        drape.cloth.widest_stitch() * 1000.0
+    );
+    assert!(lowest(true) > lowest(false) + 0.015);
+    assert!(
+        through(&drape) < 0.02,
+        "{} through the skirt",
+        through(&drape)
+    );
+    assert!(drape.cloth.widest_stitch() < 0.006);
+}
+
+#[test]
+fn a_facing_drapes_inside_the_neck_it_faces() {
+    let pieces = drapewright_pattern_core::testing::garments::yoked_blouse(true);
+    let seams: Vec<drapewright_seams::Seam> = drapewright_seams::suggest(&pieces, &[])
+        .into_iter()
+        .enumerate()
+        .map(|(k, s)| drapewright_seams::Seam {
+            id: format!("s{k}"),
+            confirmed: true,
+            ..s.seam
+        })
+        .collect();
+    let model = avatar();
+    let drape = lined(&model, &pieces, &seams);
+    eprintln!("{:.4} of the facing through the back", through(&drape));
+    assert!(
+        through(&drape) < 0.02,
+        "{} through the back",
+        through(&drape)
+    );
+    // The facing at the back of the neck, inside.
+    let x = &drape.cloth.x;
+    let facing: Vec<[f32; 3]> = (0..x.len())
+        .filter(|&k| drape.cloth.inside(k))
+        .map(|k| x[k])
+        .collect();
+    let back = facing.iter().map(|p| p[2]).sum::<f32>() / facing.len() as f32;
+    let high = facing.iter().map(|p| p[1]).fold(f32::MAX, f32::min);
+    assert!(back < 0.0, "the facing {back} m to the front");
+    assert!(high > 1.3, "the facing down to {high} m");
 }

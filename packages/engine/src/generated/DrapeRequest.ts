@@ -22,4 +22,8 @@ measured?: Measured, settings: AvatarSettings,
 /**
  * The pose to move into once draped: standing as measured if none.
  */
-pose?: AvatarPose, };
+pose?: AvatarPose, 
+/**
+ * Worn open: its buttons undone.
+ */
+open?: boolean, };

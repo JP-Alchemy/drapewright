@@ -68,6 +68,8 @@ interface Drape {
   quietly: boolean
   leftOut: string[]
   inside: string[]
+  lined: string[]
+  buttons: number
   girths: Girth[]
   finish: (last: DrapeUpdate | null) => void
   told: { stage: string; at: number }
@@ -113,6 +115,8 @@ function follow(id: number, draping: Draping, quietly: boolean): Promise<DrapeUp
       quietly,
       leftOut: draping.leftOut,
       inside: draping.inside,
+      lined: draping.lined,
+      buttons: draping.buttons,
       girths: draping.girths,
       finish,
       told: { stage: '', at: 0 },
@@ -150,6 +154,8 @@ function moveDrape(d: Drape) {
     ...progress,
     leftOut: d.leftOut,
     inside: d.inside,
+    lined: d.lined,
+    buttons: d.buttons,
     girths: d.girths,
   }
   const now = performance.now()

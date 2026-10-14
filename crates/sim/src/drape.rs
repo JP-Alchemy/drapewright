@@ -185,6 +185,13 @@ impl Drape {
         for [(pa, a), (pb, b)] in &garment.stitches {
             builder.stitch(firsts[*pa] + a, firsts[*pb] + b);
         }
+        // Facings and linings, the last panels, go inside the rest.
+        if let Some(p) = garment.panels.iter().position(|p| p.inside)
+            && garment.panels[p..].iter().all(|q| q.inside)
+            && p > 0
+        {
+            builder.inside_from(firsts[p]);
+        }
         let mut cloth = builder.build();
         cloth.damping = 6.0;
         cloth.max_speed = MAX_SPEED;
@@ -196,6 +203,7 @@ impl Drape {
             .collect();
         let field = BodyField::new(&points, body.1, CELL, MARGIN);
         cloth.push_out(&field);
+        cloth.face_out(&field);
         Drape {
             cloth,
             body: field,

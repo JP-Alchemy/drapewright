@@ -103,6 +103,77 @@ pub fn skirt() -> (Vec<Piece>, Vec<Seam>) {
     (vec![front, back], seams)
 }
 
+/// The skirt lined: a front and a back lining as the skirt's, 3 cm
+/// shorter, cut from lining, sewn at their sides and centre back and to the
+/// skirt at the waist.
+#[allow(dead_code)] // Not every test drapes it.
+pub fn lined_skirt() -> (Vec<Piece>, Vec<Seam>) {
+    use EdgeKind::*;
+    let (mut pieces, mut seams) = skirt();
+    let lining = |id: &str, name: &str, top: f64, low: f64, quantity: u32, centre: EdgeKind| {
+        let mut p = piece(
+            id,
+            name,
+            vec![
+                edge("w", Seam, Segment::line([185.0, top])),
+                edge(
+                    "s",
+                    Seam,
+                    Segment::cubic(
+                        [215.0, top + 72.0],
+                        [253.0, top + 190.0],
+                        [286.0, low - 12.0],
+                    ),
+                ),
+                edge(
+                    "h",
+                    Hem,
+                    Segment::cubic([190.0, low - 4.0], [95.0, low], [0.0, low]),
+                ),
+                edge("c", centre, Segment::line([0.0, 0.0])),
+            ],
+            quantity,
+        );
+        p.cut[0].material = "lining".into();
+        p
+    };
+    pieces.push(lining("lfront", "Skirt front lining", 8.0, 582.0, 1, Fold));
+    pieces.push(lining("lback", "Skirt back lining", 12.0, 586.0, 2, Seam));
+    let seam = |id: &str, a: SeamSide, b: SeamSide| drapewright_seams::Seam {
+        id: id.into(),
+        name: String::new(),
+        a,
+        b,
+        reversed: false,
+        ease: Default::default(),
+        confirmed: true,
+    };
+    seams.push(seam(
+        "l1",
+        SeamSide::whole("lfront", "s"),
+        SeamSide::whole("lback", "s"),
+    ));
+    seams.push(seam(
+        "l2",
+        SeamSide::whole("lback", "c"),
+        SeamSide {
+            mirror: true,
+            ..SeamSide::whole("lback", "c")
+        },
+    ));
+    seams.push(seam(
+        "l3",
+        SeamSide::whole("front", "fw"),
+        SeamSide::whole("lfront", "w"),
+    ));
+    seams.push(seam(
+        "l4",
+        SeamSide::whole("back", "bw"),
+        SeamSide::whole("lback", "w"),
+    ));
+    (pieces, seams)
+}
+
 /// A loose blouse with short sleeves for the standard figure (bust
 /// 89.5 cm): the front and back each cut on the fold, sewn at the
 /// shoulders and sides, and a sleeve cut as a pair, sewn up its underarm

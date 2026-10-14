@@ -31,6 +31,7 @@ fn garment(name: &str) -> DrapeRequest {
         measured: None,
         settings: Shape::default().into(),
         pose: None,
+        open: None,
     }
 }
 
@@ -244,4 +245,33 @@ fn a_blouse_settles_after_each_pose() {
         eprintln!("{pose:?}: {:?} after {frames} frames", progress.stage);
         assert_eq!(progress.stage, DrapeStage::Settled, "{pose:?}");
     }
+}
+
+#[test]
+fn a_shirt_drapes_open_with_its_facing_inside() {
+    let request = DrapeRequest {
+        open: Some(true),
+        ..garment("shirt")
+    };
+    let facing = request
+        .pieces
+        .iter()
+        .find(|p| p.name == "Back neck facing")
+        .map(|p| p.id.clone())
+        .unwrap();
+    let mut draping = Draping::start(&model(), &request).unwrap();
+    let mut progress = draping.progress();
+    while !matches!(progress.stage, DrapeStage::Settled | DrapeStage::Stopped) {
+        progress = draping.step();
+    }
+    // Settled, its gathered seams drawn up.
+    assert_eq!(progress.stage, DrapeStage::Settled);
+    assert!(progress.widest_gap < 8.0, "{progress:?}");
+    assert_eq!(draping.lined, [facing]);
+    assert!(draping.inside.is_empty());
+    assert_eq!(draping.buttons, 5);
+    // Open: the fronts' edges apart in front.
+    let points = draping.points();
+    let front = points.iter().map(|p| p[2]).fold(f32::MIN, f32::max);
+    assert!(front > 100.0, "the front {front} mm forward");
 }

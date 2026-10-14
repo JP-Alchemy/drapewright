@@ -350,12 +350,13 @@ fn pieces_laid_on_their_side_are_stood_upright() {
 }
 
 #[test]
-fn facings_are_left_inside_and_fronts_buttoned() {
+fn facings_go_inside_and_fronts_are_buttoned() {
     let (pieces, seams) = yoked();
     let draped = drapewright_sim::garment::draped_pieces(&pieces, &seams);
     let sewn = draped.sewn;
-    assert!(draped.alone.is_empty());
-    assert_eq!(draped.inside, ["facing"]);
+    assert!(draped.alone.is_empty() && draped.inside.is_empty());
+    let lined: Vec<&str> = draped.lined.iter().map(|p| p.id.as_str()).collect();
+    assert_eq!(lined, ["facing"]);
     assert!(sewn.iter().all(|p| p.id != "facing"));
     let g = assemble(&sewn, &seams, 20.0).unwrap();
     // Each of the left front's five buttons held to the right front's edge.
@@ -379,4 +380,9 @@ fn facings_are_left_inside_and_fronts_buttoned() {
             "button {a} held off the right front's edge"
         );
     }
+    // Worn open: the buttons undone, and only they.
+    assert_eq!(g.buttons, 5);
+    let open = g.unbuttoned();
+    assert_eq!(open.stitches.len(), g.stitches.len() - 5);
+    assert_eq!(open.stitches[..], g.stitches[..open.stitches.len()]);
 }

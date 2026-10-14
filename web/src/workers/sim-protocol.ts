@@ -21,8 +21,12 @@ import type { ViewColours } from '@drapewright/engine/avatar'
 export interface DrapeUpdate extends DrapeProgress {
   /** The pieces left out, sewn to nothing, by id. */
   leftOut: string[]
-  /** The facings and linings left out, as they go inside, by id. */
+  /** The facings and linings sewn to nothing, by id: left out, as they go inside. */
   inside: string[]
+  /** The facings and linings draped inside the rest, by id. */
+  lined: string[]
+  /** How many buttons the garment has, done up or not. */
+  buttons: number
   /** The garment's size round the body at the figure's bust, waist and hip. */
   girths: Girth[]
 }
