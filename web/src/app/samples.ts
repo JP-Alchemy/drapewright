@@ -3,9 +3,12 @@
 // FreeSewing's Sasha dress as a copy-shop PDF (MIT), to see a PDF put
 // together.
 
-import blouse from '../../../fixtures/drapewright/blouse.drapewright?url'
-import skirt from '../../../fixtures/drapewright/skirt.drapewright?url'
-import dress from '../../../fixtures/pdf/freesewing-sasha-a0.pdf?url'
+// Served as files of their own, never inlined as `data:` URLs (as small
+// files are by default): the site's Content-Security-Policy lets the app
+// fetch only from itself.
+import blouse from '../../../fixtures/drapewright/blouse.drapewright?url&no-inline'
+import skirt from '../../../fixtures/drapewright/skirt.drapewright?url&no-inline'
+import dress from '../../../fixtures/pdf/freesewing-sasha-a0.pdf?url&no-inline'
 import { t } from '../strings/en.ts'
 
 export type SampleName = 'blouse' | 'skirt' | 'dress'

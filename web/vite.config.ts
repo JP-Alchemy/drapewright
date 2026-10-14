@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -9,6 +10,25 @@ import { VitePWA } from 'vite-plugin-pwa'
 const isolationHeaders = {
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Embedder-Policy': 'require-corp',
+}
+
+/**
+ * The headers the host sends with every page (public/_headers, one block
+ * for every path). The preview, which the end-to-end tests run against,
+ * sends them too, so the tests meet drapewright.com's own
+ * Content-Security-Policy.
+ */
+function hostHeaders(): Record<string, string> {
+  const file = readFileSync(new URL('./public/_headers', import.meta.url), 'utf8')
+  return Object.fromEntries(
+    file
+      .split('\n')
+      .filter((line) => /^\s+\S/.test(line))
+      .map((line) => {
+        const at = line.indexOf(':')
+        return [line.slice(0, at).trim(), line.slice(at + 1).trim()]
+      }),
+  )
 }
 
 /** Which build this is, for feedback: the commit it was built from. */
@@ -60,8 +80,11 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // The sample dress (a PDF) and its licence too, to try offline.
-        globPatterns: ['**/*.{js,css,html,svg,png,jpg,webp,ico,wasm,webmanifest,pdf,txt}'],
+        // The samples (projects, and the dress as a PDF) and the dress's
+        // licence too, to try offline.
+        globPatterns: [
+          '**/*.{js,css,html,svg,png,jpg,webp,ico,wasm,webmanifest,pdf,txt,drapewright}',
+        ],
         // Offline, a page of the app opens the app; the site's pages are
         // kept as they are.
         navigateFallback: 'app/index.html',
@@ -81,7 +104,7 @@ export default defineConfig({
     }),
   ],
   server: { port: 5173, strictPort: true, headers: isolationHeaders },
-  preview: { port: 4173, strictPort: true, headers: isolationHeaders },
+  preview: { port: 4173, strictPort: true, headers: hostHeaders() },
   build: {
     target: 'es2022',
     // The site's front page, and the app.
