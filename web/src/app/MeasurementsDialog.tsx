@@ -29,6 +29,7 @@ import type { Session } from '../state/session.ts'
 import { t } from '../strings/en.ts'
 import { fromDisplay, lengthFormat, lengthStep, toDisplay } from '../strings/units.ts'
 import { AvatarFitter } from './AvatarFitter.tsx'
+import { EXAMPLE_ID, isExample, withExample } from './example.ts'
 import { CommitTextField } from './Inspector.tsx'
 import { measurementText } from './labels.ts'
 
@@ -65,8 +66,10 @@ function MeasurementsForm({ session, close }: { session: Session; close: () => v
   useEngineState(session)
   const doc = session.engine.document()
   const sets = doc.measurementSets
-  const [chosen, setChosen] = useState<string | null>(sets[0]?.id ?? null)
-  const set = sets.find((s) => s.id === chosen) ?? sets[0] ?? null
+  // Each person measured, and the example after them.
+  const everyone = withExample(sets)
+  const [chosen, setChosen] = useState(sets[0]?.id ?? EXAMPLE_ID)
+  const set = everyone.find((s) => s.id === chosen) ?? everyone[0]!
 
   const add = (name: string) => {
     const added = session.dispatch({
@@ -82,67 +85,58 @@ function MeasurementsForm({ session, close }: { session: Session; close: () => v
         previous: [],
       },
     })
-    if (added) setChosen(session.engine.document().measurementSets.at(-1)?.id ?? null)
+    if (added) setChosen(session.engine.document().measurementSets.at(-1)?.id ?? EXAMPLE_ID)
   }
 
   return (
     <>
       <Heading slot="title">{t.measure.heading}</Heading>
       <p className="muted">{t.measure.intro}</p>
-      {set === null ? (
-        <div className="measure-empty">
-          <p>{t.measure.empty}</p>
+      <div className="measure-people">
+        <RadioGroup
+          className="segmented"
+          orientation="horizontal"
+          aria-label={t.measure.people}
+          value={set.id}
+          onChange={setChosen}
+        >
+          <div className="segments">
+            {everyone.map((s) => (
+              <Radio key={s.id} value={s.id} className="segment">
+                {s.name}
+              </Radio>
+            ))}
+          </div>
+        </RadioGroup>
+        {sets.length === 0 ? (
           <Button className="button primary" onPress={() => add(t.measure.defaultName)}>
             <Plus size={18} aria-hidden="true" />
             {t.measure.addFirst}
           </Button>
-        </div>
-      ) : (
-        <>
-          <div className="measure-people">
-            {sets.length > 1 && (
-              <RadioGroup
-                className="segmented"
-                orientation="horizontal"
-                aria-label={t.measure.people}
-                value={set.id}
-                onChange={setChosen}
-              >
-                <div className="segments">
-                  {sets.map((s) => (
-                    <Radio key={s.id} value={s.id} className="segment">
-                      {s.name}
-                    </Radio>
-                  ))}
-                </div>
-              </RadioGroup>
-            )}
-            <Button className="button" onPress={() => add(t.measure.newName(sets.length + 1))}>
-              <Plus size={18} aria-hidden="true" />
-              {t.measure.add}
-            </Button>
-          </div>
-          <SetEditor
-            key={set.id}
-            session={session}
-            set={set}
-            units={doc.settings.displayUnits}
-            onDeleted={() => setChosen(null)}
-          />
-        </>
-      )}
-      <div className="dialog-actions">
-        {sets.length > 0 && (
-          <Button
-            className="button"
-            onPress={() => {
-              close()
-              session.showDrafting(true)
-            }}
-          >
-            {t.drafting.open}
+        ) : (
+          <Button className="button" onPress={() => add(t.measure.newName(sets.length + 1))}>
+            <Plus size={18} aria-hidden="true" />
+            {t.measure.add}
           </Button>
         )}
+      </div>
+      <SetEditor
+        key={set.id}
+        session={session}
+        set={set}
+        units={doc.settings.displayUnits}
+        onDeleted={() => setChosen(EXAMPLE_ID)}
+      />
+      <div className="dialog-actions">
+        <Button
+          className="button"
+          onPress={() => {
+            close()
+            session.showDrafting(true)
+          }}
+        >
+          {t.drafting.open}
+        </Button>
         <Button className="button primary" onPress={close}>
           {t.measure.done}
         </Button>
@@ -177,9 +171,87 @@ function SetEditor({
   }
   const vocabulary = measurementVocabulary().filter((m) => set.figure === 'woman' || !m.womenOnly)
   const groups = Object.keys(t.measure.groups) as (keyof typeof t.measure.groups)[]
+  // The example is for reference: shown, not changed.
+  const example = isExample(set)
 
   return (
     <div className="measure-set">
+      {example ? (
+        <p className="measure-example">{t.measure.exampleNote}</p>
+      ) : (
+        <SetHead session={session} set={set} update={update} />
+      )}
+      {groups.map((group) => {
+        const items = vocabulary.filter((m) => m.group === group)
+        return (
+          <section key={group} className="measure-group" aria-labelledby={`measure-${group}`}>
+            <h3 id={`measure-${group}`} className="group-label">
+              {t.measure.groups[group]}
+            </h3>
+            <div className="measure-grid">
+              {items.map((info) => (
+                <MeasurementField
+                  key={info.key}
+                  info={info}
+                  figure={set.figure}
+                  value={set.values[info.key]}
+                  units={units}
+                  readOnly={example}
+                  onChange={(mm) => setValue(info.key, mm)}
+                />
+              ))}
+            </div>
+          </section>
+        )
+      })}
+      {!example && (
+        <>
+          <AvatarFitter
+            set={set}
+            vocabulary={vocabulary}
+            units={units}
+            onAge={(age) => update({ age })}
+          />
+          <div className="measure-delete">
+            {confirming ? (
+              <>
+                <span>{t.measure.removeConfirm(set.name)}</span>
+                <Button
+                  className="button danger"
+                  onPress={() => {
+                    if (session.dispatch({ type: 'deleteMeasurementSet', id: set.id })) onDeleted()
+                  }}
+                >
+                  {t.measure.remove}
+                </Button>
+                <Button className="button" onPress={() => setConfirming(false)}>
+                  {t.screen.cancel}
+                </Button>
+              </>
+            ) : (
+              <Button className="button danger" onPress={() => setConfirming(true)}>
+                {t.measure.remove}
+              </Button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** A person's name, figure and when they were measured, and measuring again. */
+function SetHead({
+  session,
+  set,
+  update,
+}: {
+  session: Session
+  set: MeasurementSet
+  update(change: Partial<MeasurementSet>): void
+}) {
+  return (
+    <>
       <div className="measure-head">
         <CommitTextField
           key={`name-${set.name}`}
@@ -226,57 +298,7 @@ function SetEditor({
           {t.measure.again}
         </Button>
       </div>
-      {groups.map((group) => {
-        const items = vocabulary.filter((m) => m.group === group)
-        return (
-          <section key={group} className="measure-group" aria-labelledby={`measure-${group}`}>
-            <h3 id={`measure-${group}`} className="group-label">
-              {t.measure.groups[group]}
-            </h3>
-            <div className="measure-grid">
-              {items.map((info) => (
-                <MeasurementField
-                  key={info.key}
-                  info={info}
-                  figure={set.figure}
-                  value={set.values[info.key]}
-                  units={units}
-                  onChange={(mm) => setValue(info.key, mm)}
-                />
-              ))}
-            </div>
-          </section>
-        )
-      })}
-      <AvatarFitter
-        set={set}
-        vocabulary={vocabulary}
-        units={units}
-        onAge={(age) => update({ age })}
-      />
-      <div className="measure-delete">
-        {confirming ? (
-          <>
-            <span>{t.measure.removeConfirm(set.name)}</span>
-            <Button
-              className="button danger"
-              onPress={() => {
-                if (session.dispatch({ type: 'deleteMeasurementSet', id: set.id })) onDeleted()
-              }}
-            >
-              {t.measure.remove}
-            </Button>
-            <Button className="button" onPress={() => setConfirming(false)}>
-              {t.screen.cancel}
-            </Button>
-          </>
-        ) : (
-          <Button className="button danger" onPress={() => setConfirming(true)}>
-            {t.measure.remove}
-          </Button>
-        )}
-      </div>
-    </div>
+    </>
   )
 }
 
@@ -286,12 +308,14 @@ function MeasurementField({
   figure,
   value,
   units,
+  readOnly = false,
   onChange,
 }: {
   info: MeasurementInfo
   figure: Figure
   value: number | undefined
   units: DisplayUnits
+  readOnly?: boolean
   onChange(mm: number | null): void
 }) {
   const [name, howTo] = measurementText(info.key, figure)
@@ -299,6 +323,7 @@ function MeasurementField({
   return (
     <NumberField
       className="field compact"
+      isReadOnly={readOnly}
       value={value === undefined ? Number.NaN : toDisplay(value, units)}
       minValue={0}
       step={lengthStep(units)}

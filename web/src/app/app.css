@@ -1804,11 +1804,13 @@ h2 {
 
 /* Measurements */
 
-.measure-empty {
-  display: grid;
-  justify-items: start;
-  gap: 8px;
-  margin: 16px 0;
+/* The example's note: it is for reference, not to be changed. */
+.measure-example {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 14px;
 }
 
 .measure-people {

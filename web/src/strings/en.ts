@@ -80,8 +80,6 @@ export const t = {
 
   sizing: {
     heading: 'Which size fits?',
-    noPeople:
-      'To see which size fits, add someone’s measurements first (Measurements, at the top).',
     person: 'Whose measurements',
     fit: 'How it should fit',
     fits: {
@@ -130,8 +128,6 @@ export const t = {
     open: 'Draft a FreeSewing design to these measurements',
     intro:
       'FreeSewing’s designs are drafted to each person’s measurements, not cut from standard sizes. Choose one: it is drafted here, on this device, and opened as a pattern to add.',
-    noPeople:
-      'Add someone’s measurements first (Measurements, at the top): the design is drafted to them.',
     whose: 'Whose measurements',
     which: 'Design',
     designs: {
@@ -264,7 +260,8 @@ export const t = {
       blouse: 'Sewn already: see it on the figure, read where it pulls, alter it.',
       skirt: 'A front and a back, sewn at the sides, to drape in any fabric.',
       dress: 'FreeSewing’s Sasha dress as a copy-shop PDF: see it read, piece by piece.',
-      freesewing: 'A T-shirt, a dress, skirts, a corset: drafted to fit someone you have measured.',
+      freesewing:
+        'A T-shirt, a dress, skirts, a corset: drafted to fit someone you have measured, or the example figure.',
     },
     names: { blouse: 'Sample blouse', skirt: 'Sample skirt', dress: 'Sample dress' },
     opened: (name: string) =>
@@ -1029,8 +1026,10 @@ export const t = {
     heading: 'Measurements',
     intro:
       'Measure over light clothing, with the tape snug but not tight. Leave out anything you don’t have: only height, bust, waist and hip are needed to start.',
-    empty: 'No measurements yet.',
     addFirst: 'Add my measurements',
+    example: 'Example',
+    exampleNote:
+      'The standard figure, the avatar as it is until someone’s measurements are added: for reference, to see what each measurement is and about how much. It can’t be changed. Add your own to fit patterns and the avatar to you.',
     add: 'Add a person',
     defaultName: 'Me',
     newName: (n: number) => `Person ${n}`,

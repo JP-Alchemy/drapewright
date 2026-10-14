@@ -12,6 +12,23 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 56 — An example person's measurements
+
+**Measurements** always shows an **Example**: the standard figure, the
+avatar as it is before anyone's measurements are added, measured as a tape
+would measure it (176.7 cm tall, bust 89.5, waist 70.8, hip 98.6). It is
+for reference, to see what each measurement is about and roughly how much,
+and can't be changed or deleted. It isn't kept in the project: it is the
+same for everyone, and stays the standard figure's if that changes (the
+body's tests write it).
+
+**Try it:** on a new project, open **Measurements**: the Example is shown.
+**Add my measurements** adds you, first, with the Example after. Without
+measuring anyone, a FreeSewing design can be drafted to the Example, and
+**Which size fits?** in the import dialog finds the Example's size.
+
+---
+
 ## Step 55 — Choosing pieces with a box
 
 Drag across the table from where there is no piece, and a box follows the

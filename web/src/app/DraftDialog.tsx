@@ -32,6 +32,7 @@ import {
   freesewingMeasurements,
   needs,
 } from './freesewing.ts'
+import { withExample } from './example.ts'
 
 const text = t.drafting
 
@@ -76,9 +77,11 @@ interface Plan {
 
 function DraftForm({ session, close }: { session: Session; close: () => void }) {
   useEngineState(session)
-  const sets = session.engine.document().measurementSets
-  const [setId, setSetId] = useState(sets[0]?.id ?? null)
-  const set = sets.find((s) => s.id === setId) ?? sets[0]
+  // Each person measured, then the example: someone to draft to before
+  // anyone is measured.
+  const sets = withExample(session.engine.document().measurementSets)
+  const [setId, setSetId] = useState(sets[0]!.id)
+  const set = sets.find((s) => s.id === setId) ?? sets[0]!
   const [design, setDesign] = useState<DesignName>('teagan')
   const [plan, setPlan] = useState<Plan | null>(null)
   const [drafting, setDrafting] = useState(false)
@@ -86,7 +89,6 @@ function DraftForm({ session, close }: { session: Session; close: () => void }) 
 
   // What the design needs of this person, and what is estimated.
   useEffect(() => {
-    if (!set) return
     let current = true
     const have = freesewingMeasurements(set)
     void needs(design)
@@ -102,20 +104,6 @@ function DraftForm({ session, close }: { session: Session; close: () => void }) 
       current = false
     }
   }, [design, set])
-
-  if (!set) {
-    return (
-      <>
-        <Heading slot="title">{text.heading}</Heading>
-        <p>{text.noPeople}</p>
-        <div className="dialog-actions">
-          <Button className="button" onPress={close}>
-            {t.actions.close}
-          </Button>
-        </div>
-      </>
-    )
-  }
 
   const ready = plan?.design === design && plan.set === set.id ? plan : null
   const draft = async () => {

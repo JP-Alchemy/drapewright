@@ -30,6 +30,7 @@ import type { Session } from '../state/session.ts'
 import { formatLength, t } from '../strings/en.ts'
 import { sim } from '../workers/sim-client.ts'
 import { avatarRequest } from './avatar.ts'
+import { withExample } from './example.ts'
 import { FITS, type Fit, LEVELS, type Level } from './fit.ts'
 
 const text = t.sizing
@@ -75,8 +76,10 @@ export function SizeFinder({
 }) {
   const doc = session.engine.document()
   const units = doc.settings.displayUnits
-  const people = doc.measurementSets
-  const [person, setPerson] = useState(people[0]?.id ?? null)
+  // Each person measured, then the example: a size for the standard
+  // figure before anyone is measured.
+  const people = withExample(doc.measurementSets)
+  const [person, setPerson] = useState(people[0]!.id)
   const [fit, setFit] = useState<Fit>('fitted')
   const [measured, setMeasured] = useState<SizeMeasures[] | null>(null)
   const [measuring, setMeasuring] = useState(false)
@@ -85,18 +88,7 @@ export function SizeFinder({
   const [picked, setPicked] = useState<Partial<Record<Level, string>>>({})
   const [blending, setBlending] = useState(false)
   const cutId = useId()
-  const set = people.find((p) => p.id === person) ?? people[0]
-
-  if (!set) {
-    return (
-      <section className="size-finder" aria-labelledby="size-finder-heading">
-        <p className="group-label" id="size-finder-heading">
-          {text.heading}
-        </p>
-        <p className="muted small">{text.noPeople}</p>
-      </section>
-    )
-  }
+  const set = people.find((p) => p.id === person) ?? people[0]!
 
   // Every size's pieces, as they would be added (scale and allowance
   // answered, named as in the file), and the figure shaped.

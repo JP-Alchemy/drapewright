@@ -1,0 +1,33 @@
+{
+  "age": 35.0,
+  "figure": "woman",
+  "values": {
+    "acrossBack": 285.0,
+    "acrossFront": 283.0,
+    "ankle": 209.0,
+    "armLength": 559.0,
+    "backWaistLength": 400.0,
+    "bust": 895.0,
+    "bustSpan": 183.0,
+    "calf": 367.0,
+    "crotchDepth": 311.0,
+    "frontWaistLength": 422.0,
+    "height": 1767.0,
+    "highBust": 863.0,
+    "highHip": 802.0,
+    "hip": 986.0,
+    "inseam": 839.0,
+    "knee": 380.0,
+    "neck": 346.0,
+    "outseam": 1150.0,
+    "shoulderLength": 112.0,
+    "shoulderToBust": 273.0,
+    "shoulderWidth": 343.0,
+    "thigh": 578.0,
+    "underbust": 780.0,
+    "upperArm": 275.0,
+    "waist": 708.0,
+    "waistToHip": 223.0,
+    "wrist": 146.0
+  }
+}

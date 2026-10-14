@@ -206,3 +206,31 @@ fn a_fuller_figure_with_many_measurements_fits() {
         assert!(r.abs() < allowed, "{k} off by {r:.1} mm");
     }
 }
+
+/// The standard figure's measurements, as the app shows them for an
+/// example (`web/src/app/example-measurements.json`): rewritten, and the
+/// test failed, when the figure has changed, so that they are committed.
+#[test]
+fn the_example_measurements_are_the_standard_figures() {
+    let m = model();
+    let shape = Shape::default();
+    let (measured, _) = measure(m, &m.shape(&shape));
+    let values: serde_json::Map<String, serde_json::Value> = measured
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), serde_json::json!(v.round())))
+        .collect();
+    let example = serde_json::json!({
+        "figure": if shape.woman >= 0.5 { "woman" } else { "man" },
+        "age": shape.age,
+        "values": values,
+    });
+    let json = serde_json::to_string_pretty(&example).unwrap() + "\n";
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../web/src/app/example-measurements.json"
+    );
+    if std::fs::read_to_string(path).ok().as_deref() != Some(json.as_str()) {
+        std::fs::write(path, &json).unwrap();
+        panic!("{path} was out of date: rewritten, to commit");
+    }
+}
