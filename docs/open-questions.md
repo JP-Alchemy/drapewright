@@ -196,3 +196,9 @@ matters.
     way, so the corset is stretched round it. *Provisional: stretched
     cloth.* Should the avatar's waist draw in to the corset's, and say by
     how much?
+36. ☐ **Pockets drafted into a panel.** FreeSewing's Sasha draws its side
+    front as two pieces: one above the pocket's opening that runs on down
+    as the pocket's bag, and one below that lies over it. Sewing and
+    draping a piece partly worn outside and partly inside isn't possible
+    yet. *Provisional (2026-10-14): Sasha is drafted without its pockets,
+    and the sample dress is that.* Should pockets be sewn in, and shown?

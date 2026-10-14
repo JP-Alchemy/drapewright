@@ -554,6 +554,90 @@ fn tube() -> (
 }
 
 #[test]
+fn panels_are_placed_where_their_seams_meet_not_by_their_tops() {
+    // A front whose sides are sewn from 100 mm below its top (above them,
+    // armholes, say), to a back sewn all down its sides: placed with the
+    // seams' two sides level, the back's top 100 mm below the front's (not
+    // the tops level, the seams 100 mm apart until sewn).
+    use drapewright_pattern_core::{
+        CutInstruction, Edge, EdgeKind, Grainline, Outline, Piece, Pt, Segment,
+    };
+    use drapewright_seams::{Seam, SeamSide};
+    let edge = |id: &str, kind: EdgeKind, to: [f64; 2]| Edge {
+        kind,
+        ..Edge::new(id, vec![Segment::line(to)])
+    };
+    let panel = |id: &str, name: &str, edges: Vec<Edge>| {
+        let mut p = Piece::new(
+            id,
+            name,
+            Outline {
+                start: Pt::new(0.0, 0.0),
+                edges,
+            },
+        );
+        p.cut = vec![CutInstruction {
+            quantity: 1,
+            ..Default::default()
+        }];
+        p.grainline = Some(Grainline {
+            from: Pt::new(150.0, 150.0),
+            to: Pt::new(150.0, 350.0),
+            one_way: false,
+        });
+        p
+    };
+    use EdgeKind::{Hem, Seam as Sewn};
+    let front = panel(
+        "front",
+        "Front",
+        vec![
+            edge("ftop", Sewn, [300.0, 0.0]),
+            edge("farm", Sewn, [300.0, 100.0]),
+            edge("fright", Sewn, [300.0, 500.0]),
+            edge("fhem", Hem, [0.0, 500.0]),
+            edge("fleft", Sewn, [0.0, 100.0]),
+            edge("farm2", Sewn, [0.0, 0.0]),
+        ],
+    );
+    let back = panel(
+        "back",
+        "Back",
+        vec![
+            edge("btop", Sewn, [300.0, 0.0]),
+            edge("bright", Sewn, [300.0, 400.0]),
+            edge("bhem", Hem, [0.0, 400.0]),
+            edge("bleft", Sewn, [0.0, 0.0]),
+        ],
+    );
+    let side = |id: &str, a: (&str, &str), b: (&str, &str)| Seam {
+        id: id.into(),
+        name: String::new(),
+        a: SeamSide::whole(a.0, a.1),
+        b: SeamSide::whole(b.0, b.1),
+        reversed: true,
+        ease: Default::default(),
+        confirmed: true,
+    };
+    let seams = vec![
+        side("s1", ("front", "fright"), ("back", "bleft")),
+        side("s2", ("back", "bright"), ("front", "fleft")),
+    ];
+    let pieces = vec![front, back];
+    let draped = draped_pieces(&pieces, &seams);
+    let g = assemble(&draped.sewn, &seams, 20.0).unwrap();
+    let model = avatar();
+    let body = model.shape(&Shape::default());
+    let starts = place(&g, &Figure::of(&model, &body));
+    let apart = g
+        .stitches
+        .iter()
+        .map(|&[(pa, a), (pb, b)]| (starts[pa][a as usize][1] - starts[pb][b as usize][1]).abs())
+        .fold(0.0, f64::max);
+    assert!(apart < 2.0, "the seams' sides {apart} mm apart");
+}
+
+#[test]
 fn trousers_go_round_each_leg_below_the_crotch() {
     use drapewright_pattern_core::testing::garments::trousers;
     let pieces = trousers();

@@ -35,10 +35,44 @@ const LOADERS: Record<DesignName, () => Promise<Record<string, unknown>>> = {
   diana: () => import('@freesewing/diana'),
 }
 
+/**
+ * Design options set here rather than left at FreeSewing's defaults. Sasha's
+ * pockets are drafted into the side front as a bag behind the panel below
+ * it, which can't yet be sewn or draped: it is drafted without them.
+ */
+const OPTIONS: Partial<Record<DesignName, Record<string, unknown>>> = {
+  sasha: { withPocket: false },
+}
+
+/**
+ * Corrections to a design as it is drafted, where FreeSewing's pieces
+ * don't go together. Sasha widens its front neckline along the shoulder but
+ * not its back's, leaving the back shoulder longer than the front's by as
+ * much (36 mm at its default width): the back neckline is widened by as
+ * much too, keeping the design's own ease in the back shoulder.
+ */
+const CORRECTIONS: Partial<Record<DesignName, (pattern: FsPattern) => void>> = {
+  sasha(pattern) {
+    let widened = 0
+    pattern.on('postPartDraft', (p) => {
+      const front = p.parts[0]?.['sasha.frontInside']
+      if (p.activePart !== 'sasha.frontInside' || !front) return
+      widened = front.points.hps!.dist(front.points.neckShoulder!)
+    })
+    pattern.on('prePartDraft', (p) => {
+      const back = p.parts[0]?.['sasha.backInside']
+      if (p.activePart !== 'sasha.backInside' || !back) return
+      back.points.hps = back.points.hps!.shiftTowards(back.points.shoulder!, widened)
+    })
+  },
+}
+
 // What is used of FreeSewing's objects.
 interface FsPoint {
   x: number
   y: number
+  dist(that: FsPoint): number
+  shiftTowards(that: FsPoint, distance: number): FsPoint
 }
 interface FsPath {
   hidden: boolean
@@ -54,6 +88,7 @@ interface FsPath {
 }
 interface FsPart {
   hidden: boolean
+  points: Record<string, FsPoint>
   paths: Record<string, FsPath>
   snippets: Record<string, { def: string; anchor: FsPoint }>
 }
@@ -65,6 +100,10 @@ interface FsCut {
 }
 interface FsPattern {
   draft(): FsPattern
+  /** Calls `method` at a point of drafting (before or after each part, say). */
+  on(hook: 'prePartDraft' | 'postPartDraft', method: (pattern: FsPattern) => void): FsPattern
+  /** The part being drafted, by name. */
+  activePart: string
   getConfig(): { measurements?: string[]; optionalMeasurements?: string[] }
   parts: Record<string, FsPart>[]
   setStores: { cutlist?: Record<string, FsCut> }[]
@@ -250,7 +289,15 @@ export async function draftSvg(
   sa = 10,
 ): Promise<string> {
   const Design = await designOf(name)
-  const pattern = new Design({ measurements, sa, complete: true, paperless: false }).draft()
+  const pattern = new Design({
+    measurements,
+    sa,
+    complete: true,
+    paperless: false,
+    options: OPTIONS[name] ?? {},
+  })
+  CORRECTIONS[name]?.(pattern)
+  pattern.draft()
   const parts = pattern.parts[0] ?? {}
   const cutlist = pattern.setStores[0]?.cutlist ?? {}
   const groups: string[] = []

@@ -108,6 +108,57 @@ test('the skirt is draped, read where it pulls, draped in another fabric, and ta
     .toBeLessThan(0.002)
 })
 
+test('the sample dress is sewn from its PDF by Find seams, and drapes', async ({ page }) => {
+  test.setTimeout(240_000)
+  await page.goto('/app/?debug')
+  const samples = page.getByRole('group', { name: 'No pattern to hand? Try one of ours:' })
+  await samples.getByRole('button', { name: /^A dress from a PDF pattern/ }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('button', { name: 'Add 5 pieces' }).click()
+  await dialog.waitFor({ state: 'hidden' })
+  await page.getByRole('button', { name: 'Find seams' }).click()
+  await page.getByRole('button', { name: /^Sew all/ }).click()
+  // Its princess seams, sides, shoulders, centre back and sleeves' underarms,
+  // and each sleeve's head round its armhole (four pieces' edges): not its
+  // hems to each other, nor the armholes' pieces.
+  const seams = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const doc = (window as any).drapewright.engine.document()
+    const name = (id: string) => doc.pieces.find((p: { id: string }) => p.id === id).name
+    return doc.seams.map((s: { a: { piece: string }; b: { piece: string } }) =>
+      [name(s.a.piece), name(s.b.piece)].sort().join(' + '),
+    )
+  })
+  expect(seams.sort()).toEqual([
+    'Back inside + Back inside',
+    'Back inside + Back outside',
+    'Back inside + Front inside',
+    'Back inside + Sleeve',
+    'Back outside + Front outside',
+    'Back outside + Sleeve',
+    'Front inside + Front outside',
+    'Front inside + Sleeve',
+    'Front outside + Sleeve',
+    'Sleeve + Sleeve',
+  ])
+  test.skip(!(await openTheAvatar(page)), 'Draping is seen in the 3D view')
+  const pane = page.getByRole('region', { name: 'Avatar' })
+  await pane
+    .getByRole('group', { name: 'Drape the garment' })
+    .getByRole('button', { name: 'Drape', exact: true })
+    .click()
+  await expect(pane.getByRole('status').last()).toHaveText('Draped in poplin.', {
+    timeout: 120_000,
+  })
+  // Measured as it settled: a fitted bodice, the skirt flared from the waist.
+  const garment = (await pane.getByText(/^Garment: bust/).textContent()) ?? ''
+  const ease = (level: string) =>
+    Number(garment.match(new RegExp(`${level} [\\d.]+ cm \\(([\\d.]+) cm ease\\)`))?.[1])
+  expect(ease('bust')).toBeGreaterThan(0)
+  expect(ease('bust')).toBeLessThan(10)
+  expect(ease('waist')).toBeLessThan(10)
+})
+
 test('nothing is draped until something is sewn', async ({ page }) => {
   await openWithFixture(page, 'flared-skirt.svg', 'Add the piece')
   test.skip(!(await openTheAvatar(page)), 'Draping is seen in the 3D view')

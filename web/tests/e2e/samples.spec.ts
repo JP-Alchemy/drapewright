@@ -32,5 +32,6 @@ test('the sample dress is read from its PDF, and its licence is there', async ({
   expect(text).toContain('Joost De Cock')
   await samples.getByRole('button', { name: /^A dress from a PDF pattern/ }).click()
   const dialog = page.getByRole('dialog')
-  await expect(dialog.getByRole('heading', { name: 'Found 7 pieces' })).toBeVisible()
+  // Drafted without its pockets: the side front whole.
+  await expect(dialog.getByRole('heading', { name: 'Found 5 pieces' })).toBeVisible()
 })

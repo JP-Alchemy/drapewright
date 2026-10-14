@@ -3,4 +3,4 @@
 /**
  * Why a pair of edges looks like a seam.
  */
-export type Reason = "sameLength" | "sameShape" | "notchesMatch" | "linesMeet" | "sameName" | "endsMatch" | "frontAndBack" | "centreOfPair" | "gathered" | "continues" | "fitsOpening" | "fitsAlong";
+export type Reason = "sameLength" | "eased" | "sameShape" | "notchesMatch" | "linesMeet" | "sameName" | "endsMatch" | "frontAndBack" | "centreOfPair" | "gathered" | "continues" | "fitsOpening" | "fitsAlong";

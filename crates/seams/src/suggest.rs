@@ -34,6 +34,9 @@ use crate::model::{Ease, Seam, SeamSide};
 pub enum Reason {
     /// Within a few millimetres of each other's length.
     SameLength,
+    /// A straight back a little longer than the front it is sewn to, eased
+    /// onto it (as a back shoulder is).
+    Eased,
     /// Curved alike.
     SameShape,
     /// The same notches, in the same places.
@@ -78,6 +81,13 @@ const SHORTEST: f64 = 20.0;
 const MOST_APART: f64 = 0.1;
 /// Lengths this close are "the same", mm.
 const SAME_LENGTH: f64 = 3.0;
+/// A straight back is eased onto a straight front by up to this, mm, and
+/// this share of its length: a back shoulder's ease.
+const EASED_BACK: f64 = 10.0;
+const EASED_SHARE: f64 = 0.06;
+/// How likely an eased pair is by its lengths: as likely as a pair a
+/// millimetre or two apart, whatever its length.
+const EASED_SCORE: f64 = 1.15;
 /// Curves are compared at this many points.
 const SAMPLES: usize = 21;
 /// An edge whose furthest point from its chord is under this is straight, mm.
@@ -798,10 +808,29 @@ fn score(a: &Candidate, b: &Candidate, reversed: bool) -> (f64, Vec<Reason>) {
     let apart = (a.length - b.length).abs();
     let mut score = 1.0 - apart / longer / MOST_APART;
     let meet = lines_meet(a, b, reversed);
+    // A back a little longer than its front, both straight: eased onto it.
+    let back_longer = match (a.side, b.side) {
+        (Side::Back, Side::Front) => a.length > b.length,
+        (Side::Front, Side::Back) => b.length > a.length,
+        _ => false,
+    };
+    let eased = back_longer
+        && a.depth < STRAIGHT
+        && b.depth < STRAIGHT
+        && apart <= EASED_BACK
+        && apart <= EASED_SHARE * longer;
     if apart <= SAME_LENGTH {
         reasons.push(Reason::SameLength);
         // Pattern CAD trues seams to the millimetre.
         score += if apart <= 1.0 { 0.3 } else { 0.15 };
+        // A short back shoulder a millimetre or two longer: as likely as
+        // one eased more.
+        if eased {
+            score = score.max(EASED_SCORE);
+        }
+    } else if eased {
+        reasons.push(Reason::Eased);
+        score = EASED_SCORE;
     } else if meet.is_some() {
         // Sewn along the part of the longer edge where the lines meet: as
         // likely as edges as long as each other.
@@ -1243,6 +1272,51 @@ fn take<P: Borrow<Piece>>(
     out
 }
 
+/// At most this many times are the likeliest pairs taken again, without
+/// those found not to be seams.
+const ROUNDS: usize = 8;
+
+/// Of the seams taken, one meeting where the cloth is closed round a point
+/// into a spike, if any: one of those meeting there is not a seam. A seam
+/// folding back from another's end (a hem sewn to a hem from a princess
+/// seam's) meets one spike, at that end; of those, the least likely. Seams
+/// meeting spikes at both ends are left: pieces sewn all round, a cushion.
+fn spiked<P: Borrow<Piece>>(
+    accepted: &[Taken],
+    garment: &mut Assembly,
+    pieces: &[P],
+) -> Option<(usize, usize)> {
+    let spikes = garment.spikes();
+    if spikes.is_empty() {
+        return None;
+    }
+    let place = placer(pieces);
+    let mut least: Option<(f64, usize, usize)> = None;
+    for t in accepted {
+        let (score, i, j, ..) = t.pair;
+        // How many spikes the seam meets on each copy it is sewn on (a pair's
+        // two copies alike): one, or one at each end.
+        let parts: Vec<Part> = t
+            .seams
+            .iter()
+            .flat_map(|s| garment.parts(s, &place))
+            .collect();
+        let mut most = 0;
+        for part in &parts {
+            let ends: Vec<usize> = garment.joins(part).into_iter().map(|(x, _)| x).collect();
+            let met = ends
+                .iter()
+                .filter(|&&x| spikes.iter().any(|&c| garment.same_place(c, x)))
+                .count();
+            most = most.max(met);
+        }
+        if most == 1 && least.is_none_or(|(s, ..)| score < s) {
+            least = Some((score, i, j));
+        }
+    }
+    least.map(|(_, i, j)| (i, j))
+}
+
 /// Pairs that run alongside other seams rather than being one: both ends
 /// meet edges sewn to each other, as a front's and a back's armholes do
 /// (each is sewn to the sleeve; the shoulders and sides are the seams). A
@@ -1429,12 +1503,18 @@ pub fn suggest<P: Borrow<Piece>>(pieces: &[P], existing: &[Seam]) -> Vec<Suggest
             &mut used,
         ));
         let firsts: Vec<Pair> = accepted.iter().map(|t| t.pair.clone()).collect();
-        let along = alongside(&firsts, &cands, &already);
-        if along.is_empty() || rounds == 4 {
+        let mut dropped = alongside(&firsts, &cands, &already);
+        // Then a seam that closes the cloth round a point into a spike (two
+        // hems sewn to each other from a seam's end, or a front's and a
+        // back's armholes from the side seam's top).
+        if dropped.is_empty() {
+            dropped.extend(spiked(&accepted, &mut garment, pieces));
+        }
+        if dropped.is_empty() || rounds == ROUNDS {
             break;
         }
         rounds += 1;
-        banned.extend(along);
+        banned.extend(dropped);
     }
     // Then pairs less likely by themselves that go on from a seam taken,
     // along both pieces: a facing's edges, one after another, laid on the
@@ -1486,10 +1566,22 @@ pub fn suggest<P: Borrow<Piece>>(pieces: &[P], existing: &[Seam]) -> Vec<Suggest
         debug_assert!(t.used.iter().all(|&k| used[k]));
     }
     // A centre edge of a piece cut as a pair, left over: sewn to its other
-    // half (a centre back seam).
+    // half (a centre back seam). A piece has one centre: none where one of
+    // its edges is sewn to its other half already.
+    let mut centred: Vec<bool> = (0..pieces.len())
+        .map(|p| {
+            already
+                .iter()
+                .any(|&((pa, ea), (pb, eb))| pa == p && pb == p && ea == eb)
+        })
+        .collect();
     for (k, c) in cands.iter().enumerate() {
         let named = named_centre(c);
-        if used[k] || !c.pair || !(named || c.with_grain && c.side != Side::Neither) {
+        if used[k]
+            || centred[c.piece]
+            || !c.pair
+            || !(named || c.with_grain && c.side != Side::Neither)
+        {
             continue;
         }
         // Only the piece's outermost straight edge across the grain not
@@ -1510,6 +1602,7 @@ pub fn suggest<P: Borrow<Piece>>(pieces: &[P], existing: &[Seam]) -> Vec<Suggest
             continue;
         }
         used[k] = true;
+        centred[c.piece] = true;
         out.push(Suggestion {
             seam: Seam {
                 name: sentence(&c.name),

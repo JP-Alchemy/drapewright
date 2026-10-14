@@ -220,6 +220,38 @@ fn a_bodices_seams_are_suggested_but_not_its_armholes() {
 }
 
 #[test]
+fn a_back_shoulder_a_little_longer_is_eased_onto_the_front() {
+    // The back shoulder 6 mm longer than the front's, as patterns ease it:
+    // still the shoulder seam.
+    let mut pieces = bodice();
+    let back = pieces.iter_mut().find(|p| p.id == "back").unwrap();
+    let sh = back
+        .outline
+        .edges
+        .iter_mut()
+        .find(|e| e.id == "bsh")
+        .unwrap();
+    sh.segments = vec![Segment::line([187.0, 23.0])];
+    assert_eq!(
+        pairs(&pieces),
+        [
+            "back.bsh-front.fsh",
+            "back.bside-front.fside",
+            "sleeve.uback-sleeve.ufront"
+        ]
+    );
+    let shoulder = suggest(&pieces, &[])
+        .into_iter()
+        .find(|s| s.seam.a.edge == "bsh" || s.seam.b.edge == "bsh")
+        .unwrap();
+    assert!(
+        shoulder.reasons.contains(&Reason::Eased),
+        "{:?}",
+        shoulder.reasons
+    );
+}
+
+#[test]
 fn seams_already_made_are_left_alone() {
     let pieces = skirt();
     let made = Seam {

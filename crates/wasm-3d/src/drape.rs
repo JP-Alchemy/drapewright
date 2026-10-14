@@ -6,10 +6,10 @@ pub use drapewright_fabric::{Fabric, FabricPreset, Measured};
 use drapewright_pattern_core::Piece;
 use drapewright_seams::Seam;
 use drapewright_sim::drape::{Drape, Posable};
-use drapewright_sim::garment::{GarmentError, assemble, draped_pieces};
+use drapewright_sim::garment::{Garment, GarmentError, assemble, draped_pieces};
 use drapewright_sim::girth::girths;
 use drapewright_sim::inside::with_inside;
-use drapewright_sim::place::{Figure, half_round, place};
+use drapewright_sim::place::{Figure, from_shoulders, half_round, place};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -182,14 +182,38 @@ pub struct Draping {
     pub lined: Vec<String>,
     /// How many buttons it has, done up or not.
     pub buttons: usize,
-    /// The garment's size round the body at its bust, waist and hip.
+    /// The garment's size round the body at its bust, waist and hip: as
+    /// placed, then as it settles standing.
     pub girths: Vec<Girth>,
+    /// The garment without its facings and linings (its first panels), its
+    /// panels' points as placed, which of them hang from the shoulders, and
+    /// the figure: to measure it again as it settles.
+    shell: Garment,
+    placed: Vec<Vec<[f64; 3]>>,
+    hung: Vec<bool>,
+    figure: Figure,
+    /// Measured as it settled, rather than as placed.
+    measured: bool,
     done: Option<DrapeStage>,
     /// The pose asked for, and the pose the body is in or moving into.
     wanted: AvatarPose,
     posed: AvatarPose,
     /// When the drape last set off (sewing, or moving into a pose), s.
     since: f32,
+}
+
+/// The garment's size round the body at the figure's levels, its panels'
+/// points where `points` has them (mm).
+fn measure(shell: &Garment, points: &[Vec<[f64; 3]>], figure: &Figure) -> Vec<Girth> {
+    girths(shell, points, figure)
+        .into_iter()
+        .zip(&figure.levels)
+        .map(|((level, garment), at)| Girth {
+            level: level.into(),
+            garment,
+            body: at.girth,
+        })
+        .collect()
 }
 
 impl Draping {
@@ -230,15 +254,9 @@ impl Draping {
         let body = model.shape(&Shape::from(request.settings.clone()));
         let figure = Figure::of(model, &body);
         let starts = place(&shell, &figure);
-        let girths = girths(&shell, &starts, &figure)
-            .into_iter()
-            .zip(&figure.levels)
-            .map(|((level, garment), at)| Girth {
-                level: level.into(),
-                garment,
-                body: at.girth,
-            })
-            .collect();
+        let girths = measure(&shell, &starts, &figure);
+        let placed = starts.clone();
+        let hung = from_shoulders(&shell);
         // Its facings and linings inside it, or, if they can't be placed
         // there, left out.
         let ids = |pieces: &[Piece]| pieces.iter().map(|p| p.id.clone()).collect::<Vec<_>>();
@@ -248,7 +266,7 @@ impl Draping {
                 Some((whole, starts)) => (whole, starts, ids(&draped.lined)),
                 None => {
                     inside.extend(ids(&draped.lined));
-                    (shell, starts, Vec::new())
+                    (shell.clone(), starts, Vec::new())
                 }
             };
         let buttons = garment.buttons;
@@ -281,6 +299,11 @@ impl Draping {
             lined,
             buttons,
             girths,
+            shell,
+            placed,
+            hung,
+            figure,
+            measured: false,
             done: None,
             wanted: request.pose.unwrap_or_default(),
             posed: AvatarPose::Standing,
@@ -335,6 +358,28 @@ impl Draping {
         if self.done.is_none() && self.drape.ready() {
             self.drape.step(FRAME);
             if self.drape.settled() {
+                // Measured again where the cloth hung from the shoulders has
+                // settled on the body: placed flat, it reaches the bust lower
+                // than it does over the bust's curve. Cloth hung from the
+                // waist is measured where it was placed, as it is worn
+                // (settled, a skirt with nothing to hold it may slip).
+                if self.posed == AvatarPose::Standing && !self.measured {
+                    let x = &self.drape.cloth.x;
+                    let firsts = &self.drape.firsts;
+                    let points: Vec<Vec<[f64; 3]>> = (0..self.shell.panels.len())
+                        .map(|p| {
+                            if !self.hung[p] {
+                                return self.placed[p].clone();
+                            }
+                            let first = firsts[p] as usize;
+                            (0..self.shell.panels[p].mesh.points.len())
+                                .map(|k| x[first + k].map(|c| f64::from(c) * 1000.0))
+                                .collect()
+                        })
+                        .collect();
+                    self.girths = measure(&self.shell, &points, &self.figure);
+                    self.measured = true;
+                }
                 if self.wanted == self.posed {
                     self.done = Some(DrapeStage::Settled);
                 } else {

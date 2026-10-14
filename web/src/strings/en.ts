@@ -132,7 +132,7 @@ export const t = {
     which: 'Design',
     designs: {
       teagan: ['Teagan T-shirt', 'A T-shirt for knit fabrics'],
-      sasha: ['Sasha dress', 'A skater dress with princess seams and pockets'],
+      sasha: ['Sasha dress', 'A skater dress with princess seams'],
       penelope: ['Penelope pencil skirt', 'A fitted pencil skirt with darts'],
       sandy: ['Sandy circle skirt', 'A circle skirt with a waistband'],
       cathrin: ['Cathrin corset', 'An underbust corset or waist trainer'],
@@ -259,7 +259,8 @@ export const t = {
     about: {
       blouse: 'Sewn already: see it on the figure, read where it pulls, alter it.',
       skirt: 'A front and a back, sewn at the sides, to drape in any fabric.',
-      dress: 'FreeSewing’s Sasha dress as a copy-shop PDF: see it read, piece by piece.',
+      dress:
+        'FreeSewing’s Sasha dress as a copy-shop PDF: see it read piece by piece, sewn by Find seams, and draped.',
       freesewing:
         'A T-shirt, a dress, skirts, a corset: drafted to fit someone you have measured, or the example figure.',
     },
@@ -1002,6 +1003,7 @@ export const t = {
       confidence >= 0.75 ? 'Very likely' : confidence >= 0.5 ? 'Likely' : 'Possible',
     reasons: {
       sameLength: 'same length',
+      eased: 'the back eased in',
       sameShape: 'same curve',
       notchesMatch: 'notches match',
       linesMeet: 'lines across meet',

@@ -12,6 +12,46 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 57 — The sample dress sewn by Find seams, and draped
+
+The sample dress (**A dress from a PDF pattern**) now opens, sews and
+drapes as it should: its five pieces, **Find seams** and **Sew all** give
+its ten seams, and **Drape** puts a fitted skater dress on the figure.
+
+**Try it:** on an empty table press **A dress from a PDF pattern**, **Add
+5 pieces**, **Find seams**, **Sew all**, then open the avatar and
+**Drape**. The status line under it reads about 5 cm ease at the bust,
+4 cm at the waist and 10 cm at the hip.
+
+**What was wrong, and what changed:**
+
+* **The sample.** FreeSewing's Sasha draws its pockets into the side front
+  (a bag behind the panel below it), which can't be sewn or draped yet
+  (open question 36), and its back shoulder is 4 cm longer than its front's
+  (it widens the front neckline, not the back's). Sasha is now drafted
+  without its pockets, its back neckline widened as much as its front's;
+  the sample is that, drafted to the example figure and printed on A0.
+* **Find seams** no longer sews two hems to each other from the end of a
+  seam, nor a front's and a back's piece of an armhole from the side
+  seam's top: sewn, either would close the cloth round that point only half
+  way, into a spike no garment has. Such seams are found once the likeliest
+  are sewn, and the least likely seam meeting there is dropped. Once two
+  pieces cut as pairs are sewn half for half (or crossed), they stay so; a
+  piece has one centre seam; and a straight back a few millimetres longer
+  than its front (a back shoulder's ease) is sewn to it, **the back eased
+  in**.
+* **The drape** placed every piece of a bodice with its top at the
+  shoulders, so a side panel (its top at the armhole) started 13 cm too
+  high, and sewing it on pulled the centre front up into a roll across the
+  chest. Pieces are now placed where their seams with their neighbours put
+  them.
+* **The garment's size** under the avatar is now measured where the cloth
+  hung from the shoulders has settled (placed flat, it reaches the bust
+  lower than it does worn); a skirt is still measured where it is placed,
+  as it is worn.
+
+---
+
 ## Step 56 — An example person's measurements
 
 **Measurements** always shows an **Example**: the standard figure, the
@@ -291,8 +331,8 @@ from FreeSewing's standard size nearest the person, in proportion to what
 they have measured round the body (or along it, for lengths).
 
 **Not yet:** a design's own options (ease, lengths, necklines) can't be
-changed here; Simone's plackets and collar, and Sasha's princess panels,
-need some seams sewn by hand.
+changed here; Simone's plackets and collar need some seams sewn by hand.
+Sasha is drafted without its pockets (see Step 57).
 
 ---
 

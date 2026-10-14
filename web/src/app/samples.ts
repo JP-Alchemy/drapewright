@@ -1,14 +1,15 @@
 // Patterns to try Drapewright with, before opening one's own: a blouse and
 // a skirt drawn for its tests (CC0), sewn and ready to drape, and
 // FreeSewing's Sasha dress as a copy-shop PDF (MIT), to see a PDF put
-// together.
+// together, sewn by Find seams and draped: drafted to the example figure
+// (the avatar as it stands), without its pockets.
 
 // Served as files of their own, never inlined as `data:` URLs (as small
 // files are by default): the site's Content-Security-Policy lets the app
 // fetch only from itself.
 import blouse from '../../../fixtures/drapewright/blouse.drapewright?url&no-inline'
 import skirt from '../../../fixtures/drapewright/skirt.drapewright?url&no-inline'
-import dress from '../../../fixtures/pdf/freesewing-sasha-a0.pdf?url&no-inline'
+import dress from '../../../fixtures/pdf/freesewing-sasha-example-a0.pdf?url&no-inline'
 import { t } from '../strings/en.ts'
 
 export type SampleName = 'blouse' | 'skirt' | 'dress'

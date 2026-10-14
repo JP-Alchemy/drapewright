@@ -878,17 +878,22 @@ pub fn half_round(g: &Garment) -> bool {
     ring.len() >= 2 && !t.closed[r] && front_and_back
 }
 
-/// Where each panel's points start, the panels upright (see `place`).
-fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
-    let Traced {
-        boxes,
-        beside,
-        level,
-        rings,
-        closed,
-        ring_of,
-        names,
-    } = trace(g);
+/// How a garment's rings hang: each panel sewn over the shoulders to
+/// another of its ring, and the panel each one hangs under; and the
+/// bridges between rings (a yoke).
+struct Hanging {
+    bridge: Vec<bool>,
+    shoulders: Vec<bool>,
+    under: Vec<Option<usize>>,
+}
+
+fn hanging(
+    g: &Garment,
+    boxes: &[([f64; 2], [f64; 2])],
+    beside: &[Vec<(Side, usize, Side, usize)>],
+    level: &[(usize, f64, usize, f64)],
+    ring_of: &[usize],
+) -> Hanging {
     let n = g.panels.len();
     // Bridges: a panel joined to nothing side by side but sewn by two or
     // more of its edges to others (a yoke, between a front and a back over
@@ -925,7 +930,7 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
     let near_bottom = |p: usize, v: f64| v < boxes[p].0[1] + 0.25 * (boxes[p].1[1] - boxes[p].0[1]);
     let mut shoulders = vec![false; n];
     let mut under: Vec<Option<usize>> = vec![None; n];
-    for &(pa, va, pb, vb) in &level {
+    for &(pa, va, pb, vb) in level {
         if bridge[pa] || bridge[pb] {
             continue;
         }
@@ -954,6 +959,65 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
             }
         }
     }
+    Hanging {
+        bridge,
+        shoulders,
+        under,
+    }
+}
+
+/// Whether each panel hangs from the shoulders as it is placed: its ring
+/// sewn over them, or hung under one that is (a dress's skirt under its
+/// bodice). Placed flat from above the shoulders, such a panel reaches the
+/// bust lower than it does worn, over the bust's curve; one hung from the
+/// waist is placed where it is worn.
+pub fn from_shoulders(g: &Garment) -> Vec<bool> {
+    let turned = bands_turned(g);
+    let g = turned.as_ref().unwrap_or(g);
+    let t = trace(g);
+    let h = hanging(g, &t.boxes, &t.beside, &t.level, &t.ring_of);
+    let mut hung: Vec<bool> = t
+        .rings
+        .iter()
+        .map(|ring| ring.iter().any(|&(p, _)| h.shoulders[p]))
+        .collect();
+    for _ in 0..t.rings.len() {
+        for (r, ring) in t.rings.iter().enumerate() {
+            if !hung[r]
+                && ring
+                    .iter()
+                    .any(|&(p, _)| h.under[p].is_some_and(|over| hung[t.ring_of[over]]))
+            {
+                hung[r] = true;
+            }
+        }
+    }
+    (0..g.panels.len())
+        .map(|p| {
+            t.ring_of
+                .get(p)
+                .is_some_and(|&r| hung.get(r).copied().unwrap_or(false))
+        })
+        .collect()
+}
+
+/// Where each panel's points start, the panels upright (see `place`).
+fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
+    let Traced {
+        boxes,
+        beside,
+        level,
+        rings,
+        closed,
+        ring_of,
+        names,
+    } = trace(g);
+    let n = g.panels.len();
+    let Hanging {
+        bridge,
+        shoulders,
+        under,
+    } = hanging(g, &boxes, &beside, &level, &ring_of);
     // Each ring's height: from above the shoulders, under another ring, or
     // from the waist.
     let tall = |r: &[(usize, bool)]| {
@@ -1010,16 +1074,50 @@ fn place_upright(g: &Garment, figure: &Figure) -> Vec<Vec<[f64; 3]>> {
         let right = seam(Side::Right).or(outline_span.map(|s| s.1))?;
         (left < right).then_some((left, right))
     };
+    // How much higher panel `q` goes than panel `p` (from their flat y)
+    // for the seams between them to meet: the stitches' two ends level, on
+    // average. None where they are not sewn to each other.
+    let level = |p: usize, q: usize| -> Option<f64> {
+        let y = |panel: usize, point: u32| g.panels[panel].mesh.points[point as usize][1];
+        let (sum, count) = g
+            .stitches
+            .iter()
+            .filter_map(|&[(pa, a), (pb, b)]| {
+                if pa == p && pb == q {
+                    Some(y(p, a) - y(q, b))
+                } else if pa == q && pb == p {
+                    Some(y(p, b) - y(q, a))
+                } else {
+                    None
+                }
+            })
+            .fold((0.0, 0usize), |(s, c), d| (s + d, c + 1));
+        (count > 0).then(|| sum / count as f64)
+    };
     // A ring round the trunk, hanging from `top`: each panel's points.
     // How far up each panel goes from the panel's flat y, for a ring
     // whose top is at `top`: each by its waist line where every panel of a
     // ring has one and it is not hung from something placed (a corset at
-    // the waist, bust and hips where they go), else by its top.
+    // the waist, bust and hips where they go); else each where its seam
+    // with the one before it puts it (a side front's top at the armhole,
+    // below a centre front's at the shoulder), the highest at `top`.
     let raise = |ring: &[(usize, bool)], top: f64, by_waist: bool| -> Vec<f64> {
         let waists: Option<Vec<f64>> = ring.iter().map(|&(p, _)| g.panels[p].waist).collect();
         match waists {
             Some(waists) if by_waist => waists.iter().map(|w| figure.waist - w).collect(),
-            _ => ring.iter().map(|&(p, _)| top - boxes[p].1[1]).collect(),
+            _ => {
+                let mut up = vec![0.0; ring.len()];
+                for k in 1..ring.len() {
+                    let (p, q) = (ring[k - 1].0, ring[k].0);
+                    up[k] = up[k - 1] + level(p, q).unwrap_or(boxes[p].1[1] - boxes[q].1[1]);
+                }
+                let highest = ring
+                    .iter()
+                    .zip(&up)
+                    .map(|(&(p, _), u)| boxes[p].1[1] + u)
+                    .fold(f64::MIN, f64::max);
+                up.iter().map(|u| u + top - highest).collect()
+            }
         }
     };
     // Trousers: rings with a panel joined to another on both its sides (a

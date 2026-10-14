@@ -9,7 +9,6 @@ import {
   AvatarView,
   type DrapeProgress,
   type Draping,
-  type Girth,
 } from '@drapewright/engine/avatar'
 import bodyUrl from '../../../assets/body/adult.dwbody?url'
 import {
@@ -70,7 +69,6 @@ interface Drape {
   inside: string[]
   lined: string[]
   buttons: number
-  girths: Girth[]
   finish: (last: DrapeUpdate | null) => void
   told: { stage: string; at: number }
 }
@@ -117,7 +115,6 @@ function follow(id: number, draping: Draping, quietly: boolean): Promise<DrapeUp
       inside: draping.inside,
       lined: draping.lined,
       buttons: draping.buttons,
-      girths: draping.girths,
       finish,
       told: { stage: '', at: 0 },
     }
@@ -167,7 +164,8 @@ function moveDrape(d: Drape) {
     lined: d.lined,
     buttons: d.buttons,
     card: d.draping.onCard,
-    girths: d.girths,
+    // Measured as placed, then again as it settles.
+    girths: d.draping.girths,
   }
   const now = performance.now()
   if (done(progress)) {

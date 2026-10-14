@@ -4,18 +4,36 @@
 //! each copy is beside those it is sewn to, and the edges left free round
 //! the holes the seams leave (an armhole, a neck). Suggestions are tried
 //! on it first: one that would pinch a piece (bring two of its corners
-//! together through other pieces) or sew a copy both right side and wrong
-//! side out is not made.
+//! together through other pieces), sew a copy both right side and wrong
+//! side out, or sew one half of a pair to the other half of a pair it is
+//! sewn to half for half already (or the other way about) is not made. And
+//! places where the cloth is closed all round into a point no garment has
+//! (two hems sewn to each other from a seam's end) are found, for the
+//! seams that close them to be dropped.
 
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 
+use drapewright_pattern_core::stitching::stitching_edges;
 use drapewright_pattern_core::{EdgeKind, Piece};
+use kurbo::Point;
 
 use crate::model::{Seam, SeamSide};
 
 /// Ends of edges this near meet, mm.
 const END: f64 = 0.5;
+
+/// Cloth closed round a point less than this far round (degrees) is drawn
+/// into a point no garment has: what a seam sewn on from another's end
+/// closes, round a corner of each piece, where two hems or two armholes
+/// leave the seam (each piece's corner about square, together half way
+/// round). A seam going on through corners closes about 360°, a point
+/// shaped like a cone (a dart's) a little less.
+const CLOSED_ROUND: f64 = 300.0;
+
+/// A corner's angle is taken between its edges' stitching lines this far
+/// from it, mm: past the small kinks of a line drawn by hand.
+const ANGLE_REACH: f64 = 5.0;
 
 /// Corners further apart than this round the garment are as far as any,
 /// mm: a garment's whole edge is rarely longer.
@@ -110,6 +128,9 @@ pub(crate) struct Assembly {
     copy_base: Vec<usize>,
     /// Which corners meet.
     corners: Sets,
+    /// Each corner's angle, degrees: the cloth there, inside the copy (both
+    /// halves of a piece unfolded, at the ends of its fold).
+    angles: Vec<f64>,
     /// Which corners of the garment's shell meet: seams to facings and
     /// linings left out (layered inside, they bring nothing of it
     /// together).
@@ -121,6 +142,10 @@ pub(crate) struct Assembly {
     own: Sets,
     /// Which way out each copy is, beside those it is sewn to.
     faces: Sets,
+    /// Two pieces cut as pairs, sewn together: whether each half is sewn to
+    /// the other's other half (which half is which side is the pattern's
+    /// own way of drawing them), by the pieces (the first the lower).
+    halves: HashMap<(usize, usize), bool>,
     /// Each copy edge's sewn stretches, mm along it.
     sewn: HashMap<CopyEdge, Vec<(f64, f64)>>,
     /// Copies sewn to themselves: tubes (a sleeve, by its underarm).
@@ -133,6 +158,52 @@ pub(crate) struct Assembly {
     graph: Option<HashMap<usize, Vec<(usize, f64)>>>,
 }
 
+/// Each corner's angle inside the piece, degrees, between its edges'
+/// stitching lines (corner `i` is where edge `i` starts); a half turn where
+/// an edge is too short to say.
+fn corner_angles(piece: &Piece) -> Vec<f64> {
+    let edges = stitching_edges(piece);
+    let n = edges.len();
+    let all: Vec<Point> = edges.iter().flatten().copied().collect();
+    // Which way round the outline runs: the inside is on the left of a line
+    // going round anticlockwise.
+    let area: f64 = all
+        .iter()
+        .zip(all.iter().cycle().skip(1))
+        .map(|(a, b)| a.x * b.y - b.x * a.y)
+        .sum();
+    // The point `ANGLE_REACH` along a line from its first point.
+    let reach = |line: &mut dyn Iterator<Item = Point>| {
+        let first = line.next()?;
+        let mut walked = 0.0;
+        let mut last = first;
+        for p in line {
+            walked += (p - last).hypot();
+            last = p;
+            if walked >= ANGLE_REACH {
+                break;
+            }
+        }
+        (walked > 0.0).then_some((first, last))
+    };
+    (0..n)
+        .map(|i| {
+            let into = reach(&mut edges[(i + n - 1) % n].iter().rev().copied());
+            let out = reach(&mut edges[i].iter().copied());
+            let (Some((corner, from)), Some((_, to))) = (into, out) else {
+                return 180.0;
+            };
+            let (din, dout) = (corner - from, to - corner);
+            let turn = din.cross(dout).atan2(din.dot(dout)).to_degrees();
+            if area > 0.0 {
+                180.0 - turn
+            } else {
+                180.0 + turn
+            }
+        })
+        .collect()
+}
+
 /// One seam on two copies: each side's copy edge and the stretch of it
 /// sewn, and whether the first's start meets the second's end.
 pub(crate) type Part = (CopyEdge, (f64, f64), CopyEdge, (f64, f64), bool);
@@ -141,6 +212,7 @@ impl Assembly {
     /// The pieces, each edge `lengths[piece][edge]` mm long as sewn.
     pub fn new(pieces: &[&Piece], lengths: Vec<Vec<f64>>) -> Assembly {
         let mut cuts = Vec::new();
+        let mut angles = Vec::new();
         let (mut corner_base, mut copy_base) = (Vec::new(), Vec::new());
         let (mut corners, mut copies) = (0, 0);
         for piece in pieces {
@@ -163,7 +235,16 @@ impl Assembly {
             };
             corner_base.push(corners);
             copy_base.push(copies);
-            corners += 2 * piece.outline.edges.len();
+            let flat = corner_angles(piece);
+            let n = piece.outline.edges.len();
+            for half in 0..2 {
+                for i in 0..n {
+                    let a = flat.get(i).copied().unwrap_or(180.0);
+                    let at_fold = matches!(cut, Cut::Unfolded(f) if i == f || i == (f + 1) % n);
+                    angles.push(if at_fold && half == 0 { 2.0 * a } else { a });
+                }
+            }
+            corners += 2 * n;
             copies += if cut == Cut::Pair { 2 } else { 1 };
             cuts.push(cut);
         }
@@ -173,10 +254,12 @@ impl Assembly {
             corner_base,
             copy_base,
             corners: Sets::new(corners),
+            angles,
             shell: Sets::new(corners),
             inside: pieces.iter().map(|p| crate::suggest::inside(p)).collect(),
             own: Sets::new(corners),
             faces: Sets::new(copies),
+            halves: HashMap::new(),
             sewn: HashMap::new(),
             tubes: vec![false; copies],
             wrapped: Vec::new(),
@@ -368,6 +451,19 @@ impl Assembly {
             if !next.faces.join(ca, cb, !same_way) {
                 return false;
             }
+            // Two pairs sewn half for half, or each half to the other's other
+            // half, are sewn so everywhere: a left half is not sewn to the
+            // right half of what it is sewn to already.
+            if a.piece != b.piece
+                && next.cuts[a.piece] == Cut::Pair
+                && next.cuts[b.piece] == Cut::Pair
+            {
+                let crossed = a.mirror != b.mirror;
+                let pieces = (a.piece.min(b.piece), a.piece.max(b.piece));
+                if *next.halves.entry(pieces).or_insert(crossed) != crossed {
+                    return false;
+                }
+            }
             next.sewn.entry(a).or_default().push(sa);
             next.sewn.entry(b).or_default().push(sb);
         }
@@ -422,6 +518,60 @@ impl Assembly {
             }
         }
         true
+    }
+
+    /// The places where the garment's shell is closed all round (every
+    /// edge there sewn at that end) into a point no garment has: less than
+    /// `CLOSED_ROUND` of cloth round it. Each as one of its corners.
+    pub fn spikes(&mut self) -> Vec<usize> {
+        // Each corner, and whether every edge end there is sewn.
+        let n = self.angles.len();
+        let mut closed = vec![true; n];
+        let mut touched = vec![false; n];
+        for piece in 0..self.cuts.len() {
+            if self.inside[piece] {
+                continue;
+            }
+            for edge in 0..self.edges(piece) {
+                for mirror in [false, true] {
+                    let e = CopyEdge {
+                        piece,
+                        edge,
+                        mirror,
+                    };
+                    if !self.has(e) {
+                        continue;
+                    }
+                    let length = self.length(e);
+                    let stretches = self.sewn.get(&e).map(Vec::as_slice).unwrap_or(&[]);
+                    let at_start = stretches.iter().any(|s| s.0.min(s.1) <= END);
+                    let at_end = stretches.iter().any(|s| s.0.max(s.1) >= length - END);
+                    for (c, sewn) in [(self.start(e), at_start), (self.end(e), at_end)] {
+                        touched[c] = true;
+                        closed[c] &= sewn;
+                    }
+                }
+            }
+        }
+        let mut places: HashMap<usize, (bool, f64, usize)> = HashMap::new();
+        for c in (0..n).filter(|&c| touched[c]) {
+            let root = self.shell.find(c).0;
+            let place = places.entry(root).or_insert((true, 0.0, c));
+            place.0 &= closed[c];
+            place.1 += self.angles[c];
+        }
+        let mut out: Vec<usize> = places
+            .into_values()
+            .filter(|&(closed, round, _)| closed && round < CLOSED_ROUND)
+            .map(|(_, _, c)| c)
+            .collect();
+        out.sort_unstable();
+        out
+    }
+
+    /// Whether two corners are at one place of the garment's shell.
+    pub fn same_place(&mut self, a: usize, b: usize) -> bool {
+        self.shell.find(a).0 == self.shell.find(b).0
     }
 
     /// Whether any of a copy edge is sewn.
@@ -732,6 +882,72 @@ mod tests {
         assert!(!a.sew(&[(at, sat, bt, sbt, false)]));
         // Refused, nothing of it was sewn.
         assert!(!a.is_sewn(at));
+    }
+
+    /// A rectangle `w` by `h` mm whose left and right sides are two edges
+    /// each, meeting half way down (in a straight line).
+    fn split_panel(id: &str, w: f64, h: f64) -> Piece {
+        let mut p = panel(id, w, h, 1);
+        p.outline.edges = vec![
+            Edge::new("top", vec![Segment::line([w, 0.0])]),
+            Edge::new("right1", vec![Segment::line([w, h / 2.0])]),
+            Edge::new("right2", vec![Segment::line([w, h])]),
+            Edge::new("bottom", vec![Segment::line([0.0, h])]),
+            Edge::new("left2", vec![Segment::line([0.0, h / 2.0])]),
+            Edge::new("left1", vec![Segment::line([0.0, 0.0])]),
+        ];
+        p
+    }
+
+    #[test]
+    fn cloth_closed_round_a_point_into_a_spike_is_found() {
+        // Two rectangles sewn side by side, end to start: their bottoms,
+        // sewn to each other from that seam's end, close the cloth round
+        // the corners there only half way (two square corners).
+        let mut a = assembly(&[panel("a", 300.0, 500.0, 1), panel("b", 300.0, 500.0, 1)]);
+        let (ar, sar) = whole(0, 1, false, &a);
+        let (bl, sbl) = whole(1, 3, false, &a);
+        assert!(a.sew(&[(ar, sar, bl, sbl, true)]));
+        assert!(a.spikes().is_empty());
+        let (ab, sab) = whole(0, 2, false, &a);
+        let (bb, sbb) = whole(1, 2, false, &a);
+        assert!(a.sew(&[(ab, sab, bb, sbb, true)]));
+        let spikes = a.spikes();
+        assert_eq!(spikes.len(), 1, "{spikes:?}");
+        assert!(a.same_place(spikes[0], a.start(ab)));
+        // A seam going on past a corner in a straight line closes it all
+        // the way round.
+        let mut a = assembly(&[
+            split_panel("a", 300.0, 500.0),
+            split_panel("b", 300.0, 500.0),
+        ]);
+        let (ar1, sar1) = whole(0, 1, false, &a);
+        let (bl1, sbl1) = whole(1, 5, false, &a);
+        assert!(a.sew(&[(ar1, sar1, bl1, sbl1, true)]));
+        let (ar2, sar2) = whole(0, 2, false, &a);
+        let (bl2, sbl2) = whole(1, 4, false, &a);
+        assert!(a.sew(&[(ar2, sar2, bl2, sbl2, true)]));
+        assert!(a.spikes().is_empty());
+    }
+
+    #[test]
+    fn pairs_are_sewn_half_for_half_everywhere_or_crossed_everywhere() {
+        // Two pairs sewn at one side, each half to the same half of the
+        // other: at their other side, a half is not sewn to the other's
+        // other half.
+        let mut a = assembly(&[panel("a", 300.0, 500.0, 2), panel("b", 300.0, 500.0, 2)]);
+        let side = |mirror: bool, a: &Assembly| {
+            let (ar, sar) = whole(0, 1, mirror, a);
+            let (bl, sbl) = whole(1, 3, mirror, a);
+            (ar, sar, bl, sbl, true)
+        };
+        let parts = [side(false, &a), side(true, &a)];
+        assert!(a.sew(&parts));
+        let (al, sal) = whole(0, 3, false, &a);
+        let (br, sbr) = whole(1, 1, true, &a);
+        assert!(!a.sew(&[(br, sbr, al, sal, true)]));
+        let (br, sbr) = whole(1, 1, false, &a);
+        assert!(a.sew(&[(br, sbr, al, sal, true)]));
     }
 
     #[test]
