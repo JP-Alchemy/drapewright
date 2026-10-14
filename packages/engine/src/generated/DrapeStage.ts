@@ -3,4 +3,4 @@
 /**
  * Where a drape has got to.
  */
-export type DrapeStage = "sewing" | "settling" | "settled" | "stopped";
+export type DrapeStage = "sewing" | "settling" | "posing" | "settled" | "stopped";

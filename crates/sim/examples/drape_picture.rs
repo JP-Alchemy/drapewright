@@ -3,9 +3,11 @@
 //!
 //!     cargo run --release -p drapewright-sim --example drape_picture -- \
 //!         assets/body/adult.dwbody out [fabric] \
-//!         [skirt|blouse|long|bust|armhole|yoked|trousers|<project file> [suggest]]
+//!         [skirt|blouse|long|bust|armhole|yoked|trousers|<project file> [suggest]] \
+//!         [pose=arms-down|reaching|arms-up|stepping|sitting]
 //!
-//! writes out-placed.png, out-sewn.png and out-settled.png, draping a
+//! writes out-placed.png, out-sewn.png and out-settled.png (and with a
+//! pose, out-posed.png, the figure moved into it once settled), draping a
 //! skirt, a blouse, a blouse with long sleeves, or one with a full bust
 //! adjustment (its dart in the side seam, or pivoted into the armhole),
 //! cut for the standard figure, or a long blouse with yokes, gathers and
@@ -18,12 +20,12 @@
 #[path = "../tests/common/mod.rs"]
 mod common;
 
-use drapewright_body::{BodyModel, Shape};
+use drapewright_body::{BodyModel, Pose, Shape};
 use drapewright_pattern_core::Piece;
 use drapewright_project::container::unpack;
 use drapewright_project::migrate::load;
 use drapewright_seams::Seam;
-use drapewright_sim::drape::Drape;
+use drapewright_sim::drape::{Drape, Posable};
 use drapewright_sim::fabric::preset;
 use drapewright_sim::garment::{assemble, draped_pieces};
 use drapewright_sim::place::{Figure, place};
@@ -218,6 +220,21 @@ fn sewn(pieces: Vec<Piece>, seams: Vec<Seam>) -> (Vec<Piece>, Vec<Seam>) {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    let pose = args
+        .iter()
+        .find_map(|a| a.strip_prefix("pose="))
+        .map(|p| match p {
+            "arms-down" => Pose::ArmsDown,
+            "reaching" => Pose::Reaching,
+            "arms-up" => Pose::ArmsUp,
+            "stepping" => Pose::Stepping,
+            "sitting" => Pose::Sitting,
+            _ => Pose::Standing,
+        });
+    let args: Vec<String> = args
+        .into_iter()
+        .filter(|a| !a.starts_with("pose="))
+        .collect();
     let [asset, out, rest @ ..] = args.as_slice() else {
         eprintln!(
             "usage: drape_picture <body file> <out> [fabric] \
@@ -315,4 +332,40 @@ fn main() {
         lowest(false)
     );
     draw("settled", &drape);
+    if let Some(pose) = pose {
+        drape.posable(Posable::of(&model, &body).expect("joints"));
+        let start = drape.time;
+        drape.pose(pose);
+        while (drape.moving() || !drape.settled()) && drape.time - start < 10.0 {
+            drape.step(1.0 / 60.0);
+        }
+        let inside = drape
+            .cloth
+            .x
+            .iter()
+            .filter(|&&p| drape.clearance(p) < 0.0)
+            .count();
+        eprintln!(
+            "posed after {:.1} s; {inside} points inside the body",
+            drape.time - start
+        );
+        let mut posed: Vec<[f64; 3]> = drape
+            .body()
+            .map(|(_, points)| points.iter().map(|p| p.map(f64::from)).collect())
+            .unwrap_or_else(|| body.vertices.clone());
+        let mut triangles = triangles.clone();
+        if let Some(seat) = drape.seat() {
+            let (corners, faces) = seat.mesh();
+            let first = posed.len() as u32;
+            posed.extend(corners.iter().map(|p| p.map(|c| f64::from(c) * 1000.0)));
+            triangles.extend(faces.iter().map(|f| f.map(|i| i + first)));
+        }
+        picture(
+            &format!("{out}-posed.png"),
+            &posed,
+            &triangles,
+            &drape.cloth.x,
+            &drape.cloth.triangles,
+        );
+    }
 }

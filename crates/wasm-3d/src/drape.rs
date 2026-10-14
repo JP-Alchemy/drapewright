@@ -1,11 +1,11 @@
 //! The project's garment draped on the avatar: what the page asks for, and
 //! how the drape is going. The draping itself is `drapewright-sim`'s.
 
-use drapewright_body::{BodyModel, Shape};
+use drapewright_body::{BodyModel, Pose, Shape};
 pub use drapewright_fabric::{Fabric, FabricPreset, Measured};
 use drapewright_pattern_core::Piece;
 use drapewright_seams::Seam;
-use drapewright_sim::drape::Drape;
+use drapewright_sim::drape::{Drape, Posable};
 use drapewright_sim::garment::{GarmentError, assemble, draped_pieces};
 use drapewright_sim::girth::girths;
 use drapewright_sim::place::{Figure, half_round, place};
@@ -36,6 +36,43 @@ pub struct DrapeRequest {
     #[ts(optional)]
     pub measured: Option<Measured>,
     pub settings: AvatarSettings,
+    /// The pose to move into once draped: standing as measured if none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub pose: Option<AvatarPose>,
+}
+
+/// How the avatar stands.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum AvatarPose {
+    /// As measured: arms out and down, legs straight.
+    #[default]
+    Standing,
+    /// Arms hanging by the sides.
+    ArmsDown,
+    /// Both arms reaching forward at shoulder height.
+    Reaching,
+    /// Both arms raised overhead.
+    ArmsUp,
+    /// Mid-stride.
+    Stepping,
+    /// Sitting.
+    Sitting,
+}
+
+impl From<AvatarPose> for Pose {
+    fn from(p: AvatarPose) -> Pose {
+        match p {
+            AvatarPose::Standing => Pose::Standing,
+            AvatarPose::ArmsDown => Pose::ArmsDown,
+            AvatarPose::Reaching => Pose::Reaching,
+            AvatarPose::ArmsUp => Pose::ArmsUp,
+            AvatarPose::Stepping => Pose::Stepping,
+            AvatarPose::Sitting => Pose::Sitting,
+        }
+    }
 }
 
 /// Where a drape has got to.
@@ -47,6 +84,8 @@ pub enum DrapeStage {
     Sewing,
     /// Sewn, and coming to rest.
     Settling,
+    /// The body moving into a pose, the garment with it.
+    Posing,
     /// Hanging still.
     Settled,
     /// Still moving after the longest a drape is given.
@@ -117,6 +156,11 @@ pub struct Draping {
     /// The garment's size round the body at its bust, waist and hip.
     pub girths: Vec<Girth>,
     done: Option<DrapeStage>,
+    /// The pose asked for, and the pose the body is in or moving into.
+    wanted: AvatarPose,
+    posed: AvatarPose,
+    /// When the drape last set off (sewing, or moving into a pose), s.
+    since: f32,
 }
 
 impl Draping {
@@ -151,7 +195,7 @@ impl Draping {
                 body: at.girth,
             })
             .collect();
-        let drape = Drape::new(
+        let mut drape = Drape::new(
             &garment,
             &starts,
             request
@@ -159,13 +203,49 @@ impl Draping {
                 .map_or(request.fabric.fabric(), |m| m.fabric(request.fabric)),
             (&body.vertices, &model.skin()),
         );
+        if let Some(posable) = Posable::of(model, &body) {
+            drape.posable(posable);
+        }
         Ok(Draping {
             drape,
             left_out: draped.alone,
             inside: draped.inside,
             girths,
             done: None,
+            wanted: request.pose.unwrap_or_default(),
+            posed: AvatarPose::Standing,
+            since: 0.0,
         })
+    }
+
+    /// Moves the body into `pose` once the garment has settled (at once if
+    /// it has), the garment with it.
+    pub fn pose(&mut self, pose: AvatarPose) {
+        self.wanted = pose;
+        if self.done.is_some() && pose != self.posed {
+            self.set_off();
+        }
+    }
+
+    fn set_off(&mut self) {
+        self.drape.pose(self.wanted.into());
+        self.posed = self.wanted;
+        self.since = self.drape.time;
+        self.done = None;
+    }
+
+    /// The body as it is now (mm), if it has moved from standing as
+    /// measured; and its move's number, different each time it moves.
+    pub fn body(&self) -> Option<(u32, &[[f32; 3]])> {
+        self.drape.body()
+    }
+
+    /// The seat the figure sits on now, if it sits: its lowest and highest
+    /// corners, mm.
+    pub fn seat(&self) -> Option<([f32; 3], [f32; 3])> {
+        self.drape
+            .seat()
+            .map(|s| (s.low.map(|c| c * 1000.0), s.high.map(|c| c * 1000.0)))
     }
 
     /// Moves the drape on a frame, unless it is done.
@@ -173,8 +253,12 @@ impl Draping {
         if self.done.is_none() {
             self.drape.step(FRAME);
             if self.drape.settled() {
-                self.done = Some(DrapeStage::Settled);
-            } else if self.drape.time >= LONGEST {
+                if self.wanted == self.posed {
+                    self.done = Some(DrapeStage::Settled);
+                } else {
+                    self.set_off();
+                }
+            } else if self.drape.time - self.since >= LONGEST {
                 self.done = Some(DrapeStage::Stopped);
             }
         }
@@ -184,6 +268,8 @@ impl Draping {
     pub fn progress(&self) -> DrapeProgress {
         let stage = self.done.unwrap_or(if self.drape.sewing() {
             DrapeStage::Sewing
+        } else if self.drape.moving() {
+            DrapeStage::Posing
         } else {
             DrapeStage::Settling
         });

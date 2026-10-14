@@ -6,9 +6,11 @@
 pub mod asset;
 pub mod fit;
 pub mod measure;
+pub mod pose;
 pub mod shape;
 
 pub use asset::{AssetError, BodyAsset, Region};
 pub use fit::{Fit, fit};
 pub use measure::{Landmarks, measure};
+pub use pose::{Pose, Rig, Stance};
 pub use shape::{Body, BodyModel, Shape};

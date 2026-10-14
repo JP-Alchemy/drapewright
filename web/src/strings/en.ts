@@ -3,6 +3,7 @@
 
 import type {
   AllowanceNote,
+  AvatarPose,
   CornerStyle,
   DisplayUnits,
   ClothShows,
@@ -1184,6 +1185,16 @@ export const t = {
     takeOff: 'Take off',
     sewing: 'Sewing the seams…',
     settling: 'Letting it settle…',
+    posing: 'Moving into the pose…',
+    pose: 'Pose',
+    poses: {
+      standing: 'Standing',
+      armsDown: 'Arms down',
+      reaching: 'Reaching forward',
+      armsUp: 'Arms raised',
+      stepping: 'Walking',
+      sitting: 'Sitting',
+    } satisfies Record<AvatarPose, string>,
     following: 'Draping it again to follow the change…',
     draped: (fabric: string) => `Draped in ${fabric}.`,
     stillMoving: (fabric: string) => `Draped in ${fabric}; still moving a little.`,

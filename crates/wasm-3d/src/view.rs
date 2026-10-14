@@ -1,13 +1,13 @@
 //! The 3D view: drawn by `drapewright-render` on a canvas the page hands to
 //! the sim worker, through WebGPU where there is one and WebGL2 where not.
 
-use drapewright_body::Shape;
+use drapewright_body::{Pose, Rig, Shape};
 use drapewright_render::{Look, Mesh, Orbit, Renderer};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use crate::drape::ClothState;
-use crate::{Avatar, AvatarSettings, ClothShows, Draping};
+use crate::{Avatar, AvatarPose, AvatarSettings, ClothShows, Draping};
 
 fn error(e: impl std::fmt::Display) -> JsError {
     JsError::new(&e.to_string())
@@ -15,6 +15,42 @@ fn error(e: impl std::fmt::Display) -> JsError {
 
 /// Turning, radians for each CSS pixel dragged.
 const TURN: f32 = 0.008;
+
+/// A figure: its points (mm), and its skin's triangles.
+type Figure = (Vec<[f32; 3]>, Vec<[u32; 3]>);
+
+/// A seat's colour (sRGB, 0 to 1): a plain grey.
+const SEAT: [f32; 3] = [0.6, 0.6, 0.6];
+
+/// A box (its lowest and highest corners), its faces flat: four corners
+/// each, two triangles facing out.
+fn box_mesh((low, high): ([f32; 3], [f32; 3])) -> Mesh {
+    let corner = |i: usize| {
+        [
+            if i & 1 == 0 { low[0] } else { high[0] },
+            if i & 2 == 0 { low[1] } else { high[1] },
+            if i & 4 == 0 { low[2] } else { high[2] },
+        ]
+    };
+    // Each face's corners, anticlockwise seen from outside.
+    let faces: [[usize; 4]; 6] = [
+        [0, 2, 3, 1],
+        [4, 5, 7, 6],
+        [0, 1, 5, 4],
+        [2, 6, 7, 3],
+        [0, 4, 6, 2],
+        [1, 3, 7, 5],
+    ];
+    let mut positions = Vec::new();
+    let mut triangles = Vec::new();
+    for face in faces {
+        let first = positions.len() as u32;
+        positions.extend(face.map(corner));
+        triangles.push([first, first + 1, first + 2]);
+        triangles.push([first, first + 2, first + 3]);
+    }
+    Mesh::new(positions, &triangles)
+}
 
 /// The page's colours for the view (sRGB, 0 to 1).
 #[derive(Deserialize)]
@@ -44,6 +80,13 @@ pub struct View {
     cloth: Option<ClothState>,
     shows: ClothShows,
     backend: String,
+    /// The figure standing as measured, and which move of it is shown
+    /// instead: a drape's (by number), 0 for a pose of its own, none for
+    /// standing.
+    standing: Option<Figure>,
+    moved: Option<u32>,
+    /// The seat shown, if the figure sits.
+    seat: Option<([f32; 3], [f32; 3])>,
 }
 
 #[wasm_bindgen]
@@ -112,6 +155,9 @@ impl View {
             cloth: None,
             shows: ClothShows::default(),
             backend: backend.into(),
+            standing: None,
+            moved: None,
+            seat: None,
         })
     }
 
@@ -149,20 +195,49 @@ impl View {
         Ok(())
     }
 
-    /// Shows `avatar` shaped by `settings` (an `AvatarSettings`), framed
-    /// whole the first time.
-    pub fn show(&mut self, avatar: &Avatar, settings: JsValue) -> Result<(), JsError> {
+    /// Shows `avatar` shaped by `settings` (an `AvatarSettings`) in `pose`
+    /// (an `AvatarPose`), framed whole the first time.
+    pub fn show(
+        &mut self,
+        avatar: &Avatar,
+        settings: JsValue,
+        pose: JsValue,
+    ) -> Result<(), JsError> {
         let settings: AvatarSettings = serde_wasm_bindgen::from_value(settings).map_err(error)?;
+        let pose: AvatarPose = if pose.is_undefined() {
+            AvatarPose::Standing
+        } else {
+            serde_wasm_bindgen::from_value(pose).map_err(error)?
+        };
         let model = &avatar.model;
         let body = model.shape(&Shape::from(settings));
-        let positions: Vec<[f32; 3]> = body
-            .vertices
-            .iter()
-            .map(|p| [p[0] as f32, p[1] as f32, p[2] as f32])
-            .collect();
-        let mesh = Mesh::new(positions, &model.skin());
-        let (low, high) = mesh.bounds();
+        let to_f32 = |vertices: &[[f64; 3]]| -> Vec<[f32; 3]> {
+            vertices
+                .iter()
+                .map(|p| [p[0] as f32, p[1] as f32, p[2] as f32])
+                .collect()
+        };
+        let skin = model.skin();
+        let standing = to_f32(&body.vertices);
+        let mut seat = None;
+        let posed = match Rig::new(model, &body) {
+            Some(rig) if pose != AvatarPose::Standing => {
+                let stance = rig.stance(&body, Pose::from(pose));
+                if pose == AvatarPose::Sitting {
+                    let (low, high) = rig.seat(&body, &stance);
+                    seat = Some((low.map(|c| c as f32), high.map(|c| c as f32)));
+                }
+                Some(to_f32(&rig.place(&body, &stance).vertices))
+            }
+            _ => None,
+        };
+        self.show_seat(seat);
+        // Framed by the figure standing, however it's posed.
+        let (low, high) = Mesh::new(standing.clone(), &skin).bounds();
+        self.moved = posed.as_ref().map(|_| 0);
+        let mesh = Mesh::new(posed.unwrap_or_else(|| standing.clone()), &skin);
         self.renderer.set_mesh(&self.device, &mesh);
+        self.standing = Some((standing, skin));
         match &mut self.orbit {
             // A new figure for the same view: keep where it is seen from.
             Some(orbit) => {
@@ -174,11 +249,41 @@ impl View {
         Ok(())
     }
 
-    /// Shows the cloth of a drape as it is now.
+    /// Shows the cloth of a drape as it is now, and its body as it has
+    /// moved.
     #[wasm_bindgen(js_name = showCloth)]
     pub fn show_cloth(&mut self, draping: &Draping) {
         self.cloth = Some(draping.0.state());
         self.colour_cloth();
+        self.show_seat(draping.0.seat());
+        let Some((standing, skin)) = &self.standing else {
+            return;
+        };
+        match draping.0.body() {
+            Some((n, points)) if self.moved != Some(n) => {
+                let mesh = Mesh::new(points.to_vec(), skin);
+                if !self.renderer.move_figure(&self.queue, &mesh) {
+                    self.renderer.set_mesh(&self.device, &mesh);
+                }
+                self.moved = Some(n);
+            }
+            None if self.moved.is_some() => {
+                let mesh = Mesh::new(standing.clone(), skin);
+                self.renderer.move_figure(&self.queue, &mesh);
+                self.moved = None;
+            }
+            _ => {}
+        }
+    }
+
+    /// Shows `seat`, if not shown already.
+    fn show_seat(&mut self, seat: Option<([f32; 3], [f32; 3])>) {
+        if seat != self.seat {
+            let mesh = seat.map(box_mesh);
+            self.renderer
+                .set_prop(&self.device, mesh.as_ref().map(|m| (m, SEAT)));
+            self.seat = seat;
+        }
     }
 
     /// The cloth, shown as it is to be shown.

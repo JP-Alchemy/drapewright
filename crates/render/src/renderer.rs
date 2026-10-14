@@ -112,6 +112,8 @@ pub struct Renderer {
     floor: wgpu::Buffer,
     figure: Option<Figure>,
     cloth: Option<Cloth>,
+    /// Something the figure uses, in a colour of its own: a seat.
+    prop: Option<Cloth>,
     targets: Option<Targets>,
 }
 
@@ -279,8 +281,40 @@ impl Renderer {
             floor,
             figure: None,
             cloth: None,
+            prop: None,
             targets: None,
         }
+    }
+
+    /// Something the figure uses, drawn in `colour` (sRGB, 0 to 1): a seat
+    /// it sits on. None, nothing.
+    pub fn set_prop(&mut self, device: &wgpu::Device, prop: Option<(&Mesh, [f32; 3])>) {
+        self.prop = prop.map(|(mesh, colour)| {
+            let vertices: Vec<ClothVertex> = mesh
+                .positions
+                .iter()
+                .zip(&mesh.normals)
+                .map(|(&position, &normal)| ClothVertex {
+                    position,
+                    normal,
+                    colour: colour.map(linear),
+                })
+                .collect();
+            Cloth {
+                vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("prop"),
+                    contents: bytemuck::cast_slice(&vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                }),
+                indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("prop"),
+                    contents: bytemuck::cast_slice(&mesh.indices),
+                    usage: wgpu::BufferUsages::INDEX,
+                }),
+                points: vertices.len(),
+                count: mesh.indices.len() as u32,
+            }
+        });
     }
 
     /// The figure to draw from now on.
@@ -291,7 +325,7 @@ impl Renderer {
             vertices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("figure"),
                 contents: bytemuck::cast_slice(&vertices),
-                usage: wgpu::BufferUsages::VERTEX,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             }),
             indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("figure"),
@@ -301,6 +335,20 @@ impl Renderer {
             count: mesh.indices.len() as u32,
             reach: (high[0] - low[0]).max(high[2] - low[2]) * 0.75,
         });
+    }
+
+    /// The figure moved: `mesh` the same figure (as many points, the same
+    /// triangles) somewhere else, written into its buffers. False, and
+    /// nothing done, if there's no such figure.
+    pub fn move_figure(&mut self, queue: &wgpu::Queue, mesh: &Mesh) -> bool {
+        let Some(figure) = &self.figure else {
+            return false;
+        };
+        if figure.count != mesh.indices.len() as u32 {
+            return false;
+        }
+        queue.write_buffer(&figure.vertices, 0, bytemuck::cast_slice(&vertices(mesh)));
+        true
     }
 
     /// The cloth to draw from now on, draped on the figure, each point in
@@ -463,7 +511,7 @@ impl Renderer {
                 pass.set_vertex_buffer(0, figure.vertices.slice(..));
                 pass.set_index_buffer(figure.indices.slice(..), wgpu::IndexFormat::Uint32);
                 pass.draw_indexed(0..figure.count, 0, 0..1);
-                if let Some(cloth) = &self.cloth {
+                for cloth in [&self.cloth, &self.prop].into_iter().flatten() {
                     pass.set_pipeline(&self.cloth_pipeline);
                     pass.set_vertex_buffer(0, cloth.vertices.slice(..));
                     pass.set_index_buffer(cloth.indices.slice(..), wgpu::IndexFormat::Uint32);

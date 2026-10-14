@@ -9,6 +9,7 @@ import init, {
 } from '../pkg-3d/drapewright_wasm_3d.js'
 import type {
   AvatarFit,
+  AvatarPose,
   AvatarRequest,
   AvatarSettings,
   Blended,
@@ -26,6 +27,7 @@ import type {
 
 export type {
   AvatarFit,
+  AvatarPose,
   AvatarRequest,
   AvatarSettings,
   BlendNote,
@@ -124,6 +126,14 @@ export class Draping {
     return drapings.get(this)!.girths as Girth[]
   }
 
+  /**
+   * Moves the body into `pose` once the garment has settled (at once if it
+   * has), the garment with it: stepped on as a drape is.
+   */
+  pose(pose: AvatarPose): void {
+    drapings.get(this)!.pose(pose)
+  }
+
   /** Moves the drape on a frame (1/60 s of the cloth's time). */
   step(): DrapeProgress {
     return drapings.get(this)!.step() as DrapeProgress
@@ -170,12 +180,12 @@ export class AvatarView {
     this.#handle.setLook(colours)
   }
 
-  /** Shows the avatar shaped by these settings; framed whole the first time. */
-  show(avatar: Avatar, settings: AvatarSettings): void {
-    this.#handle.show(handles.get(avatar)!, settings)
+  /** Shows the avatar shaped by these settings in `pose`; framed whole the first time. */
+  show(avatar: Avatar, settings: AvatarSettings, pose: AvatarPose = 'standing'): void {
+    this.#handle.show(handles.get(avatar)!, settings, pose)
   }
 
-  /** Shows a drape's cloth as it is now. */
+  /** Shows a drape's cloth as it is now, and its body as it has moved. */
   showCloth(draping: Draping): void {
     const handle = drapings.get(draping)
     if (handle) this.#handle.showCloth(handle)

@@ -5,6 +5,7 @@
 
 import {
   Avatar,
+  type AvatarSettings,
   AvatarView,
   type DrapeProgress,
   type Draping,
@@ -72,6 +73,10 @@ interface Drape {
   told: { stage: string; at: number }
 }
 let drape: Drape | null = null
+/** The drape last settled, kept to move into another pose. */
+let kept: Draping | null = null
+/** The figure shown, to show again in another pose. */
+let figure: AvatarSettings | null = null
 /** Counts drapes asked for and taken off: a drape overtaken while starting is dropped. */
 let drapes = 0
 /** The request being answered, while its handler starts. */
@@ -79,13 +84,41 @@ let asking = 0
 
 const done = (p: DrapeProgress) => p.stage === 'settled' || p.stage === 'stopped'
 
-/** Stops the drape in progress, its request answered with `last`. */
+/**
+ * Stops the drape in progress, its request answered with `last`: settled,
+ * it is kept to pose, the last kept let go.
+ */
 function stopDrape(last: DrapeUpdate | null) {
+  forget()
   if (!drape) return
   const { draping, finish } = drape
   drape = null
-  draping.free()
+  if (last) kept = draping
+  else draping.free()
   finish(last)
+}
+
+/** Lets go of the drape kept to pose. */
+function forget() {
+  kept?.free()
+  kept = null
+}
+
+/** Steps `draping` on as the drape asked for by request `id`, answering once done. */
+function follow(id: number, draping: Draping, quietly: boolean): Promise<DrapeUpdate | null> {
+  return new Promise<DrapeUpdate | null>((finish) => {
+    drape = {
+      id,
+      draping,
+      quietly,
+      leftOut: draping.leftOut,
+      inside: draping.inside,
+      girths: draping.girths,
+      finish,
+      told: { stage: '', at: 0 },
+    }
+    redraw()
+  })
 }
 
 let pending = false
@@ -152,14 +185,34 @@ const handlers: { [M in keyof SimMethods]: (...args: Parameters<SimMethods[M]>) 
     }
     return created.backend
   },
-  showAvatar: async (settings) => {
+  showAvatar: async (settings, pose) => {
     const a = await loadAvatar()
     if (!view) throw new SimError('the view is not open', 'noView')
     // A new figure: the garment no longer fits it.
     drapes++
     stopDrape(null)
     view.hideCloth()
-    view.show(a, settings)
+    view.show(a, settings, pose)
+    figure = settings
+    redraw()
+    return null
+  },
+  pose: async (pose) => {
+    const id = asking
+    // Being draped: it moves into the pose once settled.
+    if (drape) {
+      drape.draping.pose(pose)
+      return null
+    }
+    const a = await loadAvatar()
+    if (!view) throw new SimError('the view is not open', 'noView')
+    if (kept) {
+      const draping = kept
+      kept = null
+      draping.pose(pose)
+      return follow(id, draping, false)
+    }
+    if (figure) view.show(a, figure, pose)
     redraw()
     return null
   },
@@ -169,6 +222,7 @@ const handlers: { [M in keyof SimMethods]: (...args: Parameters<SimMethods[M]>) 
     stopDrape(null)
     view = null
     surface = null
+    figure = null
     return null
   },
   drape: async (request, quietly) => {
@@ -184,19 +238,7 @@ const handlers: { [M in keyof SimMethods]: (...args: Parameters<SimMethods[M]>) 
     } catch (error) {
       throw new SimError(error instanceof Error ? error.message : String(error), 'cannotDrape')
     }
-    return new Promise<DrapeUpdate | null>((finish) => {
-      drape = {
-        id,
-        draping,
-        quietly,
-        leftOut: draping.leftOut,
-        inside: draping.inside,
-        girths: draping.girths,
-        finish,
-        told: { stage: '', at: 0 },
-      }
-      redraw()
-    })
+    return follow(id, draping, quietly)
   },
   undrape: () => {
     drapes++

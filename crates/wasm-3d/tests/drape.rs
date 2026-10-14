@@ -4,7 +4,7 @@ use drapewright_body::{BodyModel, Shape};
 use drapewright_project::{Engine, container};
 use drapewright_wasm_3d::drape::Measured;
 use drapewright_wasm_3d::drape::{DrapeError, Draping};
-use drapewright_wasm_3d::{ClothShows, DrapeRequest, DrapeStage, FabricPreset};
+use drapewright_wasm_3d::{AvatarPose, ClothShows, DrapeRequest, DrapeStage, FabricPreset};
 
 fn model() -> BodyModel {
     let path = concat!(
@@ -30,6 +30,7 @@ fn garment(name: &str) -> DrapeRequest {
         fabric: FabricPreset::Poplin,
         measured: None,
         settings: Shape::default().into(),
+        pose: None,
     }
 }
 
@@ -60,6 +61,62 @@ fn a_blouse_drapes_with_its_sleeves() {
         .map(|p| p[0].abs())
         .fold(0.0, f32::max);
     assert!(reach > 250.0, "reaches {reach} mm out");
+}
+
+#[test]
+fn a_skirt_asked_for_sitting_sits_once_draped_and_stands_again() {
+    let request = DrapeRequest {
+        pose: Some(AvatarPose::Sitting),
+        ..garment("skirt")
+    };
+    let mut draping = Draping::start(&model(), &request).unwrap();
+    let mut stages = Vec::new();
+    for _ in 0..60 * 30 {
+        let stage = draping.step().stage;
+        if stages.last() != Some(&stage) {
+            stages.push(stage);
+        }
+        if matches!(stage, DrapeStage::Settled | DrapeStage::Stopped) {
+            break;
+        }
+    }
+    assert_eq!(
+        stages,
+        [
+            DrapeStage::Sewing,
+            DrapeStage::Settling,
+            DrapeStage::Posing,
+            DrapeStage::Settling,
+            DrapeStage::Settled
+        ]
+    );
+    // Sitting: the knees forward, well in front of the toes standing (the
+    // body below the hands).
+    let knee = |d: &Draping| {
+        let (_, body) = d.body().unwrap();
+        body.iter()
+            .filter(|p| p[1] < 700.0)
+            .map(|p| p[2])
+            .fold(f32::MIN, f32::max)
+    };
+    assert!(
+        knee(&draping) > 400.0,
+        "the knees {} mm forward",
+        knee(&draping)
+    );
+    // Standing again, asked once settled.
+    draping.pose(AvatarPose::Standing);
+    assert_eq!(draping.progress().stage, DrapeStage::Posing);
+    while !matches!(
+        draping.step().stage,
+        DrapeStage::Settled | DrapeStage::Stopped
+    ) {}
+    assert_eq!(draping.progress().stage, DrapeStage::Settled);
+    assert!(
+        knee(&draping) < 250.0,
+        "the toes {} mm forward",
+        knee(&draping)
+    );
 }
 
 #[test]
@@ -166,5 +223,25 @@ fn the_cloth_is_read_where_it_is_looked_at() {
         let colours = state.colours(shows, fabric);
         assert_eq!(colours.len(), state.points.len());
         assert!(colours.iter().any(|&c| !alike(c, colours[0])), "{shows:?}");
+    }
+}
+
+#[test]
+fn a_blouse_settles_after_each_pose() {
+    let mut draping = drape_until_done(&garment("blouse"));
+    for pose in [
+        AvatarPose::Reaching,
+        AvatarPose::ArmsDown,
+        AvatarPose::ArmsUp,
+    ] {
+        draping.pose(pose);
+        let mut progress = draping.progress();
+        let mut frames = 0;
+        while !matches!(progress.stage, DrapeStage::Settled | DrapeStage::Stopped) {
+            progress = draping.step();
+            frames += 1;
+        }
+        eprintln!("{pose:?}: {:?} after {frames} frames", progress.stage);
+        assert_eq!(progress.stage, DrapeStage::Settled, "{pose:?}");
     }
 }

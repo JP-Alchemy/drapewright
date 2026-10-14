@@ -1,4 +1,5 @@
 import type {
+  AvatarPose,
   AvatarSettings,
   ClothReading,
   ClothShows,
@@ -15,6 +16,7 @@ import {
   Film,
   PanelBottom,
   PanelRight,
+  PersonStanding,
   PictureInPicture2,
   RotateCcw,
   X,
@@ -70,6 +72,8 @@ const FABRICS = Object.keys(t.avatar.fabrics) as FabricPreset[]
 
 /** What the cloth can be shown as, in the order offered. */
 const SHOWS = Object.keys(t.avatar.showsAs) as ClothShows[]
+/** The poses, in the order offered. */
+const POSES = Object.keys(t.avatar.poses) as AvatarPose[]
 /** The heatmaps' scales, as the view draws them (crates/wasm-3d/src/drape.rs). */
 const PULL_SCALE = 100
 const ROOM_SCALE = 40
@@ -181,7 +185,9 @@ function drapeText(drape: Drape): string {
         drape.kind === 'draping'
           ? update?.stage === 'settling'
             ? text.settling
-            : text.sewing
+            : update?.stage === 'posing'
+              ? text.posing
+              : text.sewing
           : update?.stage === 'stopped'
             ? text.stillMoving(fabric)
             : text.draped(fabric)
@@ -213,6 +219,9 @@ export function AvatarPane({ session }: { session: Session }) {
   // The figure in the view, to drape on.
   const shown = useRef<AvatarSettings | null>(null)
   const [drape, setDrape] = useState<Drape>({ kind: 'off' })
+  // How the figure stands; any garment on it moves with it.
+  const [pose, setPose] = useState<AvatarPose>('standing')
+  const posed = useRef<AvatarPose>('standing')
   // Counts drapes asked for: an answer for one overtaken is dropped.
   const drapes = useRef(0)
   // The garment last draped, to follow changes to it.
@@ -320,7 +329,7 @@ export function AvatarPane({ session }: { session: Session }) {
       setDrape({ kind: 'off' })
       setReading(null)
       if (!measured) {
-        if (drawing) await sim.showAvatar(STANDARD_FIGURE)
+        if (drawing) await sim.showAvatar(STANDARD_FIGURE, posed.current)
         if (live) {
           shown.current = STANDARD_FIGURE
           setStatus({ kind: 'standard' })
@@ -329,7 +338,7 @@ export function AvatarPane({ session }: { session: Session }) {
       }
       setStatus({ kind: 'fitting' })
       const fit = await sim.fitAvatar(request)
-      if (drawing) await sim.showAvatar(fit.settings)
+      if (drawing) await sim.showAvatar(fit.settings, posed.current)
       if (live) shown.current = fit.settings
       const residuals = Object.values(fit.residuals)
       const close = residuals.filter((r) => Math.abs(r) <= CLOSE_MM).length
@@ -366,6 +375,7 @@ export function AvatarPane({ session }: { session: Session }) {
       fabric: preset,
       ...(measured ? { measured } : {}),
       settings,
+      pose: posed.current,
     }
     setDrape((was) =>
       quietly && (was.kind === 'draped' || was.kind === 'following')
@@ -405,6 +415,33 @@ export function AvatarPane({ session }: { session: Session }) {
     // Followed as the pattern changes; `startDrape` is the latest render's.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revision, drape.kind])
+  // The figure moved into `to`: a garment draped moves with it as a drape
+  // again; one being draped, once settled.
+  const choosePose = (to: AvatarPose) => {
+    setPose(to)
+    posed.current = to
+    if (drape.kind !== 'draped') {
+      sim.pose(to).catch((error: unknown) => setDrape({ kind: 'failed', text: failure(error) }))
+      return
+    }
+    const mine = ++drapes.current
+    const { fabric } = drape
+    setDrape({ kind: 'draping', fabric, update: { ...drape.update, stage: 'posing' } })
+    setReading(null)
+    sim
+      .pose(to, (update) => {
+        if (mine === drapes.current) setDrape({ kind: 'draping', fabric, update })
+      })
+      .then(
+        (last) => {
+          if (mine !== drapes.current) return
+          setDrape(last ? { kind: 'draped', fabric, update: last } : { kind: 'off' })
+        },
+        (error: unknown) => {
+          if (mine === drapes.current) setDrape({ kind: 'failed', text: failure(error) })
+        },
+      )
+  }
   const takeOff = () => {
     drapes.current++
     setDrape({ kind: 'off' })
@@ -491,6 +528,31 @@ export function AvatarPane({ session }: { session: Session }) {
           {said}
         </span>
         <div className="spacer" />
+        {backend && (
+          // How the figure stands: any garment on it moves with it.
+          <Select
+            className="avatar-pose"
+            selectedKey={pose}
+            isDisabled={!canDrape}
+            onSelectionChange={(p) => choosePose(p as AvatarPose)}
+          >
+            <Label className="visually-hidden">{text.pose}</Label>
+            <Button className="select-button">
+              <PersonStanding size={16} aria-hidden="true" />
+              <SelectValue>{() => text.poses[pose]}</SelectValue>
+              <ChevronDown size={16} aria-hidden="true" />
+            </Button>
+            <Popover className="popover">
+              <ListBox className="menu">
+                {POSES.map((p) => (
+                  <ListBoxItem key={p} id={p} className="menu-item">
+                    {text.poses[p]}
+                  </ListBoxItem>
+                ))}
+              </ListBox>
+            </Popover>
+          </Select>
+        )}
         <Button
           className="icon-button"
           aria-label={floating ? (below ? text.dockBelow : text.dockBeside) : text.float}

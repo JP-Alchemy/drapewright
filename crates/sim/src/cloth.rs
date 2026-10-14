@@ -207,6 +207,7 @@ impl ClothBuilder {
             damping: 3.0,
             max_speed: f32::INFINITY,
             contacts: Vec::new(),
+            stepped: 0.0,
         }
     }
 }
@@ -266,9 +267,18 @@ pub struct Cloth {
     pub max_speed: f32,
     /// Points touching the body this step, and which way is out.
     contacts: Vec<(u32, V3)>,
+    /// How fast the points moved over the last step, on average, m/s.
+    stepped: f32,
 }
 
 impl Cloth {
+    /// Moves the whole cloth by `by` (m), as it is.
+    pub fn shift(&mut self, by: V3) {
+        for x in &mut self.x {
+            *x = [x[0] + by[0], x[1] + by[1], x[2] + by[2]];
+        }
+    }
+
     /// Holds a point still.
     pub fn pin(&mut self, i: u32) {
         self.w[i as usize] = 0.0;
@@ -293,6 +303,13 @@ impl Cloth {
             .iter()
             .map(|e| length(sub(self.x[e.i as usize], self.x[e.j as usize])) / e.rest)
             .fold(0.0, f32::max)
+    }
+
+    /// How fast the points moved over the last step as a whole, on average
+    /// (m/s): near nothing once the cloth has settled, even where a point
+    /// caught between two parts of the body is pushed to and fro within it.
+    pub fn step_speed(&self) -> f32 {
+        self.stepped
     }
 
     /// The points' mean speed, m/s: near nothing once the cloth has settled.
@@ -417,6 +434,7 @@ impl Cloth {
     pub fn step(&mut self, dt: f32, substeps: u32, body: &dyn Collider) {
         let h = dt / substeps.max(1) as f32;
         let keep = (-self.damping * h).exp();
+        let start = self.x.clone();
         for _ in 0..substeps.max(1) {
             for k in 0..self.x.len() {
                 self.p[k] = self.x[k];
@@ -449,6 +467,13 @@ impl Cloth {
                 axpy(v, -towards, n);
             }
         }
+        self.stepped = self
+            .x
+            .iter()
+            .zip(&start)
+            .map(|(&a, &b)| length(sub(a, b)))
+            .sum::<f32>()
+            / (dt * self.x.len().max(1) as f32);
     }
 
     fn solve_edges(&mut self, h: f32) {

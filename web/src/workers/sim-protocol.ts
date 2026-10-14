@@ -1,5 +1,6 @@
 import type {
   AvatarFit,
+  AvatarPose,
   AvatarRequest,
   AvatarSettings,
   ClothReading,
@@ -42,8 +43,8 @@ export interface SimMethods {
   fitSteps(request: FitRequest): FitSteps
   /** Starts the 3D view on a canvas handed over by the page; how it draws. */
   attachView(canvas: OffscreenCanvas, colours: ViewColours): string
-  /** Shows the avatar with these settings in the view, taking off any garment. */
-  showAvatar(settings: AvatarSettings): null
+  /** Shows the avatar with these settings in `pose` in the view, taking off any garment. */
+  showAvatar(settings: AvatarSettings, pose: AvatarPose): null
   /** Stops the view (its canvas is gone). */
   detachView(): null
   /**
@@ -53,6 +54,14 @@ export interface SimMethods {
    * stays until the new one has settled.
    */
   drape(request: DrapeRequest, quietly: boolean): DrapeUpdate | null
+  /**
+   * Moves the avatar into `pose`. A garment being draped moves with it once
+   * settled, its drape answering (null now). A garment draped and settled
+   * moves with it as a drape again, telling the page how it goes under this
+   * request, answering its last update once settled. With no garment, the
+   * avatar is shown in the pose (null).
+   */
+  pose(pose: AvatarPose): DrapeUpdate | null
   /** Takes the garment off. */
   undrape(): null
   /** The cloth seen at `x`, `y` CSS pixels from the view's top left, if any. */

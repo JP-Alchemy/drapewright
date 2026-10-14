@@ -1,5 +1,6 @@
 import type {
   AvatarFit,
+  AvatarPose,
   AvatarRequest,
   AvatarSettings,
   ClothReading,
@@ -125,8 +126,8 @@ class SimClient {
     return this.#call('attachView', [canvas, colours], [canvas])
   }
 
-  showAvatar(settings: AvatarSettings): Promise<null> {
-    return this.#call('showAvatar', [settings])
+  showAvatar(settings: AvatarSettings, pose: AvatarPose = 'standing'): Promise<null> {
+    return this.#call('showAvatar', [settings, pose])
   }
 
   detachView(): Promise<null> {
@@ -147,6 +148,18 @@ class SimClient {
     const id = this.#nextId++
     this.#drape = { id, onUpdate }
     return this.#call('drape', [request, quietly], [], id)
+  }
+
+  /**
+   * Moves the avatar into `pose`, and any garment on it. A garment draped
+   * and settled moves as a drape again: `onUpdate` hears how it goes, and
+   * its last update answers once settled. Otherwise null: a garment being
+   * draped moves once settled, its drape answering.
+   */
+  pose(pose: AvatarPose, onUpdate?: (update: DrapeUpdate) => void): Promise<DrapeUpdate | null> {
+    const id = this.#nextId++
+    if (onUpdate) this.#drape = { id, onUpdate }
+    return this.#call('pose', [pose], [], id)
   }
 
   /** Takes the garment off. */

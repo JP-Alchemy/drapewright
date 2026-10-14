@@ -2,8 +2,8 @@
 
 mod common;
 
-use drapewright_body::{BodyModel, Shape};
-use drapewright_sim::drape::Drape;
+use drapewright_body::{BodyModel, Pose, Shape};
+use drapewright_sim::drape::{Drape, Posable};
 use drapewright_sim::fabric::preset;
 use drapewright_sim::garment::{assemble, draped_pieces};
 use drapewright_sim::place::{Figure, half_round, place};
@@ -598,4 +598,133 @@ fn trousers_go_round_each_leg_below_the_crotch() {
             "{side}: {names:?}"
         );
     }
+}
+
+/// Drapes `garment` on the standard figure until it settles, ready to pose.
+fn settled(
+    model: &BodyModel,
+    pieces: &[drapewright_pattern_core::Piece],
+    seams: &[drapewright_seams::Seam],
+) -> Drape {
+    let body = model.shape(&Shape::default());
+    let figure = Figure::of(model, &body);
+    let garment = assemble(pieces, seams, 20.0).unwrap();
+    let starts = place(&garment, &figure);
+    let mut drape = Drape::new(
+        &garment,
+        &starts,
+        preset("poplin").unwrap(),
+        (&body.vertices, &model.skin()),
+    );
+    drape.posable(Posable::of(model, &body).unwrap());
+    let mut frames = 0;
+    while !drape.settled() && frames < 60 * 8 {
+        drape.step(1.0 / 60.0);
+        frames += 1;
+    }
+    assert!(drape.settled());
+    drape
+}
+
+/// Moves the body into `pose` until the cloth settles again, in at most
+/// `seconds`; how long that took.
+fn pose(drape: &mut Drape, pose: Pose, seconds: f32) -> f32 {
+    let start = drape.time;
+    drape.pose(pose);
+    assert!(drape.moving());
+    while (drape.moving() || !drape.settled()) && drape.time - start < seconds {
+        drape.step(1.0 / 60.0);
+    }
+    assert!(!drape.moving(), "still moving after {seconds} s");
+    drape.time - start
+}
+
+/// How much of the cloth is within the body, as a share of its points.
+fn inside(drape: &Drape) -> f32 {
+    let x = &drape.cloth.x;
+    x.iter().filter(|&&p| drape.clearance(p) < 0.0).count() as f32 / x.len() as f32
+}
+
+#[test]
+fn sleeves_go_with_the_arms_as_they_reach_forward() {
+    let model = avatar();
+    let (pieces, seams) = common::long_sleeved_blouse();
+    let mut drape = settled(&model, &pieces, &seams);
+    let front = |d: &Drape| d.cloth.x.iter().map(|p| p[2]).fold(f32::MIN, f32::max);
+    let before = front(&drape);
+    let took = pose(&mut drape, Pose::Reaching, 8.0);
+    let after = front(&drape);
+    eprintln!(
+        "reaching: {took:.1} s; the cloth's front from {before:.3} to {after:.3} m; {:.4} inside",
+        inside(&drape)
+    );
+    // The sleeves reach forward with the arms, to near the wrists half a
+    // metre in front.
+    assert!(
+        after > 0.45 && after - before > 0.2,
+        "the cloth reaches {before} m, then {after} m"
+    );
+    assert!(
+        inside(&drape) < 0.01,
+        "{} of the cloth inside the body",
+        inside(&drape)
+    );
+    // The body is shown as it moved.
+    let (_, points) = drape.body().unwrap();
+    assert_eq!(points.len(), model.asset.base.len());
+}
+
+#[test]
+fn a_skirt_moves_with_the_legs_in_a_stride() {
+    let model = avatar();
+    let (pieces, seams) = common::skirt();
+    let mut drape = settled(&model, &pieces, &seams);
+    let took = pose(&mut drape, Pose::Stepping, 8.0);
+    eprintln!("stepping: {took:.1} s; {:.4} inside", inside(&drape));
+    assert!(
+        inside(&drape) < 0.01,
+        "{} of the cloth inside the body",
+        inside(&drape)
+    );
+    // And back to standing.
+    pose(&mut drape, Pose::Standing, 8.0);
+    assert!(
+        inside(&drape) < 0.01,
+        "{} of the cloth inside the body",
+        inside(&drape)
+    );
+}
+
+#[test]
+fn a_skirt_sat_in_rests_on_the_seat() {
+    let model = avatar();
+    let (pieces, seams) = common::skirt();
+    let mut drape = settled(&model, &pieces, &seams);
+    pose(&mut drape, Pose::Sitting, 8.0);
+    let seat = drape.seat().expect("a seat");
+    // Nothing through the seat: over it, the cloth is on it or above.
+    let over = |p: &&[f32; 3]| {
+        (seat.low[0]..seat.high[0]).contains(&p[0]) && (seat.low[2]..seat.high[2]).contains(&p[2])
+    };
+    let lowest = drape
+        .cloth
+        .x
+        .iter()
+        .filter(over)
+        .map(|p| p[1])
+        .fold(f32::MAX, f32::min);
+    assert!(
+        lowest > seat.high[1] - 0.001,
+        "the cloth {lowest} m, the seat {} m",
+        seat.high[1]
+    );
+    // Resting on it, the figure lowered onto it and its feet on the floor.
+    assert!(
+        lowest < seat.high[1] + 0.03,
+        "the cloth {lowest} m over the seat"
+    );
+    assert!(seat.low[1].abs() < 1e-6, "the seat from {} m", seat.low[1]);
+    // Standing again: no seat.
+    pose(&mut drape, Pose::Standing, 8.0);
+    assert!(drape.seat().is_none());
 }

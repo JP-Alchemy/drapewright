@@ -17,7 +17,9 @@ mod view;
 
 use std::collections::BTreeMap;
 
-pub use drape::{ClothReading, ClothShows, DrapeProgress, DrapeRequest, DrapeStage, FabricPreset};
+pub use drape::{
+    AvatarPose, ClothReading, ClothShows, DrapeProgress, DrapeRequest, DrapeStage, FabricPreset,
+};
 use drapewright_body::shape::{OLD, YOUNG};
 use drapewright_body::{BodyModel, Shape, fit};
 use serde::{Deserialize, Serialize};
@@ -222,6 +224,15 @@ impl Draping {
             .girths
             .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
             .map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Moves the body into an `AvatarPose` once the garment has settled (at
+    /// once if it has), the garment with it.
+    pub fn pose(&mut self, pose: JsValue) -> Result<(), JsError> {
+        let pose: AvatarPose =
+            serde_wasm_bindgen::from_value(pose).map_err(|e| JsError::new(&e.to_string()))?;
+        self.0.pose(pose);
+        Ok(())
     }
 
     /// Moves the drape on a frame, giving a `DrapeProgress`.

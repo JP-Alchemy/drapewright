@@ -2,9 +2,9 @@
 //! eye:
 //!
 //!     cargo run --release -p drapewright-body --example picture -- \
-//!         assets/body/adult.dwbody out.png [woman=1 weight=0.7 …]
+//!         assets/body/adult.dwbody out.png [woman=1 weight=0.7 … pose=sitting]
 
-use drapewright_body::{BodyModel, Shape};
+use drapewright_body::{BodyModel, Pose, Rig, Shape};
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Transform};
 
 /// Pixels per millimetre.
@@ -22,8 +22,20 @@ fn main() {
     let model =
         BodyModel::from_bytes(&std::fs::read(asset).expect("body file")).expect("a body file");
     let mut shape = Shape::default();
+    let mut pose = Pose::Standing;
     for s in settings {
         let (key, value) = s.split_once('=').expect("setting=value");
+        if key == "pose" {
+            pose = match value {
+                "arms-down" => Pose::ArmsDown,
+                "reaching" => Pose::Reaching,
+                "arms-up" => Pose::ArmsUp,
+                "stepping" => Pose::Stepping,
+                "sitting" => Pose::Sitting,
+                _ => Pose::Standing,
+            };
+            continue;
+        }
         let v: f64 = value.parse().expect("a number");
         match key {
             "woman" => shape.woman = v,
@@ -40,6 +52,9 @@ fn main() {
         }
     }
     let body = model.shape(&shape);
+    let body = Rig::new(&model, &body)
+        .expect("joints")
+        .pose(&body, pose, 1.0);
     let shown = model.asset.shown as usize;
     let height = body.vertices[..shown]
         .iter()

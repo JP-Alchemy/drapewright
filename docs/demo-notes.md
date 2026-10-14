@@ -12,6 +12,43 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 51 — Poses: the figure moves, the garment with it
+
+The avatar can take a pose (arms down, reaching forward, arms raised,
+walking, sitting), and a garment draped on it moves with it: to see
+whether a sleeve lets the arm reach, a back is wide enough, or a skirt
+lets its wearer walk and sit.
+
+**Try it:**
+
+1. Open the avatar and choose a pose from the menu at the top of its pane
+   (it starts at **Standing**, arms out and down, as the figure is
+   measured). The figure moves into it; for **Sitting** it sits on a plain
+   grey seat, its feet on the floor.
+2. Drape a garment: it is sewn on the standing figure, settles, then moves
+   with the figure into the pose ("Moving into the pose…"). Choose another
+   pose and it moves again, from where it is.
+3. Show **Pulling** in a pose to see where the garment strains: across the
+   back when reaching, at the hips when sitting.
+
+**How it works:** each arm and leg has two bones (an upper arm, and a
+forearm with the hand; a thigh, and a shin with the foot), turning about
+the figure's own joint markers (shoulder, elbow, hip, knee). How much each
+bone moves each point of the skin comes from the body's regions, spread
+over the skin a few centimetres either side of where one meets the next,
+so that it bends smoothly round the joints; the trunk stays where it is,
+and the whole figure is lowered to keep its feet on the floor. Arms hung
+down are kept far enough from the hips and sides to leave room for cloth.
+While the body moves, the cloth feels it at keyframes a centimetre and a
+half apart, blended between, each worked out only round the cloth (without
+the hands and feet, which seldom touch it) so that it is quick; still
+again, the whole body is felt as when draping. A seat rises under the
+thighs as the figure sits. A drape counts as settled once the cloth as a
+whole has stopped moving, even where a point caught between an arm and
+the side is pushed to and fro in place.
+
+---
+
 ## Step 50 — Knits: a fabric that stretches more or less
 
 A knit pattern drawn for a fabric with some stretch can be cut from one

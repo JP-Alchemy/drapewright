@@ -207,3 +207,48 @@ test('a fabric of one’s own is measured, draped in, and changed', async ({ pag
     }),
   ])
 })
+
+test('the figure takes a pose, and a skirt draped on it moves with it', async ({ page }) => {
+  test.setTimeout(240_000)
+  await page.goto('/app/')
+  await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
+  test.skip(!(await openTheAvatar(page)), 'Poses are seen in the 3D view')
+  const pane = page.getByRole('region', { name: 'Avatar' })
+  const view = pane.getByRole('img', { name: /standard figure/ })
+  const drape = pane.getByRole('group', { name: 'Drape the garment' })
+  const status = pane.getByRole('status').last()
+  await expect(pane.getByRole('status').first()).toHaveText(
+    'A standard figure: add measurements to see someone’s.',
+    { timeout: 60_000 },
+  )
+  let standing = await view.screenshot()
+  await expect
+    .poll(async () => drawnInTheMiddle(page, (standing = await view.screenshot())), {
+      timeout: 10_000,
+    })
+    .toBe(true)
+
+  // Sitting, bare.
+  const pose = pane.getByRole('button', { name: /Pose/ })
+  await expect(pose).toContainText('Standing')
+  await pose.click()
+  await page.getByRole('option', { name: 'Sitting' }).click()
+  await expect
+    .poll(async () => differing(page, standing, await view.screenshot()), { timeout: 10_000 })
+    .toBeGreaterThan(0.01)
+
+  // Draped standing, then moved into the pose.
+  await drape.getByRole('button', { name: 'Drape', exact: true }).click()
+  await expect(status).toHaveText('Moving into the pose…', { timeout: 120_000 })
+  await expect(status).toHaveText('Draped in poplin.', { timeout: 120_000 })
+  const sitting = await view.screenshot()
+
+  // Walking: the figure stands up and steps out, the skirt with it.
+  await pose.click()
+  await page.getByRole('option', { name: 'Walking' }).click()
+  await expect(status).toHaveText(/Moving into the pose…|Letting it settle…/)
+  await expect(status).toHaveText('Draped in poplin.', { timeout: 120_000 })
+  await expect
+    .poll(async () => differing(page, sitting, await view.screenshot()), { timeout: 10_000 })
+    .toBeGreaterThan(0.01)
+})
