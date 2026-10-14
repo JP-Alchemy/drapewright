@@ -713,6 +713,8 @@ impl Stepper for GpuCloth {
                     run(&mut pass, &self.passes.layers_out, self.inside_from);
                     run(&mut pass, &self.passes.layers, self.n - self.inside_from);
                 }
+                // Seams held against the body's friction, as on the processor.
+                run_colours(&mut pass, &self.passes.stitches);
                 run(&mut pass, &self.passes.velocity, self.n);
             }
         }

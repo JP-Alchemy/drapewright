@@ -656,8 +656,9 @@ fn sleeves_go_with_the_arms_as_they_reach_forward() {
     let took = pose(&mut drape, Pose::Reaching, 8.0);
     let after = front(&drape);
     eprintln!(
-        "reaching: {took:.1} s; the cloth's front from {before:.3} to {after:.3} m; {:.4} inside",
-        inside(&drape)
+        "reaching: {took:.1} s; the cloth's front from {before:.3} to {after:.3} m; {:.4} inside; widest stitch {:.1} mm",
+        inside(&drape),
+        drape.cloth.widest_stitch() * 1000.0
     );
     // The sleeves reach forward with the arms, to near the wrists half a
     // metre in front.
@@ -669,6 +670,12 @@ fn sleeves_go_with_the_arms_as_they_reach_forward() {
         inside(&drape) < 0.01,
         "{} of the cloth inside the body",
         inside(&drape)
+    );
+    // The seams stay closed.
+    assert!(
+        drape.cloth.widest_stitch() < 0.005,
+        "a seam {} mm open",
+        drape.cloth.widest_stitch() * 1000.0
     );
     // The body is shown as it moved.
     let (_, points) = drape.body().unwrap();
@@ -855,4 +862,35 @@ fn a_facing_drapes_inside_the_neck_it_faces() {
     let high = facing.iter().map(|p| p[1]).fold(f32::MAX, f32::min);
     assert!(back < 0.0, "the facing {back} m to the front");
     assert!(high > 1.3, "the facing down to {high} m");
+}
+
+#[test]
+fn cuffs_stay_sewn_on_as_the_arms_reach_forward() {
+    let pieces = drapewright_pattern_core::testing::garments::yoked_blouse(false);
+    let seams: Vec<drapewright_seams::Seam> = drapewright_seams::suggest(&pieces, &[])
+        .into_iter()
+        .enumerate()
+        .map(|(k, s)| drapewright_seams::Seam {
+            id: format!("s{k}"),
+            confirmed: true,
+            ..s.seam
+        })
+        .collect();
+    let model = avatar();
+    let mut drape = settled(&model, &pieces, &seams);
+    let standing = drape.cloth.widest_stitch();
+    pose(&mut drape, Pose::Reaching, 8.0);
+    let reaching = drape.cloth.widest_stitch();
+    eprintln!(
+        "widest stitch standing {:.1} mm, reaching {:.1} mm; {:.4} inside",
+        standing * 1000.0,
+        reaching * 1000.0,
+        inside(&drape)
+    );
+    // The sleeves rest on the wrists, held there by the body's friction,
+    // while the cuffs are pulled on round the hands: the seams between
+    // them hold all the same.
+    assert!(standing < 0.005, "a seam {} mm open", standing * 1000.0);
+    assert!(reaching < 0.005, "a seam {} mm open", reaching * 1000.0);
+    assert!(inside(&drape) < 0.01);
 }

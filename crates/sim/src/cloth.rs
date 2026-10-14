@@ -615,6 +615,9 @@ impl Cloth {
             self.solve_stitches(h);
             self.collide(body);
             self.order_layers();
+            // And again: a seam holds where the body's friction would keep
+            // one side of it still while the cloth pulls the other away.
+            self.solve_stitches(h);
             for k in 0..self.x.len() {
                 let d = sub(self.x[k], self.p[k]);
                 self.v[k] = d.map(|c| c / h);

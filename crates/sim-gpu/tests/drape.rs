@@ -176,7 +176,7 @@ fn a_lined_skirt_and_a_shirt_drape_on_the_card_and_pose() {
             deepest(&gpu) * 1000.0
         );
         assert!(gpu.settled() && !gpu.moving(), "{name} still moving");
-        assert!(gpu.cloth.widest_stitch() < 0.008, "{name}");
+        assert!(gpu.cloth.widest_stitch() < 0.005, "{name}");
         assert!(deepest(&gpu) > -0.002, "{name}");
     }
 }

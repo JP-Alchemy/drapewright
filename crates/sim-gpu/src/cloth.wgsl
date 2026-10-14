@@ -3,8 +3,9 @@
 // their velocity and gravity; edges, bends and stitches are held, a colour
 // at a time (no two constraints of a colour share a point, so each colour
 // is solved at once); the cloth is kept off the body, with friction; cloth
-// inside (facings, linings) is kept behind the cloth over it; and the
-// velocities are what the points did. Metres, seconds.
+// inside (facings, linings) is kept behind the cloth over it; the
+// stitches are held again (so the body's friction cannot hold a seam open);
+// and the velocities are what the points did. Metres, seconds.
 
 struct Params {
     // Gravity (m/s²); w: the step, s.
