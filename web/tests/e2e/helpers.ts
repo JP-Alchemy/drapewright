@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url'
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 
 /** A file in `fixtures/svg`, `fixtures/dxf` or `fixtures/pdf`, by its extension. */
 export const fixture = (name: string) =>
@@ -243,4 +243,60 @@ export async function drawnInTheMiddle(page: Page, png: Buffer): Promise<boolean
     }
     return false
   }, png.toString('base64'))
+}
+
+/** The share of two screenshots' pixels that differ, 0 to 1. */
+export async function differing(page: Page, a: Buffer, b: Buffer): Promise<number> {
+  return page.evaluate(
+    async ([a, b]) => {
+      const pixels = async (data: string) => {
+        const image = new Image()
+        image.src = `data:image/png;base64,${data}`
+        await image.decode()
+        const canvas = new OffscreenCanvas(image.width, image.height)
+        const context = canvas.getContext('2d')!
+        context.drawImage(image, 0, 0)
+        return context.getImageData(0, 0, image.width, image.height).data
+      }
+      const [p, q] = [await pixels(a), await pixels(b)]
+      if (p.length !== q.length) return 1
+      let changed = 0
+      for (let i = 0; i < p.length; i += 4) {
+        const d =
+          Math.abs(p[i]! - q[i]!) +
+          Math.abs(p[i + 1]! - q[i + 1]!) +
+          Math.abs(p[i + 2]! - q[i + 2]!)
+        if (d > 30) changed++
+      }
+      return changed / (p.length / 4)
+    },
+    [a.toString('base64'), b.toString('base64')],
+  )
+}
+
+/**
+ * The 3D view's picture, the figure drawn, once it has held still for half
+ * a second. The worker draws the figure's first frame at the size the view
+ * had when asked; the pane's header then settles (the status that comes
+ * with the figure wraps differently), and the frames after are drawn at the
+ * view's new size. A picture of that first frame, stretched to the new
+ * size, matches none after it.
+ */
+export async function steadyPicture(page: Page, view: Locator): Promise<Buffer> {
+  let last: Buffer | null = null
+  await expect
+    .poll(
+      async () => {
+        const shot = await view.screenshot()
+        const still =
+          last !== null &&
+          (await differing(page, last, shot)) < 0.002 &&
+          (await drawnInTheMiddle(page, shot))
+        last = shot
+        return still
+      },
+      { intervals: [500], timeout: 10_000 },
+    )
+    .toBe(true)
+  return last!
 }

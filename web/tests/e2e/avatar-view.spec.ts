@@ -1,15 +1,9 @@
 import { expect, type Locator, type Page, test } from './fixtures.ts'
-import { drawnInTheMiddle } from './helpers.ts'
+import { steadyPicture } from './helpers.ts'
 
 /** The figure is drawn in the middle of the view, and a drag turns it. */
 async function seeItDrawnAndTurned(page: Page, view: Locator) {
-  // Drawn on the worker's next frame, after the status says so.
-  let before = await view.screenshot()
-  await expect
-    .poll(async () => drawnInTheMiddle(page, (before = await view.screenshot())), {
-      timeout: 10_000,
-    })
-    .toBe(true)
+  const before = await steadyPicture(page, view)
 
   // A drag across the figure turns it.
   const box = (await view.boundingBox())!

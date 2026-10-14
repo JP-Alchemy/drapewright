@@ -1,34 +1,5 @@
 import { expect, type Page, test } from './fixtures.ts'
-import { drawnInTheMiddle, openBackup, openWithFixture } from './helpers.ts'
-
-/** The share of two screenshots' pixels that differ, 0 to 1. */
-async function differing(page: Page, a: Buffer, b: Buffer): Promise<number> {
-  return page.evaluate(
-    async ([a, b]) => {
-      const pixels = async (data: string) => {
-        const image = new Image()
-        image.src = `data:image/png;base64,${data}`
-        await image.decode()
-        const canvas = new OffscreenCanvas(image.width, image.height)
-        const context = canvas.getContext('2d')!
-        context.drawImage(image, 0, 0)
-        return context.getImageData(0, 0, image.width, image.height).data
-      }
-      const [p, q] = [await pixels(a), await pixels(b)]
-      if (p.length !== q.length) return 1
-      let changed = 0
-      for (let i = 0; i < p.length; i += 4) {
-        const d =
-          Math.abs(p[i]! - q[i]!) +
-          Math.abs(p[i + 1]! - q[i + 1]!) +
-          Math.abs(p[i + 2]! - q[i + 2]!)
-        if (d > 30) changed++
-      }
-      return changed / (p.length / 4)
-    },
-    [a.toString('base64'), b.toString('base64')],
-  )
-}
+import { differing, openBackup, openWithFixture, steadyPicture } from './helpers.ts'
 
 /** Opens the avatar; whether this browser draws it in 3D (not WebKit on Linux, as in CI). */
 async function openTheAvatar(page: Page): Promise<boolean> {
@@ -58,13 +29,8 @@ test('the skirt is draped, read where it pulls, draped in another fabric, and ta
     'A standard figure: add measurements to see someone’s.',
     { timeout: 60_000 },
   )
-  // The figure as drawn, bare: on the worker's next frame after the status.
-  let bare = await view.screenshot()
-  await expect
-    .poll(async () => drawnInTheMiddle(page, (bare = await view.screenshot())), {
-      timeout: 10_000,
-    })
-    .toBe(true)
+  // The figure as drawn, bare.
+  const bare = await steadyPicture(page, view)
   await drape.getByRole('button', { name: 'Drape', exact: true }).click()
   await expect(status).toHaveText(/Sewing the seams…|Letting it settle…|Draped in poplin\./)
   await expect(status).toHaveText('Draped in poplin.', { timeout: 120_000 })
@@ -271,12 +237,7 @@ test('the figure takes a pose, and a skirt draped on it moves with it', async ({
     'A standard figure: add measurements to see someone’s.',
     { timeout: 60_000 },
   )
-  let standing = await view.screenshot()
-  await expect
-    .poll(async () => drawnInTheMiddle(page, (standing = await view.screenshot())), {
-      timeout: 10_000,
-    })
-    .toBe(true)
+  const standing = await steadyPicture(page, view)
 
   // Sitting, bare.
   const pose = pane.getByRole('button', { name: /Pose/ })
