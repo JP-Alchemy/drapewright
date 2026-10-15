@@ -21,7 +21,8 @@ const LARGER: f64 = 1.3;
 pub(crate) struct PageLabels {
     /// Each page's own label, as printed.
     pub names: Vec<Option<String>>,
-    /// Each page's place on the sheet (column, row), when labelled.
+    /// Each page's place on the sheet (column, row), when labelled (not
+    /// merely numbered).
     pub places: Vec<Option<(i64, i64)>>,
     /// Each page's labels that are its own or its edges' names (indices
     /// into its labels).
@@ -197,7 +198,16 @@ pub(crate) fn read(pages: &[Page]) -> Option<PageLabels> {
         .copied()
         .max_by_key(|&m| (score(m), m.1 > 0, m.2 > 0, m.0))
         .expect("ways");
-    let places = own.iter().map(|o| o.map(|o| place(o.1, best))).collect();
+    // Every page's label with one letter, and no page naming another at
+    // its edges ("P1" to "P28"): page numbers, which say nothing of where
+    // the pages go across and down.
+    let mut letters = own.iter().flatten().map(|o| o.1.1);
+    let first = letters.next();
+    let numbered = letters.all(|l| Some(l) == first) && edges.iter().all(Vec::is_empty);
+    let places = own
+        .iter()
+        .map(|o| o.filter(|_| !numbered).map(|o| place(o.1, best)))
+        .collect();
     Some(PageLabels {
         names: own
             .iter()
@@ -275,6 +285,19 @@ mod tests {
             .collect();
         let read = read(&pages).unwrap();
         assert_eq!(read.places, [Some((1, 0)), Some((1, 1))]);
+    }
+
+    #[test]
+    fn pages_merely_numbered_are_not_placed() {
+        // "P1" to "P4", one letter, no page naming another at its edges:
+        // page numbers, not rows and columns. They are still furniture.
+        let pages: Vec<Vec<Label>> = (1..=4)
+            .map(|k| vec![label(&format!("P{k}"), 12.0, 24.0, 10.0)])
+            .collect();
+        let pages: Vec<Page> = pages.iter().map(|l| (l.as_slice(), 185.0, 271.0)).collect();
+        let read = read(&pages).unwrap();
+        assert_eq!(read.places, [None; 4]);
+        assert_eq!(read.furniture[2], [0]);
     }
 
     #[test]

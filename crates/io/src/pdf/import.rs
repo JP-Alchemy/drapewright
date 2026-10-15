@@ -239,6 +239,15 @@ fn is_page_frame(segs: &[PathSeg], page: Rect) -> bool {
         && b.height() >= 0.8 * page.height()
 }
 
+/// Whether a layer holds the pages' grid, by its name: "Paper Grid",
+/// "Page grid", "Tiling", "Page borders".
+fn page_grid(name: &str) -> bool {
+    let n = name.to_lowercase();
+    (n.contains("grid") && ["paper", "page", "tile"].iter().any(|w| n.contains(w)))
+        || n.contains("tiling")
+        || n.contains("page border")
+}
+
 /// Pages put together on one sheet: each page, and where it goes.
 type PageGroup = Vec<(usize, Vec2)>;
 
@@ -260,6 +269,11 @@ fn page_paths(
     let shows = visible.width() > 0.0 && visible.height() > 0.0;
     // White fills on white paper are masks and backgrounds.
     if shape.stroke.is_none() && shape.fill.is_some_and(|f| f.iter().all(|v| *v > 0.95)) {
+        return Vec::new();
+    }
+    // The tiling tool's own layer: the pages' frames and the marks to match
+    // them by.
+    if shape.layers.iter().any(|l| page_grid(&layer_names(*l))) {
         return Vec::new();
     }
     let style = Style {
@@ -904,6 +918,53 @@ fn drawn_labels(lines: Vec<ReadLine>) -> Vec<Label> {
 /// the pattern near the margins, and is left alone. Lines on the frame
 /// most tiles draw are taken off every tile clipped to its page, also those
 /// where it was not seen whole.
+/// A sheet's tiles draw their furniture at the same place on at least this
+/// many of them…
+const FURNITURE_PAGES: usize = 3;
+/// …the same place to within this, mm.
+const FURNITURE_SAME: f64 = 1.0;
+
+/// Closed shapes most tiles of a sheet draw at the same place on the page:
+/// a frame to cut along, the frames of the tiles beside it drawn past its
+/// edges, boxes to match at its joins. They are page furniture, no part of
+/// the pattern (the pattern's own shapes move from tile to tile).
+fn remove_tile_furniture(pages: &mut [PageContent], groups: &[PageGroup]) {
+    let place = |segs: &[PathSeg]| bounds(&flatten_segs(segs, 0.5));
+    let same = |a: &Rect, b: &Rect| {
+        (a.x0 - b.x0).abs() <= FURNITURE_SAME
+            && (a.y0 - b.y0).abs() <= FURNITURE_SAME
+            && (a.x1 - b.x1).abs() <= FURNITURE_SAME
+            && (a.y1 - b.y1).abs() <= FURNITURE_SAME
+    };
+    for group in groups.iter().filter(|g| g.len() >= FURNITURE_PAGES) {
+        // Each page's closed shapes, where they are on it.
+        let shapes: Vec<Vec<Rect>> = group
+            .iter()
+            .map(|(i, _)| {
+                pages[*i]
+                    .paths
+                    .iter()
+                    .filter(|(r, _, _)| r.closed)
+                    .map(|(r, _, _)| place(&r.segs))
+                    .collect()
+            })
+            .collect();
+        let most = FURNITURE_PAGES.max(group.len().div_ceil(2));
+        let furniture = |b: &Rect| {
+            shapes
+                .iter()
+                .filter(|s| s.iter().any(|o| same(o, b)))
+                .count()
+                >= most
+        };
+        for (i, _) in group {
+            pages[*i]
+                .paths
+                .retain(|(r, _, _)| !r.closed || !furniture(&place(&r.segs)));
+        }
+    }
+}
+
 fn remove_trim_frames(pages: &mut [PageContent], prose: &[bool]) {
     let same = |a: &Rect, b: &Rect| {
         (a.x0 - b.x0).abs() + (a.y0 - b.y0).abs() + (a.x1 - b.x1).abs() + (a.y1 - b.y1).abs() <= 1.0
@@ -1220,6 +1281,7 @@ pub fn import_pdf_pages(
         stitches = lines;
         butted = true;
     }
+    remove_tile_furniture(&mut pages, &groups);
     // Where each page went on the sheets.
     let mut placed: HashMap<usize, Affine> = HashMap::new();
     let tiled = groups.iter().any(|g| g.len() > 1);
@@ -1310,7 +1372,8 @@ pub fn import_pdf_pages(
                 // shows if it shows on any of them. A long line drawn twice
                 // on one page is two lines: each size of a nest draws its
                 // whole outline, the stretches the sizes share too (and,
-                // dashed, the stubs at its corners).
+                // dashed, the stubs at its corners). A whole outline drawn
+                // twice alike on one page is one.
                 let length = segs.iter().map(|s| s.arclen(0.01)).sum::<f64>();
                 let stub = !style.dashed
                     && length <= DASH_STUB
@@ -1332,7 +1395,7 @@ pub fn import_pdf_pages(
                     .copied()
                     .find(|&k| {
                         let (o, os, _) = &styled[k];
-                        !(long && drawn_on[k].contains(i))
+                        !(long && !r.closed && drawn_on[k].contains(i))
                             && os == style
                             && o.closed == r.closed
                             && same_path(&o.segs, &segs, 0.2)

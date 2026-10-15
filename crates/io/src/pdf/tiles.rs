@@ -114,7 +114,8 @@ const GUIDED: f64 = 30.0;
 /// `grid[i]` where page i's label puts it (column, row), if it is labelled.
 ///
 /// Pages are joined by their strongest links first: where most shapes
-/// agree. A page whose every shape is drawn on every page (some tiling
+/// agree, a shape the same as several on the other page (a piece drawn
+/// twice on the sheet) counting as a part of one for each. A page whose every shape is drawn on every page (some tiling
 /// tools draw the whole sheet on each) shares many with its true
 /// neighbours, and only a few, by chance, with others (a page-edge mark, a
 /// motif). Labelled pages join only their label's neighbours, on the side
@@ -193,7 +194,7 @@ pub(crate) fn arrange(
 
     // Links between pages: page j sits at page i's offset plus d, as so
     // many shapes say.
-    let mut links: Vec<(usize, usize, usize, Vec2)> = Vec::new();
+    let mut links: Vec<(f64, usize, usize, Vec2)> = Vec::new();
     for i in 0..n {
         for (j, theirs) in useful_indexes.iter().enumerate().skip(i + 1) {
             let guide = apart(i, j);
@@ -201,12 +202,16 @@ pub(crate) fn arrange(
             if guide.is_some_and(|(c, r)| c.abs() + r.abs() != 1) {
                 continue;
             }
-            let mut votes: HashMap<(i64, i64), (usize, Vec2)> = HashMap::new();
+            // (shapes, their weight, offsets summed) for each offset. A
+            // shape the same as two or three on the other page (a piece
+            // drawn twice on the sheet) votes for each by halves or thirds.
+            let mut votes: HashMap<(i64, i64), (usize, f64, Vec2)> = HashMap::new();
             for a in &useful[i] {
                 let same: Vec<&Print> = theirs.matches(a).collect();
                 if same.is_empty() || same.len() > MAX_REPEATS {
                     continue;
                 }
+                let weight = 1.0 / same.len() as f64;
                 for b in same {
                     // Page j's origin on page i: a shape at `b.first` on
                     // page j is at `a.first` on page i.
@@ -236,28 +241,29 @@ pub(crate) fn arrange(
                         continue;
                     }
                     let key = ((d.x / GRID).round() as i64, (d.y / GRID).round() as i64);
-                    let v = votes.entry(key).or_insert((0, Vec2::ZERO));
+                    let v = votes.entry(key).or_insert((0, 0.0, Vec2::ZERO));
                     v.0 += 1;
-                    v.1 += d;
+                    v.1 += weight;
+                    v.2 += d;
                 }
             }
             let best = votes
                 .into_iter()
-                .max_by(|a, b| a.1.0.cmp(&b.1.0).then(b.0.cmp(&a.0)));
-            if let Some((_, (count, sum))) = best
+                .max_by(|a, b| a.1.1.total_cmp(&b.1.1).then(b.0.cmp(&a.0)));
+            if let Some((_, (count, weight, sum))) = best
                 && count >= 2
             {
                 let d = sum / count as f64;
                 if agree_where_they_overlap(i, j, d) {
-                    links.push((count, i, j, d));
+                    links.push((weight, i, j, d));
                 }
             }
         }
     }
     // The strongest links first (then as found), each joining two groups
     // not yet joined.
-    let order = ascending(&links.iter().map(|l| -(l.0 as f64)).collect::<Vec<_>>());
-    let links: Vec<(usize, usize, usize, Vec2)> = order.into_iter().map(|k| links[k]).collect();
+    let order = ascending(&links.iter().map(|l| -l.0).collect::<Vec<_>>());
+    let links: Vec<(f64, usize, usize, Vec2)> = order.into_iter().map(|k| links[k]).collect();
     let mut group: Vec<usize> = (0..n).collect();
     let mut offset: Vec<Vec2> = vec![Vec2::ZERO; n];
     let join = |group: &mut Vec<usize>, offset: &mut Vec<Vec2>, i: usize, j: usize, d: Vec2| {
@@ -386,5 +392,55 @@ mod tests {
         assert_eq!(sheet.iter().map(|(i, _)| *i).collect::<Vec<_>>(), [1, 2, 3]);
         assert!((sheet[1].1 - Vec2::new(180.0, 0.0)).hypot() < 0.01);
         assert!((sheet[2].1 - Vec2::new(360.0, 0.0)).hypot() < 0.01);
+    }
+
+    #[test]
+    fn a_piece_drawn_twice_on_the_sheet_does_not_outvote_a_neighbour() {
+        // Pages 0, 1 and 2: page 1 beside page 0 (three shapes say), page 2
+        // below page 1 (three shapes say). Page 2 also shows two copies of
+        // four shapes page 0 shows one of, at an offset no tile is at: four
+        // shapes against three, but each the same as two.
+        let moved = |segs: Vec<PathSeg>, by: (f64, f64)| -> Vec<PathSeg> {
+            segs.iter().map(|s| Affine::translate(by) * *s).collect()
+        };
+        let print = |segs: Vec<PathSeg>| Print::of(&segs, true).unwrap();
+        let beside = [(20.0, 20.0, 25.0), (60.0, 30.0, 30.0), (100.0, 40.0, 35.0)];
+        let below = [(20.0, 20.0, 40.0), (70.0, 30.0, 45.0), (120.0, 40.0, 50.0)];
+        let twice = [
+            (10.0, 150.0, 21.0),
+            (40.0, 150.0, 22.0),
+            (70.0, 150.0, 23.0),
+            (100.0, 150.0, 24.0),
+        ];
+        let page0: Vec<Print> = beside
+            .iter()
+            .map(|&(x, y, s)| print(square(x + 150.0, y, s)))
+            .chain(twice.iter().map(|&(x, y, s)| print(square(x, y, s))))
+            .collect();
+        let page1: Vec<Print> = beside
+            .iter()
+            .map(|&(x, y, s)| print(square(x, y, s)))
+            .chain(
+                below
+                    .iter()
+                    .map(|&(x, y, s)| print(square(x, y + 200.0, s))),
+            )
+            .collect();
+        let page2: Vec<Print> = below
+            .iter()
+            .map(|&(x, y, s)| print(square(x, y, s)))
+            .chain(twice.iter().flat_map(|&(x, y, s)| {
+                [
+                    print(moved(square(x, y, s), (200.0, -280.0))),
+                    print(moved(square(x, y, s), (195.0, -250.0))),
+                ]
+            }))
+            .collect();
+        let a4 = Vec2::new(210.0, 297.0);
+        let groups = arrange(&[page0, page1, page2], &[a4; 3], &[None; 3]);
+        assert_eq!(groups.len(), 1);
+        let at: Vec<Vec2> = groups[0].iter().map(|(_, d)| *d).collect();
+        assert!((at[1] - Vec2::new(150.0, 0.0)).hypot() < 0.01, "{at:?}");
+        assert!((at[2] - Vec2::new(150.0, 200.0)).hypot() < 0.01, "{at:?}");
     }
 }

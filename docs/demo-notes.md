@@ -12,6 +12,53 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 68 — Tiled sheets without their tiles' furniture
+
+Two graded home-print patterns came in as hundreds of pieces: a summer
+jacket in 14 sizes as 489 (35 a size) and a wrap skirt in 8 sizes as 422
+(53 a size). Most were not pieces at all but the tiles' furniture: the
+frame each page is cut along, the frames of the pages beside it, and the
+boxes printed across each join to match the pages by. And the jacket's
+pages, numbered "P1" to "P28", were laid in one long line.
+
+**Try it:** import either pattern from JP's test folder. The jacket comes
+in as 4 pieces a size (Sleeves, Front bodice, Optional front tie, Back
+bodice), like its A0 copy-shop sheet; the wrap skirt as 6 a size: its
+front, its back cut on the fold, and the waistband and ties. The
+patterns from a sewing book in the folder lose the frame round every
+tile, which came in as a piece: the pencil skirt is now Front, Back and Waistband (it was 16
+pieces), the pyjamas Fronts, Backs and Waistband (34), the waistcoat
+Fronts, Centre back and Side backs (16).
+
+**What changed:**
+
+* **Page numbers place nothing.** Pages labelled "P1", "P2"… with no page
+  naming the next at its edges are numbered, not set out in rows and
+  columns; they go where the shapes they share say.
+* **Tiles' furniture.** Closed shapes that most tiles of a sheet draw at
+  the same place on the page (a frame, a neighbour's frame drawn past the
+  edge, a box at a join, the designer's logo) are no part of the pattern.
+  The pattern's own shapes move from tile to tile. And a layer named for
+  the page grid ("Paper Grid", "Tiling") holds no pieces.
+* **A piece drawn twice.** A shape the same as two on another page (a piece
+  drawn twice on the sheet) counts half for each place it says the page
+  goes, so it can't outvote the page's true neighbours.
+* **An outline drawn over itself** several times on a page is one piece.
+
+Over the private test folder: besides these, tiles' join marks no longer
+count as marks on the pieces of the indie dress patterns, a bucket hat is
+Crown, Brim and Top (it was 12 pieces, tiles misplaced), and the logo
+printed on every tile no longer names pieces of the indie dress
+patterns. The cape coat's size 38 and the corset come in as before.
+
+Known: in the wrap skirt, the long tie's extension page still matches a
+page of the skirt at the wrong place (the tie's two parts look alike), so
+its waistband and ties are not all right yet. The circular skirt and the
+apron in the sewing book have pieces whose outlines don't close; they come
+in as their waistband or pocket only.
+
+---
+
 ## Step 67 — Sizes printed alike, told apart by their numbers
 
 The big pattern companies print every size of a piece nested, in one
