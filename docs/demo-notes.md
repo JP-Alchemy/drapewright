@@ -12,6 +12,31 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 71 — Instructions drawn as illustrations
+
+A kimono pattern's instructions come as a PDF of their own: six pages of
+coloured illustrations (the tools, the marks, the finished measurements,
+the cutting plan) with their words in narrow columns beside them. Its
+lines were too short to count as prose, so half its pages were read as a
+pattern and came in as 25 "pieces": the boxes round the lists and tables,
+and parts of the drawings.
+
+**Try it:** import the kimono's instructions PDF from JP's test folder.
+It now comes in with no pieces, saying all 6 pages were left out. Its
+pattern files come in as before.
+
+**What changed:** besides five lines of prose or more, a page with 40
+words or more for each A4 of it, in lines of any length, is a page of
+instructions when it is drawn mostly in filled shapes (illustrations)
+rather than in lines, as patterns are. A piece's own notes don't count
+(step 70).
+
+Over the private test folder, nothing else changes but a magazine's
+knickers pattern, which leaves out one more page of its instructions;
+its pieces are the same.
+
+---
+
 ## Step 70 — One-page templates covered in notes
 
 A face mask's free templates come as two pages, one for the main fabric

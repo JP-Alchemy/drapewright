@@ -2124,6 +2124,8 @@ fn boxes_of_notes(raw: &[(RawPath, Style)], labels: &[Label]) -> Vec<usize> {
 /// are a few lines over a square metre of pattern).
 const PROSE_LINES: usize = 5;
 const PROSE_WORDS: usize = 4;
+/// Or words this many, in lines of any length, on a page of illustrations.
+const PROSE_TEXT: usize = 40;
 const A4_AREA: f64 = 210.0 * 297.0;
 /// A piece whose notes are its own is at least this big, mm²…
 const NOTED_PIECE: f64 = 5000.0;
@@ -2165,19 +2167,26 @@ fn is_prose(page: &PageContent) -> bool {
                 .any(|l| point_in_polygon(l.at, pts) && !cuts_from_label(&l.text).is_empty())
         })
         .collect();
-    let lines = page
+    let words = |l: &&Label| {
+        l.text
+            .split_whitespace()
+            .filter(|w| w.chars().any(char::is_alphabetic))
+            .count()
+    };
+    let free: Vec<&Label> = page
         .labels
         .iter()
         .filter(|l| !on.iter().any(|pts| point_in_polygon(l.at, pts)))
-        .filter(|l| {
-            l.text
-                .split_whitespace()
-                .filter(|w| w.chars().any(char::is_alphabetic))
-                .count()
-                >= PROSE_WORDS
-        })
-        .count();
+        .collect();
+    let lines = free.iter().filter(|l| words(l) >= PROSE_WORDS).count();
+    // Instructions set in narrow columns beside their illustrations: many
+    // words in short lines, on a page drawn mostly in filled shapes (a
+    // pattern is drawn in lines).
+    let said: usize = free.iter().map(words).sum();
+    let filled = page.paths.iter().filter(|(r, _, _)| r.filled).count();
+    let drawn = page.paths.len() - filled;
     lines as f64 >= PROSE_LINES as f64 * a4s
+        || (said as f64 >= PROSE_TEXT as f64 * a4s && filled > drawn)
 }
 
 /// A piece's lines, and its grainline, cut back to its outline: of a line

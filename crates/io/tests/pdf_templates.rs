@@ -4,7 +4,8 @@
 //! print, the copyright, where the instructions are). The notes are the
 //! piece's, not a page of instructions, and two pages alike are no tiles.
 //! And a page of instructions with a lay plan on it, its pieces named in
-//! their boxes, is still left out.
+//! their boxes, is still left out; so is a page of instructions drawn as
+//! illustrations, its words in narrow columns beside them.
 
 use drapewright_io::pdf::import_pdf;
 use pdf_writer::{Content, Finish, Name, Pdf, Rect, Ref, Str};
@@ -121,6 +122,51 @@ fn a_page_of_instructions_with_a_lay_plan_is_still_left_out() {
         );
     }
     let result = import_pdf(&document(vec![c]), Some("plan.pdf")).unwrap();
+    assert!(
+        result.pieces.is_empty(),
+        "{:?}",
+        result.pieces.iter().map(|p| &p.name).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn a_page_of_illustrations_with_words_in_narrow_columns_is_instructions() {
+    let mut c = Content::new();
+    // An illustration: filled shapes, a sewing machine in coloured blocks.
+    for k in 0..30 {
+        let (x, y) = (20.0 + 6.0 * (k % 10) as f32, 60.0 + 8.0 * (k / 10) as f32);
+        c.set_fill_rgb(0.1 * (k % 7) as f32, 0.5, 0.3)
+            .rect(x * MM, y * MM, 5.0 * MM, 7.0 * MM)
+            .fill_nonzero();
+    }
+    // A box round the list of what's needed, the only line drawn.
+    c.set_fill_rgb(0.0, 0.0, 0.0);
+    c.rect(100.0 * MM, 40.0 * MM, 90.0 * MM, 150.0 * MM)
+        .stroke();
+    for (k, line) in [
+        "What you need",
+        "- Paper scissors.",
+        "- Fabric scissors.",
+        "Flat fabric, see",
+        "the cutting plan",
+        "for how much.",
+        "An iron.",
+        "A sewing machine.",
+        "Thread to match.",
+        "Pins or clips.",
+        "A tape measure.",
+        "Chalk or a pen",
+        "to mark the fabric.",
+        "First print the page",
+        "with the test square",
+        "and measure it.",
+    ]
+    .iter()
+    .enumerate()
+    {
+        text(&mut c, (105.0, 180.0 - 9.0 * k as f32), 9.0, line);
+    }
+    let result = import_pdf(&document(vec![c]), Some("needs.pdf")).unwrap();
     assert!(
         result.pieces.is_empty(),
         "{:?}",
