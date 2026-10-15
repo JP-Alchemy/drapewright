@@ -12,6 +12,45 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 70 — One-page templates covered in notes
+
+A face mask's free templates come as two pages, one for the main fabric
+and one for the lining, each a single piece covered in notes: what to
+cut, a bar to check the print by, the copyright, where the instructions
+are. With that many lines of words, both pages were taken for
+instructions and left out, and the import came in empty (all four
+templates in JP's test folder: "2 pages left out").
+
+**Try it:** import any of the four mask templates. Each comes in as two
+pieces, Main Fabric and Lining Fabric, cut 2 each, with their ¼ inch
+(or ⅜ inch) seam allowance found inside the cutting line.
+
+**What changed:**
+
+* **A piece's notes are no page of instructions.** Words printed inside
+  a piece's outline that says how many to cut ("CUT 2") don't count
+  towards a page of prose. Only an outline on the page, no bigger than
+  six tenths of it and no box (a lay plan's fabric, a box of notes, a
+  frame round the page): a page of instructions with a lay plan on it is
+  still left out.
+* **Two pages alike are no tiles.** Pages that draw the same piece in
+  nearly the same place (the main fabric's and the lining's) were joined
+  on top of each other as if they were tiles. Tiles of one sheet are at
+  least half a page apart one way; these stay two pages.
+
+Over the private test folder, besides the masks: a bikini's front and
+back, which were joined on top of each other, are two pieces; the wrap
+skirt's tie page no longer joins the skirt in the wrong place (7 pieces a
+size: front, back, two waistband sections and three tie parts, some named
+by words printed on them, "Along this line"); two of the indie dress
+patterns' tiles join so that
+the logo on every tile names no piece; a jacket's back drawn twice is
+once, on its fold. A pdfstitcher test file whose two pages draw the same
+squares at different scales now comes in as both pages. The instruction
+booklets come in as before.
+
+---
+
 ## Step 69 — A key to the lines is no list of sizes
 
 A shirt pattern's US Letter file, the same pattern as its A0 and A4
@@ -76,7 +115,8 @@ patterns. The cape coat's size 38 and the corset come in as before.
 
 Known: in the wrap skirt, the long tie's extension page still matches a
 page of the skirt at the wrong place (the tie's two parts look alike), so
-its waistband and ties are not all right yet. The circular skirt and the
+its waistband and ties are not all right yet (step 70 fixes this). The
+circular skirt and the
 apron in the sewing book have pieces whose outlines don't close; they come
 in as their waistband or pocket only.
 

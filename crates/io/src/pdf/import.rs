@@ -2125,14 +2125,50 @@ fn boxes_of_notes(raw: &[(RawPath, Style)], labels: &[Label]) -> Vec<usize> {
 const PROSE_LINES: usize = 5;
 const PROSE_WORDS: usize = 4;
 const A4_AREA: f64 = 210.0 * 297.0;
+/// A piece whose notes are its own is at least this big, mm²…
+const NOTED_PIECE: f64 = 5000.0;
+/// …and its outline closes to within this, mm…
+const NOTED_GAP: f64 = 1.0;
+/// …round at most this part of its page.
+const NOTED_SHARE: f64 = 0.6;
 
 /// Whether a page's words are mostly prose to read: instructions, a
-/// warning, not a pattern's labels.
+/// warning, not a pattern's labels. Words printed on a piece, inside an
+/// outline that says how many to cut, are the piece's notes: a one-page
+/// template can be covered in them.
 fn is_prose(page: &PageContent) -> bool {
     let a4s = (page.width * page.height / A4_AREA).max(1.0);
+    // Pieces' outlines, or lines all but closed (a hair apart where they
+    // end), on the page: not boxes (a box of notes, a lay plan's fabric, a
+    // frame round the page), nor most of the page.
+    let area = Rect::new(0.0, 0.0, page.width, page.height).inflate(1.0, 1.0);
+    let outlines: Vec<Vec<Point>> = page
+        .paths
+        .iter()
+        .filter(|(r, _, _)| !is_box(&r.segs))
+        .map(|(r, _, _)| flatten_segs(&r.segs, 0.5))
+        .filter(|pts| pts.len() > 2 && pts[0].distance(pts[pts.len() - 1]) <= NOTED_GAP)
+        .filter(|pts| {
+            let a = polygon_area(pts).abs();
+            let b = bounds(pts);
+            a >= NOTED_PIECE
+                && a <= NOTED_SHARE * page.width * page.height
+                && area.contains(b.origin())
+                && area.contains(Point::new(b.x1, b.y1))
+        })
+        .collect();
+    let on: Vec<&Vec<Point>> = outlines
+        .iter()
+        .filter(|pts| {
+            page.labels
+                .iter()
+                .any(|l| point_in_polygon(l.at, pts) && !cuts_from_label(&l.text).is_empty())
+        })
+        .collect();
     let lines = page
         .labels
         .iter()
+        .filter(|l| !on.iter().any(|pts| point_in_polygon(l.at, pts)))
         .filter(|l| {
             l.text
                 .split_whitespace()

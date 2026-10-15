@@ -228,11 +228,13 @@ pub(crate) fn arrange(
                             };
                             (0.5 * size..=size + 1.0).contains(&along) && across.abs() <= GUIDED
                         }
-                        // Two tiles are never in the same place, and
-                        // neighbours touch or overlap: they are less than
-                        // a page apart.
+                        // Two tiles are never in nearly the same place
+                        // (two pages printing a piece alike, one for the
+                        // fabric and one for the lining, are no tiles):
+                        // neighbours are at least half a page apart one
+                        // way, and touch or overlap, less than a page.
                         None => {
-                            d.hypot() >= 1.0
+                            (d.x.abs() >= 0.5 * page.x || d.y.abs() >= 0.5 * page.y)
                                 && d.x.abs() <= page.x + 1.0
                                 && d.y.abs() <= page.y + 1.0
                         }
