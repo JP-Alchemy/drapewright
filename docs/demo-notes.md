@@ -12,6 +12,64 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 67 — Sizes printed alike, told apart by their numbers
+
+The big pattern companies print every size of a piece nested, in one
+colour on no layer, each size's number printed along its line; and beside
+the pieces, a key to the marks set out as a table in four languages and
+boxes of instructions. Such a sheet came in as one muddle: the free blouse
+in JP's test folder (two sheets, five sizes each) gave 86 and 106 pieces,
+dozens of them the key's boxes, named "Milieu" and "Jareta".
+
+**Try it:** import either of the blouse's sheets, A0 or A4. The import now
+asks which of the five sizes (8 to 16, or 18 to 26) to bring in; each size
+comes with its own pieces: 10 from the first sheet, and 6 and 4 from the
+two of the second set, named in English (Front facing, Collar, Sleeve,
+Continuous lap, Cuff, Back facing…). It says "Left out 3 tables and boxes
+of notes". A Spanish pattern's back says "Cortar al lomo": it is now cut on
+the fold, its centre back a fold, and named "Trasero" rather than by that
+instruction.
+
+**What changed:**
+
+* **Sizes by the numbers on their lines.** Sizes nested in line styles
+  that come round in turn were told apart before. Now sizes drawn alike
+  are too, when each line carries its own size's number over and over,
+  more than any other size's (a piece's number by its smallest line
+  doesn't count). Nested lines with no sizes on them (a cutting line round
+  its stitching line) are still no sizes.
+* **Size numbers are no watermark.** Words printed twice or more on most
+  pages were taken out as watermarks; a nested pattern's size numbers are,
+  on every tile, so the A4 file lost them. Words that read as sizes are
+  kept.
+* **Tables and boxes of notes.** Boxes set side by side in rows and
+  columns, each up to 10 cm (a key, a size chart), and boxes holding five
+  lines of prose or more that cover a quarter of the box, are no pieces.
+  Pages' frames side by side are bigger, and stay as they were.
+* **Names.** By a piece's big number, the pattern's title is the name
+  only when nothing else is there, the name in the biggest type is taken
+  before its translations set smaller, and lines a little further either
+  side of the number's line count. "All sizes" and lines that start in the
+  middle of a sentence ("of this piece") name nothing.
+* **Five languages.** "Cut" and "on the fold" are read in Spanish, French,
+  German and Italian too ("Cortar 1 al lomo", "Couper 2 entoilage",
+  "im Stoffbruch"), with lining and interfacing.
+
+Over the private test folder, only these files change: the blouse's six
+sheets, and names on five others (a bow tie's two pieces "Short tie
+piece" and "Long tie piece" rather than "With interfacing"; a jacket's tie
+"Optional front tie" without the pattern's title; a sundress's "Front and
+back dress"; a wrap skirt's piece no longer named after the pattern; the
+kimono's back "Trasero"), and the kimono's box of notes on which sizes to
+print, left out. Nothing changes in the cape coat or the corset.
+
+Known: the second set's two sheets come in separately (6 and 4 pieces per
+size). The tiled sheets of a pattern book draw a frame round each page,
+and those frames come in as pieces while the pieces across them don't;
+that is for another step.
+
+---
+
 ## Step 66 — A lined skirt settles on the graphics card every time
 
 On the graphics card (WebGPU), about one drape in five of the test lined
@@ -71,8 +129,8 @@ ALARGUE O ACORTE AQUÍ"). Every A4 tile then had as many lines of words as
 a page of instructions, so every page was left out as instructions and the
 pattern came in empty ("43 pages left out").
 
-**Try it:** import the A4 home-print file of a Vogue-style pattern, such as
-the free blouse in JP's test folder (two sheets of 43 and 36 pages). It now
+**Try it:** import the A4 home-print file of a big pattern company's
+pattern, such as the free blouse in JP's test folder (two sheets of 43 and 36 pages). It now
 comes in with the same pieces as its A0 copy-shop file: 86 and 106 pieces,
 where before there were none. A real page of instructions in the same file
 is still left out.

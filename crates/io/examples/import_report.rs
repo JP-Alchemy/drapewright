@@ -55,6 +55,7 @@ fn note(n: &ImportNote) -> String {
         ImportNote::LetteringIgnored { count } => format!("{count} lettering left out"),
         ImportNote::KeysIgnored { count } => format!("{count} title blocks left out"),
         ImportNote::PagesArePictures { count } => format!("{count} pages are pictures"),
+        ImportNote::TablesIgnored { count } => format!("{count} tables or notes left out"),
     }
 }
 

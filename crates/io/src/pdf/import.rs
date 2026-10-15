@@ -27,11 +27,11 @@ use super::loops::{find_loops, split_touching};
 use super::marks::{arrowheads, find_fold_brackets, find_grainlines, find_notches, test_square};
 use super::pagelabels;
 use super::reading::{FAIR, ReadLine, SURE, read_block};
-use super::sizes::find_sizes;
+use super::sizes::{find_sizes, size_name};
 use super::tiles::{Print, arrange};
 use crate::assemble::{
-    CLOSE_TOLERANCE, RawPath, ascending, assemble, bounds, bridge_crowded, chain, chain_crowded,
-    is_straight, mark_folds, meaningful_name, sentence_case, to_segments,
+    CLOSE_TOLERANCE, MIN_PIECE_AREA, RawPath, ascending, assemble, bounds, bridge_crowded, chain,
+    chain_crowded, is_box, is_straight, mark_folds, meaningful_name, sentence_case, to_segments,
 };
 use crate::import::{
     AllowanceQuestion, ImportError, ImportNote, ImportResult, ImportSizes, PageLeftOut, PageUse,
@@ -61,6 +61,12 @@ const SHARED_LONG: f64 = 10.0;
 const STRAIGHT_ON: f64 = 1.2;
 /// Each of them at least this long: no dash of a line drawn dash by dash.
 const STRAIGHT_ON_LONG: f64 = 10.0;
+/// A piece's name printed in several languages is translated in smaller
+/// type, at most this part of the name's.
+const TRANSLATED: f64 = 0.8;
+/// Lines beside a piece's number, one above another, are this far either
+/// side of it at most, in the number's height.
+const BESIDE: f64 = 0.6;
 /// A line closing an outline drawn in another style is at most this part
 /// of the outline's own line.
 const CLOSER_SHORTER: f64 = 0.6;
@@ -349,14 +355,52 @@ pub(crate) fn text_lines(runs: &[TextRun], to_mm: Affine) -> Vec<Label> {
         .collect()
 }
 
+/// "Cut" in the languages patterns are printed in: English, Spanish,
+/// French, German and Italian.
+const CUT: &[&str] = &[
+    "cut",
+    "cortar",
+    "corte",
+    "couper",
+    "coupez",
+    "zuschneiden",
+    "tagliare",
+];
+
+/// "On the fold", in those languages.
+const ON_FOLD: &[&str] = &[
+    "on fold",
+    "on the fold",
+    "al lomo",
+    "en doblez",
+    "al doblez",
+    "sur la pliure",
+    "sur le pli",
+    "au pli",
+    "im stoffbruch",
+    "in piega",
+];
+
+/// Whether lower-cased words say the fabric's fold: "on fold", "al lomo",
+/// "en doblez", "sur la pliure", "au pli", "im Stoffbruch", "in piega".
+fn says_fold(t: &str) -> bool {
+    ["fold", "lomo", "doblez", "pliure", "stoffbruch", "piega"]
+        .iter()
+        .any(|w| t.contains(w))
+        || t.split(|c: char| !c.is_alphanumeric()).any(|w| w == "pli")
+}
+
 /// Words that say what to do with a piece, rather than what it is.
 fn is_instruction(text: &str) -> bool {
     let t = text.to_lowercase();
     let starts = [
-        "cut", "place", "fold", "grain", "lengthen", "shorten", "size", "sizes", "notch", "seam",
-        "stitch", "pleat", "dart", "button", "line", "cf", "cb", "selvage", "selvedge", "bias",
-        "x ", "page", "©", "www", "http", "print", "test", "this", "scale", "match", "join",
-        "gather", "hem", "inch", "cm", "mm", "height",
+        "cut", "place", "fold", "grain", "lengthen", "shorten", "size", "sizes", "all size",
+        "notch", "seam", "stitch", "pleat", "dart", "button", "line", "cf", "cb", "selvage",
+        "selvedge", "bias", "x ", "page", "©", "www", "http", "print", "test", "this", "scale",
+        "match", "join", "gather", "hem", "inch", "cm", "mm", "height",
+        // The middle of a sentence set on several lines ("… twice the
+        // length / of this piece").
+        "of ", "and ", "the ", "to ", "for ", "with ",
     ];
     let words = t.split_whitespace().count();
     let letters = t.chars().filter(|c| c.is_alphabetic()).count();
@@ -366,8 +410,8 @@ fn is_instruction(text: &str) -> bool {
         // A credit ("Project design © …").
         || t.contains('©')
         || t.contains("copyright")
-        || t.contains("cut ")
-        || t.contains("on fold")
+        || CUT.iter().any(|c| t.starts_with(c) || t.contains(&format!("{c} ")))
+        || ON_FOLD.iter().any(|f| t.contains(f))
         || t.contains("grainline")
         // The fabric's right side ("FACE!").
         || t.trim_end_matches('!') == "face"
@@ -444,9 +488,14 @@ fn number_word(w: &str) -> Option<u32> {
 }
 
 /// Cutting instructions printed on a piece: "Cut 2", "CUT 1 ON FOLD",
-/// "Cut 1 pair lining", "Cut 2 main fabric, cut 2 interfacing".
+/// "Cut 1 pair lining", "Cut 2 main fabric, cut 2 interfacing", and in
+/// other languages "Cortar 2 forro", "Couper 1 sur la pliure".
 pub(crate) fn cuts_from_label(text: &str) -> Vec<CutInstruction> {
-    let lower = text.to_lowercase();
+    let mut lower = text.to_lowercase();
+    // Longest first: "corte" is no part of "cortar", but keep it so.
+    for word in CUT.iter().skip(1) {
+        lower = lower.replace(word, "cut");
+    }
     let mut out = Vec::new();
     for part in lower.split("cut").skip(1) {
         let words: Vec<&str> = part
@@ -461,11 +510,17 @@ pub(crate) fn cuts_from_label(text: &str) -> Vec<CutInstruction> {
             quantity *= 2;
         }
         let has = |w: &str| words.iter().any(|x| x.starts_with(w));
-        let material = if has("lining") {
+        let material = if has("lining") || has("forro") || has("doublure") || has("futter") {
             "lining"
-        } else if has("interfac") || has("fusible") {
+        } else if has("interfac")
+            || has("fusible")
+            || has("entretela")
+            || has("entoilage")
+            || has("thermocollant")
+            || has("einlage")
+        {
             "interfacing"
-        } else if has("contrast") {
+        } else if has("contrast") || has("kontrast") {
             "contrast"
         } else {
             "main"
@@ -480,7 +535,7 @@ pub(crate) fn cuts_from_label(text: &str) -> Vec<CutInstruction> {
             } else {
                 (pair || has("mirror")).then_some(true)
             },
-            on_fold: has("fold").then_some(true),
+            on_fold: says_fold(part).then_some(true),
         });
     }
     out
@@ -547,9 +602,20 @@ pub(crate) fn read_labels(pieces: &mut [Piece], labels: &[Label]) {
                 let d = l.at - n.at;
                 (d.dot(down), d.dot(n.dir))
             };
-            fn nearest(found: Vec<(f64, &Label)>) -> Option<&Label> {
+            // The pattern's title, printed by every piece's number, only
+            // when nothing else is there; and the name in the biggest type
+            // (its translations are set smaller), the nearest of those.
+            fn nearest<'l>(
+                found: Vec<(f64, &'l Label)>,
+                title: &dyn Fn(&Label) -> bool,
+            ) -> Option<&'l Label> {
+                let own: Vec<(f64, &Label)> =
+                    found.iter().filter(|(_, l)| !title(l)).copied().collect();
+                let found = if own.is_empty() { found } else { own };
+                let biggest = found.iter().map(|(_, l)| l.size).fold(0.0, f64::max);
                 found
                     .into_iter()
+                    .filter(|(_, l)| l.size >= TRANSLATED * biggest)
                     .min_by(|a, b| a.0.total_cmp(&b.0))
                     .map(|(_, l)| l)
             }
@@ -562,7 +628,7 @@ pub(crate) fn read_labels(pieces: &mut [Piece], labels: &[Label]) {
                 .iter()
                 .filter_map(|l| {
                     let (below, along) = place(l);
-                    (below.abs() <= 0.3 * n.size && along > 0.0 && along <= 6.0 * n.size)
+                    (below.abs() <= BESIDE * n.size && along > 0.0 && along <= 6.0 * n.size)
                         .then_some((along, **l))
                 })
                 .collect();
@@ -574,7 +640,7 @@ pub(crate) fn read_labels(pieces: &mut [Piece], labels: &[Label]) {
                         .then_some((below, **l))
                 })
                 .collect();
-            nearest(beside).or_else(|| nearest(under))
+            nearest(beside, &everywhere).or_else(|| nearest(under, &everywhere))
         });
         let name_label = by_number.or_else(|| {
             inside
@@ -606,7 +672,7 @@ pub(crate) fn read_labels(pieces: &mut [Piece], labels: &[Label]) {
         for label in labels {
             let t = label.text.to_lowercase();
             let fold_line = t.contains("foldline") || t.contains("fold line");
-            if !t.contains("fold") || fold_line || t.split_whitespace().count() > 6 {
+            if !says_fold(&t) || fold_line || t.split_whitespace().count() > 6 {
                 continue;
             }
             let near = (0..piece.outline.edges.len())
@@ -1521,6 +1587,14 @@ pub fn import_pdf_pages(
         None => true,
     });
 
+    // Boxes of notes (instructions, a key to the marks) are no pieces.
+    let notes_boxes = boxes_of_notes(&raw, &labels);
+    let mut k = 0;
+    raw.retain(|_| {
+        k += 1;
+        !notes_boxes.contains(&(k - 1))
+    });
+
     // A pattern in several sizes is assembled one size at a time, with what
     // the sizes share.
     let order: Vec<u32> = doc.layers().iter().map(|l| l.id).collect();
@@ -1614,6 +1688,16 @@ pub fn import_pdf_pages(
     }
     if let Some(side) = square {
         notes.push(ImportNote::TestSquareFound { size: side });
+    }
+    if !notes_boxes.is_empty() {
+        let boxes = u32::try_from(notes_boxes.len()).unwrap_or(u32::MAX);
+        match counted
+            .iter_mut()
+            .find(|n| matches!(n, ImportNote::TablesIgnored { .. }))
+        {
+            Some(ImportNote::TablesIgnored { count }) => *count += boxes,
+            _ => counted.push(ImportNote::TablesIgnored { count: boxes }),
+        }
     }
     notes.extend(counted);
     // Nothing found, on pages that are pictures: a scan or a photo of a
@@ -1902,11 +1986,13 @@ fn remove_watermarks(pages: &mut [PageContent]) {
         });
         (hash as i64, (l.size * 2.0).round() as i64)
     };
-    // The pages each word is printed twice or more on.
+    // The pages each word is printed twice or more on. Sizes are printed
+    // along every line of a pattern whose sizes are nested, so on most of
+    // its pages; they are no watermark.
     let mut on_pages: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
     for (p, page) in pages.iter().enumerate() {
         let mut here: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
-        for l in &page.labels {
+        for l in page.labels.iter().filter(|l| size_name(&l.text).is_none()) {
             here.entry(key(l)).or_default().push(p);
         }
         for (k, times) in here {
@@ -1927,6 +2013,46 @@ fn remove_watermarks(pages: &mut [PageContent]) {
     for page in pages {
         page.labels.retain(|l| !marks.contains(&key(l)));
     }
+}
+
+/// A box this much covered with lines of prose (its words' letters,
+/// roughly) holds notes, not a piece.
+const NOTES_COVER: f64 = 0.25;
+
+/// Boxes of notes: closed boxes holding `PROSE_LINES` lines of prose or
+/// more, the words covering much of them (instructions printed beside the
+/// pieces, in a box). Pieces with notes on them hold few, spread out. By
+/// their place in `raw`.
+fn boxes_of_notes(raw: &[(RawPath, Style)], labels: &[Label]) -> Vec<usize> {
+    raw.iter()
+        .enumerate()
+        .filter(|(_, (r, _))| r.closed && is_box(&r.segs))
+        .filter(|(_, (r, _))| {
+            let pts = flatten_segs(&r.segs, 0.5);
+            let area = polygon_area(&pts).abs();
+            let inside: Vec<&Label> = labels
+                .iter()
+                .filter(|l| point_in_polygon(l.at, &pts))
+                .collect();
+            let prose = inside
+                .iter()
+                .filter(|l| {
+                    l.text
+                        .split_whitespace()
+                        .filter(|w| w.chars().any(char::is_alphabetic))
+                        .count()
+                        >= PROSE_WORDS
+                })
+                .count();
+            // Each letter about as wide as half its height.
+            let inked: f64 = inside
+                .iter()
+                .map(|l| 0.55 * l.size * l.size * l.text.chars().count() as f64)
+                .sum();
+            area >= MIN_PIECE_AREA && prose >= PROSE_LINES && inked >= NOTES_COVER * area
+        })
+        .map(|(i, _)| i)
+        .collect()
 }
 
 /// Lines of prose this many, of `PROSE_WORDS` words or more, make a page of
@@ -2221,6 +2347,17 @@ mod tests {
         // not a left and a right.
         let c = one("cut 2 (Inside & Outside)");
         assert_eq!((c[0].quantity, c[0].mirrored), (2, Some(false)));
+        // In Spanish, French and German.
+        let c = one("Cortar 1 al lomo");
+        assert_eq!((c[0].quantity, c[0].on_fold), (1, Some(true)));
+        let c = one("Cortar 2 en forro");
+        assert_eq!((c[0].quantity, c[0].material.as_str()), (2, "lining"));
+        let c = one("Couper 1 sur la pliure");
+        assert_eq!((c[0].quantity, c[0].on_fold), (1, Some(true)));
+        let c = one("Couper 2 entoilage");
+        assert_eq!(c[0].material, "interfacing");
+        let c = one("Zuschneiden 2 im Stoffbruch");
+        assert_eq!((c[0].quantity, c[0].on_fold), (2, Some(true)));
     }
 
     #[test]
@@ -2238,6 +2375,13 @@ mod tests {
     #[test]
     fn instructions_are_not_names() {
         assert!(is_instruction("CUT 2"));
+        assert!(is_instruction("Cortar al lomo"));
+        assert!(is_instruction("Couper ici pour raccourcir"));
+        assert!(is_instruction("Sur le pli"));
+        assert!(is_instruction("ALL SIZES"));
+        assert!(is_instruction("of this piece"));
+        assert!(!is_instruction("Centre back fold"));
+        assert!(!is_instruction("Trasero"));
         assert!(is_instruction("Place on fold"));
         assert!(is_instruction("A1"));
         assert!(is_instruction("Size 12"));

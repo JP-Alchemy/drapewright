@@ -806,6 +806,12 @@ export const t = {
             'Left out 1 box holding a picture of the garment and a key to the lines (a title block); it is no piece.',
             'Left out # boxes holding pictures of the garment and keys to the lines (title blocks); they are no pieces.',
           )
+        case 'tablesIgnored':
+          return plural(
+            n.count,
+            'Left out 1 table or box of notes (a key to the marks, a size chart or instructions); it is no piece.',
+            'Left out # tables and boxes of notes (keys to the marks, size charts or instructions); they are no pieces.',
+          )
         case 'pagesArePictures':
           return plural(
             n.count,

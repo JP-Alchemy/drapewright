@@ -175,12 +175,17 @@ fn alike(a: &Rect, b: &Rect) -> bool {
 
 /// A size's letter or number on its line is this near it, mm.
 const ON_LINE: f64 = 2.5;
+/// Sizes drawn alike are told apart by their names on their lines: each
+/// line's name at least this many times…
+const NAMED_TIMES: usize = 3;
+/// …and this many times as often as any other size's name on it.
+const NAMED_OVER: usize = 2;
 
 /// Sizes nested in fewer line styles than there are sizes, the styles
 /// taken in turn (A black, B black dashed, C red, D red dashed, E black
-/// again…): each piece's nest holds an outline for each size, smallest
-/// first, often with the size's name on its line. The lines inside the
-/// pieces, drawn once, are every size's.
+/// again…), or drawn alike with each size's name along its line: each
+/// piece's nest holds an outline for each size, smallest first. The lines
+/// inside the pieces, drawn once, are every size's.
 fn by_nesting(
     paths: &[(RawPath, Style)],
     labels: &[Label],
@@ -274,7 +279,7 @@ fn by_nesting(
                 .enumerate()
                 .all(|(x, &k)| same(style_of(k), style_of(nest[x % period])))
     };
-    if count < 3 || !whole.iter().all(in_turn) {
+    if count < 3 {
         return None;
     }
     // Each size's name: the name most often on its line.
@@ -315,6 +320,27 @@ fn by_nesting(
                 .all(|other| other.as_ref() != Some(name))
         })
     });
+    // Sizes drawn alike (all in one line, or in lines that don't come
+    // round in turn) are sizes still when each line carries its own size's
+    // name, over and over, more than the other sizes' (a piece's number
+    // beside its smallest line is no size's): a cutting line round its
+    // stitching line carries none.
+    let surely_named = distinct
+        && votes.iter().zip(&named).all(|(v, name)| {
+            let times = |n: &String| v.iter().find(|(m, _)| m == n).map_or(0, |(_, t)| *t);
+            let own = name.as_ref().map_or(0, times);
+            let others = named
+                .iter()
+                .flatten()
+                .filter(|n| Some(*n) != name.as_ref())
+                .map(times)
+                .max()
+                .unwrap_or(0);
+            own >= NAMED_TIMES && own >= NAMED_OVER * others
+        });
+    if !(whole.iter().all(in_turn) || surely_named) {
+        return None;
+    }
     let names: Vec<String> = if distinct {
         named.into_iter().flatten().collect()
     } else {

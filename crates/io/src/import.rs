@@ -121,6 +121,10 @@ pub enum ImportNote {
     /// No pieces were found, and pages are painted mostly with pictures
     /// (a scan or a photo of a pattern): there are no lines to read.
     PagesArePictures { count: u32 },
+    /// Tables (boxes set side by side in rows and columns: a key to the
+    /// pattern's marks, a size chart) and boxes of notes (instructions):
+    /// no pieces.
+    TablesIgnored { count: u32 },
 }
 
 impl ImportNote {

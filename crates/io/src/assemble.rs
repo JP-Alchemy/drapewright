@@ -544,8 +544,72 @@ const KEY_DRAWINGS: usize = 3;
 /// its largest).
 const KEY_PART: f64 = 0.25;
 
+/// A table has at least this many boxes, side by side in two rows and two
+/// columns or more.
+const TABLE_CELLS: usize = 6;
+/// Boxes are side by side when their sides meet this nearly, mm.
+const TABLE_MEET: f64 = 0.5;
+/// A table's boxes are no longer than this, mm: bigger boxes side by side
+/// are pages' frames.
+const TABLE_CELL: f64 = 100.0;
+
+/// Tables: small boxes (`cells`, by their bounds) set side by side in rows
+/// and columns, each sharing a whole side with the next: a key to the
+/// pattern's marks, a size chart. Pieces are never drawn that way. Each
+/// table's boxes, by their place in `cells`.
+fn tables(cells: &[Rect]) -> Vec<Vec<usize>> {
+    let near = |a: f64, b: f64| (a - b).abs() <= TABLE_MEET;
+    let small = |a: &Rect| a.width().max(a.height()) <= TABLE_CELL;
+    let beside = |a: &Rect, b: &Rect| {
+        let across = (near(a.x1, b.x0) || near(a.x0, b.x1)) && near(a.y0, b.y0) && near(a.y1, b.y1);
+        let down = (near(a.y1, b.y0) || near(a.y0, b.y1)) && near(a.x0, b.x0) && near(a.x1, b.x1);
+        small(a) && small(b) && (across || down)
+    };
+    let mut group: Vec<usize> = (0..cells.len()).collect();
+    fn root(group: &mut [usize], mut i: usize) -> usize {
+        while group[i] != i {
+            group[i] = group[group[i]];
+            i = group[i];
+        }
+        i
+    }
+    for a in 0..cells.len() {
+        for b in a + 1..cells.len() {
+            if beside(&cells[a], &cells[b]) {
+                let (ra, rb) = (root(&mut group, a), root(&mut group, b));
+                group[ra] = rb;
+            }
+        }
+    }
+    let mut by_root: HashMap<usize, Vec<usize>> = HashMap::new();
+    for k in 0..cells.len() {
+        let r = root(&mut group, k);
+        by_root.entry(r).or_default().push(k);
+    }
+    let lines = |ends: Vec<f64>| {
+        let mut ends = ends;
+        ends.sort_by(f64::total_cmp);
+        ends.dedup_by(|a, b| near(*a, *b));
+        ends.len()
+    };
+    let mut found: Vec<Vec<usize>> = by_root
+        .into_values()
+        .filter(|table| {
+            table.len() >= TABLE_CELLS
+                && lines(table.iter().map(|&k| cells[k].y0).collect()) >= 2
+                && lines(table.iter().map(|&k| cells[k].x0).collect()) >= 2
+        })
+        .map(|mut table| {
+            table.sort_unstable();
+            table
+        })
+        .collect();
+    found.sort();
+    found
+}
+
 /// Whether a closed path is a box: four straight sides, along the page.
-fn is_box(segs: &[PathSeg]) -> bool {
+pub(crate) fn is_box(segs: &[PathSeg]) -> bool {
     let mut corners: Vec<Point> = Vec::new();
     for seg in segs {
         let PathSeg::Line(line) = seg else {
@@ -1265,6 +1329,25 @@ pub(crate) fn assemble(
             count: u32::try_from(keys.len()).unwrap_or(u32::MAX),
         });
     }
+    // Tables, and everything in their boxes.
+    let boxes: Vec<usize> = (0..candidates.len())
+        .filter(|&c| candidates[c].parent.is_none() && is_box(&raw[candidates[c].raw].segs))
+        .collect();
+    let found = tables(
+        &boxes
+            .iter()
+            .map(|&c| bounds(&candidates[c].polyline))
+            .collect::<Vec<_>>(),
+    );
+    if !found.is_empty() {
+        notes.push(ImportNote::TablesIgnored {
+            count: u32::try_from(found.len()).unwrap_or(u32::MAX),
+        });
+    }
+    let keys: Vec<usize> = keys
+        .into_iter()
+        .chain(found.iter().flatten().map(|&k| boxes[k]))
+        .collect();
 
     let mut ids = counter("");
     let mut pieces: Vec<Piece> = Vec::new();
