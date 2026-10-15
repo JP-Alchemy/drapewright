@@ -7,11 +7,13 @@
 //! the server reads and writes only the files it is asked to, and makes no
 //! network connections.
 
+mod drape;
 mod font;
 mod render;
 mod session;
 mod text;
 mod tools;
+mod worn;
 
 use serde_json::{Value, json};
 

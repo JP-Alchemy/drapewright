@@ -428,10 +428,12 @@ name = "drapewright-mcp"
 version = "0.1.0"
 dependencies = [
  "drapewright-body",
+ "drapewright-fabric",
  "drapewright-io",
  "drapewright-pattern-core",
  "drapewright-project",
  "drapewright-seams",
+ "drapewright-sim",
  "kurbo",
  "schemars",
  "serde",

@@ -207,33 +207,33 @@ impl Draping {
     /// The pieces left out, sewn to nothing, by id.
     #[wasm_bindgen(getter, js_name = leftOut)]
     pub fn left_out(&self) -> Vec<String> {
-        self.0.left_out.clone()
+        self.0.left_out().to_vec()
     }
 
     /// The facings and linings sewn to nothing, by id: left out, as they go
     /// inside.
     #[wasm_bindgen(getter)]
     pub fn inside(&self) -> Vec<String> {
-        self.0.inside.clone()
+        self.0.inside().to_vec()
     }
 
     /// The facings and linings sewn but with nothing to lie on inside the
     /// rest (one sewn only to another), by id: left out.
     #[wasm_bindgen(getter)]
     pub fn unplaced(&self) -> Vec<String> {
-        self.0.unplaced.clone()
+        self.0.unplaced().to_vec()
     }
 
     /// The facings and linings draped inside the rest, by id.
     #[wasm_bindgen(getter)]
     pub fn lined(&self) -> Vec<String> {
-        self.0.lined.clone()
+        self.0.lined().to_vec()
     }
 
     /// How many buttons the garment has, done up or not.
     #[wasm_bindgen(getter)]
     pub fn buttons(&self) -> usize {
-        self.0.buttons
+        self.0.buttons()
     }
 
     /// The garment's size round the body at the figure's bust, waist and
@@ -241,7 +241,7 @@ impl Draping {
     #[wasm_bindgen(getter)]
     pub fn girths(&self) -> Result<JsValue, JsError> {
         self.0
-            .girths
+            .girths()
             .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
             .map_err(|e| JsError::new(&e.to_string()))
     }

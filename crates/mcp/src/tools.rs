@@ -53,7 +53,7 @@ impl Output {
         Output::text(serde_json::to_string_pretty(value).unwrap_or_default())
     }
 
-    fn image(mut self, png: &[u8]) -> Self {
+    pub(crate) fn image(mut self, png: &[u8]) -> Self {
         self.content.push(json!({
             "type": "image",
             "data": crate::base64(png),
@@ -314,6 +314,13 @@ pub fn all() -> Vec<Tool> {
             Reads,
             "Fits the avatar (the figure patterns will be draped on) to a person's measurements, and says how close it comes to each: the person's, the avatar's and the difference, mm. The avatar is an adult's (25 to 90); from pattern sizes 6 to 30W it matches height, bust, waist and hip within a few mm, and says where it cannot come closer.",
             fit_avatar,
+        ),
+        tool(
+            "drape",
+            "Drape on the avatar",
+            Reads,
+            "Drapes the project's garment on the avatar, as the app's Drape does, and shows it: a picture of the figure wearing it from the front, side and back, and how it fits standing. At the bust, waist and hip: the garment's size round the body, the body's, the ease, how hard the cloth pulls there (N/m, typically and in its hardest-pulled tenth: the app's heatmap runs from pale at 0 to red at 100) and the room it leaves (typically, and the least: 0 is touching); and the band of heights where it pulls hardest (always somewhat where it hangs from: the shoulders, or a skirt's waist). The avatar is fitted to a person's measurements (as fit_avatar) or is the standard figure. Only pieces sewn by seams are draped (sew_edges); facings and linings go inside. With pose, it then moves into that pose; with shows \"pull\" or \"room\" the picture is a heatmap. It takes from a few seconds to a minute.",
+            crate::drape::drape,
         ),
         tool(
             "get_seams",
@@ -2340,7 +2347,7 @@ fn set_measurements(session: &mut Session, a: MeasurementArgs) -> Result<Output,
 }
 
 /// The avatar's body, built into the server and loaded when first wanted.
-fn body_model() -> &'static BodyModel {
+pub(crate) fn body_model() -> &'static BodyModel {
     static BODY: OnceLock<BodyModel> = OnceLock::new();
     BODY.get_or_init(|| {
         BodyModel::from_bytes(include_bytes!("../../../assets/body/adult.dwbody"))
@@ -2359,23 +2366,38 @@ struct AvatarArgs {
     age: Option<f64>,
 }
 
-fn fit_avatar(session: &mut Session, a: AvatarArgs) -> Result<Output, ToolError> {
-    let doc = session.project()?.engine.document();
-    let set = match &a.person {
-        Some(id) => doc.measurement_sets.iter().find(|m| &m.id == id),
+/// A person's measurements for the avatar.
+pub(crate) struct ForAvatar {
+    pub name: String,
+    pub figure: Figure,
+    pub woman: bool,
+    /// Those the avatar can take: a man's figure has no bust's shape, as
+    /// in the app.
+    pub values: BTreeMap<String, f64>,
+    pub age: f64,
+}
+
+/// The measurements of `person` (by id; the first person's if none), and
+/// their age (`age`, or the one kept with them, or 35).
+pub(crate) fn measurements_for_avatar(
+    doc: &Document,
+    person: Option<&str>,
+    age: Option<f64>,
+) -> Result<ForAvatar, ToolError> {
+    let set = match person {
+        Some(id) => doc.measurement_sets.iter().find(|m| m.id == id),
         None => doc.measurement_sets.first(),
     }
     .ok_or_else(|| {
-        ToolError::new(match &a.person {
+        ToolError::new(match person {
             Some(id) => {
                 format!("There are no measurements \"{id}\". get_measurements lists them.")
             }
             None => "There are no measurements yet: add some with set_measurements.".into(),
         })
     })?;
-    // A man's figure has no bust's shape, as in the app.
     let woman = set.figure == Figure::Woman;
-    let values: BTreeMap<String, f64> = set
+    let values = set
         .values
         .iter()
         .filter(|(k, _)| {
@@ -2383,11 +2405,28 @@ fn fit_avatar(session: &mut Session, a: AvatarArgs) -> Result<Output, ToolError>
         })
         .map(|(k, v)| (k.clone(), *v))
         .collect();
-    let age = a
-        .age
+    let age = age
         .or(set.age.map(f64::from))
         .unwrap_or(35.0)
         .clamp(25.0, 90.0);
+    Ok(ForAvatar {
+        name: set.name.clone(),
+        figure: set.figure,
+        woman,
+        values,
+        age,
+    })
+}
+
+fn fit_avatar(session: &mut Session, a: AvatarArgs) -> Result<Output, ToolError> {
+    let doc = session.project()?.engine.document();
+    let ForAvatar {
+        name,
+        figure,
+        woman,
+        values,
+        age,
+    } = measurements_for_avatar(doc, a.person.as_deref(), a.age)?;
     let fitted = drapewright_body::fit(body_model(), &values, woman, age);
     let rows: Vec<Value> = MeasurementKey::ALL
         .iter()
@@ -2412,8 +2451,8 @@ fn fit_avatar(session: &mut Session, a: AvatarArgs) -> Result<Output, ToolError>
         .filter(|k| !fitted.residuals.contains_key(*k))
         .collect();
     Ok(Output::json(&json!({
-        "person": set.name,
-        "figure": set.figure,
+        "person": name,
+        "figure": figure,
         "age": age,
         "summary": format!(
             "The avatar matches {close} of {} measurements to within 1 cm.",

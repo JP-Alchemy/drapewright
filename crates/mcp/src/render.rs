@@ -280,7 +280,14 @@ fn arrowhead(tip: (f32, f32), tail: (f32, f32), size: f32) -> Option<Path> {
 }
 
 /// Text with a white halo, so it reads over lines and fills.
-fn label(pixmap: &mut Pixmap, text: &str, x: f32, y: f32, height: f32, colour: (u8, u8, u8)) {
+pub(crate) fn label(
+    pixmap: &mut Pixmap,
+    text: &str,
+    x: f32,
+    y: f32,
+    height: f32,
+    colour: (u8, u8, u8),
+) {
     let Some(path) = font::text_centred(text, x, y, height) else {
         return;
     };

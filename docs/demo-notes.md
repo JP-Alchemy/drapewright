@@ -12,6 +12,53 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 59 — An assistant drapes the garment and sees it worn
+
+The MCP server's new `drape` tool drapes the project's garment on the
+avatar, as the app's **Drape** does, and gives the assistant a picture of
+it worn from the front, the side and the back, with how it fits. An
+assistant can now show you the garment on your measurements, in a fabric,
+done up or open, and moving.
+
+**Try it:** build the server (`cargo build --release -p drapewright-mcp`)
+and add it to your assistant (see `docs/ai-assistants.md`). Then ask, for
+example: *"Open fixtures/drapewright/shirt.drapewright, drape it and show
+me. Now with the arms raised, as a heatmap of where it pulls."* The shirt
+drapes in about 2 seconds; the reply gives at the bust, waist and hip the
+shirt's size round the body, the ease (the shirt is about 11 cm bigger
+than the figure at the bust), how hard the cloth pulls (typically, and in
+its hardest-pulled tenth, in N/m; the heatmap is red at 100) and the room
+it leaves. With your measurements kept in the project (`set_measurements`)
+it drapes on the avatar fitted to them; `person: "standard"` uses the
+standard figure. `fabric` takes the app's fabrics or your own, `open:
+true` undoes the buttons, `pose` moves the figure once it has settled,
+and `shows: "room"` colours the cloth by the room between it and the body.
+
+**What changed:**
+
+* **One way to drape.** The steps from the pieces to the settled garment
+  (placing it round the body, its facings inside, its buttons, measuring
+  it again as it settles, then moving into a pose) were in the app's
+  WebAssembly side; they are now the simulator's (`drapewright-sim`'s
+  `draping`), and the app and the assistant both use them. The app drapes
+  as before (its drape tests pass unchanged); so do the heatmap's colours,
+  now shared.
+* **Pictures of the figure** are drawn by the server itself: the figure and
+  the cloth, smoothly lit, nearest in front, drawn twice the size and
+  shrunk for smooth edges. The cloth lying on the body is drawn over it.
+* **How it fits** is read as a sewist would: the finished garment's size
+  round the bust, waist and hip and the ease there (as under the avatar
+  in the app), then from the cloth on the body how hard it pulls and how
+  much room it leaves near each, and the band of heights where it pulls
+  hardest. A garment always pulls most where it hangs from, the shoulders
+  for a top or a coat.
+
+Known: a drape on the computer the server runs on is coarser than the
+app's on the graphics card (its points 20 mm apart, as in the app without
+one).
+
+---
+
 ## Step 58 — A cape coat from a layered PDF, sewn and draped as worn
 
 A lined cape coat from an independent designer's PDF (JP's test pattern,

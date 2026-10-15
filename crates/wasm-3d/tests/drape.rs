@@ -38,7 +38,7 @@ fn garment(name: &str) -> DrapeRequest {
 /// Drapes `request` until it is done, checking as it goes; its draping.
 fn drape_until_done(request: &DrapeRequest) -> Draping {
     let mut draping = Draping::start(&model(), request).unwrap();
-    assert!(draping.left_out.is_empty());
+    assert!(draping.left_out().is_empty());
     let mut progress = draping.progress();
     assert_eq!(progress.stage, DrapeStage::Sewing);
     let mut frames = 0;
@@ -147,7 +147,7 @@ fn pieces_sewn_to_nothing_are_left_out() {
     pocket.id = "pocket".into();
     request.pieces.push(pocket);
     let draping = Draping::start(&model(), &request).unwrap();
-    assert_eq!(draping.left_out, ["pocket"]);
+    assert_eq!(draping.left_out(), ["pocket"]);
 }
 
 #[test]
@@ -267,9 +267,9 @@ fn a_shirt_drapes_open_with_its_facing_inside() {
     // Settled, its gathered seams drawn up.
     assert_eq!(progress.stage, DrapeStage::Settled);
     assert!(progress.widest_gap < 8.0, "{progress:?}");
-    assert_eq!(draping.lined, [facing]);
-    assert!(draping.inside.is_empty());
-    assert_eq!(draping.buttons, 5);
+    assert_eq!(draping.lined(), [facing]);
+    assert!(draping.inside().is_empty());
+    assert_eq!(draping.buttons(), 5);
     // Open: the fronts' edges apart in front.
     let points = draping.points();
     let front = points.iter().map(|p| p[2]).fold(f32::MIN, f32::max);

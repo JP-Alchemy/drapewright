@@ -4,9 +4,11 @@
 pub mod cloth;
 pub mod collide;
 pub mod drape;
+pub mod draping;
 pub mod fabric;
 pub mod garment;
 pub mod girth;
+pub mod heatmap;
 pub mod heights;
 pub mod inside;
 pub mod mesh;

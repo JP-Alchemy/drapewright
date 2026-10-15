@@ -5,11 +5,9 @@ use drapewright_body::{BodyModel, Pose, Shape};
 pub use drapewright_fabric::{Fabric, FabricPreset, Measured};
 use drapewright_pattern_core::Piece;
 use drapewright_seams::Seam;
-use drapewright_sim::drape::{Drape, Posable};
-use drapewright_sim::garment::{Garment, GarmentError, assemble, draped_pieces};
-use drapewright_sim::girth::girths;
-use drapewright_sim::inside::with_inside;
-use drapewright_sim::place::{Figure, from_shoulders, half_round, place};
+use drapewright_sim::draping::{self, Stage};
+use drapewright_sim::garment::GarmentError;
+use drapewright_sim::heatmap;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -36,10 +34,6 @@ pub fn use_card(card: Option<Card>) {
 pub fn card() -> Option<Card> {
     CARD.with(|c| c.borrow().clone())
 }
-/// A frame of the drape, s.
-const FRAME: f32 = 1.0 / 60.0;
-/// The longest a drape is given to settle, s.
-const LONGEST: f32 = 20.0;
 
 /// What to drape: the project's pieces, sewn by its seams, in a fabric, on
 /// the avatar shaped by `settings`.
@@ -153,6 +147,16 @@ pub enum DrapeError {
     Garment(GarmentError),
 }
 
+impl From<draping::DrapeError> for DrapeError {
+    fn from(e: draping::DrapeError) -> Self {
+        match e {
+            draping::DrapeError::NothingSewn => DrapeError::NothingSewn,
+            draping::DrapeError::HalfRound => DrapeError::HalfRound,
+            draping::DrapeError::Garment(e) => DrapeError::Garment(e),
+        }
+    }
+}
+
 impl std::fmt::Display for DrapeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -169,55 +173,22 @@ impl std::fmt::Display for DrapeError {
 
 impl std::error::Error for DrapeError {}
 
-/// A drape in progress on the avatar.
-#[derive(Debug)]
-pub struct Draping {
-    drape: Drape,
-    /// The pieces sewn to nothing, by id: left out.
-    pub left_out: Vec<String>,
-    /// The facings and linings sewn to nothing, by id: left out, as they
-    /// go inside.
-    pub inside: Vec<String>,
-    /// The facings and linings sewn but not placed inside the rest (one
-    /// sewn only to another, with nothing to lie on), by id: left out.
-    pub unplaced: Vec<String>,
-    /// The facings and linings draped inside the rest, by id.
-    pub lined: Vec<String>,
-    /// How many buttons it has, done up or not.
-    pub buttons: usize,
-    /// The garment's size round the body at its bust, waist and hip: as
-    /// placed, then as it settles standing.
-    pub girths: Vec<Girth>,
-    /// The garment without its facings and linings (its first panels), its
-    /// panels' points as placed, which of them hang from the shoulders, and
-    /// the figure: to measure it again as it settles.
-    shell: Garment,
-    placed: Vec<Vec<[f64; 3]>>,
-    hung: Vec<bool>,
-    figure: Figure,
-    /// Measured as it settled, rather than as placed.
-    measured: bool,
-    done: Option<DrapeStage>,
-    /// The pose asked for, and the pose the body is in or moving into.
-    wanted: AvatarPose,
-    posed: AvatarPose,
-    /// When the drape last set off (sewing, or moving into a pose), s.
-    since: f32,
+impl From<Stage> for DrapeStage {
+    fn from(s: Stage) -> Self {
+        match s {
+            Stage::Sewing => DrapeStage::Sewing,
+            Stage::Settling => DrapeStage::Settling,
+            Stage::Posing => DrapeStage::Posing,
+            Stage::Settled => DrapeStage::Settled,
+            Stage::Stopped => DrapeStage::Stopped,
+        }
+    }
 }
 
-/// The garment's size round the body at the figure's levels, its panels'
-/// points where `points` has them (mm).
-fn measure(shell: &Garment, points: &[Vec<[f64; 3]>], figure: &Figure) -> Vec<Girth> {
-    girths(shell, points, figure)
-        .into_iter()
-        .zip(&figure.levels)
-        .map(|((level, garment), at)| Girth {
-            level: level.into(),
-            garment,
-            body: at.girth,
-        })
-        .collect()
-}
+/// A drape in progress on the avatar: `drapewright-sim`'s, in the page's
+/// terms.
+#[derive(Debug)]
+pub struct Draping(draping::Draping);
 
 impl Draping {
     /// Starts draping: the pieces sewn by confirmed seams, but for facings
@@ -234,109 +205,92 @@ impl Draping {
         request: &DrapeRequest,
         card: Option<&Card>,
     ) -> Result<Draping, DrapeError> {
-        let spacing = if card.is_some() {
-            CARD_SPACING
-        } else {
-            SPACING
-        };
-        let seams: Vec<Seam> = request
-            .seams
-            .iter()
-            .filter(|s| s.confirmed)
-            .cloned()
-            .collect();
-        let draped = draped_pieces(&request.pieces, &seams);
-        let sewn = draped.sewn;
-        if sewn.is_empty() {
-            return Err(DrapeError::NothingSewn);
-        }
-        let shell = assemble(&sewn, &seams, spacing).map_err(DrapeError::Garment)?;
-        if half_round(&shell) {
-            return Err(DrapeError::HalfRound);
-        }
-        let body = model.shape(&Shape::from(request.settings.clone()));
-        let figure = Figure::of(model, &body);
-        let starts = place(&shell, &figure);
-        let girths = measure(&shell, &starts, &figure);
-        let placed = starts.clone();
-        let hung = from_shoulders(&shell);
-        // Its facings and linings inside it, or, if they can't be placed
-        // there, left out.
-        let ids = |pieces: &[Piece]| pieces.iter().map(|p| p.id.clone()).collect::<Vec<_>>();
-        let (garment, starts, lined, unplaced) =
-            match with_inside(&shell, &starts, (&sewn, &draped.lined), &seams, spacing) {
-                Some((whole, starts)) => (whole, starts, ids(&draped.lined), Vec::new()),
-                None => (shell.clone(), starts, Vec::new(), ids(&draped.lined)),
-            };
-        let buttons = garment.buttons;
-        let garment = if request.open == Some(true) {
-            garment.unbuttoned()
-        } else {
-            garment
-        };
-        let mut drape = Drape::new(
-            &garment,
-            &starts,
-            request
-                .measured
-                .map_or(request.fabric.fabric(), |m| m.fabric(request.fabric)),
-            (&body.vertices, &model.skin()),
-        );
-        if let Some(posable) = Posable::of(model, &body) {
-            drape.posable(posable);
-        }
+        let fabric = request
+            .measured
+            .map_or(request.fabric.fabric(), |m| m.fabric(request.fabric));
+        let mut draping = draping::Draping::start(
+            model,
+            &Shape::from(request.settings.clone()),
+            draping::Request {
+                pieces: &request.pieces,
+                seams: &request.seams,
+                fabric,
+                open: request.open == Some(true),
+                spacing: if card.is_some() {
+                    CARD_SPACING
+                } else {
+                    SPACING
+                },
+            },
+            request.pose.unwrap_or_default().into(),
+        )?;
         if let Some((device, queue)) = card {
-            match drapewright_sim_gpu::GpuCloth::new(device, queue, &drape.cloth) {
-                Ok(gpu) => drape.use_stepper(Box::new(gpu)),
+            match drapewright_sim_gpu::GpuCloth::new(device, queue, &draping.drape().cloth) {
+                Ok(gpu) => draping.use_stepper(Box::new(gpu)),
                 Err(_) => return Draping::start_on(model, request, None),
             }
         }
-        Ok(Draping {
-            drape,
-            left_out: draped.alone,
-            inside: draped.inside,
-            unplaced,
-            lined,
-            buttons,
-            girths,
-            shell,
-            placed,
-            hung,
-            figure,
-            measured: false,
-            done: None,
-            wanted: request.pose.unwrap_or_default(),
-            posed: AvatarPose::Standing,
-            since: 0.0,
-        })
+        Ok(Draping(draping))
+    }
+
+    /// The pieces sewn to nothing, by id: left out.
+    pub fn left_out(&self) -> &[String] {
+        &self.0.left_out
+    }
+
+    /// The facings and linings sewn to nothing, by id: left out, as they
+    /// go inside.
+    pub fn inside(&self) -> &[String] {
+        &self.0.inside
+    }
+
+    /// The facings and linings sewn but not placed inside the rest (one
+    /// sewn only to another, with nothing to lie on), by id: left out.
+    pub fn unplaced(&self) -> &[String] {
+        &self.0.unplaced
+    }
+
+    /// The facings and linings draped inside the rest, by id.
+    pub fn lined(&self) -> &[String] {
+        &self.0.lined
+    }
+
+    /// How many buttons it has, done up or not.
+    pub fn buttons(&self) -> usize {
+        self.0.buttons
+    }
+
+    /// The garment's size round the body at its bust, waist and hip: as
+    /// placed, then as it settles standing.
+    pub fn girths(&self) -> Vec<Girth> {
+        self.0
+            .girths
+            .iter()
+            .map(|g| Girth {
+                level: g.level.into(),
+                garment: g.garment,
+                body: g.body,
+            })
+            .collect()
     }
 
     /// Moves the body into `pose` once the garment has settled (at once if
     /// it has), the garment with it.
     pub fn pose(&mut self, pose: AvatarPose) {
-        self.wanted = pose;
-        if self.done.is_some() && pose != self.posed {
-            self.set_off();
-        }
-    }
-
-    fn set_off(&mut self) {
-        self.drape.pose(self.wanted.into());
-        self.posed = self.wanted;
-        self.since = self.drape.time;
-        self.done = None;
+        self.0.pose(pose.into());
     }
 
     /// The body as it is now (mm), if it has moved from standing as
     /// measured; and its move's number, different each time it moves.
     pub fn body(&self) -> Option<(u32, &[[f32; 3]])> {
-        self.drape.body()
+        self.0.drape().body()
     }
 
     /// The seat the figure sits on now, if it sits: its lowest and highest
     /// corners, mm.
     pub fn seat(&self) -> Option<([f32; 3], [f32; 3])> {
-        self.drape
+        self.0
+            .drape()
             .seat()
             .map(|s| (s.low.map(|c| c * 1000.0), s.high.map(|c| c * 1000.0)))
     }
@@ -344,72 +298,34 @@ impl Draping {
     /// Whether a frame can be taken now: on the graphics card, not until
     /// it has caught up.
     pub fn ready(&mut self) -> bool {
-        self.done.is_some() || self.drape.ready()
+        self.0.ready()
     }
 
     /// Whether the cloth is moved on on the graphics card.
     pub fn on_card(&self) -> bool {
-        self.drape.stepped_elsewhere()
+        self.0.drape().stepped_elsewhere()
     }
 
     /// Moves the drape on a frame, unless it is done (or the graphics card
     /// is busy).
     pub fn step(&mut self) -> DrapeProgress {
-        if self.done.is_none() && self.drape.ready() {
-            self.drape.step(FRAME);
-            if self.drape.settled() {
-                // Measured again where the cloth hung from the shoulders has
-                // settled on the body: placed flat, it reaches the bust lower
-                // than it does over the bust's curve. Cloth hung from the
-                // waist is measured where it was placed, as it is worn
-                // (settled, a skirt with nothing to hold it may slip).
-                if self.posed == AvatarPose::Standing && !self.measured {
-                    let x = &self.drape.cloth.x;
-                    let firsts = &self.drape.firsts;
-                    let points: Vec<Vec<[f64; 3]>> = (0..self.shell.panels.len())
-                        .map(|p| {
-                            if !self.hung[p] {
-                                return self.placed[p].clone();
-                            }
-                            let first = firsts[p] as usize;
-                            (0..self.shell.panels[p].mesh.points.len())
-                                .map(|k| x[first + k].map(|c| f64::from(c) * 1000.0))
-                                .collect()
-                        })
-                        .collect();
-                    self.girths = measure(&self.shell, &points, &self.figure);
-                    self.measured = true;
-                }
-                if self.wanted == self.posed {
-                    self.done = Some(DrapeStage::Settled);
-                } else {
-                    self.set_off();
-                }
-            } else if self.drape.time - self.since >= LONGEST {
-                self.done = Some(DrapeStage::Stopped);
-            }
-        }
+        self.0.step();
         self.progress()
     }
 
     pub fn progress(&self) -> DrapeProgress {
-        let stage = self.done.unwrap_or(if self.drape.sewing() {
-            DrapeStage::Sewing
-        } else if self.drape.moving() {
-            DrapeStage::Posing
-        } else {
-            DrapeStage::Settling
-        });
+        let drape = self.0.drape();
         DrapeProgress {
-            stage,
-            time: f64::from(self.drape.time),
-            widest_gap: f64::from(self.drape.cloth.widest_stitch()) * 1000.0,
+            stage: self.0.stage().into(),
+            time: f64::from(drape.time),
+            widest_gap: f64::from(drape.cloth.widest_stitch()) * 1000.0,
         }
     }
 
     /// Where the cloth's points are, mm.
     pub fn points(&self) -> Vec<[f32; 3]> {
-        self.drape
+        self.0
+            .drape()
             .cloth
             .x
             .iter()
@@ -419,7 +335,7 @@ impl Draping {
 
     /// The cloth's triangles, as indices into its points.
     pub fn triangles(&self) -> &[[u32; 3]] {
-        &self.drape.cloth.triangles
+        &self.0.drape().cloth.triangles
     }
 }
 
@@ -441,47 +357,7 @@ pub enum ClothShows {
 /// white.
 const INSIDE_PALER: f32 = 0.45;
 
-/// Pull shown at its strongest, N/m (as in the app's legend).
-pub const PULL_SCALE: f32 = 100.0;
-/// Room shown up to, mm (as in the app's legend).
-pub const ROOM_SCALE: f32 = 40.0;
-
-const fn rgb(hex: u32) -> [f32; 3] {
-    [
-        ((hex >> 16) & 0xff) as f32 / 255.0,
-        ((hex >> 8) & 0xff) as f32 / 255.0,
-        (hex & 0xff) as f32 / 255.0,
-    ]
-}
-
-/// Pale where it hardly pulls, through yellow and orange to red (as in the
-/// app's legend).
-const PULL_COLOURS: [(f32, [f32; 3]); 4] = [
-    (0.0, rgb(0xe9eef4)),
-    (0.25, rgb(0xffe08a)),
-    (0.6, rgb(0xff9f43)),
-    (1.0, rgb(0xd63031)),
-];
-/// Deep blue where it touches, paler as it stands away (as in the app's
-/// legend).
-const ROOM_COLOURS: [(f32, [f32; 3]); 3] = [
-    (0.0, rgb(0x1c64d1)),
-    (0.35, rgb(0x7cc4fa)),
-    (1.0, rgb(0xf1f3f5)),
-];
-
-/// The colour `t` (0 to 1) along a scale of colours.
-fn along(scale: &[(f32, [f32; 3])], t: f32) -> [f32; 3] {
-    let t = t.clamp(0.0, 1.0);
-    for pair in scale.windows(2) {
-        let ((t0, c0), (t1, c1)) = (pair[0], pair[1]);
-        if t <= t1 {
-            let f = (t - t0) / (t1 - t0);
-            return [0, 1, 2].map(|k| c0[k] + (c1[k] - c0[k]) * f);
-        }
-    }
-    scale[scale.len() - 1].1
-}
+pub use drapewright_sim::heatmap::{PULL_SCALE, ROOM_SCALE};
 
 /// The cloth at a point.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -514,14 +390,15 @@ pub struct ClothState {
 impl Draping {
     /// The cloth as it is now.
     pub fn state(&self) -> ClothState {
-        let strain = self.drape.strain();
+        let drape = self.0.drape();
+        let strain = drape.strain();
         ClothState {
             points: self.points(),
             triangles: self.triangles().to_vec(),
             pull: strain.pull,
             stretch: strain.stretch,
-            room: self.drape.room().iter().map(|r| r * 1000.0).collect(),
-            inside_from: (0..self.drape.cloth.x.len()).find(|&k| self.drape.cloth.inside(k)),
+            room: drape.room().iter().map(|r| r * 1000.0).collect(),
+            inside_from: (0..drape.cloth.x.len()).find(|&k| drape.cloth.inside(k)),
         }
     }
 }
@@ -541,16 +418,8 @@ impl ClothState {
                     }
                 })
                 .collect(),
-            ClothShows::Pull => self
-                .pull
-                .iter()
-                .map(|&p| along(&PULL_COLOURS, p / PULL_SCALE))
-                .collect(),
-            ClothShows::Room => self
-                .room
-                .iter()
-                .map(|&r| along(&ROOM_COLOURS, r / ROOM_SCALE))
-                .collect(),
+            ClothShows::Pull => self.pull.iter().map(|&p| heatmap::pull_colour(p)).collect(),
+            ClothShows::Room => self.room.iter().map(|&r| heatmap::room_colour(r)).collect(),
         }
     }
 

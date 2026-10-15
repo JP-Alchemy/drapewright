@@ -53,6 +53,9 @@ For example:
 > Open ~/Desktop/sasha.drapewright, add a 70 × 8 cm waistband cut on the
 > fold, and lay everything out for 150 cm fabric.
 
+> Drape it on my measurements in linen and show me how it fits. Where does
+> it pull when I reach forward?
+
 To work on the project in Drapewright, open the saved `.drapewright` file
 with **Projects → Restore a backup…**, or **Open pattern**. To give an
 assistant a project from the app, save it with **Back up** and give the
@@ -67,7 +70,9 @@ assistant that file.
 * **It shows its work.** `render_preview` returns a picture of the
   pieces, numbered, with folds in blue, hems in orange, the stitching line
   dashed, notches and grainlines, and optionally each edge's id. The
-  assistant uses it to see shapes and to check its changes.
+  assistant uses it to see shapes and to check its changes. `drape`
+  returns a picture of the garment worn on the avatar, from the front,
+  side and back.
 * **It never overwrites a file unless asked**, and never drops unsaved
   changes without saying so.
 * **Millimetres throughout.** Points are `[x, y]` with y down, in each
@@ -93,6 +98,7 @@ assistant that file.
 | `move_pieces`, `rotate_piece`, `arrange_pieces` | Arrange the work table, e.g. in rows as wide as the fabric |
 | `get_measurements`, `set_measurements` | People's body measurements kept in the project; values outside the usual range are pointed out |
 | `fit_avatar` | Fits the avatar to a person's measurements and says how close it comes to each |
+| `drape` | Drapes the garment on the avatar (fitted to a person, or the standard figure) in a fabric, done up or open, and in a pose if asked: a picture of it worn (or a heatmap of where it pulls, or of the room it leaves), and at the bust, waist and hip its size, the ease, how hard it pulls and how much room it leaves |
 | `get_seams`, `sew_edges`, `unpick_seams` | Which edges are sewn together, each side's length and how the notches meet; seams Drapewright suggests (to confirm with the user) |
 | `undo`, `redo` | One tool call is one step |
 | `print_settings` | How the project prints, and its print settings |

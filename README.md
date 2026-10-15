@@ -49,7 +49,8 @@ pnpm e2e                 # Playwright, Chromium + WebKit
 
 `drapewright-mcp` lets an AI assistant work on Drapewright projects on your
 computer: import patterns, look at the pieces, name them, set allowances,
-cutting, notches and grainlines, and save a project to open in the app.
+cutting, notches and grainlines, sew them, drape the garment on your
+measurements and see it worn, and save a project to open in the app.
 
 ```bash
 cargo build --release -p drapewright-mcp
