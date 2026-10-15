@@ -806,6 +806,12 @@ export const t = {
             'Left out 1 box holding a picture of the garment and a key to the lines (a title block); it is no piece.',
             'Left out # boxes holding pictures of the garment and keys to the lines (title blocks); they are no pieces.',
           )
+        case 'pagesArePictures':
+          return plural(
+            n.count,
+            'This page is a picture (a scan or a photo), not lines, so Drapewright found no pieces in it. If the pattern comes as a PDF, SVG or DXF made on a computer, open that instead. Or print it, cut out the pieces, and photograph each one beside a sheet of printer paper.',
+            'These # pages are pictures (scans or photos), not lines, so Drapewright found no pieces in them. If the pattern comes as a PDF, SVG or DXF made on a computer, open that instead. Or print it, cut out the pieces, and photograph each one beside a sheet of printer paper.',
+          )
         case 'looseLinesIgnored':
           return plural(
             n.count,

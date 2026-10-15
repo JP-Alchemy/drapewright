@@ -187,3 +187,35 @@ fn damaged_files_are_read_as_far_as_possible() {
     assert_eq!(Document::load(b"not a pdf").unwrap_err(), PdfError::NotAPdf);
     assert!(Document::load(b"%PDF-1.7\nnothing else").is_err());
 }
+
+#[test]
+fn where_images_are_painted() {
+    // An image drawn 200 × 100 at (50, 60), and a 1 × 1 inline image
+    // scaled to 10 × 10 at (300, 200).
+    let mut pdf = Pdf::new();
+    pdf.catalog(Ref::new(1)).pages(Ref::new(2));
+    pdf.pages(Ref::new(2)).kids([Ref::new(3)]).count(1);
+    let mut p = pdf.page(Ref::new(3));
+    p.media_box(Rect::new(0.0, 0.0, 400.0, 300.0))
+        .parent(Ref::new(2))
+        .contents(Ref::new(4));
+    p.resources().x_objects().pair(Name(b"Im1"), Ref::new(5));
+    p.finish();
+    let content =
+        b"q 200 0 0 100 50 60 cm /Im1 Do Q q 10 0 0 10 300 200 cm BI /W 1 /H 1 /CS /G /BPC 8 ID \x80 EI Q";
+    pdf.stream(Ref::new(4), content);
+    let mut image = pdf.image_xobject(Ref::new(5), &[0x40, 0x80, 0xc0, 0xff]);
+    image.width(2).height(2).color_space().device_gray();
+    image.bits_per_component(8);
+    image.finish();
+    let doc = Document::load(&pdf.finish()).unwrap();
+    let page = doc.page(0).unwrap();
+    assert_eq!(
+        page.drawing.images,
+        [
+            kurbo::Rect::new(50.0, 60.0, 250.0, 160.0),
+            kurbo::Rect::new(300.0, 200.0, 310.0, 210.0)
+        ]
+    );
+    assert!(page.drawing.shapes.is_empty());
+}

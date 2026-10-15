@@ -12,6 +12,33 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 63 — A pattern that is a picture says so
+
+A PDF of a scanned pattern, or one made from photos of the pages, has no
+lines in it: only pictures. It imported with no pieces and no word of why.
+
+**Try it:** import a scanned pattern, or any PDF made from photos (a 1920s
+dressmaking book from the Internet Archive, or a free pattern drawn in a
+picture program). With no pieces found, the import now explains:
+
+> These 12 pages are pictures (scans or photos), not lines, so Drapewright
+> found no pieces in them. If the pattern comes as a PDF, SVG or DXF made
+> on a computer, open that instead. Or print it, cut out the pieces, and
+> photograph each one beside a sheet of printer paper.
+
+An assistant gets the same note through the MCP server, and is asked to
+offer those ways in.
+
+**What changed:**
+
+* **The PDF reader notes where pictures are painted** (images placed on
+  the page, and those written into the page itself) without reading them.
+* **A page painted mostly with pictures** (a third of it or more) is a
+  picture. The note is only given when no pieces were found, so a pattern
+  with a photo of the garment beside its pieces says nothing.
+
+---
+
 ## Step 62 — A test square 10 cm one way and 4 inches the other
 
 Some patterns print one "test square" to check the print in both units:

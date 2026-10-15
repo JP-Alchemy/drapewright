@@ -41,6 +41,8 @@ use crate::import::{
 const MM_PER_POINT: f64 = 25.4 / 72.0;
 /// Room left between pages that are not parts of one sheet, mm.
 const PAGE_GAP: f64 = 100.0;
+/// A page this much painted with pictures is a picture (a scan, a photo).
+const PICTURED: f64 = 0.3;
 /// Segments drawn separately are joined when their ends are this close, mm.
 const JOIN: f64 = 0.1;
 /// Hairline gaps a plotter driver leaves between strokes, mm.
@@ -640,6 +642,9 @@ struct PageContent {
     /// A frame drawn inside a page whose drawing runs on to its edges: a
     /// tile to trim there, overlapping the next (see `remove_trim_frames`).
     trim: Option<Rect>,
+    /// How much of the page is painted with pictures (scans, photos), from
+    /// 0 to 1.
+    pictured: f64,
 }
 
 fn read_page(
@@ -710,7 +715,20 @@ fn read_page(
         frame,
         drawn_frame,
         trim,
+        pictured: pictured(&page.drawing.images, to_mm, area),
     })
+}
+
+/// How much of `area` the pictures painted at `images` cover, from 0 to 1
+/// (pictures over each other counted each).
+fn pictured(images: &[Rect], to_mm: Affine, area: Rect) -> f64 {
+    let painted: f64 = images
+        .iter()
+        .map(|r| to_mm.transform_rect_bbox(*r).intersect(area))
+        .filter(|r| r.width() > 0.0 && r.height() > 0.0)
+        .map(|r| r.area())
+        .sum();
+    (painted / area.area()).min(1.0)
 }
 
 /// Takes out the moments where a path doubles back on itself (a stretch
@@ -1575,6 +1593,14 @@ pub fn import_pdf_pages(
         notes.push(ImportNote::TestSquareFound { size: side });
     }
     notes.extend(counted);
+    // Nothing found, on pages that are pictures: a scan or a photo of a
+    // pattern, with no lines to read.
+    let pictures = pages.iter().filter(|p| p.pictured >= PICTURED).count();
+    if pieces.is_empty() && pictures > 0 {
+        notes.push(ImportNote::PagesArePictures {
+            count: u32::try_from(pictures).unwrap_or(u32::MAX),
+        });
+    }
     let sizes = sizes
         .map(|s| ImportSizes {
             names: s.names,

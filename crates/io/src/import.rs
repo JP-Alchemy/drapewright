@@ -118,6 +118,9 @@ pub enum ImportNote {
     /// Boxes holding a picture of the garment and a key to the pattern's
     /// lines (a title block), and everything in them: no pieces.
     KeysIgnored { count: u32 },
+    /// No pieces were found, and pages are painted mostly with pictures
+    /// (a scan or a photo of a pattern): there are no lines to read.
+    PagesArePictures { count: u32 },
 }
 
 impl ImportNote {

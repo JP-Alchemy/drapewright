@@ -129,6 +129,11 @@ pub fn note(n: &ImportNote, name: &dyn Fn(&str) -> String) -> String {
             "Left out 1 box holding a picture of the garment and a key to the lines (a title block); it is no piece.",
             "Left out # boxes holding pictures of the garment and keys to the lines (title blocks); they are no pieces.",
         ),
+        ImportNote::PagesArePictures { count: c } => count(
+            *c,
+            "1 page is a picture (a scan or a photo), not lines, so no pieces were found in it. Ask the user for the pattern's vector PDF, SVG or DXF if there is one; or each paper piece can be photographed beside a sheet of printer paper and opened in the app.",
+            "# pages are pictures (scans or photos), not lines, so no pieces were found in them. Ask the user for the pattern's vector PDF, SVG or DXF if there is one; or each paper piece can be photographed beside a sheet of printer paper and opened in the app.",
+        ),
         ImportNote::LooseLinesIgnored { count: c } => count(
             *c,
             "Left out 1 line outside the pieces (a title or border).",

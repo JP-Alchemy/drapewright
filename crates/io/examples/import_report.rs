@@ -54,6 +54,7 @@ fn note(n: &ImportNote) -> String {
         ImportNote::TestSquareFound { size } => format!("test square {size} mm"),
         ImportNote::LetteringIgnored { count } => format!("{count} lettering left out"),
         ImportNote::KeysIgnored { count } => format!("{count} title blocks left out"),
+        ImportNote::PagesArePictures { count } => format!("{count} pages are pictures"),
     }
 }
 

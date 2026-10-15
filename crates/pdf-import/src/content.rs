@@ -1,6 +1,8 @@
 //! Content streams (§8, §9): the paths a page paints, with their stroke and
-//! fill, and the text it shows, in default user space. Images, shadings and
-//! transparency effects are skipped: a pattern is lines and words.
+//! fill, and the text it shows, in default user space. Of images only where
+//! they are painted is kept (a pattern scanned or photographed is a picture,
+//! with no lines to read); shadings and transparency effects are skipped: a
+//! pattern is lines and words.
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -54,6 +56,8 @@ pub struct TextRun {
 pub struct Drawing {
     pub shapes: Vec<Shape>,
     pub texts: Vec<TextRun>,
+    /// Where images are painted: each one's box in default user space.
+    pub images: Vec<Rect>,
 }
 
 /// A colour space, enough to tell colours apart.
@@ -247,6 +251,7 @@ impl Interpreter<'_> {
         while let Some(token) = lx.next_token() {
             match token {
                 Token::Keyword(b"BI") => {
+                    self.image();
                     skip_inline_image(&mut lx);
                     operands.clear();
                 }
@@ -805,6 +810,12 @@ impl Interpreter<'_> {
         }
     }
 
+    /// An image painted: the unit square, where the current matrix puts it.
+    fn image(&mut self) {
+        let unit = Rect::new(0.0, 0.0, 1.0, 1.0);
+        self.out.images.push(self.gs.ctm.transform_rect_bbox(unit));
+    }
+
     fn draw_xobject(&mut self, name: &[u8], res: &Rc<Dict>) {
         let Some(entry) = self.resource(res, b"XObject", name) else {
             return;
@@ -819,6 +830,10 @@ impl Interpreter<'_> {
         let Some(stream) = object.as_stream() else {
             return;
         };
+        if stream.dict.name(b"Subtype") == Some(b"Image") {
+            self.image();
+            return;
+        }
         if stream.dict.name(b"Subtype") != Some(b"Form") {
             return;
         }
