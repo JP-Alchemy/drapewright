@@ -355,17 +355,55 @@ pub(crate) fn drawn_frame<'a>(
     lines: impl Iterator<Item = &'a [PathSeg]> + Clone,
     size: Vec2,
 ) -> Option<Rect> {
+    let frame = frame_lines(lines.clone(), size, false)?;
+    // Everything drawn is inside it.
+    let around = frame.inflate(0.5, 0.5);
+    lines
+        .flat_map(|segs| segs.iter().flat_map(|s| [s.start(), s.end()]))
+        .all(|p: Point| around.contains(p))
+        .then_some(frame)
+}
+
+/// A frame to trim a tile at, drawn inside the page on a drawing that runs
+/// on past it to the page's edges (where the next tile overlaps it): the
+/// same lines along all four sides, whatever else is drawn outside them.
+/// Only a frame most tiles draw in the same place is one (see
+/// `pdf::import::remove_trim_frames`): one page's long straight edges near
+/// its margins could be a piece's.
+pub(crate) fn trim_frame<'a>(
+    lines: impl Iterator<Item = &'a [PathSeg]> + Clone,
+    size: Vec2,
+) -> Option<Rect> {
+    frame_lines(lines, size, true)
+}
+
+/// Straight lines along all four sides of a large rectangle within the
+/// page's margins, seen on the page (lines running on off it are cut at
+/// its edges). With `run_on`, the sides may run on past the corners, and
+/// are lines drawn on their own: the straight edges of pieces running on
+/// under the next tile are not.
+fn frame_lines<'a>(
+    lines: impl Iterator<Item = &'a [PathSeg]>,
+    size: Vec2,
+    run_on: bool,
+) -> Option<Rect> {
     // Straight stretches along x and along y, by where they lie.
     let mut across: Vec<(f64, f64, f64)> = Vec::new(); // (y, x0, x1)
     let mut down: Vec<(f64, f64, f64)> = Vec::new(); // (x, y0, y1)
-    for segs in lines.clone() {
+    for segs in lines.filter(|segs| !run_on || segs.len() == 1) {
         for seg in segs {
             let PathSeg::Line(l) = seg else { continue };
             let (a, b) = (l.p0, l.p1);
             if (a.y - b.y).abs() < 0.05 && (a.x - b.x).abs() > 1.0 {
-                across.push((a.y, a.x.min(b.x), a.x.max(b.x)));
+                let (x0, x1) = (a.x.min(b.x).max(0.0), a.x.max(b.x).min(size.x));
+                if x1 - x0 > 1.0 {
+                    across.push((a.y, x0, x1));
+                }
             } else if (a.x - b.x).abs() < 0.05 && (a.y - b.y).abs() > 1.0 {
-                down.push((a.x, a.y.min(b.y), a.y.max(b.y)));
+                let (y0, y1) = (a.y.min(b.y).max(0.0), a.y.max(b.y).min(size.y));
+                if y1 - y0 > 1.0 {
+                    down.push((a.x, y0, y1));
+                }
             }
         }
     }
@@ -406,8 +444,13 @@ pub(crate) fn drawn_frame<'a>(
     let (top, bottom) = (across.first()?, across.last()?);
     let (left, right) = (down.first()?, down.last()?);
     let frame = Rect::new(left.0, top.0, right.0, bottom.0);
-    let fits =
-        |l: &(f64, f64, f64), lo: f64, hi: f64| (l.1 - lo).abs() <= 1.0 && (l.2 - hi).abs() <= 1.0;
+    let fits = |l: &(f64, f64, f64), lo: f64, hi: f64| {
+        if run_on {
+            l.1 <= lo + 1.0 && l.2 >= hi - 1.0
+        } else {
+            (l.1 - lo).abs() <= 1.0 && (l.2 - hi).abs() <= 1.0
+        }
+    };
     // A frame keeps to the page's margins: a large rectangular piece with
     // everything else inside it is not one.
     let margins = [frame.x0, frame.y0, size.x - frame.x1, size.y - frame.y1];
@@ -421,12 +464,19 @@ pub(crate) fn drawn_frame<'a>(
     {
         return None;
     }
-    // Everything drawn is inside it.
-    let around = frame.inflate(0.5, 0.5);
-    lines
-        .flat_map(|segs| segs.iter().flat_map(|s| [s.start(), s.end()]))
-        .all(|p: Point| around.contains(p))
-        .then_some(frame)
+    // A frame to trim at runs on past its corners, toward the next tiles,
+    // on one side at least; a grid of squares printed over a page stops at
+    // its corners.
+    let runs_on = |l: &(f64, f64, f64), lo: f64, hi: f64| l.1 < lo - 1.0 || l.2 > hi + 1.0;
+    if run_on
+        && !(runs_on(top, frame.x0, frame.x1)
+            || runs_on(bottom, frame.x0, frame.x1)
+            || runs_on(left, frame.y0, frame.y1)
+            || runs_on(right, frame.y0, frame.y1))
+    {
+        return None;
+    }
+    Some(frame)
 }
 
 #[cfg(test)]

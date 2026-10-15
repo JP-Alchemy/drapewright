@@ -12,6 +12,46 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 60 — Tiles trimmed at a frame inside the page
+
+Many free patterns printed for home draw a frame a few millimetres inside
+each A4 or Letter page to trim it at, with scissors on its lines. The
+pattern itself runs on past the frame to the page's edges, under the next
+tile. Imported, the frames came together into one box round the whole
+sheet. The importer took that box for a title block (a key to the lines)
+and left out every piece inside it, so these patterns came in with no
+pieces at all ("1 title block left out").
+
+**Try it:** import such a pattern's A4/Letter file: one of the free
+patterns in your test folder, or any whose tiles say "Page 1A" in the
+middle and have a frame with scissors. Each page's frame lines go, the
+tiles overlap as printed, and the pieces come in with every size. In JP's
+test folder:
+* a wrap dress gives 80 pieces in 10 sizes, matching its A0 copy-shop file;
+* a jumpsuit gives 50;
+* children's joggers give 20 and 42 (before: 4 and none).
+
+Bigger files that half-worked gain the sizes they lost: a hoodie gives 70
+pieces (was 32), a bomber 80 (was 30), a haori jacket 7 (was 3).
+
+**What changed:**
+
+* **A frame to trim at is found inside a page** whose drawing is clipped
+  to the whole page. Before, a frame was only looked for when the drawing
+  stopped at it (plotter tiles to butt together). Each side is a line on
+  its own, running on past the frame's corners toward the next tiles. A
+  piece's straight edge near the margin is part of its outline, so it
+  doesn't count. A grid of squares printed over the page stops at its
+  corners, so it doesn't either.
+* **Only a frame most tiles draw in the same place** (three at least) is
+  taken off, and then from every tile clipped to its page. One page with
+  a large rectangle near its margins keeps it.
+
+Every other test pattern imports exactly as before: the bought blouse and
+trousers, the corset, the cape coat, the DXF and SVG sets.
+
+---
+
 ## Step 59 — An assistant drapes the garment and sees it worn
 
 The MCP server's new `drape` tool drapes the project's garment on the

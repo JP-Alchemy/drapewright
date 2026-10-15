@@ -1,7 +1,9 @@
 //! A pattern's pages as many indie patterns print them: a page of
 //! instructions first, then tiles that each name themselves ("1A") and
 //! their neighbours at the edges they join by, a watermark over every page,
-//! and each tile drawing the shapes that cross it, clipped to it.
+//! and each tile drawing the shapes that cross it, clipped to it. Some
+//! print a frame inside each tile to trim it at, with the drawing running on
+//! past it to the page's edges, under the next tile.
 
 use drapewright_io::pdf::{import_pdf, import_pdf_pages};
 use drapewright_io::{ImportNote, PageLeftOut};
@@ -66,6 +68,15 @@ fn text(c: &mut Content, at: P, size: f32, angle: f32, words: &str) {
 
 /// The PDF: a page of instructions, then tiles 1A to 3B row by row.
 fn pattern() -> Vec<u8> {
+    pattern_trimmed(0.0)
+}
+
+/// The same, each tile overlapping its neighbours by `trim` on each side,
+/// a frame drawn there to trim it at: each side a line on its own from
+/// corner to corner, running on to the next tiles' corners off the page. A
+/// line across each of two pieces too.
+fn pattern_trimmed(trim: f32) -> Vec<u8> {
+    let (pw, ph) = (W - 2.0 * trim, H - 2.0 * trim);
     let tiles: Vec<(usize, usize)> = (0..3).flat_map(|r| (0..2).map(move |c| (c, r))).collect();
     let mut pdf = Pdf::new();
     let pages = tiles.len() + 1;
@@ -108,7 +119,7 @@ fn pattern() -> Vec<u8> {
     }
     page(&mut pdf, 0, c);
     for (k, &(col, row)) in tiles.iter().enumerate() {
-        let (ox, oy) = (col as f32 * W, row as f32 * H);
+        let (ox, oy) = (col as f32 * pw - trim, row as f32 * ph - trim);
         let mut c = Content::new();
         // Clipped to the page; sheet y runs down, the page's up.
         c.save_state();
@@ -140,6 +151,42 @@ fn pattern() -> Vec<u8> {
                 c.line_to(p.0, p.1);
             }
             c.close_path().stroke();
+        }
+        if trim > 0.0 {
+            // A line on the front and one on the back, across the joins:
+            // two shapes each pair of tiles shares, to say how far they
+            // overlap.
+            for (a, b) in [
+                ((200.0, 400.0), (200.0, 1000.0)),
+                ((350.0, 1700.0), (750.0, 1700.0)),
+            ] {
+                let (a, b) = (at(a), at(b));
+                c.move_to(a.0, a.1).line_to(b.0, b.1).stroke();
+            }
+            // Each side from corner to corner, and on to the neighbouring
+            // tiles' corners (pages run up, rows down the sheet).
+            let (x0, x1, y0, y1) = (trim, W - trim, trim, H - trim);
+            for k in -1..=1 {
+                let (dx, dy) = (k as f32 * pw, -k as f32 * ph);
+                let across = (0..2).contains(&(col as i32 + k));
+                let down = (0..3).contains(&(row as i32 + k));
+                let mut sides = Vec::new();
+                if across {
+                    sides.extend([
+                        ((x0 + dx, y0), (x1 + dx, y0)),
+                        ((x0 + dx, y1), (x1 + dx, y1)),
+                    ]);
+                }
+                if down {
+                    sides.extend([
+                        ((x0, y0 + dy), (x0, y1 + dy)),
+                        ((x1, y0 + dy), (x1, y1 + dy)),
+                    ]);
+                }
+                for (a, b) in sides {
+                    c.move_to(a.0, a.1).line_to(b.0, b.1).stroke();
+                }
+            }
         }
         c.restore_state();
         // Each piece's name on the tile holding most of it.
@@ -251,5 +298,33 @@ fn chosen_pages_are_the_ones_used() {
             Some(PageLeftOut::NotChosen),
             Some(PageLeftOut::NotChosen),
         ]
+    );
+}
+
+#[test]
+fn tiles_trimmed_at_a_frame_inside_the_page_join_without_their_frames() {
+    // Tiles overlapping by 12 pt (about 4 mm) on each side. Their frames,
+    // put together, would be a box round the whole sheet: no piece, and not
+    // a title block that the pieces inside it would be taken for.
+    let result = import_pdf(&pattern_trimmed(12.0), Some("trimmed.pdf")).unwrap();
+    let mut names: Vec<&str> = result.pieces.iter().map(|p| p.name.as_str()).collect();
+    names.sort_unstable();
+    assert_eq!(names, ["Back", "Front", "Pocket"], "{:?}", result.notes);
+    assert!(
+        !result
+            .notes
+            .iter()
+            .any(|n| matches!(n, ImportNote::KeysIgnored { .. })),
+        "{:?}",
+        result.notes
+    );
+    let front = result.pieces.iter().find(|p| p.name == "Front").unwrap();
+    let b = front.outline.bounds();
+    let mm = 25.4 / 72.0;
+    assert!(
+        (b.width() - 240.0 * mm).abs() < 1.0 && (b.height() - 800.0 * mm).abs() < 1.0,
+        "{} x {}",
+        b.width(),
+        b.height()
     );
 }

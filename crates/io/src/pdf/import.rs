@@ -19,7 +19,7 @@ use kurbo::{
     Vec2,
 };
 
-use super::butt::{Edges, Stitch, butt_grid, drawn_frame};
+use super::butt::{Edges, Stitch, butt_grid, drawn_frame, trim_frame};
 use super::lettering::{
     find_crosses, find_lettering, find_outlined_crosses, find_repeated_decorations,
 };
@@ -614,6 +614,9 @@ struct PageContent {
     /// The frame was drawn round the drawing, which stops at it: a tile to
     /// trim there and butt to the next.
     drawn_frame: bool,
+    /// A frame drawn inside a page whose drawing runs on to its edges: a
+    /// tile to trim there, overlapping the next (see `remove_trim_frames`).
+    trim: Option<Rect>,
 }
 
 fn read_page(
@@ -666,6 +669,16 @@ fn read_page(
     } else {
         false
     };
+    // A tile clipped to the whole page may still draw a frame inside it to
+    // trim it at, with the drawing running on under the next tile.
+    let trim = frame
+        .filter(|f| f.width() >= width - 1.0 && f.height() >= height - 1.0)
+        .and_then(|_| {
+            trim_frame(
+                paths.iter().map(|(r, _, _)| r.segs.as_slice()),
+                Vec2::new(width, height),
+            )
+        });
     Ok(PageContent {
         paths,
         labels: text_lines(&page.drawing.texts, to_mm),
@@ -673,6 +686,7 @@ fn read_page(
         height,
         frame,
         drawn_frame,
+        trim,
     })
 }
 
@@ -777,6 +791,38 @@ fn drawn_labels(lines: Vec<ReadLine>) -> Vec<Label> {
 }
 
 /// A line drawn along a side of `frame`.
+/// The lines of the frame most tiles draw to be trimmed at, inside a
+/// drawing that runs on past it: no part of the pattern. A frame only one
+/// or two pages seem to draw, or only a few of the pages, may be lines of
+/// the pattern near the margins, and is left alone. Lines on the frame
+/// most tiles draw are taken off every tile clipped to its page, also those
+/// where it was not seen whole.
+fn remove_trim_frames(pages: &mut [PageContent], prose: &[bool]) {
+    let same = |a: &Rect, b: &Rect| {
+        (a.x0 - b.x0).abs() + (a.y0 - b.y0).abs() + (a.x1 - b.x1).abs() + (a.y1 - b.y1).abs() <= 1.0
+    };
+    let frames: Vec<Rect> = pages
+        .iter()
+        .zip(prose)
+        .filter(|(_, prose)| !**prose)
+        .filter_map(|(p, _)| p.trim)
+        .collect();
+    let count = |f: &Rect| frames.iter().filter(|g| same(f, g)).count();
+    let Some(common) = frames.iter().copied().max_by_key(count) else {
+        return;
+    };
+    let tiles = prose.iter().filter(|p| !**p).count();
+    if count(&common) < 3 || 2 * count(&common) < tiles {
+        return;
+    }
+    for (page, _) in pages.iter_mut().zip(prose).filter(|(_, prose)| !**prose) {
+        let whole = Rect::new(0.0, 0.0, page.width, page.height);
+        if page.frame.is_some_and(|f| same(&f, &whole)) {
+            page.paths.retain(|(r, _, _)| !on_frame(&r.segs, common));
+        }
+    }
+}
+
 fn on_frame(segs: &[PathSeg], frame: Rect) -> bool {
     let pts = flatten_segs(segs, 0.1);
     let near = |v: f64, at: f64| (v - at).abs() <= 0.3;
@@ -994,6 +1040,7 @@ pub fn import_pdf_pages(
         .iter()
         .map(|p| choice.is_none() && is_prose(p))
         .collect();
+    remove_trim_frames(&mut pages, &prose);
     // Pages labelled for putting together ("1B") go where their labels
     // say; the labels are not the pattern's.
     let labelled = pagelabels::read(
