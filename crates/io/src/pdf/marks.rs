@@ -409,16 +409,32 @@ pub(crate) fn find_notches(raw: &mut Vec<RawPath>, avoid: &[Point]) -> Vec<RawNo
 
 /// The side of a test square (a square of 1–4 in or 5–10 cm with its
 /// size printed inside, as text or drawn as lettering), if `r` is one, mm.
+/// Some are metric one way and imperial the other (10 cm across, 4 in
+/// down): then the side across.
 pub(crate) fn test_square(r: &RawPath, labels: &[Label], lettering: &[Rect]) -> Option<f64> {
     if !r.closed || !r.segs.iter().all(|s| matches!(s, PathSeg::Line(_))) || r.segs.len() != 4 {
         return None;
     }
     let pts = flatten_segs(&r.segs, 0.05);
     let b = bounds(&pts);
+    // Which of the standard sides a side is.
+    let standard = |side: f64| TEST_SQUARES.iter().position(|s| (side - s).abs() <= 0.4);
+    let rectangle = (polygon_area(&pts).abs() - b.area()).abs() <= 0.02 * b.area();
     let side = (b.width() + b.height()) / 2.0;
-    let square = (b.width() - b.height()).abs() <= 0.5
-        && (polygon_area(&pts).abs() - b.area()).abs() <= 0.02 * b.area();
-    let standard = TEST_SQUARES.iter().find(|s| (side - **s).abs() <= 0.4)?;
+    let standard = if (b.width() - b.height()).abs() <= 0.5 {
+        standard(side)?
+    } else {
+        // 5 cm and 2 in, or 10 cm and 4 in, either way round (by their
+        // places in TEST_SQUARES).
+        let (across, down) = (standard(b.width())?, standard(b.height())?);
+        let mixed = [(1, 2), (4, 5)]
+            .iter()
+            .any(|&(cm, inch)| (across, down) == (cm, inch) || (across, down) == (inch, cm));
+        if !mixed {
+            return None;
+        }
+        across
+    };
     let says_size = labels.iter().any(|l| {
         let t = l.text.to_lowercase();
         b.contains(l.at)
@@ -431,7 +447,7 @@ pub(crate) fn test_square(r: &RawPath, labels: &[Label], lettering: &[Rect]) -> 
     });
     // Its size printed inside, as text or drawn as lettering.
     let lettered = lettering.iter().any(|l| b.contains(l.center()));
-    (square && (says_size || lettered)).then_some(*standard)
+    (rectangle && (says_size || lettered)).then_some(TEST_SQUARES[standard])
 }
 
 #[cfg(test)]
@@ -501,5 +517,30 @@ mod tests {
         assert_eq!(paths.len(), 2);
         assert!(paths[0].hint.contains("grain"));
         assert!(!paths[1].hint.contains("grain"));
+    }
+
+    #[test]
+    fn test_squares_square_or_metric_one_way_and_imperial_the_other() {
+        let label = |x: f64, y: f64, text: &str| Label {
+            text: text.to_string(),
+            at: Point::new(x, y),
+            size: 4.0,
+            dir: Vec2::new(1.0, 0.0),
+            naming: super::super::import::Naming::Maybe,
+        };
+        let rect = |w: f64, h: f64| raw(&[(0.0, 0.0), (w, 0.0), (w, h), (0.0, h)], true);
+        let labels = [label(40.0, 50.0, "TEST SQUARE")];
+        // Square, 10 cm or 4 in.
+        assert_eq!(test_square(&rect(100.0, 100.0), &labels, &[]), Some(100.0));
+        assert_eq!(test_square(&rect(101.6, 101.6), &labels, &[]), Some(101.6));
+        // 10 cm across and 4 in down ("10 centimeters", "4 inches" on its
+        // sides), and the other way round: the side across.
+        assert_eq!(test_square(&rect(100.0, 101.6), &labels, &[]), Some(100.0));
+        assert_eq!(test_square(&rect(101.6, 100.0), &labels, &[]), Some(101.6));
+        // Not a test square: a 10 × 5 cm rectangle, a square of no
+        // standard size, nor one with nothing printed in it.
+        assert_eq!(test_square(&rect(100.0, 50.0), &labels, &[]), None);
+        assert_eq!(test_square(&rect(103.0, 103.0), &labels, &[]), None);
+        assert_eq!(test_square(&rect(100.0, 101.6), &[], &[]), None);
     }
 }

@@ -12,6 +12,29 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 62 — A test square 10 cm one way and 4 inches the other
+
+Some patterns print one "test square" to check the print in both units:
+10 cm across, 4 inches (101.6 mm) down, with a ruler along each side. It
+isn't quite square, so the importer didn't know it. It came in as a piece
+called "4 inches", one for each size, with its ruler's marks as notches.
+
+**Try it:** import an A0 copy-shop file whose test square says "10
+centimeters" along one side and "4 inches" along the other. The square is
+left out ("Found the 10 cm test square; it was left out of the pieces")
+and the piece count matches the A4 file's. In JP's test folder:
+* a wrap dress gives 80 pieces, not 90;
+* a bomber 80, not 90;
+* a hoodie 70, not 80;
+* a slip dress 30, not 40.
+
+**What changed:** a test square may be metric one way and imperial the
+other: 5 cm by 2 in, or 10 cm by 4 in, either way round. As before, it
+must be a rectangle with its size or "test square" printed in it. The note
+gives its side across.
+
+---
+
 ## Step 61 — Pieces named by their own words, not the designer's
 
 Indie patterns print the same words on every piece: the designer's name
