@@ -4,7 +4,7 @@
 //! and the words printed on the pattern name the pieces, say how many to
 //! cut, and mark edges to place on the fold.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use drapewright_pattern_core::geom::{
     distance_to_polyline, flatten_segs, label_point, point_in_polygon, polygon_area, segs_of,
@@ -361,6 +361,9 @@ fn is_instruction(text: &str) -> bool {
     letters < 3
         || words > 6
         || starts.iter().any(|s| t.starts_with(s))
+        // A credit ("Project design © …").
+        || t.contains('©')
+        || t.contains("copyright")
         || t.contains("cut ")
         || t.contains("on fold")
         || t.contains("grainline")
@@ -509,6 +512,21 @@ pub(crate) fn read_labels(pieces: &mut [Piece], labels: &[Label]) {
                 })
         })
         .collect();
+    // Words printed on most of the pieces (the pattern's title, the
+    // designer's name, "with seam allowance") name a piece only when
+    // nothing else on it does.
+    let key = |l: &Label| l.text.trim().to_lowercase();
+    let mut on: HashMap<String, HashSet<usize>> = HashMap::new();
+    for (l, o) in labels.iter().zip(&owner) {
+        if let Some(i) = o {
+            on.entry(key(l)).or_default().insert(*i);
+        }
+    }
+    let labelled = owner.iter().flatten().collect::<HashSet<_>>().len();
+    let everywhere = |l: &Label| {
+        on.get(&key(l))
+            .is_some_and(|s| s.len() >= 3 && 2 * s.len() >= labelled)
+    };
     for (index, piece) in pieces.iter_mut().enumerate() {
         let inside: Vec<&Label> = labels
             .iter()
@@ -561,7 +579,12 @@ pub(crate) fn read_labels(pieces: &mut [Piece], labels: &[Label]) {
                 .iter()
                 .filter(named)
                 .filter(|l| meaningful_name(&l.text).is_some())
-                .max_by(|a, b| a.naming.cmp(&b.naming).then(a.size.total_cmp(&b.size)))
+                .max_by(|a, b| {
+                    (!everywhere(a))
+                        .cmp(&!everywhere(b))
+                        .then(a.naming.cmp(&b.naming))
+                        .then(a.size.total_cmp(&b.size))
+                })
                 .copied()
         });
         if piece.name.starts_with("Piece ")

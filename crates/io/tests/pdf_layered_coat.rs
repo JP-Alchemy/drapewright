@@ -6,7 +6,9 @@
 //! line of its own; pieces numbered with the name beside the number or
 //! under it on three lines; a box holding the key to the lines; centre
 //! lines labelled with the grain. And the notice every sheet prints, which
-//! is no page of instructions.
+//! is no page of instructions; and the words printed on every piece (the
+//! designer's name in big type, the pattern's title, a credit), which name
+//! none of them.
 
 use drapewright_io::ImportNote;
 use drapewright_io::pdf::import_pdf;
@@ -313,6 +315,44 @@ fn names_beside_their_number_and_set_on_several_lines() {
     let mut names: Vec<&str> = r.pieces.iter().map(|p| p.name.as_str()).collect();
     names.sort_unstable();
     assert_eq!(names, ["Armhole Front Facing", "Collar"]);
+}
+
+#[test]
+fn words_on_every_piece_name_none_of_them() {
+    let mut sheet = Sheet::new(900.0, 400.0);
+    sheet.raw("0 0 0 RG 0.7 w");
+    for (k, name) in ["Front", "Back", "Sleeve", "Collar"].iter().enumerate() {
+        let x = 20.0 + 220.0 * k as f64;
+        sheet.path(&rect(x, 20.0, x + 200.0, 300.0), true, None);
+        // The designer's name in big script, bigger than the piece's.
+        sheet.text((x + 20.0, 60.0), 30.0, 0.0, "Atelier");
+        sheet.text((x + 20.0, 80.0), 14.0, 0.0, "WRAP DRESS");
+        sheet.text((x + 20.0, 90.0), 10.0, 0.0, "with seam allowance");
+        sheet.text((x + 20.0, 120.0), 18.0, 0.0, name);
+        sheet.text((x + 20.0, 130.0), 10.0, 0.0, "cut 2");
+        sheet.text(
+            (x + 20.0, 280.0),
+            12.0,
+            0.0,
+            "Project design (c) Atelier 2013",
+        );
+    }
+    let r = import_pdf(&pdf(&sheet, &[]), None).unwrap();
+    let mut names: Vec<&str> = r.pieces.iter().map(|p| p.name.as_str()).collect();
+    names.sort_unstable();
+    assert_eq!(names, ["Back", "Collar", "Front", "Sleeve"]);
+
+    // Pieces with nothing else on them are still named by it.
+    let mut sheet = Sheet::new(700.0, 300.0);
+    sheet.raw("0 0 0 RG 0.7 w");
+    for k in 0..3 {
+        let x = 20.0 + 220.0 * f64::from(k);
+        sheet.path(&rect(x, 20.0, x + 200.0, 150.0), true, None);
+        sheet.text((x + 60.0, 80.0), 18.0, 0.0, "Pocket");
+    }
+    let r = import_pdf(&pdf(&sheet, &[]), None).unwrap();
+    let names: Vec<&str> = r.pieces.iter().map(|p| p.name.as_str()).collect();
+    assert_eq!(names, ["Pocket", "Pocket", "Pocket"]);
 }
 
 #[test]

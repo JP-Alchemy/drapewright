@@ -12,6 +12,32 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 61 — Pieces named by their own words, not the designer's
+
+Indie patterns print the same words on every piece: the designer's name
+or logo (often in large script), the pattern's title, "with seam
+allowance", a credit line such as "Project design © …". The importer
+named each piece by the largest word inside it, so a whole pattern could
+come in with every piece called after its designer.
+
+**Try it:** import a free pattern whose pieces each carry the designer's
+logo. In JP's test folder, eight patterns from one designer, about 600
+pieces in all, were all named after the logo; now they are named Front,
+Back, Sleeve, Front facing, Back neck facing, Pocket… A Spanish kimono's
+pieces are Delantero, Manga and Cuello instead of its title, and a
+book's patterns lose their "Project design ©" names.
+
+**What changed:**
+
+* **Words on most of the pieces are a last resort for a name.** Words
+  found on three pieces or more, and on half the pieces that carry words,
+  are the title, the designer or a note. They name a piece only when
+  nothing else on it does: three pockets labelled only "Pocket" are still
+  pockets.
+* **A credit never names a piece** (words with © or "copyright" in them).
+
+---
+
 ## Step 60 — Tiles trimmed at a frame inside the page
 
 Many free patterns printed for home draw a frame a few millimetres inside
