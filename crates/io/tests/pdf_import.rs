@@ -316,6 +316,54 @@ fn pieces_in_different_colours_are_not_sizes() {
 }
 
 #[test]
+fn a_key_to_the_lines_is_no_legend_of_sizes() {
+    use pdf_writer::{Content, Finish, Name, Pdf, Rect, Ref, Str};
+    let mut pdf = Pdf::new();
+    pdf.catalog(Ref::new(1)).pages(Ref::new(2));
+    pdf.pages(Ref::new(2)).kids([Ref::new(3)]).count(1);
+    pdf.type1_font(Ref::new(5)).base_font(Name(b"Helvetica"));
+    let mut page = pdf.page(Ref::new(3));
+    page.media_box(Rect::new(0.0, 0.0, 1200.0, 800.0))
+        .parent(Ref::new(2))
+        .contents(Ref::new(4));
+    page.resources().fonts().pair(Name(b"F1"), Ref::new(5));
+    page.finish();
+    let mut c = Content::new();
+    // Two pieces, each a cutting line in black round a stitching line in
+    // pink, 1 cm inside it; and the key to those lines.
+    let lines = [
+        ((0.0, 0.0, 0.0), "Cutting line"),
+        ((0.9, 0.3, 0.6), "1cm seam allowance"),
+    ];
+    for (k, ((r, g, b), words)) in lines.into_iter().enumerate() {
+        let inset = 28.35 * k as f32;
+        c.set_stroke_rgb(r, g, b);
+        for x in [100.0, 600.0] {
+            c.rect(
+                x + inset,
+                100.0 + inset,
+                400.0 - 2.0 * inset,
+                500.0 - 2.0 * inset,
+            )
+            .stroke();
+        }
+        let y = 700.0 - 20.0 * k as f32;
+        c.move_to(100.0, y).line_to(140.0, y).stroke();
+        c.begin_text()
+            .set_font(Name(b"F1"), 9.0)
+            .set_text_matrix([1.0, 0.0, 0.0, 1.0, 146.0, y - 3.0])
+            .show(Str(words.as_bytes()))
+            .end_text();
+    }
+    pdf.stream(Ref::new(4), &c.finish());
+    let result = import_pdf(&pdf.finish(), None).unwrap();
+    assert!(result.sizes.names.is_empty(), "{:?}", result.sizes.names);
+    // Each piece once, its stitching line found inside it.
+    assert_eq!(result.pieces.len(), 2);
+    assert!(result.allowance.pieces.is_empty(), "{:?}", result.notes);
+}
+
+#[test]
 fn protected_with_aes_like_acrobat() {
     // fixtures/pdf/protect.py: owner password only, as most bought patterns.
     for file in ["pdf/sizes-layers-aes128.pdf", "pdf/sizes-layers-aes256.pdf"] {

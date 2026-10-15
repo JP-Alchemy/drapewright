@@ -414,7 +414,7 @@ fn is_instruction(text: &str) -> bool {
         "match", "join", "gather", "hem", "inch", "cm", "mm", "height",
         // The middle of a sentence set on several lines ("… twice the
         // length / of this piece").
-        "of ", "and ", "the ", "to ", "for ", "with ",
+        "of ", "and ", "the ", "to ", "for ", "with ", "see ",
     ];
     let words = t.split_whitespace().count();
     let letters = t.chars().filter(|c| c.is_alphabetic()).count();

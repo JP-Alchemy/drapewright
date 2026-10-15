@@ -86,6 +86,17 @@ pub(crate) fn size_name(name: &str) -> Option<String> {
     })
 }
 
+/// A legend's entry as a size, if it is one: "Size 10", "XS", or a size
+/// with a note after it ("36 (UK 8)", "10, bust 87 cm").
+fn legend_size(text: &str) -> Option<String> {
+    size_name(text).or_else(|| {
+        let first = text.split(['(', ',', ':']).next()?;
+        (first.len() < text.len())
+            .then(|| size_name(first))
+            .flatten()
+    })
+}
+
 /// Whether a path is a piece-sized closed outline.
 fn is_outline(r: &RawPath) -> bool {
     r.closed && polygon_area(&flatten_segs(&r.segs, 0.5)).abs() >= MIN_PIECE_AREA
@@ -397,8 +408,9 @@ fn by_lines(paths: &[(RawPath, Style)], labels: &[Label]) -> Option<Sizes> {
     if let Some(sizes) = by_nesting(paths, labels, &styles) {
         return Some(sizes);
     }
-    // A legend: a short line of a style, outside every outline, with words
-    // just after it.
+    // A legend: a short line of a style, outside every outline, with a
+    // size just after it. (A key to the lines, "seam allowance", "Pink
+    // line", names no sizes.)
     let outlines: Vec<Vec<Point>> = paths
         .iter()
         .filter(|(r, _)| is_outline(r))
@@ -427,7 +439,7 @@ fn by_lines(paths: &[(RawPath, Style)], labels: &[Label]) -> Option<Sizes> {
                         && d.y.abs() < l.size.max(3.0)
                 })
                 .min_by(|x, y| (x.at - end).hypot().total_cmp(&(y.at - end).hypot()))
-                .map(|l| size_name(&l.text).unwrap_or_else(|| l.text.clone()))
+                .and_then(|l| legend_size(&l.text))
         })
     };
     let named: Vec<Option<String>> = styles.iter().map(|(s, _, _)| legend_name(s)).collect();
@@ -542,6 +554,16 @@ mod tests {
         assert_eq!(size_name("Text"), None);
         assert_eq!(size_name("Cutting lines"), None);
         assert_eq!(size_name("Layer 1"), None);
+    }
+
+    #[test]
+    fn legend_entries_name_sizes_only_when_they_read_as_sizes() {
+        assert_eq!(legend_size("Size 12").as_deref(), Some("12"));
+        assert_eq!(legend_size("36 (UK 8)").as_deref(), Some("36"));
+        assert_eq!(legend_size("XS, bust 82 cm").as_deref(), Some("XS"));
+        assert_eq!(legend_size("1cm seam allowance"), None);
+        assert_eq!(legend_size("Pink line"), None);
+        assert_eq!(legend_size("Cutting line (with allowance)"), None);
     }
 
     #[test]

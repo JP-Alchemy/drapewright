@@ -12,6 +12,29 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 69 — A key to the lines is no list of sizes
+
+A shirt pattern's US Letter file, the same pattern as its A0 and A4
+files, prints a key beside the pieces: a sample of each line with what it
+is ("1cm seam allowance", "Pink line"). The import took the key for the
+sizes, and came in as 23 pieces in 10 "sizes" named after the key; its A0
+and A4 files come in as 7 pieces.
+
+**Try it:** import the shirt's US Letter file from JP's test folder. It
+comes in as 7 pieces, like the other two files, with its stitching lines
+found inside the cutting lines.
+
+**What changed:** a legend names sizes only when its entries read as
+sizes ("Size 10", "XS", or "36 (UK 8)" with a note after the size). A key
+to the lines names none. And a line starting "See …" ("See the cutting
+layout for details.") names no piece.
+
+Over the private test folder, one other pattern changes: a children's
+sundress whose key to its lines was read as three sizes named "/", "w"
+and "Black line" now comes in without sizes, its yoke named "Yoke".
+
+---
+
 ## Step 68 — Tiled sheets without their tiles' furniture
 
 Two graded home-print patterns came in as hundreds of pieces: a summer
