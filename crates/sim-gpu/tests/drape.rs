@@ -232,6 +232,107 @@ fn the_card_moves_the_cloth_the_same_way_every_time() {
     assert_eq!(differ, 0, "{differ} of {} points elsewhere", first.len());
 }
 
+/// How a drape on the card is waited for.
+#[derive(Clone, Copy, Debug)]
+enum Waiting {
+    /// After every frame, as the tests here do.
+    EveryFrame,
+    /// Not at all: asked as often as it can be whether the next frame can
+    /// be taken.
+    Eagerly,
+    /// Not at all: as many frames as can be taken, then a pause of up to
+    /// 6 ms, as a page's frames go by in the browser.
+    NowAndThen,
+}
+
+/// The lined skirt settled on the card, moved into a pose and settled
+/// again, waited for so.
+fn waited(model: &BodyModel, card: &(wgpu::Device, wgpu::Queue), waiting: Waiting) -> Drape {
+    let mut gpu = drape(model, "lined-skirt", 12.0, Some(card), None);
+    let mut h = 0x9E37_79B9_7F4A_7C15u64;
+    for pose in [None, Some(Pose::Stepping)] {
+        if let Some(pose) = pose {
+            gpu.pose(pose);
+        }
+        let until = gpu.time + 6.0;
+        // As in the browser: done as soon as a frame leaves it settled.
+        let going = |gpu: &Drape| (gpu.moving() || !gpu.settled()) && gpu.time < until;
+        while going(&gpu) {
+            match waiting {
+                Waiting::EveryFrame => {
+                    gpu.step(1.0 / 60.0);
+                    gpu.catch_up();
+                }
+                Waiting::Eagerly => {
+                    if gpu.ready() {
+                        gpu.step(1.0 / 60.0);
+                    }
+                }
+                Waiting::NowAndThen => {
+                    while gpu.ready() && going(&gpu) {
+                        gpu.step(1.0 / 60.0);
+                    }
+                    // Xorshift.
+                    h ^= h << 13;
+                    h ^= h >> 7;
+                    h ^= h << 17;
+                    std::thread::sleep(std::time::Duration::from_micros(h % 6000));
+                }
+            }
+        }
+    }
+    gpu
+}
+
+#[test]
+fn the_card_drapes_alike_however_long_its_cloth_takes_to_come_back() {
+    let Some(card) = card() else {
+        eprintln!("no graphics card: skipped");
+        return;
+    };
+    // In the browser nothing can be waited for: the cloth's points come
+    // back as they do, and the next frame is taken when it can be. What is
+    // worked out from them (which of the lining's points are kept behind
+    // which of the skirt's, when it has settled, the body's field as it
+    // moves) comes from the same frames however long that takes.
+    let model = avatar();
+    let mut drapes = [Waiting::EveryFrame, Waiting::Eagerly, Waiting::NowAndThen]
+        .map(|waiting| {
+            let start = Instant::now();
+            let gpu = waited(&model, &card, waiting);
+            eprintln!(
+                "{waiting:?}: {:.2} s of cloth in {:.2} s",
+                gpu.time,
+                start.elapsed().as_secs_f64()
+            );
+            gpu
+        })
+        .into_iter();
+    let first = drapes.next().unwrap();
+    assert!(first.settled(), "still moving");
+    for again in drapes {
+        assert_eq!(
+            again.time.to_bits(),
+            first.time.to_bits(),
+            "settled at another frame"
+        );
+        // Bit for bit.
+        let differ = first
+            .cloth
+            .x
+            .iter()
+            .zip(&again.cloth.x)
+            .filter(|(a, b)| a.map(f32::to_bits) != b.map(f32::to_bits))
+            .count();
+        assert_eq!(
+            differ,
+            0,
+            "{differ} of {} points elsewhere",
+            first.cloth.x.len()
+        );
+    }
+}
+
 #[test]
 fn the_lined_skirt_settles_on_the_card_however_it_starts() {
     let Some(card) = card() else {
@@ -331,8 +432,7 @@ fn a_lining_is_not_pushed_through_cloth_folded_over_it_on_the_card() {
         seat: None,
     };
     gpu.step(&mut cloth, 1.0 / 1800.0, 1, &felt);
-    gpu.catch_up(&mut cloth);
-    let front = cloth.x[b as usize..]
+    let front = gpu.points_now()[b as usize..]
         .iter()
         .map(|p| p[2])
         .fold(f32::MIN, f32::max);

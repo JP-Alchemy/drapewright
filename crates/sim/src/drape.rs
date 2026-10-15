@@ -61,18 +61,21 @@ pub struct Felt<'a> {
 }
 
 /// Moves the cloth on elsewhere than here: on the graphics card. Its
-/// points here are brought up to date as they come back, a step or two
-/// behind.
+/// points here are brought on as they come back, always the same number of
+/// steps behind, so that what is worked out from them here (whether it has
+/// settled, where the body's field reaches as it moves) is the same however
+/// long they take.
 pub trait Stepper: std::fmt::Debug {
-    /// Whether another step can be taken now, without running too far
-    /// ahead of what has come back.
+    /// Whether another step can be taken now: the points it goes on from
+    /// have come back.
     fn ready(&mut self) -> bool;
     /// Moves `cloth` on by `dt` seconds in `substeps`, feeling `felt`.
     fn step(&mut self, cloth: &mut Cloth, dt: f32, substeps: u32, felt: &Felt<'_>);
     /// Moves the whole cloth by `by`, m.
     fn shift(&mut self, cloth: &mut Cloth, by: V3);
-    /// Waits until the cloth here is as far on as it is there.
-    fn catch_up(&mut self, cloth: &mut Cloth);
+    /// Waits until another step can be taken (where anything can be waited
+    /// for: not in the browser).
+    fn catch_up(&mut self);
 }
 
 /// Moves `cloth` on by `dt`, feeling `felt`: by `stepper`, or here.
@@ -298,10 +301,11 @@ impl Drape {
         self.stepper.as_mut().is_none_or(|s| s.ready())
     }
 
-    /// Brings the cloth here up to date with where it is elsewhere.
+    /// Waits until another frame can be taken, where the cloth is moved
+    /// on elsewhere.
     pub fn catch_up(&mut self) {
         if let Some(s) = &mut self.stepper {
-            s.catch_up(&mut self.cloth);
+            s.catch_up();
         }
     }
 

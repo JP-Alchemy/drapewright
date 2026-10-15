@@ -12,6 +12,50 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 72 — The same drape on the graphics card in the browser, every time
+
+Step 66 made the graphics card's own work repeat exactly, but in the
+browser two drapes of the same garment could still come out a little
+different. Which lining points are kept behind which skirt points, and when
+the cloth has settled, were worked out from whichever of the cloth's points
+had come back from the card, and that depends on how busy the computer is.
+
+**Try it:** in Chrome or Safari, **Open pattern** and choose
+`fixtures/drapewright/lined-skirt.drapewright`, open the avatar (it says
+**Drawn and draped with WebGPU**) and **Drape**. Note how the hem and its
+folds hang, reload the page and drape again without moving the view: it
+hangs exactly as before, fold for fold. It drapes as fast as it did.
+
+**What changed:**
+
+* Every frame's points now come back from the card, and the drape always
+  goes on from those of the frame eight before the one it sends: which
+  lining points to keep behind which skirt points (looked for again every
+  fourth frame at most), when the cloth has settled, and where the body is
+  felt as it moves into a pose. Where the computer can wait, as the tests
+  do, it waits for them. The browser can't, so the next frame is held back
+  until they have come, rather than going on from whatever has. So the
+  drape is the same however long they take.
+* Measured in Chrome on a Mac (M3 Pro): the lined skirt's 2.2 s of cloth
+  takes 0.51 s to drape, as before (0.52 s), and 2.8 s from **Drape** to
+  settled, most of it spent placing the garment. Six drapes in a row came
+  out the same to the pixel, where before no two did. Outside the browser
+  (the tests) a drape is about three times as fast as before, as the card
+  no longer stands idle while each frame's points come back: the lined
+  skirt settles in 0.5 s, from 1.8 s.
+* Looking for the lining's pairs every frame, or keeping the drape only
+  four frames behind, made the browser's drape a fifth to two fifths
+  slower, so neither is done. With starts nudged by up to 0.3, 1 or 3 mm,
+  0 of 384 lined-skirt drapes failed to settle clear of the body, as
+  before.
+* A new test drapes the lined skirt, moves it into a pose and settles it
+  again three ways: waiting for every frame, asking as fast as it can
+  whether the next frame can be taken, and asking now and then as a
+  page's frames go by. The three must come out the same, bit for bit.
+  Before, they settled at different frames.
+
+---
+
 ## Step 71 — Instructions drawn as illustrations
 
 A kimono pattern's instructions come as a PDF of their own: six pages of

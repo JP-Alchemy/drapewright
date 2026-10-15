@@ -3,11 +3,15 @@
 //! (`cloth.wgsl`). Edges, bends and stitches are coloured, no two of a
 //! colour sharing a point, and each colour solved at once. No pass reads
 //! what another thread of it writes, so the same cloth moves the same way
-//! every time. The cloth's points come back to the processor a frame or two
-//! behind, for showing it and telling when it has settled.
+//! every time. The cloth's points come back to the processor, for showing
+//! it, telling when it has settled and finding which of a lining's points
+//! to keep behind which of the shell's: always the same number of frames
+//! behind, so that the drape is the same however long they take to come
+//! back (in the browser, which can't wait for them, too).
 
+use std::collections::VecDeque;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use bytemuck::{Pod, Zeroable};
 use drapewright_sim::cloth::{Cloth, Parts, V3};
@@ -17,8 +21,20 @@ use wgpu::util::DeviceExt;
 
 /// Points a workgroup moves on (as in the shaders).
 const WORKGROUP: u32 = 64;
-/// Frames sent to the graphics card ahead of those it has done.
-const AHEAD: u64 = 8;
+/// Frames the cloth here is behind the card. Every frame's points are read
+/// back, and before a frame is sent the cloth here is brought on to the
+/// frame this many before it: waited for, or in the browser, where nothing
+/// can be waited for, the frame held back until they have come. So what is
+/// worked out here from the cloth is the same however long they take. The
+/// browser takes no more frames than this between two of its own (points
+/// come back only between them), as many as the card ran ahead before.
+const BEHIND: u64 = 8;
+/// Which of a lining's points are kept behind which of the shell's is
+/// found again at most every this many frames (once the cloth has moved):
+/// finding them takes a few milliseconds, and every frame slowed a lined
+/// skirt's drape in the browser by a fifth. About as often as before, when
+/// they were found only from the points that happened to have come back.
+const FIND_EVERY: u64 = 4;
 /// A range's entry in its uniform buffer, bytes: as uniform buffer offsets
 /// must be aligned.
 const RANGE_STRIDE: u64 = 256;
@@ -162,6 +178,18 @@ struct Pass {
     colours: Vec<(wgpu::BindGroup, u32)>,
 }
 
+/// A frame's points being read back.
+struct Reading {
+    frame: u64,
+    /// Its step, s.
+    dt: f32,
+    /// Where they are copied to, and the work that copies them.
+    buffer: wgpu::Buffer,
+    submitted: wgpu::SubmissionIndex,
+    /// Whether they are here (or can't be).
+    here: Arc<AtomicBool>,
+}
+
 /// The cloth on the graphics card.
 pub struct GpuCloth {
     device: wgpu::Device,
@@ -171,7 +199,6 @@ pub struct GpuCloth {
     params: wgpu::Buffer,
     grids: wgpu::Buffer,
     x: wgpu::Buffer,
-    staging: wgpu::Buffer,
     fields: wgpu::Buffer,
     /// The fields in `fields` now: their numbers.
     fields_in: (u64, Option<u64>),
@@ -188,16 +215,14 @@ pub struct GpuCloth {
     reach: f32,
     /// Moved by this before the next step.
     shift: V3,
-    /// Frames sent, and done.
+    /// Frames sent.
     sent: u64,
-    done: Arc<AtomicU64>,
-    /// Points being read back (from the frame after which they were
-    /// copied), and whether they are here.
-    reading: Option<(u64, Arc<AtomicBool>)>,
-    /// The frame the cloth here was last brought up to date with.
+    /// Each frame's points being read back, oldest first.
+    reading: VecDeque<Reading>,
+    /// Buffers to read points back into, not in use.
+    spare: Vec<wgpu::Buffer>,
+    /// The frame the cloth here is at.
     read: u64,
-    /// The step (s) of the last frame.
-    dt: f32,
 }
 
 struct Passes {
@@ -319,12 +344,6 @@ impl GpuCloth {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let staging = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("cloth read back"),
-            size: (n.max(1) * 16) as u64,
-            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("cloth"),
             source: wgpu::ShaderSource::Wgsl(include_str!("cloth.wgsl").into()),
@@ -434,7 +453,6 @@ impl GpuCloth {
             params,
             grids,
             x: x_buf,
-            staging,
             fields,
             fields_in: (0, None),
             layers,
@@ -448,10 +466,9 @@ impl GpuCloth {
             reach: parts.reach,
             shift: [0.0; 3],
             sent: 0,
-            done: Arc::new(AtomicU64::new(0)),
-            reading: None,
+            reading: VecDeque::new(),
+            spare: Vec::new(),
             read: 0,
-            dt: 0.0,
         })
     }
 
@@ -526,9 +543,10 @@ impl GpuCloth {
         self.fields_in = ids;
     }
 
-    /// Each inside point's outside points near it, as found here.
+    /// Each inside point's outside points near it, as found here: from the
+    /// cloth `BEHIND` frames back, every `FIND_EVERY` frames.
     fn put_layers(&mut self, cloth: &mut Cloth) {
-        if self.inside_from >= self.n {
+        if self.inside_from >= self.n || !self.sent.is_multiple_of(FIND_EVERY) {
             return;
         }
         let first = self.inside_from as usize;
@@ -572,38 +590,124 @@ impl GpuCloth {
         }
     }
 
-    /// Brings the cloth here up to date if its points have come back.
-    fn collect(&mut self, cloth: &mut Cloth) {
-        let Some((frame, here)) = &self.reading else {
-            return;
-        };
-        if !here.load(Ordering::Acquire) {
-            return;
-        }
-        let frame = *frame;
-        let x: Vec<V3> = {
-            let Ok(data) = self.staging.slice(..).get_mapped_range() else {
-                return;
-            };
-            let all: &[[f32; 4]] = bytemuck::cast_slice(&data);
-            all.iter()
-                .take(self.n as usize)
-                .map(|p| [p[0], p[1], p[2]])
-                .collect()
-        };
-        self.staging.unmap();
-        cloth.moved_to(x, (frame - self.read) as f32 * self.dt);
-        self.read = frame;
-        self.reading = None;
+    /// The frame the cloth here is to be at before the next is sent.
+    fn wanted(&self) -> u64 {
+        (self.sent + 1).saturating_sub(BEHIND)
     }
 
-    fn poll(&self, wait: bool) {
-        let _ = self.device.poll(if wait {
-            wgpu::PollType::wait_indefinitely()
-        } else {
-            wgpu::PollType::Poll
+    /// Whether the cloth here can be brought on to where the next frame
+    /// wants it, its points having come back.
+    fn can_go_on(&self) -> bool {
+        let wanted = self.wanted();
+        self.reading
+            .iter()
+            .take_while(|r| r.frame <= wanted)
+            .all(|r| r.here.load(Ordering::Acquire))
+    }
+
+    /// Brings the cloth here on to where the next frame wants it, frame by
+    /// frame as their points come back: waiting for them, where it can.
+    fn bring_on(&mut self, cloth: &mut Cloth) {
+        let wanted = self.wanted();
+        while self.read < wanted {
+            let Some(next) = self.reading.front() else {
+                return;
+            };
+            if !next.here.load(Ordering::Acquire) {
+                if cfg!(target_arch = "wasm32") || !self.wait_for(&next.submitted) {
+                    return;
+                }
+                continue;
+            }
+            let next = self.reading.pop_front().expect("a frame being read");
+            let x = (next.buffer.get_mapped_range(..).ok()).map(|data| points(&data, self.n));
+            // Points that couldn't be read back (the card lost) are left
+            // as they were.
+            if let Some(x) = x {
+                next.buffer.unmap();
+                self.spare.push(next.buffer);
+                cloth.moved_to(x, next.dt);
+            }
+            self.read = next.frame;
+        }
+    }
+
+    /// Copies the points as they are now to be read back, as frame `frame`
+    /// of `dt` s, in `encoder`'s work; sends it.
+    fn send(&mut self, mut encoder: wgpu::CommandEncoder, frame: u64, dt: f32) {
+        let buffer = self.spare.pop().unwrap_or_else(|| {
+            self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("cloth read back"),
+                size: u64::from(self.n.max(1)) * 16,
+                usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        });
+        encoder.copy_buffer_to_buffer(&self.x, 0, &buffer, 0, buffer.size());
+        let submitted = self.queue.submit([encoder.finish()]);
+        let here = Arc::new(AtomicBool::new(false));
+        let flag = here.clone();
+        buffer.map_async(wgpu::MapMode::Read, .., move |_| {
+            flag.store(true, Ordering::Release);
+        });
+        self.reading.push_back(Reading {
+            frame,
+            dt,
+            buffer,
+            submitted,
+            here,
         });
     }
+
+    /// Waits until `submitted` is done (and its points read back); false
+    /// if it can't be waited for.
+    fn wait_for(&self, submitted: &wgpu::SubmissionIndex) -> bool {
+        self.device
+            .poll(wgpu::PollType::Wait {
+                submission_index: Some(submitted.clone()),
+                timeout: None,
+            })
+            .is_ok()
+    }
+
+    /// The cloth's points as they are on the card now, waited for: for
+    /// checking a step, as the cloth here is behind. Not in the browser,
+    /// where nothing can be waited for.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn points_now(&self) -> Vec<V3> {
+        let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("cloth now"),
+            size: u64::from(self.n.max(1)) * 16,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("cloth now"),
+            });
+        encoder.copy_buffer_to_buffer(&self.x, 0, &buffer, 0, buffer.size());
+        let submitted = self.queue.submit([encoder.finish()]);
+        buffer.map_async(wgpu::MapMode::Read, .., |_| {});
+        self.wait_for(&submitted);
+        points(
+            &buffer.get_mapped_range(..).expect("the points read back"),
+            self.n,
+        )
+    }
+
+    fn poll(&self) {
+        let _ = self.device.poll(wgpu::PollType::Poll);
+    }
+}
+
+/// The first `n` points in `data`, as read back.
+fn points(data: &[u8], n: u32) -> Vec<V3> {
+    let all: &[[f32; 4]] = bytemuck::cast_slice(data);
+    all.iter()
+        .take(n as usize)
+        .map(|p| [p[0], p[1], p[2]])
+        .collect()
 }
 
 /// A bind group for group 0 of `pipeline`, binding `bindings`.
@@ -632,14 +736,13 @@ fn group_for(
 
 impl Stepper for GpuCloth {
     fn ready(&mut self) -> bool {
-        self.poll(false);
-        self.sent < self.done.load(Ordering::Acquire) + AHEAD
+        self.poll();
+        self.can_go_on()
     }
 
     fn step(&mut self, cloth: &mut Cloth, dt: f32, substeps: u32, felt: &Felt<'_>) {
-        self.poll(false);
-        self.collect(cloth);
-        self.dt = dt;
+        self.poll();
+        self.bring_on(cloth);
         self.put_fields(felt);
         self.put_layers(cloth);
         let h = dt / substeps.max(1) as f32;
@@ -730,28 +833,7 @@ impl Stepper for GpuCloth {
         }
         self.shift = [0.0; 3];
         self.sent += 1;
-        let read = self.reading.is_none();
-        if read {
-            encoder.copy_buffer_to_buffer(&self.x, 0, &self.staging, 0, self.staging.size());
-        }
-        self.queue.submit([encoder.finish()]);
-        let done = self.done.clone();
-        let frame = self.sent;
-        self.queue.on_submitted_work_done(move || {
-            done.fetch_max(frame, Ordering::AcqRel);
-        });
-        if read {
-            let here = Arc::new(AtomicBool::new(false));
-            let flag = here.clone();
-            self.staging
-                .slice(..)
-                .map_async(wgpu::MapMode::Read, move |result| {
-                    if result.is_ok() {
-                        flag.store(true, Ordering::Release);
-                    }
-                });
-            self.reading = Some((frame, here));
-        }
+        self.send(encoder, self.sent, dt);
     }
 
     fn shift(&mut self, cloth: &mut Cloth, by: V3) {
@@ -761,40 +843,23 @@ impl Stepper for GpuCloth {
         cloth.shift(by);
     }
 
-    fn catch_up(&mut self, cloth: &mut Cloth) {
-        // In the browser nothing can be waited for: the cloth comes back
-        // as it does.
+    fn catch_up(&mut self) {
+        // In the browser nothing can be waited for: the next frame is held
+        // back instead (see `ready`).
         if cfg!(target_arch = "wasm32") {
             return;
         }
-        // What is being read, then the cloth as it is now.
-        while self.reading.is_some() {
-            self.poll(true);
-            self.collect(cloth);
-        }
-        if self.sent == self.read {
-            return;
-        }
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("catch up"),
-            });
-        encoder.copy_buffer_to_buffer(&self.x, 0, &self.staging, 0, self.staging.size());
-        self.queue.submit([encoder.finish()]);
-        let here = Arc::new(AtomicBool::new(false));
-        let flag = here.clone();
-        self.staging
-            .slice(..)
-            .map_async(wgpu::MapMode::Read, move |result| {
-                if result.is_ok() {
-                    flag.store(true, Ordering::Release);
-                }
-            });
-        self.reading = Some((self.sent, here));
-        while self.reading.is_some() {
-            self.poll(true);
-            self.collect(cloth);
+        while !self.can_go_on() {
+            let Some(next) = self
+                .reading
+                .iter()
+                .find(|r| !r.here.load(Ordering::Acquire))
+            else {
+                return;
+            };
+            if !self.wait_for(&next.submitted) {
+                return;
+            }
         }
     }
 }
