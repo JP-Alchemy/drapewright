@@ -1077,7 +1077,7 @@ pub fn import_pdf_pages(
     remove_watermarks(&mut pages);
     // A page of prose (instructions, a warning) is no part of the sheet;
     // left out unless chosen.
-    let prose: Vec<bool> = pages
+    let mut prose: Vec<bool> = pages
         .iter()
         .map(|p| choice.is_none() && is_prose(p))
         .collect();
@@ -1120,6 +1120,29 @@ pub fn import_pdf_pages(
         .collect();
     let page_sizes: Vec<Vec2> = pages.iter().map(|p| Vec2::new(p.width, p.height)).collect();
     let mut groups = arrange(&prints, &page_sizes, &grid);
+    // Labels printed in several languages, and many of them, can make a
+    // tile look like a page of instructions. When the other pages make no
+    // sheet, those that share shapes with each other, three or more, are
+    // tiles of one: pages of instructions share none.
+    if !groups.iter().any(|g| g.len() > 1) && prose.iter().filter(|p| **p).count() >= 3 {
+        let prints: Vec<Vec<Print>> = pages
+            .iter()
+            .map(|p| {
+                p.paths
+                    .iter()
+                    .filter_map(|(r, _, _)| Print::of(&r.segs, r.closed))
+                    .collect()
+            })
+            .collect();
+        let tiles = arrange(&prints, &page_sizes, &grid);
+        if tiles.iter().any(|g| g.len() >= 3) {
+            for (i, _) in tiles.iter().filter(|g| g.len() >= 3).flatten() {
+                prose[*i] = false;
+            }
+            groups = tiles;
+            remove_trim_frames(&mut pages, &prose);
+        }
+    }
     // Tiles that share no shapes, each cut off at its frame: placed by
     // where their lines are cut off. They have no marks for joining them.
     let mut butted = false;

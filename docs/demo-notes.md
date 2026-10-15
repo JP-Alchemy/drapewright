@@ -12,6 +12,32 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 65 — Tiles wordy enough to look like instructions
+
+Patterns from the big pattern companies print every label in three or
+four languages ("LENGTHEN OR SHORTEN HERE / ALLONGER OU RACCOURCIR ICI /
+ALARGUE O ACORTE AQUÍ"). Every A4 tile then had as many lines of words as
+a page of instructions, so every page was left out as instructions and the
+pattern came in empty ("43 pages left out").
+
+**Try it:** import the A4 home-print file of a Vogue-style pattern, such as
+the free blouse in JP's test folder (two sheets of 43 and 36 pages). It now
+comes in with the same pieces as its A0 copy-shop file: 86 and 106 pieces,
+where before there were none. A real page of instructions in the same file
+is still left out.
+
+**What changed:** when the pages that aren't wordy make no sheet, the
+wordy pages are tried too. Those that share shapes with each other, three
+or more, are tiles of one sheet; pages of instructions share none. This
+only happens where the import found nothing before, so other patterns come
+in as they did.
+
+Known: those two sheets hold five sizes nested, drawn alike with no layers
+or colours, and the sizes don't come apart yet. Some pieces are named by
+their French or Spanish label ("Milieu", "Jareta").
+
+---
+
 ## Step 64 — The same PDF comes in the same every time
 
 Some PDFs came in with their pieces in a different order each time they

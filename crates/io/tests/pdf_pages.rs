@@ -68,14 +68,16 @@ fn text(c: &mut Content, at: P, size: f32, angle: f32, words: &str) {
 
 /// The PDF: a page of instructions, then tiles 1A to 3B row by row.
 fn pattern() -> Vec<u8> {
-    pattern_trimmed(0.0)
+    pattern_with(0.0, false)
 }
 
 /// The same, each tile overlapping its neighbours by `trim` on each side,
 /// a frame drawn there to trim it at: each side a line on its own from
 /// corner to corner, running on to the next tiles' corners off the page. A
-/// line across each of two pieces too.
-fn pattern_trimmed(trim: f32) -> Vec<u8> {
+/// line across each of two pieces too. `wordy`: each tile prints its labels
+/// in three languages, as many patterns do, as many lines of words as a
+/// page of instructions has.
+fn pattern_with(trim: f32, wordy: bool) -> Vec<u8> {
     let (pw, ph) = (W - 2.0 * trim, H - 2.0 * trim);
     let tiles: Vec<(usize, usize)> = (0..3).flat_map(|r| (0..2).map(move |c| (c, r))).collect();
     let mut pdf = Pdf::new();
@@ -221,6 +223,21 @@ fn pattern_trimmed(trim: f32) -> Vec<u8> {
             text(&mut c, (x - 30.0, y + 14.0), 12.0, 0.0, &name);
         }
         text(&mut c, (20.0, H - 50.0), 36.0, 0.0, &label(col, row));
+        if wordy {
+            for (k, words) in [
+                "LENGTHEN OR SHORTEN HERE",
+                "ALLONGER OU RACCOURCIR ICI",
+                "ALARGUE O ACORTE AQUI",
+                "PLACE ON FOLD OF FABRIC",
+                "PLACER SUR LE PLI DU TISSU",
+                "COLOQUE EN EL DOBLEZ DE LA TELA",
+            ]
+            .iter()
+            .enumerate()
+            {
+                text(&mut c, (60.0, 200.0 + 30.0 * k as f32), 9.0, 0.0, words);
+            }
+        }
         watermark(&mut c);
         page(&mut pdf, k + 1, c);
     }
@@ -306,7 +323,7 @@ fn tiles_trimmed_at_a_frame_inside_the_page_join_without_their_frames() {
     // Tiles overlapping by 12 pt (about 4 mm) on each side. Their frames,
     // put together, would be a box round the whole sheet: no piece, and not
     // a title block that the pieces inside it would be taken for.
-    let result = import_pdf(&pattern_trimmed(12.0), Some("trimmed.pdf")).unwrap();
+    let result = import_pdf(&pattern_with(12.0, false), Some("trimmed.pdf")).unwrap();
     let mut names: Vec<&str> = result.pieces.iter().map(|p| p.name.as_str()).collect();
     names.sort_unstable();
     assert_eq!(names, ["Back", "Front", "Pocket"], "{:?}", result.notes);
@@ -327,4 +344,17 @@ fn tiles_trimmed_at_a_frame_inside_the_page_join_without_their_frames() {
         b.width(),
         b.height()
     );
+}
+
+#[test]
+fn tiles_printing_their_labels_in_three_languages_are_no_instructions() {
+    // Every tile has as many lines of words as the page of instructions.
+    // The tiles share shapes, so they are a sheet; the instructions are
+    // still left out.
+    let result = import_pdf(&pattern_with(12.0, true), Some("wordy.pdf")).unwrap();
+    let mut names: Vec<&str> = result.pieces.iter().map(|p| p.name.as_str()).collect();
+    names.sort_unstable();
+    assert_eq!(names, ["Back", "Front", "Pocket"], "{:?}", result.notes);
+    assert_eq!(result.pages[0].left_out, Some(PageLeftOut::Instructions));
+    assert!(result.pages[1..].iter().all(|p| p.left_out.is_none()));
 }
