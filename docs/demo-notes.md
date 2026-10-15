@@ -12,6 +12,26 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 64 — The same PDF comes in the same every time
+
+Some PDFs came in with their pieces in a different order each time they
+were imported. The pieces were the same, but the unnamed ones swapped
+numbers: "Piece 3" one time was "Piece 31" the next. An assistant (or a
+person) told "Piece 3 is the front" would be wrong after importing again.
+
+**Try it:** import a PDF whose outlines are drawn as many separate strokes,
+with unnamed pieces, twice. The pieces get the same numbers both times. In
+JP's test folder an underwired bra pattern (40 pieces) changed order on
+every import; now it never does. Every file in the folder comes in the
+same on every run, Find seams' suggestions included. One sewing book's
+dungarees also stop flickering between 190 and 191 small shapes left out.
+
+**What changed:** outlines joined from lines that meet end to middle came
+out in whatever order a hash map kept them in. They now come out in the
+order they were found.
+
+---
+
 ## Step 63 — A pattern that is a picture says so
 
 A PDF of a scanned pattern, or one made from photos of the pages, has no

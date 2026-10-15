@@ -458,9 +458,12 @@ fn peel(edges: &mut [Edge]) -> Vec<Vec<PathSeg>> {
         }
     }
     // A line crossed both ways joins two loops: each is a loop of its own.
-    let rings: Vec<(Vec<PathSeg>, Vec<usize>)> = outside
-        .values()
-        .flat_map(|&(_, k)| split_at_bridges(faces[k].1.clone()))
+    // In the order the faces were found, the same every time.
+    let mut outsides: Vec<usize> = outside.values().map(|&(_, k)| k).collect();
+    outsides.sort_unstable();
+    let rings: Vec<(Vec<PathSeg>, Vec<usize>)> = outsides
+        .into_iter()
+        .flat_map(|k| split_at_bridges(faces[k].1.clone()))
         .map(|ring| (ring.iter().flat_map(|&h| oriented(h)).collect(), ring))
         .collect();
     let mut loops = Vec::new();

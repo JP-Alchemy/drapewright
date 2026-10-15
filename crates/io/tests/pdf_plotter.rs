@@ -617,3 +617,40 @@ fn plotter_tiles_butted_together() {
     );
     assert_eq!(summary(&tiles), summary(&sheet));
 }
+
+#[test]
+fn the_same_drawing_comes_in_the_same_every_time() {
+    // Pieces apart from each other, each drawn in strokes, its top running
+    // on past its corner and its side starting partway along it: joined,
+    // each is a network of its own, and they come in in one order,
+    // whatever order the joining kept them in. A piece is Piece 3 every
+    // time.
+    let mut plotter = Plotter::default();
+    for k in 0..6 {
+        let (x, y) = (
+            20.0 + 130.0 * f64::from(k % 3),
+            20.0 + 150.0 * f64::from(k / 3),
+        );
+        plotter.line(&[(x, y + 120.0), (x, y), (x + 110.0, y)], 10.0);
+        plotter.line(
+            &[(x + 90.0, y), (x + 90.0, y + 120.0), (x, y + 120.0)],
+            10.0,
+        );
+    }
+    let file = pdf(SHEET, &[plotter.strokes]);
+    let order = |result: drapewright_io::ImportResult| -> Vec<(String, i64, i64)> {
+        result
+            .pieces
+            .iter()
+            .map(|p| {
+                let b = p.outline.bounds();
+                (p.name.clone(), b.x0.round() as i64, b.y0.round() as i64)
+            })
+            .collect()
+    };
+    let first = order(import_pdf(&file, None).unwrap());
+    assert_eq!(first.len(), 6);
+    for _ in 0..20 {
+        assert_eq!(order(import_pdf(&file, None).unwrap()), first);
+    }
+}
