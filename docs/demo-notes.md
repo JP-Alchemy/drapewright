@@ -12,6 +12,57 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 66 — A lined skirt settles on the graphics card every time
+
+On the graphics card (WebGPU), about one drape in five of the test lined
+skirt never settled: the cloth kept stirring, and the skirt sat up to a
+centimetre into the body round the hips or waist (step 58 noted it).
+Whether the GPU test passed was luck, and changed with unrelated code.
+
+**Try it:** in Safari or Chrome, **Open pattern** and choose
+`fixtures/drapewright/lined-skirt.drapewright`, open the avatar (it says
+**Drawn and draped with WebGPU**) and **Drape**, several times. Each time
+it settles in a few seconds ("Draped in poplin. Inside, shown paler: Skirt
+front lining and Skirt back lining."), its lining inside and the skirt
+clear of the body.
+
+**What was wrong, and what changed:**
+
+* **A folded corner let the lining through.** The lining is kept behind
+  the skirt along the skirt's outward side, read from the skirt's
+  triangles. As the hem first swings, a corner beside a side seam can
+  flip over for a moment; there the skirt's "outward" points inward, and
+  the lining was pushed out through it. Once through, each push between
+  the two layers undid another, so they tangled and never came to rest,
+  and where the skirt's folded side faced the body it was pushed into it.
+  Now the lining is kept behind the skirt only where the two face the same
+  way; where one has folded over they are left be until it opens. Facings
+  and linings are now taken to face the way the cloth they lie on faces,
+  rather than by which side is towards the body (a back neck facing away
+  from the body could be taken either way).
+  The processor drapes the same way. It hardly ever got tangled, because
+  it solves the cloth from the top down, but solved in the graphics card's
+  order it did too.
+* **The graphics card's drape was different every time.** Keeping the
+  cloth off the body read neighbouring points while other threads were
+  moving them. It now reads them from a copy taken just before, so a
+  drape whose every frame is waited for (as the tests do) comes out the
+  same, bit for bit. In the browser, which can't wait, which lining
+  points are kept behind which skirt points is still worked out from
+  points that come back a frame or two late, so two drapes there can
+  differ a little.
+
+Measured on a Mac's GPU, each start nudged by up to 0.3, 1 or 3 mm: 0
+failures in 384 drapes (it was about 1 in 27, and about 1 in 5 before
+the drape was the same every time). Ordinary drapes on the processor come
+out as before (the tests' figures move by a tenth of a millimetre at
+most). The tests now drape the lined skirt from six nudged starts and
+require each to settle clear of the body, check that a drape repeats
+exactly, and fold a hem corner over a lining on purpose, on both the
+processor and the card.
+
+---
+
 ## Step 65 — Tiles wordy enough to look like instructions
 
 Patterns from the big pattern companies print every label in three or

@@ -7,10 +7,14 @@ use drapewright_body::{BodyModel, Pose, Shape};
 use drapewright_project::container::unpack;
 use drapewright_project::migrate::load;
 use drapewright_seams::Seam;
-use drapewright_sim::drape::{Drape, Posable};
+use drapewright_sim::ClothBuilder;
+use drapewright_sim::cloth::V3;
+use drapewright_sim::collide::{BodyField, Seat};
+use drapewright_sim::drape::{Drape, Felt, Posable, Stepper};
 use drapewright_sim::fabric::preset;
 use drapewright_sim::garment::{assemble, draped_pieces};
 use drapewright_sim::inside::with_inside;
+use drapewright_sim::mesh::{PanelMesh, mesh};
 use drapewright_sim::place::{Figure, place};
 use drapewright_sim_gpu::GpuCloth;
 
@@ -70,12 +74,13 @@ fn project(name: &str) -> (Vec<drapewright_pattern_core::Piece>, Vec<Seam>) {
 }
 
 /// A drape of `name` on the standard figure, its cloth `spacing` mm apart,
-/// moved on by `card` if given.
+/// moved on by `card` if given; its points nudged by `nudge` if given.
 fn drape(
     model: &BodyModel,
     name: &str,
     spacing: f64,
     card: Option<&(wgpu::Device, wgpu::Queue)>,
+    nudge: Option<u64>,
 ) -> Drape {
     let (pieces, seams) = project(name);
     let body = model.shape(&Shape::default());
@@ -98,12 +103,31 @@ fn drape(
         (&body.vertices, &model.skin()),
     );
     drape.posable(Posable::of(model, &body).unwrap());
+    if let Some(seed) = nudge {
+        nudged(&mut drape, seed);
+    }
     if let Some((device, queue)) = card {
         let gpu = GpuCloth::new(device, queue, &drape.cloth).unwrap();
         eprintln!("colours (edges, bends, stitches): {:?}", gpu.colours());
         drape.use_stepper(Box::new(gpu));
     }
     drape
+}
+
+/// Each point moved up to a millimetre each way, differently for each
+/// `seed`: a start as near the same as makes no difference to how the
+/// garment should hang, but a different path there.
+fn nudged(drape: &mut Drape, seed: u64) {
+    let mut h = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    for p in &mut drape.cloth.x {
+        for c in p.iter_mut() {
+            // Xorshift.
+            h ^= h << 13;
+            h ^= h >> 7;
+            h ^= h << 17;
+            *c += ((h % 2001) as f32 - 1000.0) * 1e-6;
+        }
+    }
 }
 
 /// Steps until settled, at most `seconds` of the cloth's time; how long
@@ -138,9 +162,9 @@ fn the_skirt_hangs_alike_on_the_card_and_the_processor() {
         return;
     };
     let model = avatar();
-    let mut cpu = drape(&model, "skirt", 20.0, None);
+    let mut cpu = drape(&model, "skirt", 20.0, None, None);
     let cpu_took = settle(&mut cpu, 10.0);
-    let mut gpu = drape(&model, "skirt", 20.0, Some(&card));
+    let mut gpu = drape(&model, "skirt", 20.0, Some(&card), None);
     let gpu_took = settle(&mut gpu, 10.0);
     eprintln!(
         "processor: {:.1} s of cloth in {cpu_took:.2} s, hem {:.3} m; card: {:.1} s in {gpu_took:.2} s, hem {:.3} m, widest stitch {:.1} mm, nearest the body {:.1} mm",
@@ -165,7 +189,7 @@ fn a_lined_skirt_and_a_shirt_drape_on_the_card_and_pose() {
     };
     let model = avatar();
     for (name, pose) in [("lined-skirt", Pose::Stepping), ("shirt", Pose::Reaching)] {
-        let mut gpu = drape(&model, name, 12.0, Some(&card));
+        let mut gpu = drape(&model, name, 12.0, Some(&card), None);
         let took = settle(&mut gpu, 10.0);
         let points = gpu.cloth.x.len();
         gpu.pose(pose);
@@ -179,4 +203,138 @@ fn a_lined_skirt_and_a_shirt_drape_on_the_card_and_pose() {
         assert!(gpu.cloth.widest_stitch() < 0.005, "{name}");
         assert!(deepest(&gpu) > -0.002, "{name}");
     }
+}
+
+#[test]
+fn the_card_moves_the_cloth_the_same_way_every_time() {
+    let Some(card) = card() else {
+        eprintln!("no graphics card: skipped");
+        return;
+    };
+    // A lining's cloth too, half a second in: still moving fast, and
+    // pressed against the body and the skirt over it.
+    let model = avatar();
+    let half_a_second = || {
+        let mut gpu = drape(&model, "lined-skirt", 12.0, Some(&card), None);
+        for _ in 0..30 {
+            gpu.step(1.0 / 60.0);
+            gpu.catch_up();
+        }
+        gpu.cloth.x
+    };
+    let (first, again) = (half_a_second(), half_a_second());
+    // Bit for bit.
+    let differ = first
+        .iter()
+        .zip(&again)
+        .filter(|(a, b)| a.map(f32::to_bits) != b.map(f32::to_bits))
+        .count();
+    assert_eq!(differ, 0, "{differ} of {} points elsewhere", first.len());
+}
+
+#[test]
+fn the_lined_skirt_settles_on_the_card_however_it_starts() {
+    let Some(card) = card() else {
+        eprintln!("no graphics card: skipped");
+        return;
+    };
+    // Each start nudged a little: another path to the same skirt. Before,
+    // about one start in twenty-five folded a hem corner over by a side
+    // seam as it first swung, the lining was pushed out through it, and
+    // the two layers tangled, never still and pressed into the body.
+    let model = avatar();
+    for seed in 1..=6 {
+        let mut gpu = drape(&model, "lined-skirt", 12.0, Some(&card), Some(seed));
+        let took = settle(&mut gpu, 10.0);
+        eprintln!(
+            "start {seed}: {:.2} s of cloth in {took:.2} s; nearest the body {:.1} mm",
+            gpu.time,
+            deepest(&gpu) * 1000.0
+        );
+        assert!(gpu.settled(), "start {seed}: still moving");
+        assert!(deepest(&gpu) > 0.0, "start {seed}: into the body");
+    }
+}
+
+/// A rectangle `w` by `h` m, meshed with points about `spacing` m apart,
+/// laid flat.
+fn rectangle(w: f64, h: f64, spacing: f64) -> (PanelMesh, Vec<[f32; 2]>) {
+    let side = |a: [f64; 2], b: [f64; 2]| {
+        let n = ((b[0] - a[0]).hypot(b[1] - a[1]) / spacing)
+            .round()
+            .max(1.0) as usize;
+        (0..=n)
+            .map(|k| {
+                let t = k as f64 / n as f64;
+                [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]
+            })
+            .collect::<Vec<_>>()
+    };
+    let m = mesh(
+        &[
+            side([0.0, 0.0], [w, 0.0]),
+            side([w, 0.0], [w, h]),
+            side([w, h], [0.0, h]),
+            side([0.0, h], [0.0, 0.0]),
+        ],
+        spacing,
+    )
+    .unwrap();
+    let rest = m
+        .points
+        .iter()
+        .map(|p| [p[0] as f32, p[1] as f32])
+        .collect();
+    (m, rest)
+}
+
+#[test]
+fn a_lining_is_not_pushed_through_cloth_folded_over_it_on_the_card() {
+    let Some((device, queue)) = card() else {
+        eprintln!("no graphics card: skipped");
+        return;
+    };
+    // As on the processor (crates/sim/tests/cloth.rs): cloth 9 cm across
+    // in front of a body (a box whose face is 1 cm behind it), a lining
+    // 2 cm across 2 mm behind it, and the cloth's right-hand 3 cm folded
+    // back over in front of the lining, 4 mm out.
+    let (outside, rest) = rectangle(0.09, 0.06, 0.01);
+    let (inside, lining) = rectangle(0.02, 0.02, 0.01);
+    let mut builder = ClothBuilder::new(preset("poplin").unwrap());
+    let start: Vec<V3> = rest.iter().map(|p| [p[0], p[1], 0.0]).collect();
+    let a = builder.panel(&rest, &start, &outside.triangles);
+    let behind: Vec<V3> = lining
+        .iter()
+        .map(|p| [p[0] + 0.035, p[1] + 0.02, -0.002])
+        .collect();
+    let b = builder.panel(&lining, &behind, &inside.triangles);
+    builder.inside_from(b);
+    builder.lies_on(b..b + lining.len() as u32, a..b);
+    let mut cloth = builder.build();
+    cloth.gravity = [0.0; 3];
+    let (corners, faces) = Seat {
+        low: [-0.05, -0.05, -0.06],
+        high: [0.14, 0.11, -0.01],
+    }
+    .mesh();
+    let body = BodyField::new(&corners, &faces, 0.005, 0.03);
+    cloth.face_out(&body);
+    for p in &mut cloth.x[..b as usize] {
+        if p[0] > 0.06 + 1e-6 {
+            *p = [0.12 - p[0], p[1], 0.004];
+        }
+    }
+    let mut gpu = GpuCloth::new(&device, &queue, &cloth).unwrap();
+    let felt = Felt {
+        body: &body,
+        towards: None,
+        seat: None,
+    };
+    gpu.step(&mut cloth, 1.0 / 1800.0, 1, &felt);
+    gpu.catch_up(&mut cloth);
+    let front = cloth.x[b as usize..]
+        .iter()
+        .map(|p| p[2])
+        .fold(f32::MIN, f32::max);
+    assert!(front < 0.0, "the lining {:.1} mm in front", front * 1000.0);
 }

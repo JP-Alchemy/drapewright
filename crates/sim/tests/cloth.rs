@@ -67,6 +67,15 @@ impl Collider for Post {
     }
 }
 
+/// A wall standing in the x-y plane, facing +z, its face at z = -1 cm.
+struct Wall;
+
+impl Collider for Wall {
+    fn distance(&self, p: V3) -> (f32, V3) {
+        (p[2] + 0.01, [0.0, 0.0, 1.0])
+    }
+}
+
 /// Steps a second takes, in small steps of 1/1800 s: small enough for
 /// stiff cloth to settle without stretching.
 fn run(cloth: &mut Cloth, seconds: f32, body: &dyn Collider) {
@@ -259,4 +268,40 @@ fn room_is_the_space_between_cloth_and_body() {
         let expected = distance - fabric.thickness - 0.003;
         assert!((r - expected).abs() < 1e-5, "{r} for {expected}");
     }
+}
+
+#[test]
+fn a_lining_is_not_pushed_through_cloth_folded_over_it() {
+    // Cloth 9 cm across hanging flat in front of a wall, and a lining 2 cm
+    // across 2 mm behind it; then the cloth's right-hand 3 cm folded back
+    // over in front of the lining, 4 mm out, as a hem's corner flips over
+    // as it swings. Behind the fold the lining is in front of cloth that
+    // faces the wrong way: pushed along that, it would go through.
+    let outside = rectangle(0.09, 0.06, 0.01);
+    let inside = rectangle(0.02, 0.02, 0.01);
+    let (rest, lining) = (flat(&outside), flat(&inside));
+    let mut builder = ClothBuilder::new(preset("poplin").unwrap());
+    let start: Vec<V3> = rest.iter().map(|p| [p[0], p[1], 0.0]).collect();
+    let a = builder.panel(&rest, &start, &outside.triangles);
+    let behind: Vec<V3> = lining
+        .iter()
+        .map(|p| [p[0] + 0.035, p[1] + 0.02, -0.002])
+        .collect();
+    let b = builder.panel(&lining, &behind, &inside.triangles);
+    builder.inside_from(b);
+    builder.lies_on(b..b + lining.len() as u32, a..b);
+    let mut cloth = builder.build();
+    cloth.gravity = [0.0; 3];
+    cloth.face_out(&Wall);
+    for p in &mut cloth.x[..b as usize] {
+        if p[0] > 0.06 + 1e-6 {
+            *p = [0.12 - p[0], p[1], 0.004];
+        }
+    }
+    cloth.step(1.0 / 1800.0, 1, &Wall);
+    let front = cloth.x[b as usize..]
+        .iter()
+        .map(|p| p[2])
+        .fold(f32::MIN, f32::max);
+    assert!(front < 0.0, "the lining {:.1} mm in front", front * 1000.0);
 }

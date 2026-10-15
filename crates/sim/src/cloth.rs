@@ -718,7 +718,10 @@ impl Cloth {
     /// Which way each triangle faces out, away from the body: the side its
     /// corners run anticlockwise round, or (-1) the other. Each panel (each
     /// piece of cloth joined by its triangles) faces one way, as most of it
-    /// near the body faces.
+    /// near the body faces; cloth inside (a facing, a lining) as the cloth
+    /// it lies on faces, where it lies on any. It is kept behind that cloth
+    /// only where the two face alike (see `order_layers`), and a facing
+    /// round the neck, away from the body, could be taken either way.
     pub fn face_out(&mut self, body: &dyn Collider) {
         let n = self.x.len();
         let mut group: Vec<usize> = (0..n).collect();
@@ -746,13 +749,40 @@ impl Cloth {
                 votes[r] += dot(*normal, out);
             }
         }
+        let mut facing: Vec<f32> = votes
+            .iter()
+            .map(|&v| if v < 0.0 { -1.0 } else { 1.0 })
+            .collect();
+        let first = self.inside_from;
+        if first < n {
+            // Each point's normal by its corners, from its own layer's
+            // triangles; the inside cloth starts on the cloth it lies on.
+            let mut at = vec![[0f32; 3]; n];
+            for (t, normal) in self.triangles.iter().zip(&normals) {
+                let inside = t[0] as usize >= first;
+                if t.iter().all(|&i| (i as usize >= first) == inside) {
+                    for &i in t {
+                        axpy(&mut at[i as usize], 1.0, *normal);
+                    }
+                }
+            }
+            self.find_layer_pairs();
+            let mut alike = vec![0f32; n];
+            for &(i, j) in &self.layer_pairs {
+                let (ri, rj) = (root(&mut group, i as usize), root(&mut group, j as usize));
+                alike[ri] += facing[rj] * dot(at[i as usize], at[j as usize]);
+            }
+            // An inside panel's points are all inside, and so is its root.
+            for r in first..n {
+                if alike[r] != 0.0 {
+                    facing[r] = if alike[r] < 0.0 { -1.0 } else { 1.0 };
+                }
+            }
+        }
         self.facing = self
             .triangles
             .iter()
-            .map(|t| {
-                let r = root(&mut group, t[0] as usize);
-                if votes[r] < 0.0 { -1.0 } else { 1.0 }
-            })
+            .map(|t| facing[root(&mut group, t[0] as usize)])
             .collect();
     }
 
@@ -820,16 +850,25 @@ impl Cloth {
     /// along the outside cloth's outward normal until the inside one is
     /// behind it by its thickness and a little air. There is no cloth
     /// resting on cloth otherwise.
+    ///
+    /// Not where the two face opposite ways: there one of them has folded
+    /// over (a hem's corner flipping as it swings), and which is behind
+    /// which can't be told. Pushed along the fold, the inside cloth would
+    /// go through the outside, and once through, each push between them
+    /// undoes another, so the cloth never settles. They are left be until
+    /// the fold opens.
     fn order_layers(&mut self) {
         let first = self.inside_from;
         if self.layer_pairs.is_empty() {
             return;
         }
         let apart = self.fabric.thickness + LAYER_AIR;
-        // The outside cloth's outward normals, point by point.
-        let mut out = vec![[0f32; 3]; first];
+        // Outward normals, point by point, each from its own layer's
+        // triangles.
+        let mut out = vec![[0f32; 3]; self.x.len()];
         for (t, &facing) in self.triangles.iter().zip(&self.facing) {
-            if t.iter().any(|&i| i as usize >= first) {
+            let inside = t[0] as usize >= first;
+            if t.iter().any(|&i| (i as usize >= first) != inside) {
                 continue;
             }
             let normal = self.normal(t);
@@ -846,6 +885,9 @@ impl Cloth {
         for &(i, j) in &self.layer_pairs {
             let (i, j) = (i as usize, j as usize);
             let normal = out[j];
+            if dot(out[i], normal) < 0.0 {
+                continue;
+            }
             let off = sub(self.x[i], self.x[j]);
             let along = dot(off, normal);
             if along < -apart || along > LAYER_REACH {

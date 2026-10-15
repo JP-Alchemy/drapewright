@@ -1,9 +1,10 @@
 //! The drape's cloth moved on on the graphics card: the same small XPBD
 //! steps as `drapewright-sim` takes on the processor, in compute shaders
 //! (`cloth.wgsl`). Edges, bends and stitches are coloured, no two of a
-//! colour sharing a point, and each colour solved at once. The cloth's
-//! points come back to the processor a frame or two behind, for showing it
-//! and telling when it has settled.
+//! colour sharing a point, and each colour solved at once. No pass reads
+//! what another thread of it writes, so the same cloth moves the same way
+//! every time. The cloth's points come back to the processor a frame or two
+//! behind, for showing it and telling when it has settled.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -147,7 +148,8 @@ const SHIFT: &[u32] = &[0, 1];
 const EDGES: &[u32] = &[0, 1, 5];
 const BENDS: &[u32] = &[0, 1, 6];
 const STITCHES: &[u32] = &[0, 1, 7];
-const COLLIDE: &[u32] = &[0, 1, 2, 4, 8, 9, 10, 11];
+const KEEP: &[u32] = &[0, 1, 16];
+const COLLIDE: &[u32] = &[0, 1, 2, 4, 8, 9, 10, 11, 16];
 const FACE_OUT: &[u32] = &[0, 1, 8, 9, 12];
 const LAYERS: &[u32] = &[0, 1, 2, 12, 13, 15];
 const LAYERS_OUT: &[u32] = &[0, 1, 2, 12, 14, 15];
@@ -204,6 +206,7 @@ struct Passes {
     edges: Pass,
     bends: Pass,
     stitches: Pass,
+    keep: Pass,
     collide: Pass,
     face_out: Pass,
     layers: Pass,
@@ -252,6 +255,7 @@ impl GpuCloth {
         let v_buf = buf("cloth v", bytemuck::cast_slice(&v));
         let contact = buf("cloth contact", &vec![0u8; n * 16]);
         let layered = buf("cloth layered", &vec![0u8; n * 16]);
+        let before = buf("cloth before", &vec![0u8; n * 16]);
         // Constraints, in colours.
         let (edge_order, edge_ranges) = coloured(parts.edges.iter().map(|e| vec![e.0, e.1]), n);
         let edges: Vec<EdgeGpu> = edge_order
@@ -325,7 +329,7 @@ impl GpuCloth {
             label: Some("cloth"),
             source: wgpu::ShaderSource::Wgsl(include_str!("cloth.wgsl").into()),
         });
-        let mut bound: Vec<Option<wgpu::Buffer>> = vec![None; 16];
+        let mut bound: Vec<Option<wgpu::Buffer>> = vec![None; 17];
         for (k, b) in [
             (0, &params),
             (1, &x_buf),
@@ -343,6 +347,7 @@ impl GpuCloth {
             (13, &layers),
             (14, &layers_out),
             (15, &layered),
+            (16, &before),
         ] {
             bound[k] = Some(b.clone());
         }
@@ -414,6 +419,7 @@ impl GpuCloth {
                 &stitch_ranges,
                 edge_ranges.len() + bend_ranges.len(),
             ),
+            keep: make("keep", KEEP, &[], 0),
             collide: make("collide", COLLIDE, &[], 0),
             face_out: make("face_out", FACE_OUT, &[], 0),
             layers: make("order_layers", LAYERS, &[], 0),
@@ -707,9 +713,13 @@ impl Stepper for GpuCloth {
                 run_colours(&mut pass, &self.passes.edges);
                 run_colours(&mut pass, &self.passes.bends);
                 run_colours(&mut pass, &self.passes.stitches);
+                // Where the points are, kept: the middles of each point's
+                // triangles are felt from these, not from neighbours being
+                // moved off the body at the same time.
+                run(&mut pass, &self.passes.keep, self.n);
                 run(&mut pass, &self.passes.collide, self.n);
                 if layered {
-                    run(&mut pass, &self.passes.face_out, self.inside_from);
+                    run(&mut pass, &self.passes.face_out, self.n);
                     run(&mut pass, &self.passes.layers_out, self.inside_from);
                     run(&mut pass, &self.passes.layers, self.n - self.inside_from);
                 }

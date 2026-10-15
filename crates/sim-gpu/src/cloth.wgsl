@@ -3,9 +3,10 @@
 // their velocity and gravity; edges, bends and stitches are held, a colour
 // at a time (no two constraints of a colour share a point, so each colour
 // is solved at once); the cloth is kept off the body, with friction; cloth
-// inside (facings, linings) is kept behind the cloth over it; the
-// stitches are held again (so the body's friction cannot hold a seam open);
-// and the velocities are what the points did. Metres, seconds.
+// inside (facings, linings) is kept behind the cloth over it, where the two
+// face the same way; the stitches are held again (so the body's friction
+// cannot hold a seam open); and the velocities are what the points did.
+// Metres, seconds.
 
 struct Params {
     // Gravity (m/s²); w: the step, s.
@@ -78,7 +79,7 @@ struct Bend {
 @group(0) @binding(9) var<storage, read> around: array<u32>;
 @group(0) @binding(10) var<uniform> grids: Grids;
 @group(0) @binding(11) var<storage, read> fields: array<f32>;
-// The outside cloth's outward normal at each of its points.
+// The outward normal at each point, from its own layer's triangles.
 @group(0) @binding(12) var<storage, read_write> outward: array<vec4<f32>>;
 // Each inside point's outside points near it, as `around` is laid out.
 @group(0) @binding(13) var<storage, read> layers: array<u32>;
@@ -86,6 +87,10 @@ struct Bend {
 @group(0) @binding(14) var<storage, read> layers_out: array<u32>;
 // The way apart where a point rests on the other layer; w: 1 if it does.
 @group(0) @binding(15) var<storage, read_write> layered: array<vec4<f32>>;
+// Where each point was as the cloth came to be kept off the body: the
+// middles of its triangles found from these, whichever point is moved
+// first.
+@group(0) @binding(16) var<storage, read_write> before: array<vec4<f32>>;
 @group(1) @binding(0) var<uniform> range: Range;
 
 const FAR: f32 = 1e30;
@@ -289,12 +294,21 @@ fn felt(q: vec3<f32>) -> vec4<f32> {
 }
 
 @compute @workgroup_size(64)
+fn keep(@builtin(global_invocation_id) id: vec3<u32>) {
+    let k = id.x;
+    if k >= params.counts.x {
+        return;
+    }
+    before[k] = x[k];
+}
+
+@compute @workgroup_size(64)
 fn collide(@builtin(global_invocation_id) id: vec3<u32>) {
     let k = id.x;
     if k >= params.counts.x {
         return;
     }
-    var xk = x[k];
+    var xk = before[k];
     if xk.w == 0.0 {
         return;
     }
@@ -314,7 +328,7 @@ fn collide(@builtin(global_invocation_id) id: vec3<u32>) {
                 if t[c] == k {
                     corners = corners + xk.xyz;
                 } else {
-                    corners = corners + x[t[c]].xyz;
+                    corners = corners + before[t[c]].xyz;
                 }
             }
             at = corners / 3.0;
@@ -345,13 +359,14 @@ fn collide(@builtin(global_invocation_id) id: vec3<u32>) {
 fn face_out(@builtin(global_invocation_id) id: vec3<u32>) {
     let k = id.x;
     let first = params.counts.y;
-    if k >= first {
+    if k >= params.counts.x {
         return;
     }
+    let inside = k >= first;
     var sum = vec3<f32>(0.0);
     for (var q = around[k]; q < around[k + 1u]; q = q + 1u) {
         let t = tris[around[q]];
-        if t.x >= first || t.y >= first || t.z >= first {
+        if (t.x >= first) != inside || (t.y >= first) != inside || (t.z >= first) != inside {
             continue;
         }
         let a = x[t.x].xyz;
@@ -362,13 +377,15 @@ fn face_out(@builtin(global_invocation_id) id: vec3<u32>) {
     outward[k] = vec4<f32>(select(vec3<f32>(0.0), sum / l, l > 0.0), 0.0);
 }
 
-// How far inside point `xi` falls short of being behind outside point
-// `xj` (outward normal `n`) by `apart`; 0 where they are apart enough, or
-// not over each other.
-fn short_of(xi: vec3<f32>, xj: vec3<f32>, n: vec3<f32>) -> f32 {
+// How far inside point `xi` (outward normal `m`) falls short of being
+// behind outside point `xj` (outward normal `n`) by `apart`; 0 where they
+// are apart enough, or not over each other, or face opposite ways (one has
+// folded over, and which is behind which can't be told: as on the
+// processor, they are left be until the fold opens).
+fn short_of(xi: vec3<f32>, m: vec3<f32>, xj: vec3<f32>, n: vec3<f32>) -> f32 {
     let apart = params.b.x;
     let reach = params.b.y;
-    if dot(n, n) == 0.0 {
+    if dot(n, n) == 0.0 || dot(m, n) < 0.0 {
         return 0.0;
     }
     let off = xi - xj;
@@ -411,7 +428,7 @@ fn order_layers_out(@builtin(global_invocation_id) id: vec3<u32>) {
     for (var q = layers_out[j]; q < layers_out[j + 1u]; q = q + 1u) {
         let i = layers_out[q];
         let xi = x[i];
-        let short = short_of(xi.xyz, at, n);
+        let short = short_of(xi.xyz, outward[i].xyz, at, n);
         if short > 0.0 {
             let share = xj.w / (xi.w + xj.w);
             at = at + short * share * n;
@@ -440,11 +457,12 @@ fn order_layers(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
     var at = xi.xyz;
+    let m = outward[i].xyz;
     for (var q = layers[id.x]; q < layers[id.x + 1u]; q = q + 1u) {
         let j = layers[q];
         let xj = x[j];
         let n = outward[j].xyz;
-        let short = short_of(at, xj.xyz, n);
+        let short = short_of(at, m, xj.xyz, n);
         if short > 0.0 {
             let share = xi.w / (xi.w + xj.w);
             at = at - short * share * n;
