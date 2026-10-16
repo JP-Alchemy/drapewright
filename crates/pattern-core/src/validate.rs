@@ -274,6 +274,11 @@ fn all_points_finite(piece: &Piece) -> bool {
             .iter()
             .all(|l| l.start.is_finite() && l.segments.iter().all(seg_ok))
         && piece.labels.iter().all(|l| l.at.is_finite())
+        && piece
+            .source
+            .iter()
+            .flat_map(|s| &s.words)
+            .all(|w| w.at.is_finite() && w.size.is_finite() && w.angle.is_finite())
         && piece.allowance.seam.is_finite()
 }
 

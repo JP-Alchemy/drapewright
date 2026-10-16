@@ -790,6 +790,7 @@ fn piece_of(outline: &[P2], request: &PhotoRequest, sha256: &str) -> Piece {
             basis: ScaleBasis::Measured,
             confirmed: true,
         }),
+        words: Vec::new(),
     });
     piece
 }

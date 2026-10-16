@@ -211,6 +211,13 @@ pub fn all() -> Vec<Tool> {
             render_preview,
         ),
         tool(
+            "piece_labels",
+            "Words on the pieces",
+            Reads,
+            "The words printed on each piece in the PDF it was imported from, biggest first, each with what it seems to be: the piece's number, its cutting (\"Cut 2 on fold\"), an instruction, a size, a page's label, or words printed on most pieces (the pattern's title, the designer's name; listed once at the top). Sizes and page labels are left off unless all is true. namedIt marks the words the import named the piece by. The import names pieces by rules that a title, a translation (big pattern companies print each name in four languages, the translations smaller) or a stray note can fool: read the words, name each piece as the pattern does, in its language, and rename it with update_piece. Ask the user when unsure. Pieces drawn in several sizes carry the same words in each.",
+            crate::words::piece_labels,
+        ),
+        tool(
             "update_piece",
             "Update piece",
             Edits,
@@ -385,7 +392,7 @@ fn pt(p: Pt) -> [f64; 2] {
     [r1(p.x), r1(p.y)]
 }
 
-fn unknown_piece(id: &str) -> ToolError {
+pub(crate) fn unknown_piece(id: &str) -> ToolError {
     ToolError::new(format!(
         "There is no piece \"{id}\". project_summary lists the pieces and their ids."
     ))
@@ -1860,6 +1867,7 @@ fn create_piece(session: &mut Session, a: CreateArgs) -> Result<Output, ToolErro
         sha256: None,
         reference: None,
         scale: None,
+        words: Vec::new(),
     });
     if !session.is_open() {
         session.create("Untitled pattern", false)?;

@@ -455,6 +455,7 @@ pub fn import_dxf(data: &[u8], file_name: Option<&str>) -> Result<ImportResult, 
             basis: scale.chosen.basis,
             confirmed: scale.certain,
         }),
+        words: Vec::new(),
     };
 
     let aama = is_aama(&drawing);

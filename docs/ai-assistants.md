@@ -56,6 +56,9 @@ For example:
 > Drape it on my measurements in linen and show me how it fits. Where does
 > it pull when I reach forward?
 
+> Check the names of the pieces you just imported against the words printed
+> on them, and fix any that are wrong.
+
 To work on the project in Drapewright, open the saved `.drapewright` file
 with **Projects → Restore a backup…**, or **Open pattern**. To give an
 assistant a project from the app, save it with **Back up** and give the
@@ -87,6 +90,7 @@ assistant that file.
 | `inspect_pattern_file` | What an SVG, DXF or PDF holds (for a PDF, the pages read and those left out, and why), and the questions importing it needs answered |
 | `import_pattern` | Adds a file's pieces, with the answers to those questions; for a PDF, `pages` chooses the pages to read |
 | `get_piece` | One piece in full: edges, notches, grainline, marks, lines, position |
+| `piece_labels` | The words printed on each piece in the PDF it came from, biggest first, each marked as the piece's number, its cutting, an instruction, a size or the pattern's own words (title, designer), and which words named it: to name pieces the import named poorly |
 | `render_preview` | A picture of the pieces (PNG) with a legend |
 | `update_piece` | Name, seam allowance, cutting instructions |
 | `update_edge` | An edge's kind (seam, hem, fold), name, allowance and corner shape |

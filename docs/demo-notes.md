@@ -12,6 +12,46 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 73 — An assistant names pieces by the words printed on them
+
+The importer names each piece by rules: the biggest words beside its
+number, not the pattern's title, not a translation. Every such rule fixes
+one pattern and fools another (steps 67 to 71 kept finding more). An
+assistant reading all the words printed on a piece is not fooled. Now it
+can: the import keeps the words printed on each piece, and the MCP server
+has a tool to read them.
+
+**Try it:** with the assistant connected (`docs/ai-assistants.md`), ask it
+to import `fixtures/pdf/sizes-layers.pdf` (size 10) and then: *"Check the
+names of the pieces against the words printed on them."* It calls
+`piece_labels`, which lists for the Front bodice "FRONT BODICE" (the words
+that named it), "Cut 1 on fold" (its cutting) and "PLACE ON FOLD" (an
+instruction), biggest first. On a big company's pattern it lists each name
+in English and, smaller, its translations, and once, at the top, the words
+printed on most pieces (the pattern's title). Pieces drawn here, or
+imported before this step, say they have no words kept.
+
+**What changed:**
+
+* **The words are kept** with each piece imported from a PDF, as part of
+  where it came from (`source.words`: each line's text, where its middle
+  was on the piece, its letter height and which way it read). They are
+  never printed, and move with the piece when its scale is set again.
+  Projects are now schema version 7; earlier ones open as before, their
+  pieces with no words kept.
+* **`piece_labels`** lists them, marking each as the piece's number (set
+  in its biggest type), its cutting, an instruction, a size along its
+  lines or words printed on most pieces, and which words named it. Sizes
+  and the pattern's own words are left off each piece unless asked for.
+  The server's instructions tell an assistant to check names this way
+  after importing a PDF.
+
+Over the private test folder, the imports are the same as before (only the
+words are kept besides). SVG and DXF imports name pieces from their layers
+and blocks and keep no words yet.
+
+---
+
 ## Step 72 — The same drape on the graphics card in the browser, every time
 
 Step 66 made the graphics card's own work repeat exactly, but in the

@@ -28,7 +28,7 @@ const EARLIER_FORMAT: &str = "soom-project";
 type Migration = fn(&mut Value) -> Result<(), String>;
 
 /// `MIGRATIONS[i]` upgrades version `i + 1` to `i + 2`.
-const MIGRATIONS: &[Migration] = &[v1_to_v2, v2_to_v3, v3_to_v4, v4_to_v5, v5_to_v6];
+const MIGRATIONS: &[Migration] = &[v1_to_v2, v2_to_v3, v3_to_v4, v4_to_v5, v5_to_v6, v6_to_v7];
 
 /// Version 2 adds people's measurements: none yet.
 fn v1_to_v2(value: &mut Value) -> Result<(), String> {
@@ -71,6 +71,12 @@ fn v5_to_v6(value: &mut Value) -> Result<(), String> {
     object
         .entry("fabrics")
         .or_insert_with(|| Value::Array(Vec::new()));
+    Ok(())
+}
+
+/// Version 7 keeps the words printed on an imported piece with its source:
+/// none kept before.
+fn v6_to_v7(_: &mut Value) -> Result<(), String> {
     Ok(())
 }
 

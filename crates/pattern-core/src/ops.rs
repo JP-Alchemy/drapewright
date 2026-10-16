@@ -228,7 +228,8 @@ pub fn join_with_next(piece: &mut Piece, edge_id: &str) -> Result<(), OpError> {
 }
 
 /// Applies an affine map to every point of the piece's geometry (outline,
-/// grainline, marks, internal lines and labels). Distances stored along
+/// grainline, marks, internal lines, labels and the words printed on it in
+/// its file). Distances stored along
 /// edges (notches) and allowances are not changed. If the map mirrors, the
 /// outline is reversed so it keeps running clockwise.
 pub fn transform(piece: &mut Piece, affine: Affine) {
@@ -260,6 +261,15 @@ pub fn transform(piece: &mut Piece, affine: Affine) {
     }
     for l in &mut piece.labels {
         l.at = f(l.at);
+    }
+    // The words printed on it in its file, which way they read too.
+    if let Some(source) = &mut piece.source {
+        for w in &mut source.words {
+            let (s, c) = w.angle.to_radians().sin_cos();
+            let way = affine * kurbo::Point::new(c, s) - affine * kurbo::Point::ZERO;
+            w.angle = way.y.atan2(way.x).to_degrees();
+            w.at = f(w.at);
+        }
     }
     if affine.determinant() < 0.0 {
         // The piece as drawn was turned round already.
@@ -359,6 +369,33 @@ mod tests {
         assert_eq!(p.outline.edges[1].end_corner, CornerStyle::MirrorThis);
         assert!(p.outline.signed_area() < 0.0);
         assert_eq!(p.notches[0].from, NotchFrom::End);
+    }
+
+    #[test]
+    fn words_printed_on_a_piece_move_and_turn_with_it() {
+        let mut p = rect_piece();
+        p.source = Some(crate::Source {
+            format: crate::SourceFormat::Pdf,
+            file: None,
+            sha256: None,
+            reference: None,
+            scale: None,
+            words: vec![crate::PrintedText {
+                text: "FRONT".into(),
+                at: Pt::new(50.0, 20.0),
+                size: 5.0,
+                angle: 90.0,
+            }],
+        });
+        transform(&mut p, Affine::scale(2.0));
+        let w = &p.source.as_ref().unwrap().words[0];
+        assert_eq!(w.at, Pt::new(100.0, 40.0));
+        assert!((w.angle - 90.0).abs() < 1e-9);
+        // Mirrored across, it reads down still; turned a quarter, across.
+        transform(&mut p, Affine::FLIP_X);
+        assert!((p.source.as_ref().unwrap().words[0].angle - 90.0).abs() < 1e-9);
+        transform(&mut p, Affine::rotate(-std::f64::consts::FRAC_PI_2));
+        assert!(p.source.as_ref().unwrap().words[0].angle.abs() < 1e-9);
     }
 
     #[test]

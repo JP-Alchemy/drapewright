@@ -11,7 +11,7 @@ use drapewright_pattern_core::geom::{
     unit_tangent,
 };
 use drapewright_pattern_core::{
-    CutInstruction, Grainline, Mark, MarkKind, Piece, Pt, ScaleBasis, SourceFormat,
+    CutInstruction, Grainline, Mark, MarkKind, Piece, PrintedText, Pt, ScaleBasis, SourceFormat,
 };
 use drapewright_pdf_import::{Document, Page, Shape, TextRun};
 use kurbo::{
@@ -404,6 +404,35 @@ fn says_fold(t: &str) -> bool {
         || t.split(|c: char| !c.is_alphanumeric()).any(|w| w == "pli")
 }
 
+/// What a line printed on a piece says, as the importer reads it.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PrintedReading {
+    /// A piece's number set out in big type ("- 4 -", "#12").
+    pub number: bool,
+    /// How many to cut, if it says ("Cut 2 on fold", "Cortar 1 al lomo").
+    pub cutting: Vec<CutInstruction>,
+    /// Words saying what to do with the piece rather than what it is.
+    pub instruction: bool,
+    /// The size it names, if it reads as one ("10", "XS", "Size 12").
+    pub size: Option<String>,
+    /// A page's label, for putting the pages together ("4A", "Page 11").
+    pub page: bool,
+}
+
+/// Reads a line printed on a piece: whether it is a piece's number, its
+/// cutting, an instruction or a size. What is none of these may be its
+/// name.
+pub fn read_printed(text: &str) -> PrintedReading {
+    PrintedReading {
+        number: is_piece_number(text),
+        cutting: cuts_from_label(text),
+        instruction: is_instruction(text),
+        size: size_name(text),
+        page: pagelabels::tile_label(text).is_some()
+            || text.trim().to_lowercase().starts_with("page "),
+    }
+}
+
 /// Words that say what to do with a piece, rather than what it is.
 fn is_instruction(text: &str) -> bool {
     let t = text.to_lowercase();
@@ -673,6 +702,20 @@ pub(crate) fn read_labels(pieces: &mut [Piece], labels: &[Label]) {
             && let Some(name) = name_label.and_then(|l| meaningful_name(&name_read_on(l, &inside)))
         {
             piece.name = sentence_case(&name);
+        }
+        // The words printed on it, kept with where it came from, to name it
+        // again (lettering read from strokes may be anything: not kept).
+        if let Some(source) = &mut piece.source {
+            source.words = inside
+                .iter()
+                .filter(|l| l.naming != Naming::Never)
+                .map(|l| PrintedText {
+                    text: l.text.clone(),
+                    at: Pt::from(l.at),
+                    size: l.size,
+                    angle: l.dir.y.atan2(l.dir.x).to_degrees(),
+                })
+                .collect();
         }
         let cuts: Vec<CutInstruction> = inside
             .iter()
@@ -2478,6 +2521,18 @@ mod tests {
         assert_eq!(centre_line("Centre back fold"), Some("Centre back"));
         assert_eq!(centre_line("Front"), None);
         assert_eq!(centre_line("Centrepiece"), None);
+    }
+
+    #[test]
+    fn printed_lines_read_as_numbers_cutting_sizes_and_page_labels() {
+        assert!(read_printed("- 4 -").number);
+        assert_eq!(read_printed("Cut 2 on fold").cutting[0].quantity, 2);
+        assert_eq!(read_printed("Size 12").size.as_deref(), Some("12"));
+        assert!(read_printed("Page 11").page);
+        assert!(read_printed("4A").page);
+        let name = read_printed("Front skirt");
+        assert!(!name.number && name.cutting.is_empty() && !name.instruction && !name.page);
+        assert!(name.size.is_none());
     }
 
     #[test]

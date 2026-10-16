@@ -357,6 +357,9 @@ impl ImportResult {
                     mark.size = mark.size.map(|s| s * factor);
                     mark.length = mark.length.map(|l| l * factor);
                 }
+                for word in piece.source.iter_mut().flat_map(|s| &mut s.words) {
+                    word.size *= factor;
+                }
                 if detected.contains(&piece.id) {
                     piece.allowance.seam *= factor;
                     piece.allowance.hem = piece.allowance.hem.map(|h| h * factor);

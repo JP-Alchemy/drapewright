@@ -795,3 +795,54 @@ fn an_assistant_drapes_a_shirt_done_up_and_sees_it_move() {
         "{posed}"
     );
 }
+
+#[test]
+fn an_assistant_reads_the_words_printed_on_the_pieces() {
+    let mut s = server();
+    ok(
+        &mut s,
+        "import_pattern",
+        json!({
+            "path": fixture("pdf/sizes-layers.pdf"),
+            "sizes": ["10"],
+            "seam_allowance": { "included": false, "width_mm": 15 },
+        }),
+    );
+    let summary = ok_json(&mut s, "project_summary", json!({}));
+    let bodice = piece_id(&summary, "Front bodice");
+    let labels = ok_json(&mut s, "piece_labels", json!({ "pieces": [bodice] }));
+    let words = labels["pieces"][0]["words"].as_array().unwrap();
+    let find = |text: &str| {
+        words
+            .iter()
+            .find(|w| w["text"] == text)
+            .unwrap_or_else(|| panic!("no {text}: {words:?}"))
+    };
+    // Biggest first: the name, which named the piece.
+    assert_eq!(words[0]["text"], "FRONT BODICE");
+    assert_eq!(find("FRONT BODICE")["namedIt"], true);
+    assert_eq!(find("FRONT BODICE")["kind"], "words");
+    assert_eq!(find("Cut 1 on fold")["kind"], "cutting");
+    assert_eq!(find("PLACE ON FOLD")["kind"], "instruction");
+    assert!(find("FRONT BODICE")["letterMm"].as_f64().unwrap() > 4.0);
+
+    // A piece drawn here has no words kept; an unknown one is said so.
+    ok(
+        &mut s,
+        "create_piece",
+        json!({ "name": "Pocket", "rectangle": { "width_mm": 150, "height_mm": 180 } }),
+    );
+    let all = ok_json(&mut s, "piece_labels", json!({}));
+    assert_eq!(all["pieces"].as_array().unwrap().len(), 2);
+    let none = all["noWordsKept"].as_array().unwrap();
+    assert_eq!(none.len(), 1);
+    assert_eq!(none[0]["name"], "Pocket");
+    assert!(
+        none[0]["why"]
+            .as_str()
+            .unwrap()
+            .contains("not imported from a PDF")
+    );
+    let e = fails(&mut s, "piece_labels", json!({ "pieces": ["nope"] }));
+    assert!(e.contains("project_summary"), "{e}");
+}

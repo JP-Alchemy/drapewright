@@ -1,6 +1,6 @@
 # The Drapewright project format
 
-Status: **schema version 6** (Phase 4). Sections marked *draft* describe
+Status: **schema version 7** (Phase 4). Sections marked *draft* describe
 how later phases will extend the format; they become normative, with a
 version bump and a migration, when they are implemented.
 
@@ -300,7 +300,8 @@ changes a piece's shape or its printed result.
   "file": "skirt.svg",
   "sha256": "9b2f…",
   "ref": "path#front-outline",
-  "scale": { "mmPerUnit": 0.264583, "basis": "declaredUnits", "confirmed": true }
+  "scale": { "mmPerUnit": 0.264583, "basis": "declaredUnits", "confirmed": true },
+  "words": [{ "text": "FRONT FACING -A,B", "at": [140.2, 210.5], "size": 6.35, "angle": -90 }]
 }
 ```
 
@@ -312,6 +313,7 @@ changes a piece's shape or its printed result.
 | `scale.mmPerUnit` | Millimetres per source unit used at import. |
 | `scale.basis` | How the scale was established: `declaredUnits` (file states physical units), `assumed96dpi`, `assumed72dpi`, `assumed90dpi` (drawings without units), `assumedMm`, `assumedCm`, `assumedInches` (CAD drawings without units), `measured` (the user measured a known length). |
 | `scale.confirmed` | Whether the user confirmed the scale. Imports never proceed with an unconfirmed guess. |
+| `words` | The lines of text printed on the piece in its file (version 7): `text`, `at` (its middle, in the piece's own frame, mm), `size` (letter height, mm) and `angle` (degrees clockwise from across, y down). What the file called the piece and said about it, kept so it can be named again; never printed. Default `[]`; kept for PDF imports. |
 
 ### 4.13 Alterations (version 5)
 
@@ -537,6 +539,7 @@ Non-semantic: readers may ignore it.
 | 4 | A measurement set's `age` (§10.2). Earlier files leave it unknown. |
 | 5 | A piece's `alterations` and `drawn` (§4.13), and its `darts` (§4.14). Earlier pieces have none. |
 | 6 | `fabrics` (§10.5): fabrics of one's own. Earlier files have none. |
+| 7 | A piece source's `words` (§4.12): the text printed on it in its file. Earlier pieces keep none. |
 
 ## 9. Validation
 

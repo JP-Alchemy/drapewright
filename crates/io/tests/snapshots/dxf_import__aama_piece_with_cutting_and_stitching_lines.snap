@@ -141,7 +141,8 @@ expression: r
           "mmPerUnit": 1.0,
           "basis": "assumedMm",
           "confirmed": false
-        }
+        },
+        "words": []
       },
       "alterations": [],
       "drawn": null
@@ -261,7 +262,8 @@ expression: r
           "mmPerUnit": 1.0,
           "basis": "assumedMm",
           "confirmed": false
-        }
+        },
+        "words": []
       },
       "alterations": [],
       "drawn": null

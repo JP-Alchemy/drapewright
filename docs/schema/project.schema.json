@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Drapewright project (project.json)",
-  "description": "A Drapewright sewing pattern project, schema version 6. See docs/file-format.md.",
+  "description": "A Drapewright sewing pattern project, schema version 7. See docs/file-format.md.",
   "type": "object",
   "properties": {
     "extensions": {
@@ -1494,6 +1494,35 @@
         }
       }
     },
+    "PrintedText": {
+      "description": "A line of text printed on a piece in the file it came from.",
+      "type": "object",
+      "properties": {
+        "angle": {
+          "description": "Which way it read, degrees clockwise from across (y down).",
+          "type": "number",
+          "format": "double",
+          "default": 0.0
+        },
+        "at": {
+          "description": "Where its middle was, in the piece's own frame, mm.",
+          "$ref": "#/$defs/Pt"
+        },
+        "size": {
+          "description": "Letter height, mm.",
+          "type": "number",
+          "format": "double"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "at",
+        "size"
+      ]
+    },
     "Pt": {
       "description": "A point `[x, y]` in millimetres; y points down.",
       "type": "array",
@@ -1685,6 +1714,14 @@
             "null"
           ],
           "default": null
+        },
+        "words": {
+          "description": "The words printed on the piece in its file, as they were: what the\nfile called it and said about it. Kept to name it again; never\nprinted.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PrintedText"
+          }
         }
       },
       "required": [

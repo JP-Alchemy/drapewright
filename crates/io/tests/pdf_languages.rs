@@ -104,3 +104,32 @@ fn cutting_on_the_fold_is_read_in_spanish() {
     assert_eq!(back.cut[0].quantity, 1);
     assert_eq!(back.cut[0].on_fold, Some(true));
 }
+
+#[test]
+fn the_words_printed_on_a_piece_are_kept_with_it() {
+    let result = import_pdf(&sheet(), Some("words.pdf")).unwrap();
+    let facing = named(&result.pieces, "Front facing");
+    let words = &facing.source.as_ref().unwrap().words;
+    let mut texts: Vec<&str> = words.iter().map(|w| w.text.as_str()).collect();
+    texts.sort_unstable();
+    assert_eq!(
+        texts,
+        [
+            "4",
+            "FRONT FACING",
+            "PAREMENTURE DEVANT",
+            "V1234",
+            "VISTA DEL FRENTE"
+        ]
+    );
+    let name = words.iter().find(|w| w.text == "FRONT FACING").unwrap();
+    // 11 points tall, across the page, its middle on the piece.
+    assert!(
+        (name.size - 11.0 * 25.4 / 72.0).abs() < 0.01,
+        "{}",
+        name.size
+    );
+    assert!(name.angle.abs() < 1e-9);
+    let b = facing.outline.bounds();
+    assert!(b.contains(kurbo::Point::new(name.at.x, name.at.y)));
+}

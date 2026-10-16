@@ -17,6 +17,6 @@ mod text;
 mod tiles;
 mod write;
 
-pub use import::{import_pdf, import_pdf_pages};
+pub use import::{PrintedReading, import_pdf, import_pdf_pages, read_printed};
 pub use plan::{PlannedPage, PrintError, PrintPlan, SheetPlacement, plan_print};
 pub use write::{PdfTexts, export_pdf};

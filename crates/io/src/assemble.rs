@@ -1363,6 +1363,7 @@ pub(crate) fn assemble(
             basis: scale.chosen.basis,
             confirmed: scale.certain,
         }),
+        words: Vec::new(),
     };
 
     // Open paths that became stitching lines.

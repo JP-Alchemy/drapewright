@@ -109,7 +109,8 @@ expression: r
           "mmPerUnit": 0.26458333333333334,
           "basis": "declaredUnits",
           "confirmed": true
-        }
+        },
+        "words": []
       },
       "alterations": [],
       "drawn": null

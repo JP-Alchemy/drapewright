@@ -459,6 +459,26 @@ pub struct Source {
     pub reference: Option<String>,
     #[serde(default)]
     pub scale: Option<SourceScale>,
+    /// The words printed on the piece in its file, as they were: what the
+    /// file called it and said about it. Kept to name it again; never
+    /// printed.
+    #[serde(default)]
+    pub words: Vec<PrintedText>,
+}
+
+/// A line of text printed on a piece in the file it came from.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct PrintedText {
+    pub text: String,
+    /// Where its middle was, in the piece's own frame, mm.
+    pub at: Pt,
+    /// Letter height, mm.
+    pub size: f64,
+    /// Which way it read, degrees clockwise from across (y down).
+    #[serde(default)]
+    pub angle: f64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]

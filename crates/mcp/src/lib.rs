@@ -13,6 +13,7 @@ mod render;
 mod session;
 mod text;
 mod tools;
+mod words;
 mod worn;
 
 use serde_json::{Value, json};
@@ -29,6 +30,7 @@ const INSTRUCTIONS: &str = "Drapewright is a sewing pattern studio. This server 
 - All lengths are millimetres. Points are [x, y] with y pointing down, in a piece's own frame unless a tool says the work table.
 - Start with project_summary, open_project, new_project, or inspect_pattern_file and import_pattern.
 - Use render_preview to see the pieces; with labels \"edges\" it shows every edge's id, which update_edge, add_notch and split_edge take.
+- After importing a PDF, read the words printed on the pieces with piece_labels and rename any piece the import named poorly (\"Piece 7\", the pattern's title, a translation) with update_piece.
 - Never guess what the user should decide. When a file holds several sizes, doesn't say how big it is, or may or may not include seam allowance, ask the user and pass their answer.
 - Each tool call is one undo step (undo, redo). Nothing is saved until save_project.
 - Seam allowance terms: \"add\" means the outline is the stitching line and allowance goes outside it; \"included\" means the outline is the cutting line. Fold edges get no allowance.";
