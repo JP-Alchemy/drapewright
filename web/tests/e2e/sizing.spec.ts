@@ -76,8 +76,8 @@ test('a size at the waist and another at the hip, blended between', async ({ pag
   await expect(
     page.getByText('2 pieces blended between sizes: 36 at the waist and 42 at the hip.'),
   ).toBeVisible()
-  const list = page.getByRole('listbox', { name: 'Pieces' })
-  await expect(list.getByRole('option')).toHaveText([/^Skirt front/, /^Skirt back/])
+  const list = page.getByRole('treegrid', { name: 'Pieces' })
+  await expect(list.getByRole('row', { level: 1 })).toHaveText([/^Skirt front/, /^Skirt back/])
   // The front: size 36's waist (170 mm), size 42's hem (285 mm).
   const widths = await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -76,6 +76,7 @@ export class Engine {
   #state: EngineState
   #document: { revision: number; value: Document } | null = null
   #seamReports: { revision: number; value: SeamReport[] } | null = null
+  #suggestions: { revision: number; value: Suggestion[] } | null = null
 
   private constructor(handle: EngineHandle) {
     this.#handle = handle
@@ -165,9 +166,17 @@ export class Engine {
     return cached.value
   }
 
-  /** Seams likely among the edges not sewn yet, most likely first. */
+  /** Seams likely among the edges not sewn yet, most likely first; once per revision. */
   suggestSeams(): Suggestion[] {
-    return this.#handle.suggestSeams() as Suggestion[]
+    let cached = this.#suggestions
+    if (cached?.revision !== this.#state.revision) {
+      cached = {
+        revision: this.#state.revision,
+        value: this.#handle.suggestSeams() as Suggestion[],
+      }
+      this.#suggestions = cached
+    }
+    return cached.value
   }
 
   /**

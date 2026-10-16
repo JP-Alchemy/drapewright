@@ -56,8 +56,8 @@ test('a piece is lengthened, switched off, shortened instead, and as drawn again
   await page.goto('/app/')
   // The test blouse: its front and back 60 cm long, sewn at the sides.
   await page.getByTestId('pattern-file').setInputFiles(fixture('blouse.drapewright'))
-  const pieces = page.getByRole('listbox', { name: 'Pieces' })
-  const front = pieces.getByRole('option', { name: /Blouse front/ })
+  const pieces = page.getByRole('treegrid', { name: 'Pieces' })
+  const front = pieces.getByRole('row', { name: /Blouse front/, level: 1 })
   await expect(front).toContainText('25.5 cm × 60.0 cm')
   await front.click()
 
@@ -66,7 +66,8 @@ test('a piece is lengthened, switched off, shortened instead, and as drawn again
   await expect(front).toContainText('25.5 cm × 61.0 cm')
   const step = page.getByRole('switch', { name: 'Lengthened by 1.0 cm' })
   await expect(step).toBeChecked()
-  await expect(page.getByText(/the first side 1\.0 cm longer/).first()).toBeVisible()
+  await pieces.getByRole('row', { name: 'Blouse back, edge 4 ↔ edge 4', level: 2 }).click()
+  await expect(page.getByText(/the first side 1\.0 cm longer/)).toBeVisible()
 
   // Switched off, the piece is as drawn; on again, lengthened.
   const label = page.getByText('Lengthened by 1.0 cm', { exact: true })
@@ -98,8 +99,9 @@ test('a bust adjustment is placed by tapping the bust point, armhole and side se
 }) => {
   await page.goto('/app/?debug')
   await page.getByTestId('pattern-file').setInputFiles(fixture('blouse.drapewright'))
-  const front = page.getByRole('listbox', { name: 'Pieces' }).getByRole('option', {
+  const front = page.getByRole('treegrid', { name: 'Pieces' }).getByRole('row', {
     name: /Blouse front/,
+    level: 1,
   })
   await front.click()
   /** Where a point of the front (its own mm) is on the page. */
@@ -142,6 +144,10 @@ test('a bust adjustment is placed by tapping the bust point, armhole and side se
   await expect(front).not.toContainText('25.5 cm × 60.0 cm')
   await expect(front).toContainText(/2[6-9]\.\d cm × 6[1-3]\.\d cm/)
   // The side seam measured with the new dart closed: as long as the back's.
+  await page
+    .getByRole('treegrid', { name: 'Pieces' })
+    .getByRole('row', { name: 'Blouse back, edge 4 ↔ edge 4', level: 2 })
+    .click()
   await expect(page.getByText(/^Same length, 38\.\d cm/)).toBeVisible()
   // Its dart pivoted to the armhole: the piece's only dart, so only where
   // it goes is tapped (halfway up the armhole's part above the hinge).
@@ -188,8 +194,8 @@ test('shoulders are made broader by tapping the shoulder seam and the armhole', 
   await page.goto('/app/?debug')
   await page.getByTestId('pattern-file').setInputFiles(fixture('blouse.drapewright'))
   await page
-    .getByRole('listbox', { name: 'Pieces' })
-    .getByRole('option', { name: /Blouse front/ })
+    .getByRole('treegrid', { name: 'Pieces' })
+    .getByRole('row', { name: /Blouse front/, level: 1 })
     .click()
   // The shoulder in the middle of the table, clear of the prompt at its top left.
   await page.evaluate(() => {
@@ -232,9 +238,9 @@ test('shoulders are made broader by tapping the shoulder seam and the armhole', 
 test('a swayback and a waist are adjusted on a skirt', async ({ page }) => {
   await page.goto('/app/?debug')
   await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
-  const pieces = page.getByRole('listbox', { name: 'Pieces' })
+  const pieces = page.getByRole('treegrid', { name: 'Pieces' })
   // The back: its centre back a seam, (0, 616) up to (0, 0).
-  await pieces.getByRole('option', { name: /Skirt back/ }).click()
+  await pieces.getByRole('row', { name: /Skirt back/, level: 1 }).click()
   await addStep(page, 'Swayback')
   await expect(page.getByText('Tap the centre back where the wedge is taken out.')).toBeVisible()
   const side = await onCurve(page, 1, 1, 0.15)
@@ -242,7 +248,7 @@ test('a swayback and a waist are adjusted on a skirt', async ({ page }) => {
   await tapOn(page, 1, side)
   await expect(page.getByRole('switch', { name: 'Swayback, 1.5 cm taken out' })).toBeChecked()
   // A front cut on the fold: let out at the side seam, tapering to the hip.
-  await pieces.getByRole('option', { name: /Skirt front/ }).click()
+  await pieces.getByRole('row', { name: /Skirt front/, level: 1 }).click()
   await addStep(page, 'Waist')
   await tapOn(page, 0, await onCurve(page, 0, 1, 0.02))
   await tapOn(page, 0, await onCurve(page, 0, 1, 0.3))
@@ -260,9 +266,9 @@ test('a knit cut from a fabric that stretches more is made smaller, on every pie
 }) => {
   await page.goto('/app/')
   await page.getByTestId('pattern-file').setInputFiles(fixture('blouse.drapewright'))
-  const pieces = page.getByRole('listbox', { name: 'Pieces' })
-  const front = pieces.getByRole('option', { name: /Blouse front/ })
-  const back = pieces.getByRole('option', { name: /Blouse back/ })
+  const pieces = page.getByRole('treegrid', { name: 'Pieces' })
+  const front = pieces.getByRole('row', { name: /Blouse front/, level: 1 })
+  const back = pieces.getByRole('row', { name: /Blouse back/, level: 1 })
   await front.click()
 
   // Made for a fabric that stretches 20%, cut from one that stretches 20%: as drawn.

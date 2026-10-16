@@ -27,8 +27,8 @@ test('work is saved on the device and comes back after a reload', async ({ page 
 
   await page.reload()
   await expect(page.getByRole('button', { name: /open now: Skirt for Anna/ })).toBeVisible()
-  const list = page.getByRole('listbox', { name: 'Pieces' })
-  await expect(list.getByRole('option')).toHaveCount(2)
+  const list = page.getByRole('treegrid', { name: 'Pieces' })
+  await expect(list.getByRole('row', { level: 1 })).toHaveCount(2)
   await expect(page.getByTestId('save-status')).toHaveText('Saved')
 })
 
@@ -43,7 +43,9 @@ test('projects can be switched, backed up, restored and deleted', async ({ page 
   await page.getByRole('button', { name: projectsButton }).click()
   const dialog = page.getByRole('dialog', { name: 'Projects' })
   await dialog.getByRole('button', { name: /Untitled pattern.*1 piece/ }).click()
-  await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(1)
+  await expect(
+    page.getByRole('treegrid', { name: 'Pieces' }).getByRole('row', { level: 1 }),
+  ).toHaveCount(1)
 
   // Back up: a .drapewright file with the project and the SVG it came from.
   const download = page.waitForEvent('download')
@@ -63,7 +65,9 @@ test('projects can be switched, backed up, restored and deleted', async ({ page 
   await expect(
     page.getByRole('button', { name: /open now: Untitled pattern \(restored\)/ }),
   ).toBeVisible()
-  await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(1)
+  await expect(
+    page.getByRole('treegrid', { name: 'Pieces' }).getByRole('row', { level: 1 }),
+  ).toHaveCount(1)
 
   // Delete the original, after confirming.
   await page.getByRole('button', { name: projectsButton }).click()
@@ -134,5 +138,7 @@ test('projects saved before the rename (as Soom) still open', async ({ page }) =
   await expect(
     page.getByRole('button', { name: /open now: Saved before the rename/ }),
   ).toBeVisible()
-  await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(2)
+  await expect(
+    page.getByRole('treegrid', { name: 'Pieces' }).getByRole('row', { level: 1 }),
+  ).toHaveCount(2)
 })

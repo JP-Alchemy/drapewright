@@ -12,7 +12,7 @@ const saved = (page: import('@playwright/test').Page) =>
 test('Phase 1 walk-through: open, adjust, mark, print, and find it again', async ({ page }) => {
   // Open a pattern drawn on its stitching line.
   await openWithFixture(page, 'flared-skirt.svg', 'Add the piece')
-  await page.getByRole('option', { name: /Flared skirt front/ }).click()
+  await page.getByRole('row', { name: /Flared skirt front/, level: 1 }).click()
 
   // A little more seam allowance, a 4 cm hem.
   await page.getByRole('button', { name: 'Increase Seam allowance' }).click()
@@ -31,7 +31,7 @@ test('Phase 1 walk-through: open, adjust, mark, print, and find it again', async
   await page.mouse.click(side.x, side.y)
   expect((await notchesOf(page, 0)).notches).toHaveLength(1)
   await page.keyboard.press('v')
-  await page.getByRole('option', { name: /Flared skirt front/ }).click()
+  await page.getByRole('row', { name: /Flared skirt front/, level: 1 }).click()
   await page.getByRole('button', { name: 'Add a straight grainline' }).click()
 
   // Print it.
@@ -69,7 +69,9 @@ test('works offline after the first visit', async ({ page, context }, info) => {
   const dialog = page.getByRole('dialog')
   await dialog.getByText('Not included', { exact: true }).click()
   await dialog.getByRole('button', { name: 'Add 2 pieces' }).click()
-  await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(2)
+  await expect(
+    page.getByRole('treegrid', { name: 'Pieces' }).getByRole('row', { level: 1 }),
+  ).toHaveCount(2)
   await context.setOffline(false)
 })
 

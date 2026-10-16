@@ -14,11 +14,19 @@ import type {
   PhotoRequest,
   Piece,
   ScaleOption,
+  Seam,
+  SeamSide,
   Traced,
 } from '@drapewright/engine'
 import { buildPaths } from '../canvas/paths.ts'
-import { type ScenePiece, sceneBounds } from '../canvas/renderer.ts'
-import { NOMINAL_PX_PER_MM, type ViewportState, fit, initialViewport } from '../canvas/viewport.ts'
+import { type ScenePiece, sceneBounds, sidesBounds } from '../canvas/renderer.ts'
+import {
+  NOMINAL_PX_PER_MM,
+  type ViewportState,
+  fit,
+  initialViewport,
+  reveal,
+} from '../canvas/viewport.ts'
 import { t } from '../strings/en.ts'
 import { saveScreenScale } from '../platform/screen.ts'
 import type { Projects } from '../storage/projects.ts'
@@ -148,8 +156,13 @@ export interface UiState {
   toast: string | null
   /** Whether this screen's true size has been measured (see `setScreenScale`). */
   screenMeasured: boolean
-  /** The seam picked in the seam list, drawn stronger. */
+  /**
+   * The seam picked (under a piece in the list, or from an edge it sews):
+   * its edges drawn stronger and joined by a line across the table.
+   */
   seam: string | null
+  /** A suggested seam shown on the table, its edges joined by a dashed line. */
+  suggestion: Seam | null
   /** An edge waiting for the edge it is to be sewn to: the next edge tapped. */
   sewing: { piece: string; edge: string } | null
   /** The 3D view of the avatar is open beside the table. */
@@ -203,6 +216,7 @@ export class Session {
       toast: null,
       screenMeasured: screenScale !== null,
       seam: null,
+      suggestion: null,
       sewing: null,
       avatar: false,
       projector: false,
@@ -253,6 +267,12 @@ export class Session {
     }
     if (ui.seam && !doc.seams.some((s) => s.id === ui.seam)) {
       this.ui.set((s) => ({ ...s, seam: null }))
+    }
+    const shown = ui.suggestion
+    const edgeAlive = (side: SeamSide) =>
+      doc.pieces.some((p) => p.id === side.piece && p.outline.edges.some((e) => e.id === side.edge))
+    if (shown && !(edgeAlive(shown.a) && edgeAlive(shown.b))) {
+      this.ui.set((s) => ({ ...s, suggestion: null }))
     }
     const sewing = ui.sewing
     if (sewing && !doc.pieces.some((p) => p.id === sewing.piece)) {
@@ -336,12 +356,62 @@ export class Session {
   }
 
   select(ids: Iterable<string>, part: PartRef | null = null): void {
-    if (this.ui.get().sewing && part?.kind === 'edge') this.#sewTo(part.piece, part.edge)
-    this.ui.set((s) => ({ ...s, selection: new Set(ids), part }))
+    if (this.ui.get().sewing && part?.kind === 'edge' && this.#sewTo(part.piece, part.edge)) return
+    const selection = new Set(ids)
+    const [only] = selection.size === 1 ? selection : []
+    const seams = this.engine.document().seams
+    this.ui.set((s) => {
+      const picked = seams.find((seam) => seam.id === s.seam)
+      return {
+        ...s,
+        selection,
+        part,
+        // The picked seam stays while one of its pieces is chosen on its
+        // own, none of its parts chosen: moved, say, to lie by the other.
+        seam: picked && part === null && only !== undefined && sews(picked, only) ? s.seam : null,
+        suggestion: selection.size > 0 ? s.suggestion : null,
+      }
+    })
   }
 
-  selectSeam(seam: string | null): void {
-    this.ui.set((s) => ({ ...s, seam }))
+  /**
+   * Picks a seam on one of its pieces (`piece`; else the piece chosen, if
+   * it is one of them; else its first side's), which is chosen: its edges
+   * are drawn joined, and the view moves if it must to show them both.
+   * Null puts the picked seam down.
+   */
+  selectSeam(seam: string | null, piece?: string): void {
+    const picked = this.engine.document().seams.find((s) => s.id === seam)
+    if (!picked) {
+      this.ui.set((s) => ({ ...s, seam: null }))
+      return
+    }
+    const { selection } = this.ui.get()
+    const [only] = selection.size === 1 ? selection : []
+    const on = piece ?? (only !== undefined && sews(picked, only) ? only : picked.a.piece)
+    this.ui.set((s) => ({
+      ...s,
+      selection: new Set([on]),
+      part: null,
+      seam: picked.id,
+      suggestion: null,
+    }))
+    this.#show([picked.a, picked.b])
+  }
+
+  /**
+   * Shows a suggested seam on the table, its edges joined by a dashed line,
+   * moving the view if it must to show them both; null stops showing it.
+   */
+  showSuggestion(suggestion: Seam | null): void {
+    this.ui.set((s) => ({ ...s, suggestion, seam: suggestion ? null : s.seam }))
+    if (suggestion) this.#show([suggestion.a, suggestion.b])
+  }
+
+  /** Moves the view, if it must, to show the edges these sides of a seam sew. */
+  #show(sides: SeamSide[]): void {
+    const r = sidesBounds(this.scene(), sides)
+    if (r) this.setViewport((v) => reveal(v, r))
   }
 
   /** Waits for the edge to sew this one to: the next edge tapped. */
@@ -354,19 +424,20 @@ export class Session {
   }
 
   /**
-   * Sews the waiting edge to this one, the right way round. The same edge
-   * again, on a piece cut as a pair, is sewn to its other half.
+   * Sews the waiting edge to this one, the right way round, and picks the
+   * seam to show it sewn. The same edge again, on a piece cut as a pair, is
+   * sewn to its other half. Whether it was sewn.
    */
-  #sewTo(piece: string, edge: string): void {
+  #sewTo(piece: string, edge: string): boolean {
     const from = this.ui.get().sewing
-    if (!from) return
+    if (!from) return false
     this.cancelSewing()
     const doc = this.engine.document()
     const same = from.piece === piece && from.edge === edge
     const pair = doc.pieces
       .find((p) => p.id === piece)
       ?.cut.some((c) => c.quantity >= 2 && c.mirrored !== false)
-    if (same && !pair) return
+    if (same && !pair) return false
     const a = { piece: from.piece, edge: from.edge, from: null, to: null, mirror: false }
     const b = { piece, edge, from: null, to: null, mirror: same }
     const reversed = !same && this.engine.sewnReversed(a, b)
@@ -375,9 +446,10 @@ export class Session {
       seams: [{ id: '', name: '', a, b, reversed, ease: 'even', confirmed: true }],
     })
     if (sewn) {
-      this.selectSeam(this.engine.document().seams.at(-1)?.id ?? null)
+      this.selectSeam(this.engine.document().seams.at(-1)?.id ?? null, piece)
       this.toast(t.seams.sewn)
     }
+    return sewn
   }
 
   setHover(hover: Hit | null): void {
@@ -702,6 +774,9 @@ export class Session {
     }))
   }
 }
+
+/** Whether a seam sews an edge of this piece. */
+const sews = (seam: Seam, piece: string) => seam.a.piece === piece || seam.b.piece === piece
 
 function outlinePoints(p: Piece): [number, number][] {
   return [

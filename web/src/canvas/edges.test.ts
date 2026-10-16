@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { stretch } from './edges.ts'
+import { joinCurve, stretch } from './edges.ts'
 
 describe('stretch', () => {
   // The top of a square drawn clockwise on screen, left to right.
@@ -26,5 +26,25 @@ describe('stretch', () => {
     const s = stretch(top, 1, 0)
     expect(s.points[0]).toEqual([0, 0])
     expect(s.points.at(-1)).toEqual([100, 0])
+  })
+})
+
+describe('joinCurve', () => {
+  it('leaves each edge outwards, further for edges further apart', () => {
+    // A front's right side facing a back's left side, 300 mm apart.
+    const c = joinCurve([0, 0], [1, 0], [300, 0], [-1, 0])!
+    expect(c[0]).toEqual([0, 0])
+    expect(c[1]).toEqual([105, 0])
+    expect(c[2]).toEqual([195, 0])
+    expect(c[3]).toEqual([300, 0])
+  })
+
+  it('reaches out at least 20 mm, and at most 150 mm', () => {
+    expect(joinCurve([0, 0], [0, -1], [10, 0], [0, -1])![1]).toEqual([0, -20])
+    expect(joinCurve([0, 0], [0, 1], [2000, 0], [0, 1])![2]).toEqual([2000, 150])
+  })
+
+  it('joins nothing where the middles meet', () => {
+    expect(joinCurve([5, 5], [1, 0], [5.5, 5], [-1, 0])).toBeNull()
   })
 })

@@ -68,3 +68,22 @@ export function stretch(points: P[], from: number, to: number): { points: P[]; m
     out: [(b[1] - a[1]) / length, -(b[0] - a[0]) / length],
   }
 }
+
+/**
+ * The curve joining two sewn edges across the table, from the middle of
+ * one (`a`, the way out of its piece there `aOut`) to the middle of the
+ * other: it leaves each edge outwards, as a thread pulled from one edge to
+ * the other would. A cubic Bézier's points, mm; none where the two middles
+ * meet.
+ */
+export function joinCurve(a: P, aOut: P, b: P, bOut: P): [P, P, P, P] | null {
+  const apart = Math.hypot(b[0] - a[0], b[1] - a[1])
+  if (apart < 1) return null
+  const reach = Math.min(Math.max(apart * 0.35, 20), 150)
+  return [
+    a,
+    [a[0] + aOut[0] * reach, a[1] + aOut[1] * reach],
+    [b[0] + bOut[0] * reach, b[1] + bOut[1] * reach],
+    b,
+  ]
+}

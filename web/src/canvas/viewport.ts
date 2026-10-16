@@ -86,6 +86,29 @@ export function fit(v: ViewportState, r: Rect, padding = 48): ViewportState {
   return { ...v, zoom, cx: (r.x0 + r.x1) / 2, cy: (r.y0 + r.y1) / 2 }
 }
 
+/**
+ * Shows all of `r`, with `padding` CSS px around it, moving the view as
+ * little as it can: not at all when `r` is on screen already, and zoomed
+ * out only as far as it must be for `r` to fit.
+ */
+export function reveal(v: ViewportState, r: Rect, padding = 48): ViewportState {
+  if (v.width <= 0 || v.height <= 0) return v
+  const availW = Math.max(v.width - 2 * padding, 1)
+  const availH = Math.max(v.height - 2 * padding, 1)
+  const zoom = Math.min(
+    v.zoom,
+    clampZoom(Math.min(availW / (r.x1 - r.x0), availH / (r.y1 - r.y0)) / v.pxPerMm),
+  )
+  const s = v.pxPerMm * zoom
+  // The middle moves only as far as it must for `lo` to `hi` to be within
+  // `half` of it; it goes to their middle when they can't be.
+  const along = (middle: number, lo: number, hi: number, half: number) =>
+    hi - lo > 2 * half ? (lo + hi) / 2 : Math.min(Math.max(middle, hi - half), lo + half)
+  const cx = along(v.cx, r.x0, r.x1, availW / 2 / s)
+  const cy = along(v.cy, r.y0, r.y1, availH / 2 / s)
+  return zoom === v.zoom && cx === v.cx && cy === v.cy ? v : { ...v, zoom, cx, cy }
+}
+
 /** Shows true size (zoom 1) around the current centre. */
 export function actualSize(v: ViewportState): ViewportState {
   return { ...v, zoom: 1 }

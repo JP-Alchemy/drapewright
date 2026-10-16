@@ -54,7 +54,7 @@ test('the grainline tool snaps to the piece’s axes', async ({ page }, info) =>
 
 test('cutting instructions', async ({ page }) => {
   await openWithFixture(page, 'inkscape-mm.svg', 'Add 2 pieces')
-  await page.getByRole('option', { name: /Waistband/ }).click()
+  await page.getByRole('row', { name: /Waistband/, level: 1 }).click()
   await expect(page.getByRole('switch', { name: 'As mirrored pairs' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Increase How many' }).click()
   await expect(page.getByRole('switch', { name: 'As mirrored pairs' })).toBeChecked()

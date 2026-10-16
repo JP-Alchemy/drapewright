@@ -157,8 +157,8 @@ test('a draped garment follows changes to its pattern', async ({ page }) => {
   // The front lengthened 8 cm: draped again by itself, the skirt shown
   // till then.
   await page
-    .getByRole('listbox', { name: 'Pieces' })
-    .getByRole('option', { name: /Skirt front/ })
+    .getByRole('treegrid', { name: 'Pieces' })
+    .getByRole('row', { name: /Skirt front/, level: 1 })
     .click()
   await page.getByRole('button', { name: 'Add a step' }).click()
   await page.getByRole('menuitem', { name: /^Lengthen or shorten/ }).click()

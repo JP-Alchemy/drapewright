@@ -44,8 +44,9 @@ test('a paper pattern piece is found in a photo and added at its size', async ({
   await expect(dialog).toContainText('Measured against the sheet of paper in the photo.')
   await dialog.getByText('Already included', { exact: true }).click()
   await dialog.getByRole('button', { name: 'Add the piece' }).click()
-  const piece = page.getByRole('listbox', { name: 'Pieces' }).getByRole('option', {
+  const piece = page.getByRole('treegrid', { name: 'Pieces' }).getByRole('row', {
     name: /Skirt front/,
+    level: 1,
   })
   // 27 cm × 55.5 cm, as photographed (within a few millimetres).
   await expect(piece).toContainText(/2[67]\.\d cm × 55\.\d cm/)

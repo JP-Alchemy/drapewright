@@ -35,7 +35,9 @@ test('a picture and a turning video of the garment on the figure are saved', asy
   test.setTimeout(240_000)
   await page.goto('/app/')
   await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
-  await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(2)
+  await expect(
+    page.getByRole('treegrid', { name: 'Pieces' }).getByRole('row', { level: 1 }),
+  ).toHaveCount(2)
   test.skip(!(await openTheAvatar(page)), 'Pictures are of the 3D view')
   const pane = page.getByRole('region', { name: 'Avatar' })
   const drape = pane.getByRole('group', { name: 'Drape the garment' })

@@ -28,8 +28,9 @@ test.describe('moving pieces', () => {
 
   test('arrow keys nudge the selection; a run of nudges is one undo step', async ({ page }) => {
     await openWithFixture(page, 'inkscape-mm.svg', 'Add 2 pieces')
-    await page.getByRole('option', { name: /Waistband/ }).click()
-    await page.locator('canvas').focus()
+    await page.getByRole('row', { name: /Waistband/, level: 1 }).click()
+    // Away from the list, where the arrow keys go through its rows.
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
     for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight')
     await page.keyboard.press('Shift+ArrowDown')
     const nudged = await placementOf(page, 1)
@@ -95,7 +96,7 @@ test.describe('choosing pieces with a box', () => {
     await page.keyboard.press('Delete')
     await expect(page.getByText('No pieces yet.')).toBeVisible()
     await page.getByRole('button', { name: 'Undo delete pieces' }).click()
-    await expect(page.getByRole('option')).toHaveCount(2)
+    await expect(page.getByRole('row', { level: 1 })).toHaveCount(2)
 
     // The table's own menu chooses them all.
     await page.mouse.click(empty.x, empty.y)
@@ -120,7 +121,7 @@ test('two fingers tapped together undo; three redo', async ({ page }) => {
   await expect(page.getByRole('status').filter({ hasText: 'Undo add pieces' })).toBeVisible()
   await expect(page.getByText('No pieces yet.')).toBeVisible()
   await multiTap(page, at, 3)
-  await expect(page.getByRole('option', { name: /Skirt front/ })).toBeVisible()
+  await expect(page.getByRole('row', { name: /Skirt front/, level: 1 })).toBeVisible()
 })
 
 test('right-click opens the piece menu; turning a piece can be undone', async ({ page }, info) => {
@@ -136,11 +137,11 @@ test('right-click opens the piece menu; turning a piece can be undone', async ({
 
 test('the inspector renames a piece and changes its allowance', async ({ page }) => {
   await openWithFixture(page, 'inkscape-mm.svg', 'Add 2 pieces')
-  await page.getByRole('option', { name: /Waistband/ }).click()
+  await page.getByRole('row', { name: /Waistband/, level: 1 }).click()
   const name = page.getByRole('textbox', { name: 'Name' })
   await name.fill('Waistband (front)')
   await name.press('Enter')
-  await expect(page.getByRole('option', { name: /Waistband \(front\)/ })).toBeVisible()
+  await expect(page.getByRole('row', { name: /Waistband \(front\)/, level: 1 })).toBeVisible()
   await page.getByRole('button', { name: 'Increase Seam allowance' }).click()
   await expect(page.getByRole('textbox', { name: 'Seam allowance' })).toHaveValue('1.6 cm')
 })
@@ -150,13 +151,13 @@ test('several pieces are chosen with Select and cut at once', async ({ page }, i
     info.project.name === 'ipad-webkit' ? target.tap() : target.click()
   await page.goto('/app/')
   await page.getByTestId('pattern-file').setInputFiles(fixture('corset.drapewright'))
-  const pieces = page.getByRole('listbox', { name: 'Pieces' })
-  await expect(pieces.getByRole('option')).toHaveCount(4)
+  const pieces = page.getByRole('treegrid', { name: 'Pieces' })
+  await expect(pieces.getByRole('row', { level: 1 })).toHaveCount(4)
 
   // Select turns tapping into ticking, for a finger as for a mouse.
   await tap(page.getByRole('button', { name: 'Select several pieces' }))
   for (const name of [/Front Center/, /Front Side/, /Back Center/]) {
-    await tap(pieces.getByRole('option', { name }))
+    await tap(pieces.getByRole('row', { name, level: 1 }))
   }
   await expect(page.getByRole('heading', { name: '3 pieces' })).toBeVisible()
   await expect(
@@ -166,29 +167,29 @@ test('several pieces are chosen with Select and cut at once', async ({ page }, i
   // One press cuts all three twice, as mirrored pairs; one undo, once again.
   await tap(page.getByRole('button', { name: 'Increase How many' }))
   for (const name of [/Front Center/, /Front Side/, /Back Center/]) {
-    await expect(pieces.getByRole('option', { name })).toContainText('Cut 2')
+    await expect(pieces.getByRole('row', { name, level: 1 })).toContainText('Cut 2')
   }
-  await expect(pieces.getByRole('option', { name: /Crotch Front/ })).toContainText('Cut 1')
+  await expect(pieces.getByRole('row', { name: /Crotch Front/, level: 1 })).toContainText('Cut 1')
   await expect(page.getByRole('switch', { name: 'As mirrored pairs' })).toBeChecked()
   await page.getByRole('button', { name: /^Undo/ }).click()
-  await expect(pieces.getByRole('option', { name: /Front Side/ })).toContainText('Cut 1')
+  await expect(pieces.getByRole('row', { name: /Front Side/, level: 1 })).toContainText('Cut 1')
 
   // Pieces that differ show it, and a press sets each from its own.
-  await tap(pieces.getByRole('option', { name: /Front Side/ }))
+  await tap(pieces.getByRole('row', { name: /Front Side/, level: 1 }))
   await expect(page.getByRole('heading', { name: '2 pieces' })).toBeVisible()
   await tap(page.getByRole('button', { name: 'Increase How many' }))
-  await tap(pieces.getByRole('option', { name: /Front Side/ }))
+  await tap(pieces.getByRole('row', { name: /Front Side/, level: 1 }))
   await expect(page.getByRole('textbox', { name: 'How many' })).toHaveAttribute(
     'placeholder',
     'Mixed',
   )
   await tap(page.getByRole('button', { name: 'Increase How many' }))
-  await expect(pieces.getByRole('option', { name: /Front Center/ })).toContainText('Cut 3')
-  await expect(pieces.getByRole('option', { name: /Front Side/ })).toContainText('Cut 2')
+  await expect(pieces.getByRole('row', { name: /Front Center/, level: 1 })).toContainText('Cut 3')
+  await expect(pieces.getByRole('row', { name: /Front Side/, level: 1 })).toContainText('Cut 2')
 
   // Done: tapping chooses one piece again.
   await tap(page.getByRole('button', { name: 'Done' }))
-  await tap(pieces.getByRole('option', { name: /Crotch Front/ }))
+  await tap(pieces.getByRole('row', { name: /Crotch Front/, level: 1 }))
   await expect(page.getByRole('heading', { name: 'Piece', exact: true })).toBeVisible()
   await expect(page.getByRole('textbox', { name: 'Name' })).toHaveValue('Crotch Front')
 })
@@ -196,7 +197,7 @@ test('several pieces are chosen with Select and cut at once', async ({ page }, i
 test('a part of the details folds away, says what it holds, and stays folded', async ({ page }) => {
   await page.goto('/app/')
   await page.getByTestId('pattern-file').setInputFiles(fixture('corset.drapewright'))
-  await page.getByRole('option', { name: /Front Side/ }).click()
+  await page.getByRole('row', { name: /Front Side/, level: 1 }).click()
   const allowance = page.getByRole('button', { name: /^Allowance/ })
   await expect(allowance).toHaveAttribute('aria-expanded', 'true')
   await allowance.click()
@@ -205,10 +206,10 @@ test('a part of the details folds away, says what it holds, and stays folded', a
   await expect(page.getByRole('textbox', { name: 'Seam allowance' })).toBeHidden()
 
   // Another piece, and after a reload: still folded.
-  await page.getByRole('option', { name: /Back Center/ }).click()
+  await page.getByRole('row', { name: /Back Center/, level: 1 }).click()
   await expect(allowance).toHaveAttribute('aria-expanded', 'false')
   await page.reload()
-  await page.getByRole('option', { name: /Front Center/ }).click()
+  await page.getByRole('row', { name: /Front Center/, level: 1 }).click()
   await expect(page.getByRole('button', { name: /^Allowance/ })).toHaveAttribute(
     'aria-expanded',
     'false',
@@ -219,7 +220,9 @@ test('the bar between the lists and the details moves', async ({ page }) => {
   await page.goto('/app/')
   await page.getByTestId('pattern-file').setInputFiles(fixture('corset.drapewright'))
   // Opened: the panel is the project's own.
-  await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(4)
+  await expect(
+    page.getByRole('treegrid', { name: 'Pieces' }).getByRole('row', { level: 1 }),
+  ).toHaveCount(4)
   const bar = page.getByRole('separator', { name: 'Resize the lists and the details' })
   await expect(bar).toHaveAttribute('aria-valuenow', '45')
   await bar.focus()

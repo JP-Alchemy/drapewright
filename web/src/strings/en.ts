@@ -987,10 +987,10 @@ export const t = {
   },
 
   seams: {
-    heading: 'Seams',
     none: 'No seams yet. Find them, or pick an edge and choose Sew to another edge.',
     find: 'Find seams',
     finding: 'Edges that look sewn together',
+    findingHint: 'Tap one to see its edges joined on the table.',
     noneFound: 'No more likely seams found. Pick an edge to sew it by hand.',
     sew: 'Sew',
     sewAll: (n: number) => plural(n, 'Sew it', 'Sew all #'),
@@ -1005,6 +1005,8 @@ export const t = {
     seam: (n: number, name: string) => (name ? `${n} · ${name}` : `Seam ${n}`),
     between: (a: string, b: string) => `${a} ↔ ${b}`,
     otherHalf: (piece: string) => `${piece}, other half`,
+    /** This piece's edge, sewn on its other half. */
+    halfEdge: (edge: string) => `${edge}, other half`,
     partOf: (edge: string) => `part of ${edge}`,
     sameLength: 'Same length',
     lengths: (a: string, b: string) => `${a} and ${b}`,
@@ -1013,6 +1015,8 @@ export const t = {
     notchesMeet: 'notches meet',
     notchesApart: (by: string) => `notches up to ${by} apart`,
     notchAlone: (n: number) => plural(n, 'a notch without a partner', '# notches without partners'),
+    /** A seam whose notches don't meet, flagged in the list. */
+    notchesMiss: (by: string) => `Its notches miss each other by up to ${by}.`,
     problem: 'An edge of this seam is gone: unpick it.',
     turn: 'Turn round',
     turnHint: 'Sews the first side’s start to the second side’s end instead.',

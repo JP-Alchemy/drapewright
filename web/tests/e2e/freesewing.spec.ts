@@ -46,9 +46,9 @@ test('a FreeSewing skirt is drafted to someone’s measurements and added', asyn
   })
   await expect(found.getByText('Penelope pencil skirt for Jo.svg')).toBeVisible()
   await found.getByRole('button', { name: /^Add 3 pieces/ }).click()
-  const list = page.getByRole('listbox', { name: 'Pieces' })
-  await expect(list.getByRole('option')).toHaveCount(3)
-  await expect(list.getByRole('option', { name: /^Front/ })).toContainText('on the fold')
+  const list = page.getByRole('treegrid', { name: 'Pieces' })
+  await expect(list.getByRole('row', { level: 1 })).toHaveCount(3)
+  await expect(list.getByRole('row', { name: /^Front/, level: 1 })).toContainText('on the fold')
 })
 
 test('every FreeSewing design offered drafts and opens', async ({ page }) => {
@@ -88,17 +88,16 @@ test('a drafted T-shirt is sewn by Find seams, its sleeves set into its armholes
   await expect(dialog.getByRole('status')).toHaveText(/^Drafted to Jo’s/)
   await dialog.getByRole('button', { name: 'Draft Teagan T-shirt' }).click()
   await page.getByRole('button', { name: 'Add 3 pieces' }).click()
-  const seams = page.getByRole('region', { name: 'Seams' })
-  await seams.getByRole('button', { name: 'Find seams' }).click()
-  const found = seams.getByRole('group', { name: 'Edges that look sewn together' })
+  await page.getByRole('button', { name: 'Find seams' }).click()
+  const found = page.getByRole('group', { name: 'Edges that look sewn together' })
   // Shoulders, sides, the sleeves' underarms, and each sleeve's head round
   // its armhole: the front's half and the back's.
   await found.getByRole('button', { name: 'Sew all 5' }).click()
-  await expect(seams.getByRole('button', { name: /^Seam \d/ })).toHaveCount(5)
-  await expect(
-    seams.getByRole('button', { name: /Sleeve · part of edge \d ↔ Front · edge \d/ }),
-  ).toHaveCount(1)
-  await expect(
-    seams.getByRole('button', { name: /Sleeve · part of edge \d ↔ Back · edge \d/ }),
-  ).toHaveCount(1)
+  await expect(found.getByText(/No more likely seams found/)).toBeVisible()
+  // Under the sleeve, chosen: part of its head sewn to each armhole.
+  const pieces = page.getByRole('treegrid', { name: 'Pieces' })
+  await pieces.getByRole('row', { name: 'Sleeve', level: 1 }).click()
+  const under = (name: RegExp) => pieces.getByRole('row', { name, level: 2 })
+  await expect(under(/^Front, part of edge \d ↔ edge \d$/)).toHaveCount(1)
+  await expect(under(/^Back, part of edge \d ↔ edge \d$/)).toHaveCount(1)
 })

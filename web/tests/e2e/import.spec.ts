@@ -20,15 +20,17 @@ test('opens an SVG pattern and lays out its pieces', async ({ page }) => {
   await question.getByText('Not included', { exact: true }).click()
   await add.click()
 
-  const list = page.getByRole('listbox', { name: 'Pieces' })
-  await expect(list.getByRole('option', { name: /Skirt front/ })).toBeVisible()
+  const list = page.getByRole('treegrid', { name: 'Pieces' })
+  await expect(list.getByRole('row', { name: /Skirt front/, level: 1 })).toBeVisible()
   // The waistband is drawn 80 × 700 mm in the file.
-  await expect(list.getByRole('option', { name: /Waistband/ })).toContainText('8.0 cm × 70.0 cm')
+  await expect(list.getByRole('row', { name: /Waistband/, level: 1 })).toContainText(
+    '8.0 cm × 70.0 cm',
+  )
 
   await page.getByRole('button', { name: 'Undo add pieces' }).click()
   await expect(page.getByText('No pieces yet.')).toBeVisible()
   await page.getByRole('button', { name: 'Redo add pieces' }).click()
-  await expect(list.getByRole('option')).toHaveCount(2)
+  await expect(list.getByRole('row', { level: 1 })).toHaveCount(2)
 })
 
 test('asks how big a file without units is', async ({ page }) => {
@@ -43,8 +45,8 @@ test('asks how big a file without units is', async ({ page }) => {
   await dialog.getByText('Not included', { exact: true }).click()
   await dialog.getByRole('button', { name: 'Add the piece' }).click()
 
-  const list = page.getByRole('listbox', { name: 'Pieces' })
-  await expect(list.getByRole('option', { name: /Pocket/ })).toContainText('7.5 cm × 3.7 cm')
+  const list = page.getByRole('treegrid', { name: 'Pieces' })
+  await expect(list.getByRole('row', { name: /Pocket/, level: 1 })).toContainText('7.5 cm × 3.7 cm')
 })
 
 test('opens a garment CAD (AAMA) DXF file', async ({ page }) => {
@@ -72,9 +74,13 @@ test('opens a garment CAD (AAMA) DXF file', async ({ page }) => {
   await width.press('Tab')
   await dialog.getByRole('button', { name: 'Add 2 pieces' }).click()
 
-  const list = page.getByRole('listbox', { name: 'Pieces' })
-  await expect(list.getByRole('option', { name: /Waistband/ })).toContainText('38.0 cm × 8.0 cm')
-  await expect(list.getByRole('option', { name: /Skirt front/ })).toContainText('25.0 cm × 60.0 cm')
+  const list = page.getByRole('treegrid', { name: 'Pieces' })
+  await expect(list.getByRole('row', { name: /Waistband/, level: 1 })).toContainText(
+    '38.0 cm × 8.0 cm',
+  )
+  await expect(list.getByRole('row', { name: /Skirt front/, level: 1 })).toContainText(
+    '25.0 cm × 60.0 cm',
+  )
   const allowances = await page.evaluate(() =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).drapewright.engine.document().pieces.map((p: any) => [p.name, p.allowance]),
@@ -102,9 +108,11 @@ test('a file with every size asks which, and adds only those', async ({ page }) 
   await dialog.getByRole('button', { name: 'Add 4 pieces' }).click()
   await expect(dialog).toBeHidden()
 
-  const list = page.getByRole('listbox', { name: 'Pieces' })
-  await expect(list.getByRole('option')).toHaveCount(4)
-  await expect(list.getByRole('option', { name: /Front \(L\)/ })).toContainText('25.0 cm × 61.0 cm')
+  const list = page.getByRole('treegrid', { name: 'Pieces' })
+  await expect(list.getByRole('row', { level: 1 })).toHaveCount(4)
+  await expect(list.getByRole('row', { name: /Front \(L\)/, level: 1 })).toContainText(
+    '25.0 cm × 61.0 cm',
+  )
 })
 
 test('opens a FreeSewing pattern with its names, fold, notches and cutting', async ({ page }) => {
@@ -222,9 +230,9 @@ test('a PDF in several colours asks which size, showing each size’s line', asy
     .click()
   await dialog.getByRole('button', { name: 'Add 2 pieces' }).click()
   await expect(dialog).toBeHidden()
-  const list = page.getByRole('listbox', { name: 'Pieces' })
-  await expect(list.getByRole('option')).toHaveCount(2)
-  await expect(list.getByRole('option', { name: /Front bodice/ })).toBeVisible()
+  const list = page.getByRole('treegrid', { name: 'Pieces' })
+  await expect(list.getByRole('row', { level: 1 })).toHaveCount(2)
+  await expect(list.getByRole('row', { name: /Front bodice/, level: 1 })).toBeVisible()
 })
 
 test('pieces that are not pattern pieces can be left out', async ({ page }) => {
@@ -239,9 +247,9 @@ test('pieces that are not pattern pieces can be left out', async ({ page }) => {
   await expect(pieces.getByRole('checkbox', { name: 'Pocket' })).not.toBeChecked()
   await dialog.getByRole('button', { name: 'Add 5 pieces' }).click()
   await expect(dialog).toBeHidden()
-  const list = page.getByRole('listbox', { name: 'Pieces' })
-  await expect(list.getByRole('option')).toHaveCount(5)
-  await expect(list.getByRole('option', { name: /Pocket/ })).toHaveCount(0)
+  const list = page.getByRole('treegrid', { name: 'Pieces' })
+  await expect(list.getByRole('row', { level: 1 })).toHaveCount(5)
+  await expect(list.getByRole('row', { name: /Pocket/, level: 1 })).toHaveCount(0)
 })
 
 test('a PDF’s pages can be chosen and read again', async ({ page }) => {

@@ -5,7 +5,7 @@ import { pickTool } from '../tools/pick.ts'
 import { notchTool } from '../tools/notch.ts'
 import { selectTool } from '../tools/select.ts'
 import { attachInput } from './input.ts'
-import { draw, readTheme, seamMarks } from './renderer.ts'
+import { draw, readTheme, seamJoin, seamMarks } from './renderer.ts'
 
 /**
  * The work table. Draws on demand (once per animation frame at most) when
@@ -25,6 +25,7 @@ export function PatternCanvas({ session }: { session: Session }) {
       frame = 0
       const ui = session.ui.get()
       const { viewport } = ui
+      const { seams } = session.engine.document()
       const dpr = window.devicePixelRatio || 1
       const w = Math.max(1, Math.round(viewport.width * dpr))
       const h = Math.max(1, Math.round(viewport.height * dpr))
@@ -46,7 +47,8 @@ export function PatternCanvas({ session }: { session: Session }) {
           marquee: ui.marquee,
           grainPreview: ui.grainPreview,
           picking: ui.picking,
-          seams: seamMarks(session.engine.document().seams, ui.seam, ui.sewing),
+          seams: seamMarks(seams, ui.seam, ui.sewing, ui.suggestion),
+          join: seamJoin(seams, ui.seam, ui.suggestion),
         },
         theme,
       )

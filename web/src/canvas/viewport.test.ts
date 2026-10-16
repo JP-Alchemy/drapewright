@@ -4,6 +4,7 @@ import {
   NOMINAL_PX_PER_MM,
   fit,
   panBy,
+  reveal,
   scaleOf,
   toScreen,
   toWorld,
@@ -58,5 +59,30 @@ describe('viewport', () => {
     expect(1000 * s).toBeCloseTo(700, 6)
     expect(f.cx).toBe(500)
     expect(f.cy).toBe(250)
+  })
+
+  it('shows a rectangle already on screen as it is', () => {
+    expect(reveal(v, { x0: 50, y0: 0, x1: 150, y1: 100 }, 50)).toBe(v)
+  })
+
+  it('moves the least to show a rectangle off screen, at the same zoom', () => {
+    // Off to the right and a little low: it comes in just inside the padding.
+    const r = reveal(v, { x0: 400, y0: 100, x1: 450, y1: 160 }, 50)
+    expect(r.zoom).toBe(1)
+    expect(toScreen(r, { x: 450, y: 160 }).x).toBeCloseTo(750, 6)
+    expect(toScreen(r, { x: 450, y: 160 }).y).toBeCloseTo(550, 6)
+    // The other way, up and to the left.
+    const l = reveal(v, { x0: -300, y0: -200, x1: -250, y1: -150 }, 50)
+    expect(toScreen(l, { x: -300, y: -200 }).x).toBeCloseTo(50, 6)
+    expect(toScreen(l, { x: -300, y: -200 }).y).toBeCloseTo(50, 6)
+  })
+
+  it('zooms out only as far as a rectangle needs to fit, never in', () => {
+    const wide = reveal(v, { x0: 0, y0: 0, x1: 2000, y1: 10 }, 50)
+    expect(wide.zoom).toBeLessThan(1)
+    expect(toScreen(wide, { x: 0, y: 0 }).x).toBeCloseTo(50, 6)
+    expect(toScreen(wide, { x: 2000, y: 0 }).x).toBeCloseTo(750, 6)
+    // A speck far away is shown at the zoom it was.
+    expect(reveal(v, { x0: 5000, y0: 5000, x1: 5001, y1: 5001 }, 50).zoom).toBe(1)
   })
 })

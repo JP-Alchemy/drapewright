@@ -28,6 +28,7 @@ import {
   NotchSection,
   grainSummary,
 } from './PieceDetails.tsx'
+import { SeamSection } from './Seams.tsx'
 import { edgeLabel, sideLabel } from './labels.ts'
 
 /**
@@ -296,7 +297,11 @@ function EdgeSection({
     <section className="panel-section inspector" aria-labelledby="edge-heading">
       <h2 id="edge-heading">{t.inspector.edge}</h2>
       {sewn.map(({ seam, i }) => (
-        <Button key={seam.id} className="link-button" onPress={() => session.selectSeam(seam.id)}>
+        <Button
+          key={seam.id}
+          className="link-button"
+          onPress={() => session.selectSeam(seam.id, piece.id)}
+        >
           {t.seams.sewnTo(sideLabel(doc, here(seam.a) && !seam.a.mirror ? seam.b : seam.a))} (
           {t.seams.seam(i + 1, seam.name)})
         </Button>
@@ -399,17 +404,18 @@ function CornerSection({
 }
 
 /**
- * Details of the selected piece, edge or corner, editable in sewing terms;
- * or of several pieces, set together. Each new choice shows from the top.
+ * Details of the selected piece, edge or corner, or of the seam picked on
+ * it, editable in sewing terms; or of several pieces, set together. Each
+ * new choice shows from the top.
  */
 export function Inspector({ session }: { session: Session }) {
-  const { selection, part } = useStore(session.ui)
+  const { selection, part, seam } = useStore(session.ui)
   useEngineState(session)
   const top = useRef<HTMLDivElement>(null)
   const chosen = [...selection].sort().join(',')
   useEffect(() => {
     top.current?.closest('.side-details')?.scrollTo({ top: 0 })
-  }, [chosen])
+  }, [chosen, seam])
 
   // In the pieces' order, whichever was chosen first.
   const scene = session.scene().filter((sp) => selection.has(sp.piece.id))
@@ -425,8 +431,10 @@ export function Inspector({ session }: { session: Session }) {
   } else {
     const { piece, view } = scene[0]!
     const own: PartRef | null = part?.piece === piece.id ? part : null
+    const picked = session.engine.document().seams.find((s) => s.id === seam)
     body = (
       <>
+        {picked && <SeamSection session={session} seam={picked} />}
         {own?.kind === 'corner' && (
           <CornerSection session={session} piece={piece} edgeId={own.edge} />
         )}

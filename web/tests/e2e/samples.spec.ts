@@ -7,8 +7,14 @@ test('a sample blouse opens sewn, as a project of its own, beside the figure', a
   await expect(
     page.getByRole('button', { name: /^Projects \(open now: Sample blouse\)/ }),
   ).toBeVisible()
-  await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(3)
-  await expect(page.getByRole('button', { name: /^Seam 1/ })).toBeVisible()
+  const pieces = page.getByRole('treegrid', { name: 'Pieces' })
+  await expect(pieces.getByRole('row', { level: 1 })).toHaveCount(3)
+  // Sewn: a piece opens to show its seams.
+  await pieces
+    .getByRole('button', { name: /^Expand/ })
+    .first()
+    .click()
+  await expect(pieces.getByRole('row', { level: 2 }).first()).toBeVisible()
   await expect(page.getByRole('region', { name: 'Avatar' })).toBeVisible()
   await expect(page.getByText(/is open as a project of its own: press Drape/)).toBeVisible()
 })
@@ -18,7 +24,9 @@ test('a sample asked for in the address opens once', async ({ page }) => {
   await expect(
     page.getByRole('button', { name: /^Projects \(open now: Sample skirt\)/ }),
   ).toBeVisible()
-  await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(2)
+  await expect(
+    page.getByRole('treegrid', { name: 'Pieces' }).getByRole('row', { level: 1 }),
+  ).toHaveCount(2)
   // Taken out of the address, so a reload doesn't open another.
   await expect(page).toHaveURL(/\/app\/$/)
 })

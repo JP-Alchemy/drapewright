@@ -17,7 +17,9 @@ test('a draped skirt says how it fits, and is altered at its side seams to fit',
   test.setTimeout(300_000)
   await page.goto('/app/')
   await page.getByTestId('pattern-file').setInputFiles(fixture('skirt.drapewright'))
-  await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(2)
+  await expect(
+    page.getByRole('treegrid', { name: 'Pieces' }).getByRole('row', { level: 1 }),
+  ).toHaveCount(2)
   test.skip(!(await openTheAvatar(page)), 'Draping is seen in the 3D view')
   const pane = page.getByRole('region', { name: 'Avatar' })
   const drape = pane.getByRole('group', { name: 'Drape the garment' })
@@ -38,7 +40,10 @@ test('a draped skirt says how it fits, and is altered at its side seams to fit',
     ),
   ).toBeVisible()
   // Each piece has its step, and the skirt, draped again, fits.
-  const front = page.getByRole('listbox', { name: 'Pieces' }).getByRole('option').first()
+  const front = page
+    .getByRole('treegrid', { name: 'Pieces' })
+    .getByRole('row', { level: 1 })
+    .first()
   await expect(front).toBeVisible()
   await expect(said).toHaveText('It fits as fitted should at the waist and hip.', {
     timeout: 180_000,

@@ -868,32 +868,76 @@ h2 {
   margin-top: 24px;
 }
 
-.piece-list {
+/* The pieces, each with its seams under it when open. */
+.piece-tree {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   margin: 0;
   padding: 0;
   outline: none;
 }
 
+/* A piece: the chevron that opens it (or, ticking, its tick) beside its
+   name and size. */
 .piece-item {
   display: grid;
+  grid-template-columns: 28px 1fr;
+  column-gap: 6px;
+  align-items: center;
   min-height: var(--tap);
-  padding: 8px 12px;
+  padding: 6px 12px 6px 4px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   outline: none;
 }
 
-/* Ticking several: a circle before each, ticked when chosen. */
-.piece-item.ticking {
-  grid-template-columns: auto 1fr;
-  column-gap: 10px;
+.piece-item > .piece-name,
+.piece-item > .muted {
+  grid-column: 2;
 }
 
-.piece-item.ticking .tick {
+.piece-item .tree-chevron,
+.piece-item .tick {
   grid-row: span 2;
-  align-self: center;
+  justify-self: center;
+}
+
+.tree-chevron {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+/* A finger-sized hold round the small chevron. */
+button.tree-chevron::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+button.tree-chevron[data-hovered] {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.tree-chevron svg {
+  transition: transform 0.15s;
+}
+
+.piece-item[data-expanded] .tree-chevron svg {
+  transform: rotate(90deg);
+}
+
+/* Ticking several: a circle before each, ticked when chosen. */
+.piece-item.ticking .tick {
   color: var(--ink-muted);
 }
 
@@ -925,6 +969,63 @@ h2 {
 .piece-item[data-focus-visible] {
   outline: 3px solid var(--focus-ring);
   outline-offset: -3px;
+}
+
+/* A seam under a piece: its number (as on the table), the piece it is sewn
+   to and the edges, on a line down from the piece's chevron. */
+.seam-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  column-gap: 10px;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 4px 12px 4px 40px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  outline: none;
+}
+
+.seam-row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 17px;
+  width: 2px;
+  background: var(--border);
+}
+
+.seam-row[data-hovered] {
+  background: var(--surface-2);
+}
+
+.seam-row[data-selected] {
+  background: color-mix(in srgb, var(--select) 10%, transparent);
+}
+
+.seam-row[data-selected]::before {
+  background: var(--select);
+}
+
+.seam-row[data-focus-visible] {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -3px;
+}
+
+.seam-row[data-selected] .seam-badge {
+  background: var(--select);
+}
+
+.seam-to {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+/* A seam to check: its notches miss, or an edge of it is gone. */
+.seam-trouble {
+  display: grid;
+  color: var(--accent);
 }
 
 .piece-name {
@@ -1726,16 +1827,15 @@ h2 {
   border-radius: var(--radius-sm);
 }
 
-.seam-item[data-picked] {
-  background: color-mix(in srgb, var(--select) 10%, transparent);
-  box-shadow: inset 3px 0 0 var(--select);
-}
-
+/* A suggested seam: tapped, it is shown joined on the table. */
 .seam-item.suggested {
   display: grid;
-  gap: 6px;
-  padding: 8px 12px;
   background: var(--surface-2);
+}
+
+.seam-item.suggested[data-shown] {
+  background: color-mix(in srgb, var(--select) 12%, var(--surface-2));
+  box-shadow: inset 3px 0 0 var(--select);
 }
 
 .seam-pick {
@@ -1755,7 +1855,7 @@ h2 {
 }
 
 .seam-pick[data-hovered] {
-  background: var(--surface-2);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
 }
 
 .seam-pick[data-focus-visible] {
@@ -1789,8 +1889,8 @@ h2 {
   padding: 0 12px 8px;
 }
 
-.seam-item.suggested .seam-actions {
-  padding: 0;
+.find-seams {
+  margin-top: 12px;
 }
 
 .seam-suggestions {
@@ -1800,6 +1900,12 @@ h2 {
 .seam-suggestions h3 {
   margin: 12px 0 4px;
   font-size: 14px;
+}
+
+/* The picked seam's sides, in the details. */
+.seam-sides {
+  margin: 4px 0;
+  font-weight: 600;
 }
 
 /* Measurements */

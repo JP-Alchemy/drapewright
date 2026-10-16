@@ -12,6 +12,61 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 74 — Seams under the pieces they sew, joined on the table
+
+The side panel listed the pieces, then every seam apart from them: to see
+which pieces fit together, you matched each seam's number to the numbers
+on the table by eye. Now each piece's seams are under it in the list, as
+an outliner shows what belongs to what, and picking one draws a line on
+the table from one of its edges to the other.
+
+**Try it:** on an empty table press **A dress from a PDF pattern** and
+**Add 5 pieces**.
+
+1. Press **Find seams**, under the pieces. Tap a suggestion's words (not
+   its buttons): its two edges are drawn dashed on the table, joined by a
+   dashed line. Tap it again to hide it. Then **Sew all**.
+2. Tap **Front inside**, in the list or on the table. It opens to show the
+   pieces it is sewn to, each with its seam's number (as on the table) and
+   the edges sewn, its own first: *Sleeve, edge 4 ↔ part of edge 1*. The
+   chevron beside a piece with seams opens and closes it.
+3. Tap **Sleeve** under it. A line joins the front's armhole to the
+   sleeve's head, and the details show the seam: both sides, how they
+   measure against each other, **Turn round** and **Unpick**. Had either
+   edge been off screen, the table would have moved to show both.
+4. Tap the sleeve on the table, or **Sleeve** in the list: the seam stays
+   picked, now under the sleeve. Drag the sleeve and the line goes with it.
+   Tap the seam again to put it down; tapping the table where there is no
+   piece, or Escape, puts down the piece too.
+5. Pick an edge, **Sew to another edge…** and tap another: the new seam is
+   picked, so the line shows what was sewn to what, **Turn round** at hand.
+
+With the keyboard, the arrow keys go through the pieces and their seams,
+picking each seam they come to. A seam whose notches miss each other by a
+centimetre or more (sewn the wrong way round, say) has a warning sign
+beside it.
+
+**What changed:**
+
+* **The pieces list is a tree.** A seam is listed under each piece it
+  sews (once, for a piece sewn to itself), saying the piece it is sewn to
+  and the edges. A piece chosen on its own opens, and stays open until
+  closed, so nothing moves under the pointer. **Select** (to tick several)
+  lists the pieces alone.
+* **The seams' own section is gone.** **Find seams** and its suggestions
+  are under the pieces; a picked seam's lengths and notches, **Turn round**
+  and **Unpick** are in the details, above its piece's.
+* **The line** leaves each edge at its middle (or the middle of the part
+  sewn), outwards, as a thread pulled from one edge to the other would,
+  over a halo of paper so it shows on the mat and across pieces alike. A
+  seam sewing an edge to its own other half (a centre back) is a dot on
+  the edge.
+* **The view** moves only when an edge of the seam picked (or the
+  suggestion shown) is off screen: as little as it can, zoomed out only
+  if both edges don't fit.
+
+---
+
 ## Step 73 — An assistant names pieces by the words printed on them
 
 The importer names each piece by rules: the biggest words beside its

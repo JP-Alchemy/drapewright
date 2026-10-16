@@ -1,14 +1,14 @@
 // Draws the work table: a cutting mat with a true-size centimetre grid and
 // the pieces laid on it like pattern paper.
 
-import type { Hit, Piece, PieceView, Seam } from '@drapewright/engine'
+import type { Hit, Piece, PieceView, Seam, SeamSide } from '@drapewright/engine'
 import type { DisplayUnits } from '@drapewright/engine'
 import type { GrainPreview, Marquee, MovePreview, PartRef, Picking } from '../state/session.ts'
 import { cutSummary } from '../app/PieceDetails.tsx'
 import { formatLength } from '../strings/en.ts'
-import { edgePoints, stretch } from './edges.ts'
+import { edgePoints, joinCurve, stretch } from './edges.ts'
 import { type PiecePaths, addSegment } from './paths.ts'
-import { type ViewportState, scaleOf, toScreen, visibleWorld } from './viewport.ts'
+import { type Rect, type ViewportState, scaleOf, toScreen, visibleWorld } from './viewport.ts'
 
 export interface ScenePiece {
   piece: Piece
@@ -29,43 +29,91 @@ export interface Scene {
   /** Points tapped so far to place an alteration. */
   picking?: Picking | null
   seams?: SeamMark[]
+  /** The picked seam's edges, or a suggested seam's, joined across the table. */
+  join?: SeamJoin | null
 }
 
-/** One side of a seam, as drawn: its number, beside its edge. */
-export interface SeamMark {
-  number: number
+/** An edge of a piece, or the part of it from and to how far along it, mm. */
+interface EdgePart {
   piece: string
   edge: string
-  /** The piece's other half (drawn on the piece itself, marked ′). */
-  mirror: boolean
-  /** The picked seam, or an edge waiting to be sewn. */
-  strong: boolean
-  /** Sewing only part of the edge: from and to how far along it, mm. */
   from?: number | null
   to?: number | null
 }
 
-/** Marks for every seam side, numbered as the seam list numbers them. */
+/** One side of a seam, as drawn: its number, beside its edge. */
+export interface SeamMark extends EdgePart {
+  number: number
+  /** The piece's other half (drawn on the piece itself, marked ′). */
+  mirror: boolean
+  /** The picked seam, or an edge waiting to be sewn. */
+  strong: boolean
+  /** A suggested seam's, not sewn yet: drawn dashed, with no number. */
+  suggested?: boolean
+}
+
+/** A seam's sides as drawn: one, where it sews an edge to its own other half. */
+const sidesOf = (seam: Seam): SeamSide[] =>
+  seam.a.piece === seam.b.piece && seam.a.edge === seam.b.edge ? [seam.a] : [seam.a, seam.b]
+
+/**
+ * Marks for every seam side, numbered as the pieces' list numbers them,
+ * and for a suggested seam's.
+ */
 export function seamMarks(
   seams: Seam[],
   picked: string | null,
   sewing: { piece: string; edge: string } | null,
+  suggestion: Seam | null = null,
 ): SeamMark[] {
-  const marks: SeamMark[] = seams.flatMap((seam, i) => {
-    // Sewn to its own other half: one edge, one mark.
-    const self = seam.a.piece === seam.b.piece && seam.a.edge === seam.b.edge
-    return (self ? [seam.a] : [seam.a, seam.b]).map((side) => ({
-      number: i + 1,
-      piece: side.piece,
-      edge: side.edge,
-      mirror: side.mirror,
-      strong: seam.id === picked,
-      from: side.from,
-      to: side.to,
-    }))
+  const mark = (side: SeamSide, number: number, strong: boolean, suggested = false) => ({
+    number,
+    piece: side.piece,
+    edge: side.edge,
+    mirror: side.mirror,
+    strong,
+    suggested,
+    from: side.from,
+    to: side.to,
   })
+  const marks: SeamMark[] = seams.flatMap((seam, i) =>
+    sidesOf(seam).map((side) => mark(side, i + 1, seam.id === picked)),
+  )
   if (sewing) marks.push({ number: 0, ...sewing, mirror: false, strong: true })
+  if (suggestion) marks.push(...sidesOf(suggestion).map((side) => mark(side, 0, false, true)))
   return marks
+}
+
+/** A seam's two sides, joined by a line across the table. */
+export interface SeamJoin {
+  a: SeamSide
+  b: SeamSide
+  /** A suggested seam, not sewn yet: the line is dashed. */
+  suggested: boolean
+}
+
+/** The picked seam's sides, or else a suggested seam's, to join on the table. */
+export function seamJoin(
+  seams: Seam[],
+  picked: string | null,
+  suggestion: Seam | null,
+): SeamJoin | null {
+  const seam = seams.find((s) => s.id === picked)
+  if (seam) return { a: seam.a, b: seam.b, suggested: false }
+  return suggestion && { a: suggestion.a, b: suggestion.b, suggested: true }
+}
+
+/**
+ * The part of its edge a seam's side sews, in its piece's coordinates,
+ * where it sews only part of it.
+ */
+function partSewn(pieces: ScenePiece[], side: EdgePart) {
+  if (side.from == null && side.to == null) return null
+  const sp = pieces.find((p) => p.piece.id === side.piece)
+  const ev = sp?.view.edges.find((e) => e.id === side.edge)
+  const points = sp && edgePoints(sp.piece, side.edge)
+  if (!ev || !points || ev.length <= 0) return null
+  return stretch(points, (side.from ?? 0) / ev.length, (side.to ?? ev.length) / ev.length)
 }
 
 export interface Theme {
@@ -321,28 +369,23 @@ export function draw(
   }
 
   // Sewn edges: a band along the edge (or the part of it sewn) and the
-  // seam's number inside it.
+  // seam's number inside it. A suggested seam's edges, dashed.
   const marks = scene.seams ?? []
-  /** The part of its edge a mark sews, where it sews only part of it. */
-  const partOf = (mark: SeamMark) => {
-    if (mark.from == null && mark.to == null) return null
-    const sp = scene.pieces.find((p) => p.piece.id === mark.piece)
-    const ev = sp?.view.edges.find((e) => e.id === mark.edge)
-    const points = sp && edgePoints(sp.piece, mark.edge)
-    if (!ev || !points || ev.length <= 0) return null
-    return stretch(points, (mark.from ?? 0) / ev.length, (mark.to ?? ev.length) / ev.length)
-  }
+  const partOf = (mark: EdgePart) => partSewn(scene.pieces, mark)
   for (const mark of marks) {
     const sp = scene.pieces.find((p) => p.piece.id === mark.piece)
     const part = partOf(mark)
     const path = part ? linePath(part.points) : sp && edgePath(sp.piece, mark.edge)
     if (!sp || !path) continue
+    const strong = mark.strong || mark.suggested
     ctx.setTransform(world.multiply(placement(sp.piece, scene.preview)))
-    ctx.strokeStyle = mark.strong ? theme.select : theme.seam
-    ctx.globalAlpha = mark.strong ? 0.9 : 0.6
-    ctx.lineWidth = (mark.strong ? 5 : 3.5) / s
+    ctx.strokeStyle = strong ? theme.select : theme.seam
+    ctx.globalAlpha = strong ? 0.9 : 0.6
+    ctx.lineWidth = (strong ? 5 : 3.5) / s
     ctx.lineCap = 'round'
+    if (mark.suggested) ctx.setLineDash([8 / s, 7 / s])
     ctx.stroke(path)
+    ctx.setLineDash([])
     ctx.globalAlpha = 1
   }
 
@@ -393,6 +436,10 @@ export function draw(
   const part = scene.part
   if (part?.kind === 'notch') highlight(part.piece, `notch:${part.notch}`, false, true)
   else if (part) highlight(part.piece, part.edge, part.kind === 'corner', true)
+
+  // The picked seam's edges (or a suggested seam's) joined by a line, so
+  // which edges are sewn together shows at a glance.
+  if (scene.join) drawJoin(ctx, world, scene, scene.join, s, theme)
 
   // Lengths of the hovered and selected edges, just outside the cutting line.
   const lengthLabels: { piece: string; edge: string }[] = []
@@ -474,6 +521,68 @@ export function draw(
   }
 }
 
+/**
+ * A line across the table from the middle of one sewn edge (or of the part
+ * of it sewn) to the other's, a dot where it meets each; dashed for a
+ * suggested seam. An edge sewn to its own other half has just the dot.
+ */
+function drawJoin(
+  ctx: CanvasRenderingContext2D,
+  world: DOMMatrix,
+  scene: Scene,
+  join: SeamJoin,
+  s: number,
+  theme: Theme,
+) {
+  /** Where a side is joined, on the table: its middle and the way out of its piece there. */
+  const end = (side: SeamSide) => {
+    const sp = scene.pieces.find((p) => p.piece.id === side.piece)
+    const ev = sp?.view.edges.find((e) => e.id === side.edge)
+    if (!sp || !ev) return null
+    const part = partSewn(scene.pieces, side)
+    const [middle, out] = part ? [part.middle, part.out] : [ev.middle, ev.middleNormal]
+    const m = placement(sp.piece, scene.preview)
+    const at = m.transformPoint(new DOMPoint(middle[0], middle[1]))
+    const beyond = m.transformPoint(new DOMPoint(middle[0] + out[0], middle[1] + out[1]))
+    return {
+      at: [at.x, at.y] as [number, number],
+      out: [beyond.x - at.x, beyond.y - at.y] as [number, number],
+    }
+  }
+  const a = end(join.a)
+  const b = end(join.b)
+  if (!a || !b) return
+  ctx.setTransform(world)
+  ctx.lineCap = 'round'
+  const curve = joinCurve(a.at, a.out, b.at, b.out)
+  if (curve) {
+    const [from, c1, c2, to] = curve
+    const path = new Path2D()
+    path.moveTo(from[0], from[1])
+    path.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], to[0], to[1])
+    // Over a halo of paper, to show on the mat and across pieces alike.
+    ctx.strokeStyle = theme.labelHalo
+    ctx.globalAlpha = 0.85
+    ctx.lineWidth = 6 / s
+    ctx.stroke(path)
+    ctx.globalAlpha = 1
+    ctx.strokeStyle = theme.select
+    ctx.lineWidth = 2.5 / s
+    if (join.suggested) ctx.setLineDash([7 / s, 5 / s])
+    ctx.stroke(path)
+    ctx.setLineDash([])
+  }
+  for (const { at } of curve ? [a, b] : [a]) {
+    ctx.beginPath()
+    ctx.arc(at[0], at[1], 4.5 / s, 0, Math.PI * 2)
+    ctx.fillStyle = theme.select
+    ctx.fill()
+    ctx.strokeStyle = theme.labelHalo
+    ctx.lineWidth = 2 / s
+    ctx.stroke()
+  }
+}
+
 /** A seam's number in a round badge. */
 function drawBadge(
   ctx: CanvasRenderingContext2D,
@@ -507,6 +616,29 @@ function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, y: num
   ctx.fill()
   ctx.fillStyle = '#fff'
   ctx.fillText(text, x, y + 0.5)
+}
+
+/** Bounds of the edges (or the parts of them) seams' sides sew, on the work table, mm. */
+export function sidesBounds(pieces: ScenePiece[], sides: EdgePart[]): Rect | null {
+  let r: Rect | null = null
+  for (const side of sides) {
+    const sp = pieces.find((p) => p.piece.id === side.piece)
+    const points = sp && (partSewn(pieces, side)?.points ?? edgePoints(sp.piece, side.edge))
+    if (!sp || !points) continue
+    const m = placement(sp.piece)
+    for (const [x, y] of points) {
+      const p = m.transformPoint(new DOMPoint(x, y))
+      r = r
+        ? {
+            x0: Math.min(r.x0, p.x),
+            y0: Math.min(r.y0, p.y),
+            x1: Math.max(r.x1, p.x),
+            y1: Math.max(r.y1, p.y),
+          }
+        : { x0: p.x, y0: p.y, x1: p.x, y1: p.y }
+    }
+  }
+  return r
 }
 
 /** Bounds of all pieces on the work table, mm. */

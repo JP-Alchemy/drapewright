@@ -4,7 +4,6 @@ import type { Session } from '../state/session.ts'
 import { t } from '../strings/en.ts'
 import { Inspector } from './Inspector.tsx'
 import { PieceList } from './PieceList.tsx'
-import { SeamList } from './SeamList.tsx'
 
 const SPLIT_KEY = 'drapewright.sidePanel.split'
 /** The lists' share of the side panel's height: at first, least and most. */
@@ -15,8 +14,8 @@ const clamp = (share: number) =>
   Number.isFinite(share) ? Math.min(SPLIT.most, Math.max(SPLIT.least, share)) : SPLIT.first
 
 /**
- * The side panel: the pieces and seams above, the details of what is
- * selected below, each scrolling on its own, so picking the next piece
+ * The side panel: the pieces (with their seams) above, the details of what
+ * is selected below, each scrolling on its own, so picking the next piece
  * keeps the list where it was and shows the piece's details from the top.
  * The bar between them moves: drag it, or focus it and use the arrow keys;
  * double-click puts it back.
@@ -36,7 +35,6 @@ export function SidePanel({ session }: { session: Session }) {
     <aside ref={panel} className="side-panel" style={style}>
       <div className="side-lists">
         <PieceList session={session} />
-        <SeamList session={session} />
       </div>
       <div
         role="separator"

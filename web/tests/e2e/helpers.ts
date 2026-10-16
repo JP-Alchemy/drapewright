@@ -13,9 +13,9 @@ export const fixture = (name: string) =>
  */
 export async function openBackup(page: Page, name: string, pieces: number): Promise<void> {
   await page.getByTestId('pattern-file').setInputFiles(fixture(name))
-  await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(
-    pieces,
-  )
+  await expect(
+    page.getByRole('treegrid', { name: 'Pieces' }).getByRole('row', { level: 1 }),
+  ).toHaveCount(pieces)
 }
 
 /**

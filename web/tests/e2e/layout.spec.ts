@@ -4,7 +4,9 @@ import { fixture } from './helpers.ts'
 test('the pieces are laid out on fabric, and say how much it takes', async ({ page }) => {
   await page.goto('/app/')
   await page.getByTestId('pattern-file').setInputFiles(fixture('blouse.drapewright'))
-  await expect(page.getByRole('listbox', { name: 'Pieces' }).getByRole('option')).toHaveCount(3)
+  await expect(
+    page.getByRole('treegrid', { name: 'Pieces' }).getByRole('row', { level: 1 }),
+  ).toHaveCount(3)
   await page.getByRole('button', { name: 'Layout' }).click()
   const dialog = page.getByRole('dialog', { name: 'Cutting layout' })
   const takes = dialog.getByRole('status')
