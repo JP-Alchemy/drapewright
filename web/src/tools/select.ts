@@ -6,10 +6,19 @@
 
 import type { ToolPointer } from '@drapewright/input'
 import { TUNING } from '@drapewright/input'
-import { HANDLE_RADIUS, towardHandles } from '../canvas/handles.ts'
+import { HANDLE_RADIUS, towardCorner, towardHandles } from '../canvas/handles.ts'
 import { piecesTouching } from '../canvas/marquee.ts'
 import type { Point } from '../canvas/viewport.ts'
 import { formatLength, t } from '../strings/en.ts'
+import {
+  type CornerDrag,
+  cancelCornerDrag,
+  cornerUnder,
+  endCornerDrag,
+  moveCornerDrag,
+  shownCorners,
+  startCornerDrag,
+} from './corner-move.ts'
 import {
   type EdgeDrag,
   cancelEdgeDrag,
@@ -24,6 +33,7 @@ import type { Tool, ToolContext } from './tool.ts'
 type State =
   | { kind: 'idle' }
   | { kind: 'edge'; drag: EdgeDrag }
+  | { kind: 'corner'; drag: CornerDrag }
   | {
       kind: 'press'
       start: Point
@@ -72,6 +82,12 @@ export function selectTool(): Tool {
       const drag = handle && startEdgeDrag(ctx, p, handle.handles, handle.kind)
       if (drag) {
         state = { kind: 'edge', drag }
+        return
+      }
+      const corner = cornerUnder(session, p)
+      const moving = corner && startCornerDrag(ctx, p, corner)
+      if (moving) {
+        state = { kind: 'corner', drag: moving }
         return
       }
       const hit = ctx.hit(p)
@@ -127,6 +143,10 @@ export function selectTool(): Tool {
         moveEdgeDrag(ctx, p, state.drag)
         return
       }
+      if (state.kind === 'corner') {
+        moveCornerDrag(ctx, p, state.drag)
+        return
+      }
       if (state.kind === 'table') {
         const travel = Math.hypot(p.x - state.screen.x, p.y - state.screen.y)
         if (!state.boxing && travel <= TUNING.dragSlop[state.pointer]) return
@@ -155,6 +175,7 @@ export function selectTool(): Tool {
 
     up(p, ctx) {
       if (state.kind === 'edge') endEdgeDrag(ctx, state.drag)
+      else if (state.kind === 'corner') endCornerDrag(ctx, state.drag)
       else if (state.kind === 'table') ctx.session.setMarquee(null)
       else if (state.kind === 'drag') finishDrag(ctx, ctx.world(p))
       // A tap (no drag) on one piece of a group selects just that piece.
@@ -164,6 +185,7 @@ export function selectTool(): Tool {
 
     cancel(ctx) {
       if (state.kind === 'edge') cancelEdgeDrag(ctx, state.drag)
+      if (state.kind === 'corner') cancelCornerDrag(ctx, state.drag)
       // A box called off (a second finger down, say) leaves the choice as it was.
       if (state.kind === 'table') {
         ctx.session.setMarquee(null)
@@ -192,6 +214,18 @@ export function selectTool(): Tool {
         session.showTip({ x: at.x, y: at.y - HANDLE_RADIUS, text: t.edgeMove.handle[kind] })
         return
       }
+      const corner = cornerUnder(session, p)
+      if (corner) {
+        const { at } = corner
+        session.setEdgeHandle({
+          piece: corner.piece,
+          edge: corner.edge,
+          kind: 'corner',
+          dragging: false,
+        })
+        session.showTip({ x: at.x, y: at.y - HANDLE_RADIUS, text: t.cornerMove.handle })
+        return
+      }
       if (session.ui.get().edgeHandle) {
         session.setEdgeHandle(null)
         session.showTip(null)
@@ -200,12 +234,17 @@ export function selectTool(): Tool {
       // edge stays shown.
       const hit = ctx.hit(p)
       const hover = session.ui.get().hover
+      const clear = !hit || (hit.kind === 'piece' && hit.piece === hover?.piece)
       const onTheWay =
-        hover?.kind === 'edge' &&
-        (!hit || (hit.kind === 'piece' && hit.piece === hover.piece)) &&
-        shownHandles(session).some(
-          (h) => h.piece === hover.piece && h.edge === hover.edge && towardHandles(h, p),
-        )
+        clear &&
+        ((hover?.kind === 'edge' &&
+          shownHandles(session).some(
+            (h) => h.piece === hover.piece && h.edge === hover.edge && towardHandles(h, p),
+          )) ||
+          (hover?.kind === 'corner' &&
+            shownCorners(session).some(
+              (h) => h.piece === hover.piece && h.edge === hover.edge && towardCorner(h, p),
+            )))
       if (!onTheWay) session.setHover(hit)
     },
 

@@ -416,6 +416,12 @@ pub struct SeenEdge {
     /// Out of the piece at its middle point, along the cloth: how far on
     /// the view each mm goes, CSS px.
     pub out: [f32; 2],
+    /// Along it from its start, and back along it from its end: how far on
+    /// the view each mm goes, CSS px (for moving its corners).
+    pub ends: [[f32; 2]; 2],
+    /// How squarely the cloth faces the eye at its start and its end: 1
+    /// straight on, 0 edge on (at the figure's side).
+    pub facing: [f32; 2],
     /// How long it is as draped, mm.
     pub length: f64,
 }
@@ -540,6 +546,23 @@ impl ClothState {
                     (Some(a), Some(b)) => [b[0] - a[0], b[1] - a[1]],
                     _ => [0.0; 2],
                 };
+                let leaving = |from: usize, to: usize| {
+                    let p = at(from);
+                    let way = unit(sub(at(to), p));
+                    match (project(p), project([0, 1, 2].map(|i| p[i] + way[i]))) {
+                        (Some(a), Some(b)) => [b[0] - a[0], b[1] - a[1]],
+                        _ => [0.0; 2],
+                    }
+                };
+                // Over two of its points, where there are: steadier than one.
+                let ends = [
+                    leaving(0, 2.min(n - 1)),
+                    leaving(n - 1, (n - 1).saturating_sub(2)),
+                ];
+                let facing = [0, n - 1].map(|i| {
+                    let normal = unit(around[slot[e.points[i] as usize] as usize].0);
+                    dot(normal, unit(sub(eye, at(i)))).max(0.0)
+                });
                 let length = (1..n)
                     .map(|i| f64::from(dot(sub(at(i), at(i - 1)), sub(at(i), at(i - 1))).sqrt()))
                     .sum();
@@ -551,6 +574,8 @@ impl ClothState {
                     shown,
                     middle: m as u32,
                     out,
+                    ends,
+                    facing,
                     length,
                 }
             })

@@ -8,11 +8,12 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::Pt;
 use crate::alter::{
     AlterError, Drawn, crossing, cubic, seg_len_zero, stretch, to_segments, with_start,
 };
 use crate::geom::{EdgeGeom, SAME_POINT, flatten_segs, outward_normal, segs_of, unit_tangent};
-use crate::model::{Dart, EdgeKind, NotchFrom};
+use crate::model::{CubicSeg, Dart, EdgeKind, LineSeg, NotchFrom, Segment};
 
 /// How the edges either side of an edge moved out carry on to meet it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS, JsonSchema)]
@@ -202,6 +203,116 @@ pub(crate) fn move_edge(
         };
         (dart.from, dart.to) = (from, to);
     }
+    Ok(altered)
+}
+
+/// The shape with the corner at the end of edge `edge` (its start, where
+/// `start`) moved by `by` (mm): the edges either side drawn to it, each of
+/// their points moved by `by` times how near the corner it is along them
+/// (all of it at the corner, none at their other ends). A straight edge
+/// stays straight.
+pub(crate) fn move_corner(
+    shape: &Drawn,
+    edge: &str,
+    start: bool,
+    by: Vec2,
+) -> Result<Drawn, AlterError> {
+    let outline = &shape.outline;
+    let k = outline.edge_index(edge).ok_or_else(|| AlterError::NoEdge {
+        edge: edge.to_owned(),
+    })?;
+    let n = outline.edges.len();
+    if n < 2 {
+        return Err(AlterError::AllRound);
+    }
+    // The edge it ends.
+    let i = if start { (k + n - 1) % n } else { k };
+    if by.hypot() < 1e-9 {
+        return Ok(shape.clone());
+    }
+    let next = (i + 1) % n;
+    // How much of `by` a point of edge `k` moves, by how far along it it is
+    // (0 to 1).
+    let weight = |k: usize, f: f64| if k == i { f } else { 1.0 - f };
+    let shift = |p: Pt, w: f64| Pt::new(p.x + by.x * w, p.y + by.y * w);
+    let mut altered = shape.clone();
+    for k in [i, next] {
+        let geom = outline.edge_geom(k);
+        let length = geom.length().max(1e-9);
+        let mut walked = 0.0;
+        altered.outline.edges[k].segments = outline.edges[k]
+            .segments
+            .iter()
+            .enumerate()
+            .map(|(s, seg)| {
+                let start = walked;
+                walked = geom.along_at(s, 1.0);
+                let (w0, w1) = (weight(k, start / length), weight(k, walked / length));
+                match *seg {
+                    Segment::Line(l) => Segment::Line(LineSeg {
+                        to: shift(l.to, w1),
+                    }),
+                    // Moved in proportion along it: its control points by
+                    // the thirds between.
+                    Segment::Cubic(c) => Segment::Cubic(CubicSeg {
+                        c1: shift(c.c1, w0 + (w1 - w0) / 3.0),
+                        c2: shift(c.c2, w0 + 2.0 * (w1 - w0) / 3.0),
+                        to: shift(c.to, w1),
+                    }),
+                }
+            })
+            .collect();
+    }
+    if next == 0 {
+        altered.outline.start = shift(outline.start, 1.0);
+    }
+    if altered.outline.signed_area() <= 0.0 {
+        return Err(AlterError::InsideOut);
+    }
+    // Notches and darts where they were on their edges' cloth, moved with
+    // it.
+    let mapped = |k: usize, s: f64| -> f64 {
+        let geom = outline.edge_geom(k);
+        let p = geom.point_at(s);
+        let w = weight(k, s / geom.length().max(1e-9));
+        let p = Point::new(p.x + by.x * w, p.y + by.y * w);
+        altered
+            .outline
+            .edge_geom(k)
+            .nearest(p)
+            .map_or(s, |near| near.along)
+    };
+    let mut notches = altered.notches.clone();
+    for notch in &mut notches {
+        let Some(k) = outline
+            .edge_index(&notch.edge)
+            .filter(|k| *k == i || *k == next)
+        else {
+            continue;
+        };
+        let (was, now) = (
+            outline.edge_geom(k).length(),
+            altered.outline.edge_geom(k).length(),
+        );
+        notch.at = match notch.from {
+            NotchFrom::Start => mapped(k, notch.at),
+            NotchFrom::End => now - mapped(k, was - notch.at),
+        }
+        .max(0.0);
+    }
+    let mut darts = altered.darts.clone();
+    for dart in &mut darts {
+        let Some(k) = outline
+            .edge_index(&dart.edge)
+            .filter(|k| *k == i || *k == next)
+        else {
+            continue;
+        };
+        let (a, b) = (mapped(k, dart.from), mapped(k, dart.to));
+        (dart.from, dart.to) = (a.min(b), a.max(b));
+    }
+    altered.notches = notches;
+    altered.darts = darts;
     Ok(altered)
 }
 

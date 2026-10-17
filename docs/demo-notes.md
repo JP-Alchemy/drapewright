@@ -12,6 +12,49 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 77 — Moving a corner, on the table and on the figure
+
+A corner can now be moved like an edge. Hover a corner (or tap it): a
+round handle with arrows every way appears just out from it. Drag it and
+the corner follows the pointer; the two edges meeting there are drawn to
+it, each moving less and less along its length, nothing at its far end.
+A straight edge stays straight; a curve (an armhole) keeps its shape,
+stretched.
+
+* **On the table** the corner moves across and down the piece as you
+  drag, to the millimetre (or tenth of an inch).
+* **On the figure**, while editing on it, the corners are the dots where
+  edges meet. A corner facing you gets the same handle; dragging it moves
+  the corner on the figure the way the pointer goes. A corner seen side-on
+  (at the edge of the figure, where a waist runs away from you) has no
+  handle: which way a drag means is unclear there, so it says to turn the
+  figure to face it.
+* Each drag is one step (*Corner of edge 4 and the hem moved 2.0 cm right
+  and 3.0 cm down*, its edges called what you named them), one undo step;
+  dragging the same corner again changes that step. With the corner chosen, its details show the step,
+  with **Across** and **Down** to type exact amounts.
+
+**Try it:** open the test blouse, hover the front's corner where its side
+seam meets the hem, and drag its handle right and down: the front grows
+wider and longer at that corner only. Then drape it, press **Edit on the
+figure**, turn the figure to see its side (the arrow keys turn it), and
+drag the corner at the foot of the side seam.
+
+**What changed:** a new kind of step, `moveCorner` (`docs/file-format.md`
+§4.13): the corner at the end (or start, for a mirrored piece) of an edge
+moved by an amount across and down. The 3D side also says, for each edge
+it sees, how it leaves its corners on the view and how squarely the cloth
+there faces you; the page turns a drag on the view into a move on the
+piece by the two edges' ways at the corner, damping a way seen nearly end
+on.
+
+**Limits:** a piece cut on the fold has no corner on the figure at the
+fold (the fold is the middle of the cloth there); move it on the table.
+The front's and back's corners at a side seam sit in the same place on the
+figure; the one under the pointer first is moved.
+
+---
+
 ## Step 76 — Editing on the figure
 
 The pattern can now be changed where it is worn. With a garment draped,

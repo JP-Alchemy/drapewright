@@ -529,6 +529,31 @@
             "edge",
             "by"
           ]
+        },
+        {
+          "description": "The corner at the end of `edge` (at its start where `start`) moved\nby `by` (mm, across and down the piece): the two edges meeting there\ndrawn to it, each point of them moved as much less as it is further\nalong them from the corner, nothing at their other ends.",
+          "type": "object",
+          "properties": {
+            "by": {
+              "$ref": "#/$defs/Pt"
+            },
+            "edge": {
+              "type": "string"
+            },
+            "start": {
+              "type": "boolean",
+              "default": false
+            },
+            "type": {
+              "type": "string",
+              "const": "moveCorner"
+            }
+          },
+          "required": [
+            "type",
+            "edge",
+            "by"
+          ]
         }
       ]
     },

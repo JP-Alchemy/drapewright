@@ -34,6 +34,7 @@ import type { PickFor, Session } from '../state/session.ts'
 import { formatLength, t } from '../strings/en.ts'
 import { edgeLabel } from './labels.ts'
 import { LengthField } from './LengthField.tsx'
+import { cornerMoves } from '../tools/corner-move.ts'
 
 /** The choice of a line straight across the piece, among its own lines. */
 const ACROSS = 'across'
@@ -149,7 +150,7 @@ const KINDS = [
 
 /** What a step that changes by an amount says it does, and the two ways it can go (more, or less). */
 function wording(
-  change: Exclude<Change, { type: 'pivot' | 'trueUp' | 'stretch' }>,
+  change: Exclude<Change, { type: 'pivot' | 'trueUp' | 'stretch' | 'moveCorner' }>,
   by: string,
   edge?: string,
 ) {
@@ -245,11 +246,13 @@ export function AlterStep({
               Math.round((stretchFactor(change.pattern, change.fabric) - 1) * 100),
               change.bothWays,
             )
-          : wording(
-              change,
-              formatLength(Math.abs(change.by), units),
-              change.type === 'moveEdge' ? edgeLabel(piece, change.edge) : undefined,
-            ).said
+          : change.type === 'moveCorner'
+            ? cornerSaid(piece, change, units)
+            : wording(
+                change,
+                formatLength(Math.abs(change.by), units),
+                change.type === 'moveEdge' ? edgeLabel(piece, change.edge) : undefined,
+              ).said
   return (
     <div className="alter-step">
       <div className="alter-step-head">
@@ -319,6 +322,28 @@ export function AlterStep({
           change={change}
           withChange={withChange}
         />
+      ) : change.type === 'moveCorner' ? (
+        <>
+          <LengthField
+            label={t.alter.cornerRight}
+            value={change.by[0]}
+            units={units}
+            min={-MOST_MOVED}
+            onChange={(mm) =>
+              withChange({ ...change, by: [mm, change.by[1]] }, `corner:${alteration.id}`)
+            }
+          />
+          <LengthField
+            label={t.alter.cornerDownBy}
+            value={change.by[1]}
+            units={units}
+            min={-MOST_MOVED}
+            description={t.alter.cornerHint}
+            onChange={(mm) =>
+              withChange({ ...change, by: [change.by[0], mm] }, `corner:${alteration.id}`)
+            }
+          />
+        </>
       ) : (
         <Amount change={change} units={units} withChange={withChange} id={alteration.id} />
       )}
@@ -357,6 +382,23 @@ export function AlterStep({
       )}
     </div>
   )
+}
+
+/** The most a corner is moved either way, mm (as the engine allows). */
+const MOST_MOVED = 1000
+
+/** "Corner of the hem and edge 2 moved 2.0 cm right and 1.0 cm up". */
+export function cornerSaid(
+  piece: Piece,
+  change: Extract<Change, { type: 'moveCorner' }>,
+  units: DisplayUnits,
+): string {
+  const edges = piece.outline.edges
+  const k = edges.findIndex((e) => e.id === change.edge)
+  const i = change.start ? (k + edges.length - 1) % edges.length : k
+  const [a, b] = [edges[i]?.id ?? change.edge, edges[(i + 1) % edges.length]?.id ?? change.edge]
+  const moves = cornerMoves(change.by, units)
+  return t.alter.cornerStep(edgeLabel(piece, a), edgeLabel(piece, b), moves)
 }
 
 /** As the engine has it: a piece made for `pattern` % stretch, cut from a fabric of `fabric` %. */
@@ -460,7 +502,7 @@ function Amount({
   withChange,
   id,
 }: {
-  change: Exclude<Change, { type: 'pivot' | 'trueUp' | 'stretch' }>
+  change: Exclude<Change, { type: 'pivot' | 'trueUp' | 'stretch' | 'moveCorner' }>
   units: DisplayUnits
   withChange: (next: Change, coalesce?: string) => void
   id: string

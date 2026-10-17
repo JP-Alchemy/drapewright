@@ -324,3 +324,116 @@ fn on_a_piece_of_two_edges_the_other_carries_on_at_both_ends() {
     let round = edge(&shape, "round");
     assert_eq!(round.segments.len(), 4, "{round:?}");
 }
+
+fn corner_moved(shape: &Drawn, edge: &str, by: [f64; 2]) -> Result<Drawn, AlterError> {
+    let step = Alteration {
+        id: "a".into(),
+        on: true,
+        change: Change::MoveCorner {
+            edge: edge.into(),
+            start: false,
+            by: Pt::new(by[0], by[1]),
+        },
+    };
+    alter(shape, &[step])
+}
+
+#[test]
+fn a_corner_moved_draws_the_edges_either_side_to_it() {
+    // The panel's bottom right corner (where its right side meets the
+    // hem) 20 out and 30 down.
+    let shape = corner_moved(&panel(), "right", [20.0, 30.0]).unwrap();
+    assert!(shape.outline.closure_gap() < 1e-9);
+    let (_, end) = ends(&shape, "right");
+    assert!(near(end, Point::new(320.0, 430.0)), "{end:?}");
+    let (start, _) = ends(&shape, "hem");
+    assert!(near(start, Point::new(320.0, 430.0)), "{start:?}");
+    // Their other ends where they were; both still straight.
+    let (start, _) = ends(&shape, "right");
+    assert!(near(start, Point::new(250.0, 0.0)));
+    let (_, end) = ends(&shape, "hem");
+    assert!(near(end, Point::new(0.0, 400.0)));
+    assert_eq!(edge(&shape, "right").segments.len(), 1);
+    // The waist and the left side as they were.
+    assert_eq!(edge(&shape, "waist"), edge(&panel(), "waist"));
+    assert_eq!(edge(&shape, "left"), edge(&panel(), "left"));
+}
+
+#[test]
+fn a_curved_edge_follows_its_corner_less_and_less_along_it() {
+    let p = Piece::new(
+        "p",
+        "Armhole",
+        Outline {
+            start: Pt::new(0.0, 0.0),
+            edges: vec![
+                Edge::new("shoulder", vec![Segment::line([100.0, 0.0])]),
+                Edge::new(
+                    "armhole",
+                    vec![Segment::cubic(
+                        [100.0, 100.0],
+                        [150.0, 200.0],
+                        [200.0, 200.0],
+                    )],
+                ),
+                Edge::new(
+                    "rest",
+                    vec![Segment::line([0.0, 200.0]), Segment::line([0.0, 0.0])],
+                ),
+            ],
+        },
+    );
+    let drawn = Drawn::of(&p);
+    // The shoulder point raised 20.
+    let shape = corner_moved(&drawn, "shoulder", [0.0, -20.0]).unwrap();
+    let before = drawn.outline.edge_geom(1);
+    let after = shape.outline.edge_geom(1);
+    // The armhole's start 20 up, its end where it was, and half way along
+    // it about half as much.
+    assert!(near(after.start(), Point::new(100.0, -20.0)));
+    assert!(near(after.end(), before.end()));
+    let at = |g: &drapewright_pattern_core::EdgeGeom, t: f64| g.segs()[0].eval(t);
+    let mid = at(&after, 0.5) - at(&before, 0.5);
+    assert!(mid.x.abs() < 1e-9 && (mid.y + 10.0).abs() < 1e-9, "{mid:?}");
+}
+
+#[test]
+fn a_corner_moved_so_far_the_piece_turns_inside_out_is_refused() {
+    // The panel's bottom right corner dragged across past its left side.
+    assert_eq!(
+        corner_moved(&panel(), "right", [-700.0, -800.0]),
+        Err(AlterError::InsideOut)
+    );
+    assert_eq!(
+        corner_moved(&panel(), "gone", [1.0, 1.0]),
+        Err(AlterError::NoEdge {
+            edge: "gone".into()
+        })
+    );
+}
+
+#[test]
+fn mirrored_a_piece_moved_at_a_corner_is_moved_the_mirrored_way() {
+    let drawn = panel();
+    let mut p = Piece::new("p", "Panel", drawn.outline.clone());
+    drawn.clone().put(&mut p);
+    p.alterations = vec![Alteration {
+        id: "a".into(),
+        on: true,
+        change: Change::MoveCorner {
+            edge: "right".into(),
+            start: false,
+            by: Pt::new(20.0, 30.0),
+        },
+    }];
+    alter(&drawn, &p.alterations).unwrap().put(&mut p);
+    p.drawn = Some(Box::new(drawn));
+    drapewright_pattern_core::ops::transform(&mut p, kurbo::Affine::FLIP_X);
+    let Change::MoveCorner { by, start, .. } = &p.alterations[0].change else {
+        panic!("{:?}", p.alterations[0]);
+    };
+    // Turned round, the corner is at the start of the right side.
+    assert_eq!((by.x, by.y, *start), (-20.0, 30.0, true));
+    let again = alter(p.drawn.as_ref().unwrap(), &p.alterations).unwrap();
+    assert_eq!(again.outline.bounds(), p.outline.bounds());
+}

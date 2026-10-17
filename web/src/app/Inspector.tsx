@@ -30,6 +30,7 @@ import {
 } from './PieceDetails.tsx'
 import { SeamSection } from './Seams.tsx'
 import { edgeLabel, sideLabel } from './labels.ts'
+import { cornerSteps } from '../tools/corner-move.ts'
 
 /**
  * A text field that reports its value when editing ends, not per keystroke.
@@ -377,10 +378,12 @@ function EdgeSection({
 function CornerSection({
   session,
   piece,
+  view,
   edgeId,
 }: {
   session: Session
   piece: Piece
+  view: PieceView
   edgeId: string
 }) {
   const i = piece.outline.edges.findIndex((e) => e.id === edgeId)
@@ -392,6 +395,12 @@ function CornerSection({
       <p className="muted small">
         {t.corner.between(edgeLabel(piece, edgeId), edgeLabel(piece, next.id))}
       </p>
+      {cornerSteps(piece, edgeId).map((a) => (
+        <AlterStep key={a.id} session={session} piece={piece} view={view} alteration={a} />
+      ))}
+      {cornerSteps(piece, edgeId).length === 0 && (
+        <p className="muted small">{t.cornerMove.hint}</p>
+      )}
       <CornerChooser
         session={session}
         piece={piece}
@@ -444,7 +453,7 @@ export function Inspector({ session }: { session: Session }) {
       <>
         {picked && <SeamSection session={session} seam={picked} />}
         {own?.kind === 'corner' && (
-          <CornerSection session={session} piece={piece} edgeId={own.edge} />
+          <CornerSection session={session} piece={piece} view={view} edgeId={own.edge} />
         )}
         {own?.kind === 'edge' && (
           <EdgeSection session={session} piece={piece} view={view} edgeId={own.edge} />

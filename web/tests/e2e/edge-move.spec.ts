@@ -155,3 +155,54 @@ test('a chosen edge is dragged by a finger on its handle', async ({ page }) => {
   await expect(front).toContainText('25.5 cm × 62.0 cm')
   await expect(page.getByRole('switch', { name: 'The hem extruded 2.0 cm' }).first()).toBeChecked()
 })
+
+test('a corner is moved by the handle beside it, its edges following', async ({ page }, info) => {
+  test.skip(info.project.name === 'ipad-webkit', 'mouse drag')
+  await page.goto('/app/?debug')
+  await openBackup(page, 'blouse.drapewright', 3)
+  const front = page
+    .getByRole('treegrid', { name: 'Pieces' })
+    .getByRole('row', { name: /Blouse front/, level: 1 })
+  await centreOnFront(page)
+  // The corner where its side seam (e5) meets its hem, at (255, 600).
+  const corner = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s = (window as any).drapewright
+    const v = s.ui.get().viewport
+    const sp = s.scene()[0]
+    const scale = v.pxPerMm * v.zoom
+    const r = document.querySelector('canvas')!.getBoundingClientRect()
+    return {
+      x: r.left + (255 + sp.piece.placement.x - v.cx) * scale + v.width / 2,
+      y: r.top + (600 + sp.piece.placement.y - v.cy) * scale + v.height / 2,
+    }
+  })
+  await page.mouse.move(corner.x, corner.y)
+  // Its handle is out from it, between the two edges' ways out: down and
+  // to the right here. Found by moving out to it.
+  let handle: { x: number; y: number } | null = null
+  for (let d = 0; d <= 40 && !handle; d += 2) {
+    await page.mouse.move(corner.x + d, corner.y + d)
+    const on = await page.evaluate(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      () => (window as any).drapewright.ui.get().edgeHandle?.kind,
+    )
+    if (on === 'corner') handle = { x: corner.x + d, y: corner.y + d }
+  }
+  expect(handle).not.toBeNull()
+  const mm = await pxPerMm(page)
+  await page.mouse.down()
+  await page.mouse.move(handle!.x + 20.2 * mm, handle!.y + 30.2 * mm, { steps: 8 })
+  await page.mouse.up()
+  // 2 cm wider and 3 cm longer, as one step the corner's details show.
+  await expect(front).toContainText('27.5 cm × 63.0 cm')
+  await expect(
+    page
+      .getByRole('switch', {
+        name: 'Corner of edge 4 and the hem moved 2.0 cm right and 3.0 cm down',
+      })
+      .first(),
+  ).toBeChecked()
+  await page.getByRole('button', { name: 'Undo alter piece' }).click()
+  await expect(front).toContainText('25.5 cm × 60.0 cm')
+})

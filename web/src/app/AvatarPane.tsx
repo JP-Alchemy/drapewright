@@ -51,8 +51,7 @@ import { DockEdge, useDocksBelow, useFloatingBox } from './AvatarFrame.tsx'
 import { setAvatarLayout, useAvatarLayout } from './avatar-layout.ts'
 import { FabricDialog } from './FabricDialog.tsx'
 import { FitAdvice } from './FitAdvice.tsx'
-import { edgeNear } from './avatar-edit.ts'
-import { useFigureEditing } from './figure-editing.ts'
+import { chooseOnFigure, useFigureEditing } from './figure-editing.ts'
 import { canRecord, video } from './turnaround.ts'
 import { fileName, saveBlob } from '../platform/save-file.ts'
 
@@ -253,14 +252,10 @@ export function AvatarPane({ session }: { session: Session }) {
   const [editing, setEditing] = useState(false)
   const overlay = useRef<HTMLCanvasElement>(null)
   const seen = useRef<SeenEdge[] | null>(null)
-  // Editing, an edge tapped on the figure is chosen: whether one was.
+  // Editing, an edge or a corner tapped on the figure is chosen: whether one was.
   const chooseEdge = useRef<(x: number, y: number) => boolean>(() => false)
   useEffect(() => {
-    chooseEdge.current = (x, y) => {
-      const edge = seen.current ? edgeNear(seen.current, { x, y }) : null
-      if (edge) session.select([edge.piece], { kind: 'edge', piece: edge.piece, edge: edge.edge })
-      return edge !== null
-    }
+    chooseEdge.current = (x, y) => chooseOnFigure(session, seen.current, { x, y })
   }, [session])
   // A fabric being measured, or the one chosen being changed.
   const [measuring, setMeasuring] = useState<typeof MEASURE | typeof CHANGE | null>(null)

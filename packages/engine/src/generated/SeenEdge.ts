@@ -28,6 +28,16 @@ middle: number,
  */
 out: [number, number], 
 /**
+ * Along it from its start, and back along it from its end: how far on
+ * the view each mm goes, CSS px (for moving its corners).
+ */
+ends: [[number, number], [number, number]], 
+/**
+ * How squarely the cloth faces the eye at its start and its end: 1
+ * straight on, 0 edge on (at the figure's side).
+ */
+facing: [number, number], 
+/**
  * How long it is as draped, mm.
  */
 length: number, };

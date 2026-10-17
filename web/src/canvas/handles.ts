@@ -4,7 +4,8 @@
 // out in screen space, so the renderer and the select tool agree on where
 // they are.
 
-import type { EdgeMove, EdgeView } from '@drapewright/engine'
+import type { EdgeMove, EdgeView, Piece } from '@drapewright/engine'
+import { cornerOf } from './edges.ts'
 import { type Point, type ViewportState, scaleOf, toScreen } from './viewport.ts'
 
 /** A handle's radius, CSS px. */
@@ -164,13 +165,38 @@ export function towardHandles(h: EdgeHandles, p: Point): boolean {
   return outward >= -GRAB_RADIUS && outward <= length + GRAB_RADIUS && across <= half
 }
 
+/** A handle's kind: moving an edge, extended or extruded, or a corner. */
+export type HandleKind = EdgeMove | 'corner'
+
 /**
  * The handle's picture, in its own frame: x along the edge, y out of the
- * piece, about 20 px across. An arrow out of the edge, and the sides
- * either side carrying on: flaring as they run (extend), or square
- * (extrude).
+ * piece, about 20 px across. For an edge, an arrow out of it, and the
+ * sides either side carrying on: flaring as they run (extend), or square
+ * (extrude). For a corner, arrows every way.
  */
-export function handleGlyph(kind: EdgeMove): [number, number][][] {
+export function handleGlyph(kind: HandleKind): [number, number][][] {
+  if (kind === 'corner') {
+    return [
+      [
+        [0, -7],
+        [0, 7],
+      ],
+      [
+        [-7, 0],
+        [7, 0],
+      ],
+      ...[
+        [0, -1],
+        [0, 1],
+        [-1, 0],
+        [1, 0],
+      ].map(([x, y]): [number, number][] => [
+        [7 * x! + 2.5 * y! - 2.5 * x!, 7 * y! - 2.5 * x! - 2.5 * y!],
+        [7 * x!, 7 * y!],
+        [7 * x! - 2.5 * y! - 2.5 * x!, 7 * y! + 2.5 * x! - 2.5 * y!],
+      ]),
+    ]
+  }
   const sides: [number, number][][] =
     kind === 'extend'
       ? [
@@ -211,4 +237,70 @@ export function handleGlyph(kind: EdgeMove): [number, number][][] {
     ],
     ...sides,
   ]
+}
+
+/** How far out from a corner its handle is, CSS px. */
+const CORNER_OUT = 26
+
+/** A corner's handle on screen: the corner, out of the piece there, and where the handle is. */
+export interface CornerHandle {
+  piece: string
+  /** The edge the corner ends. */
+  edge: string
+  corner: Point
+  out: Point
+  at: Point
+}
+
+/** A corner's handle: out from it (`out`, a unit vector), kept on a view `size` big. */
+export function cornerHandle(
+  piece: string,
+  edge: string,
+  corner: Point,
+  out: Point,
+  size: { width: number; height: number },
+): CornerHandle {
+  const room = HANDLE_RADIUS + EDGE_ROOM
+  const within = (z: number, length: number) =>
+    length > 2 * room ? Math.min(Math.max(z, room), length - room) : z
+  const at = {
+    x: within(corner.x + out.x * CORNER_OUT, size.width),
+    y: within(corner.y + out.y * CORNER_OUT, size.height),
+  }
+  return { piece, edge, corner, out, at }
+}
+
+/**
+ * The handle of the corner at the end of `edge` of a piece on the table,
+ * `toTable` its placement.
+ */
+export function pieceCornerHandle(
+  piece: Piece,
+  edge: string,
+  toTable: ToTable,
+  v: ViewportState,
+): CornerHandle | null {
+  const c = cornerOf(piece, edge)
+  if (!c) return null
+  const screen = (x: number, y: number) => toScreen(v, toTable.transformPoint({ x, y }))
+  const at = screen(c.at[0], c.at[1])
+  const tip = screen(c.at[0] + c.out[0], c.at[1] + c.out[1])
+  return cornerHandle(piece.id, edge, at, unit(tip.x - at.x, tip.y - at.y), v)
+}
+
+/** Whether a screen point is on a corner's handle. */
+export function onCornerHandle(h: CornerHandle, p: Point): boolean {
+  return Math.hypot(p.x - h.at.x, p.y - h.at.y) <= GRAB_RADIUS
+}
+
+/** Whether a screen point is on the way from a corner to its handle. */
+export function towardCorner(h: CornerHandle, p: Point): boolean {
+  const [dx, dy] = [h.at.x - h.corner.x, h.at.y - h.corner.y]
+  const n2 = dx * dx + dy * dy
+  const t = n2 > 0 ? ((p.x - h.corner.x) * dx + (p.y - h.corner.y) * dy) / n2 : 0
+  const [x, y] = [
+    h.corner.x + dx * Math.min(Math.max(t, 0), 1),
+    h.corner.y + dy * Math.min(Math.max(t, 0), 1),
+  ]
+  return Math.hypot(p.x - x, p.y - y) <= GRAB_RADIUS
 }

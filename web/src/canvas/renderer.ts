@@ -1,7 +1,7 @@
 // Draws the work table: a cutting mat with a true-size centimetre grid and
 // the pieces laid on it like pattern paper.
 
-import type { EdgeMove, Hit, Piece, PieceView, Seam, SeamSide } from '@drapewright/engine'
+import type { Hit, Piece, PieceView, Seam, SeamSide } from '@drapewright/engine'
 import type { DisplayUnits } from '@drapewright/engine'
 import type {
   EdgeHandleRef,
@@ -14,7 +14,15 @@ import type {
 import { cutSummary } from '../app/PieceDetails.tsx'
 import { formatLength } from '../strings/en.ts'
 import { edgePoints, joinCurve, stretch } from './edges.ts'
-import { HANDLE_RADIUS, PILL_FONT, PILL_HEIGHT, edgeHandles, handleGlyph } from './handles.ts'
+import {
+  HANDLE_RADIUS,
+  type HandleKind,
+  PILL_FONT,
+  PILL_HEIGHT,
+  edgeHandles,
+  handleGlyph,
+  pieceCornerHandle,
+} from './handles.ts'
 import { type PiecePaths, addSegment } from './paths.ts'
 import { type Rect, type ViewportState, scaleOf, toScreen, visibleWorld } from './viewport.ts'
 
@@ -472,6 +480,20 @@ export function draw(
     drawHandle(ctx, 'extend', h.extend, h.out, on === 'extend', theme)
     drawHandle(ctx, 'extrude', h.extrude, h.out, on === 'extrude', theme)
   }
+  // The hovered and chosen corners' handles, to move them by.
+  if (scene.handles) {
+    const corners: { piece: string; edge: string }[] = []
+    if (hover?.kind === 'corner') corners.push(hover)
+    if (part?.kind === 'corner') corners.push(part)
+    for (const ref of corners) {
+      const sp = scene.pieces.find((p) => p.piece.id === ref.piece)
+      const h = sp && pieceCornerHandle(sp.piece, ref.edge, placement(sp.piece, scene.preview), v)
+      if (!h) continue
+      const active = scene.edgeHandle
+      const on = active?.kind === 'corner' && active.piece === ref.piece && active.edge === ref.edge
+      drawHandle(ctx, 'corner', h.at, h.out, on, theme)
+    }
+  }
 
   // Seam numbers, just inside each sewn edge.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -618,12 +640,13 @@ function drawBadge(
 }
 
 /**
- * A handle to drag an edge by: a round button with its picture turned to
- * point out of the piece; filled in while under the pointer or dragged.
+ * A handle to drag an edge or a corner by: a round button with its picture
+ * turned to point out of the piece; filled in while under the pointer or
+ * dragged.
  */
 export function drawHandle(
   ctx: CanvasRenderingContext2D,
-  kind: EdgeMove,
+  kind: HandleKind,
   at: { x: number; y: number },
   out: { x: number; y: number },
   active: boolean,

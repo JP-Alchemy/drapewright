@@ -66,8 +66,9 @@ export type PartRef =
 /** One of the handles beside an edge's length, to drag the edge by. */
 export interface EdgeHandleRef {
   piece: string
+  /** The edge, or for a corner the edge it ends. */
   edge: string
-  kind: EdgeMove
+  kind: EdgeMove | 'corner'
   /** Being dragged, not only under the pointer. */
   dragging: boolean
 }

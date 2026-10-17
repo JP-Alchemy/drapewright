@@ -460,6 +460,18 @@ Refused if the edges either side never meet it (moved in further than
 they are long, or carried on nearly along it), or if the piece would turn
 inside out. `mode` defaults to `extend`.
 
+**Change** `moveCorner` — `{ "type": "moveCorner", "edge": id, "start":
+boolean, "by": [x, y] }`: the corner at the end of `edge` (at its start
+where `start`; a mirrored piece's outline runs the other way round, so
+mirroring it turns `start` over) moved by `by` mm, across and down the
+piece. The two edges meeting there are drawn to it: each point of them
+moves by `by` times how near the corner it is along them, all of it at
+the corner and none at their other ends (a curve's control points by the
+thirds between), so a straight edge stays straight and a curve keeps its
+shape, stretched. Notches and darts on them stay where they were on their
+cloth. Refused if the piece would turn inside out. `start` defaults to
+false.
+
 **AlterLine** — `{ "type": "own", "line": id }`: one of the piece's
 internal lines (normally its lengthen or shorten line), straight from its
 start to its end; or `{ "type": "through", "from": [x, y], "to": [x, y] }`:

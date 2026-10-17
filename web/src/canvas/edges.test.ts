@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { joinCurve, stretch } from './edges.ts'
+import type { Piece } from '@drapewright/engine'
+import { cornerOf, edgeEnds, joinCurve, stretch } from './edges.ts'
 
 describe('stretch', () => {
   // The top of a square drawn clockwise on screen, left to right.
@@ -46,5 +47,31 @@ describe('joinCurve', () => {
 
   it('joins nothing where the middles meet', () => {
     expect(joinCurve([5, 5], [1, 0], [5.5, 5], [-1, 0])).toBeNull()
+  })
+})
+
+describe('corners', () => {
+  // A square 100 mm a side, drawn clockwise on screen from its top left.
+  const square = {
+    outline: {
+      start: [0, 0],
+      edges: [
+        { id: 'top', segments: [{ to: [100, 0] }] },
+        { id: 'right', segments: [{ to: [100, 100] }] },
+        { id: 'bottom', segments: [{ to: [0, 100] }] },
+        { id: 'left', segments: [{ to: [0, 0] }] },
+      ],
+    },
+  } as unknown as Piece
+
+  it('knows which way each edge leaves its corners', () => {
+    expect(edgeEnds(square, 'top')).toEqual({ start: [1, 0], end: [-1, 0] })
+  })
+
+  it('points out of the piece at a corner, between its edges', () => {
+    const c = cornerOf(square, 'top')!
+    expect(c.at).toEqual([100, 0])
+    expect(c.out[0]).toBeCloseTo(Math.SQRT1_2)
+    expect(c.out[1]).toBeCloseTo(-Math.SQRT1_2)
   })
 })

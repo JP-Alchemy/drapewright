@@ -321,3 +321,31 @@ fn the_pieces_edges_are_seen_on_the_figure_those_turned_away_hidden() {
         assert_eq!(hem.points.len(), 2 * hem.shown.len());
     }
 }
+
+#[test]
+fn each_edge_says_how_it_leaves_its_corners_on_the_view() {
+    let state = drape_until_done(&garment("skirt")).state();
+    let seen = state.seen([0.0, 1000.0, 50_000.0], |p| Some([p[0], -p[1]]));
+    // The front's side seam (e3) runs down from the waist: leaving its
+    // start it goes down the view, leaving its end (at the hem) up it,
+    // about a pixel a mm either way.
+    for side in seen.iter().filter(|e| e.piece == "p1" && e.edge == "e3") {
+        let [down, up] = side.ends;
+        assert!(down[1] > 0.7 && down[1] <= 1.01, "{down:?}");
+        assert!(up[1] < -0.7 && up[1] >= -1.01, "{up:?}");
+    }
+}
+
+#[test]
+fn each_edge_says_how_squarely_its_corners_face_the_eye() {
+    let state = drape_until_done(&garment("skirt")).state();
+    let seen = state.seen([0.0, 1000.0, 50_000.0], |p| Some([p[0], -p[1]]));
+    // The front's hem, seen from in front: its middle faces the eye
+    // squarely, its ends (at the sides) much less.
+    for hem in seen.iter().filter(|e| e.piece == "p1" && e.edge == "e4") {
+        let [start, end] = hem.facing;
+        assert!((0.0..=1.0).contains(&start) && (0.0..=1.0).contains(&end));
+        assert!(start.min(end) < 0.6, "{:?}", hem.facing);
+        assert!(start.max(end) > 0.8, "{:?}", hem.facing);
+    }
+}

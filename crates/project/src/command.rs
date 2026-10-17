@@ -421,6 +421,13 @@ fn checked_alteration(alteration: &Alteration) -> Result<(), CommandError> {
                 });
             }
         }
+        Change::MoveCorner { by, .. } => {
+            if !by.x.is_finite() || !by.y.is_finite() || by.x.hypot(by.y) > MOST_ALTERED {
+                return Err(CommandError::Rejected {
+                    message: "A corner can be moved by up to a metre.".into(),
+                });
+            }
+        }
         Change::TrueUp { .. } => {}
         Change::Stretch {
             pattern, fabric, ..

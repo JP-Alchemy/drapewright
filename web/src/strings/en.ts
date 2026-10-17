@@ -545,6 +545,15 @@ export const t = {
       `${edge.charAt(0).toUpperCase()}${edge.slice(1)} trued ${straight ? 'straight' : 'smooth'}`,
     moveStep: (edge: string, mode: EdgeMove, by: number, amount: string) =>
       `${edge.charAt(0).toUpperCase()}${edge.slice(1)} ${by < 0 ? 'moved in' : mode === 'extend' ? 'extended' : 'extruded'} ${amount}`,
+    cornerStep: (a: string, b: string, moves: string[]) =>
+      moves.length === 0
+        ? `Corner of ${a} and ${b}, where it was`
+        : `Corner of ${a} and ${b} moved ${moves.join(' and ')}`,
+    cornerAcross: (right: boolean, by: string) => `${by} ${right ? 'right' : 'left'}`,
+    cornerDown: (down: boolean, by: string) => `${by} ${down ? 'down' : 'up'}`,
+    cornerRight: 'Across (to the right)',
+    cornerDownBy: 'Down',
+    cornerHint: 'Across and down the piece as drawn; less than 0 is to the left, or up.',
     moveWay: 'Out or in',
     out: 'Out',
     in: 'In',
@@ -581,8 +590,15 @@ export const t = {
     asDrawn: 'Dashed: the piece as drawn.',
   },
 
+  cornerMove: {
+    hint: 'To move it, drag the handle beside it, on the table or on the figure.',
+    handle: 'Drag to move the corner: the edges either side follow',
+    turn: 'Turn the figure to face this corner to move it here',
+    tip: (moves: string[]) => (moves.length === 0 ? 'As it was' : moves.join(', ')),
+  },
+
   edgeMove: {
-    hint: 'To move it out or in, drag the handles beside its length on the table.',
+    hint: 'To move it out or in, drag the handles beside its length, on the table or on the figure.',
     handle: {
       extend: 'Drag to extend: the edges either side carry on as they run',
       extrude: 'Drag to extrude: a strip added, its sides square',

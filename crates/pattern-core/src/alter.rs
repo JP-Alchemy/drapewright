@@ -11,7 +11,7 @@ use ts_rs::TS;
 
 use crate::Pt;
 pub use crate::edge_move::EdgeMove;
-use crate::edge_move::move_edge;
+use crate::edge_move::{move_corner, move_edge};
 use crate::geom::{
     EdgeGeom, SAME_POINT, flatten_segs, point_in_polygon, polygon_area, segs_of, unit_tangent,
 };
@@ -185,6 +185,16 @@ pub enum Change {
         #[serde(default)]
         mode: EdgeMove,
     },
+    /// The corner at the end of `edge` (at its start where `start`) moved
+    /// by `by` (mm, across and down the piece): the two edges meeting there
+    /// drawn to it, each point of them moved as much less as it is further
+    /// along them from the corner, nothing at their other ends.
+    MoveCorner {
+        edge: Id,
+        #[serde(default)]
+        start: bool,
+        by: Pt,
+    },
 }
 
 impl Change {
@@ -237,6 +247,16 @@ impl Change {
                 *at = f(*at);
                 *to = f(*to);
             }
+            Change::MoveCorner { by, start, .. } => {
+                let origin = f(Pt::new(0.0, 0.0));
+                let moved = f(*by);
+                *by = Pt::new(moved.x - origin.x, moved.y - origin.y);
+                // Mirrored, the outline runs the other way round: the
+                // corner at the end of the edge is at its start.
+                if mirrors {
+                    *start = !*start;
+                }
+            }
             Change::TrueUp { .. } | Change::Stretch { .. } | Change::MoveEdge { .. } => {}
         }
     }
@@ -255,7 +275,9 @@ impl Change {
     /// The piece's edge it trues or moves, if one.
     pub fn own_edge(&mut self) -> Option<&mut Id> {
         match self {
-            Change::TrueUp { edge, .. } | Change::MoveEdge { edge, .. } => Some(edge),
+            Change::TrueUp { edge, .. }
+            | Change::MoveEdge { edge, .. }
+            | Change::MoveCorner { edge, .. } => Some(edge),
             _ => None,
         }
     }
@@ -397,6 +419,9 @@ pub fn alter(drawn: &Drawn, alterations: &[Alteration]) -> Result<Drawn, AlterEr
             | Change::Hip { at, to, by } => widen(&shape, (*at).into(), (*to).into(), *by)?,
             Change::TrueUp { edge, straight } => true_up(&shape, edge, *straight)?,
             Change::MoveEdge { edge, by, mode } => move_edge(&shape, edge, *by, *mode)?,
+            Change::MoveCorner { edge, start, by } => {
+                move_corner(&shape, edge, *start, Vec2::new(by.x, by.y))?
+            }
             Change::Stretch {
                 pattern,
                 fabric,

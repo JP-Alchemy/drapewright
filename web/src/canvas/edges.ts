@@ -87,3 +87,39 @@ export function joinCurve(a: P, aOut: P, b: P, bOut: P): [P, P, P, P] | null {
     b,
   ]
 }
+
+/**
+ * The ways an edge leaves its corners, in piece coordinates (unit
+ * vectors): along it from its start, and back along it from its end.
+ */
+export function edgeEnds(piece: Piece, edgeId: string): { start: P; end: P } | null {
+  const points = edgePoints(piece, edgeId)
+  if (!points || points.length < 2) return null
+  const way = (from: P, to: P): P => {
+    const length = Math.hypot(to[0] - from[0], to[1] - from[1]) || 1
+    return [(to[0] - from[0]) / length, (to[1] - from[1]) / length]
+  }
+  const at = (k: number) => points[Math.max(0, Math.min(points.length - 1, k))]!
+  return { start: way(at(0), at(1)), end: way(at(points.length - 1), at(points.length - 2)) }
+}
+
+/**
+ * The corner at the end of an edge, in piece coordinates: where it is, and
+ * out of the piece there (a unit vector, halfway between the two edges'
+ * ways out).
+ */
+export function cornerOf(piece: Piece, edgeId: string): { at: P; out: P } | null {
+  const edges = piece.outline.edges
+  const i = edges.findIndex((e) => e.id === edgeId)
+  const next = edges[(i + 1) % edges.length]
+  const [a, b] = [edgeEnds(piece, edgeId), next && edgeEnds(piece, next.id)]
+  const at = edges[i]?.segments.at(-1)?.to
+  if (!a || !b || !at) return null
+  // Out of a piece drawn clockwise is to the left of the way it runs.
+  const into = [-a.end[0], -a.end[1]]
+  const outA: P = [into[1]!, -into[0]!]
+  const outB: P = [b.start[1], -b.start[0]]
+  const [x, y] = [outA[0] + outB[0], outA[1] + outB[1]]
+  const length = Math.hypot(x, y)
+  return { at: [at[0], at[1]], out: length > 1e-6 ? [x / length, y / length] : outA }
+}
