@@ -275,3 +275,49 @@ fn a_shirt_drapes_open_with_its_facing_inside() {
     let front = points.iter().map(|p| p[2]).fold(f32::MIN, f32::max);
     assert!(front > 100.0, "the front {front} mm forward");
 }
+
+#[test]
+fn the_pieces_edges_are_seen_on_the_figure_those_turned_away_hidden() {
+    let state = drape_until_done(&garment("skirt")).state();
+    // Seen from in front, far off, drawn as it is (1 px a mm, y down).
+    let eye = [0.0, 1000.0, 50_000.0];
+    let seen = state.seen(eye, |p| Some([p[0], -p[1]]));
+    let ids: Vec<(&str, &str)> = seen
+        .iter()
+        .map(|e| (e.piece.as_str(), e.edge.as_str()))
+        .collect();
+    // The front cut on the fold: each edge but the fold twice, one each
+    // side. The back cut as a pair: each edge twice, once on each.
+    for (piece, edge) in [
+        ("p1", "e2"),
+        ("p1", "e3"),
+        ("p1", "e4"),
+        ("p6", "e7"),
+        ("p6", "e8"),
+        ("p6", "e9"),
+        ("p6", "e10"),
+    ] {
+        assert_eq!(
+            ids.iter().filter(|&&id| id == (piece, edge)).count(),
+            2,
+            "{piece} {edge}: {ids:?}"
+        );
+    }
+    assert!(!ids.contains(&("p1", "e5")));
+    let middle_shown = |piece: &str, edge: &str| {
+        seen.iter()
+            .filter(|e| e.piece == piece && e.edge == edge)
+            .map(|e| e.shown[e.middle as usize])
+            .collect::<Vec<_>>()
+    };
+    // The front's hem faces the eye; the back's is behind the figure.
+    assert_eq!(middle_shown("p1", "e4"), [true, true]);
+    assert_eq!(middle_shown("p6", "e9"), [false, false]);
+    // Out of the front's hem is down the view, about a pixel a mm.
+    for hem in seen.iter().filter(|e| e.piece == "p1" && e.edge == "e4") {
+        let [x, y] = hem.out;
+        assert!(y > 0.8 && y <= 1.01 && x.abs() < 0.5, "{:?}", hem.out);
+        assert!(hem.length > 200.0, "{}", hem.length);
+        assert_eq!(hem.points.len(), 2 * hem.shown.len());
+    }
+}

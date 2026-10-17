@@ -58,7 +58,7 @@ export interface ToTable {
   transformPoint(p: Point): Point
 }
 
-const unit = (x: number, y: number): Point => {
+export const unit = (x: number, y: number): Point => {
   const n = Math.hypot(x, y) || 1
   return { x: x / n, y: y / n }
 }
@@ -85,30 +85,53 @@ export function edgeHandles(
   const reach = edge.allowance + PILL_OUT / s
   const middle = screen(mx, my)
   const tip = screen(mx + nx, my + ny)
-  const out = unit(tip.x - middle.x, tip.y - middle.y)
+  const beyond = screen(mx + nx * reach, my + ny * reach)
+  return handlesBeside(
+    piece,
+    edge.id,
+    middle,
+    unit(tip.x - middle.x, tip.y - middle.y),
+    beyond,
+    label,
+    v,
+  )
+}
+
+/**
+ * The length label at `pill` (or as near as keeps it on a view `size`
+ * big), out of the edge's `middle` the way `out` goes (a unit vector), and
+ * a handle either side of it along the edge.
+ */
+export function handlesBeside(
+  piece: string,
+  edge: string,
+  middle: Point,
+  out: Point,
+  pill: Point,
+  label: string,
+  size: { width: number; height: number },
+): EdgeHandles {
   // Along the edge either side of the label, clear of it.
   const along = { x: -out.y, y: out.x }
   const width = pillWidth(label)
   const away =
     (Math.abs(along.x) * width) / 2 + (Math.abs(along.y) * PILL_HEIGHT) / 2 + GAP + HANDLE_RADIUS
-  // Kept on the table's view, so an edge near its side can still be
-  // taken hold of.
+  // Kept on the view, so an edge near its side can still be taken hold of.
   const half = {
     x: Math.max(width / 2, Math.abs(along.x) * away + HANDLE_RADIUS) + EDGE_ROOM,
     y: Math.max(PILL_HEIGHT / 2, Math.abs(along.y) * away + HANDLE_RADIUS) + EDGE_ROOM,
   }
-  const within = (z: number, room: number, size: number) =>
-    size > 2 * room ? Math.min(Math.max(z, room), size - room) : z
-  const beyond = screen(mx + nx * reach, my + ny * reach)
-  const pill = { x: within(beyond.x, half.x, v.width), y: within(beyond.y, half.y, v.height) }
-  const a = { x: pill.x - along.x * away, y: pill.y - along.y * away }
-  const b = { x: pill.x + along.x * away, y: pill.y + along.y * away }
+  const within = (z: number, room: number, length: number) =>
+    length > 2 * room ? Math.min(Math.max(z, room), length - room) : z
+  const at = { x: within(pill.x, half.x, size.width), y: within(pill.y, half.y, size.height) }
+  const a = { x: at.x - along.x * away, y: at.y - along.y * away }
+  const b = { x: at.x + along.x * away, y: at.y + along.y * away }
   const aFirst = a.x < b.x - 0.5 || (Math.abs(a.x - b.x) <= 0.5 && a.y < b.y)
   return {
     piece,
-    edge: edge.id,
+    edge,
     middle,
-    pill,
+    pill: at,
     width,
     out,
     extend: aFirst ? a : b,

@@ -8,6 +8,7 @@ import type {
   DrapeProgress,
   DrapeRequest,
   Girth,
+  SeenEdge,
   Blended,
   BlendRequest,
   FitRequest,
@@ -93,11 +94,18 @@ export type SimNote =
   | { note: 'slide'; dx: number; dy: number; pixelRatio: number }
   | { note: 'reset' }
   | { note: 'shows'; shows: ClothShows }
+  /** Tells the page the pieces' edges as seen after each frame (`SimOutline`), or stops. */
+  | { note: 'outline'; pixelRatio: number | null }
 
 /** What the worker tells the page unasked: how the drape asked for by request `drape` is going. */
 export interface SimUpdate {
   drape: number
   update: DrapeUpdate
+}
+
+/** What the worker tells the page unasked while editing on the figure: the pieces' edges as last drawn. */
+export interface SimOutline {
+  outline: SeenEdge[] | null
 }
 
 /** Failures the app explains in its own words. */

@@ -16,6 +16,7 @@ import {
   SimError,
   type SimMethods,
   type SimNote,
+  type SimOutline,
   type SimRequest,
   type SimResponse,
   type SimUpdate,
@@ -125,6 +126,8 @@ function follow(id: number, draping: Draping, quietly: boolean): Promise<DrapeUp
 }
 
 let pending = false
+/** Telling the page the pieces' edges as seen after each frame, at this pixel ratio. */
+let outlining: number | null = null
 
 /** Draws once before the next frame, however many changes come first. */
 function redraw() {
@@ -138,6 +141,9 @@ function redraw() {
     pending = false
     if (drape) moveDrape(drape)
     view?.draw()
+    if (view && outlining !== null) {
+      self.postMessage({ outline: view.outline(outlining) } satisfies SimOutline)
+    }
   })
 }
 
@@ -309,6 +315,9 @@ function apply(note: SimNote) {
       break
     case 'shows':
       view.setShows(note.shows)
+      break
+    case 'outline':
+      outlining = note.pixelRatio
       break
   }
   redraw()

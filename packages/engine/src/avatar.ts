@@ -21,6 +21,7 @@ import type {
   FitRequest,
   FitSteps,
   Girth,
+  SeenEdge,
   SizeMeasures,
   SizesRequest,
 } from './types'
@@ -42,6 +43,7 @@ export type {
   FitRequest,
   FitSteps,
   Girth,
+  SeenEdge,
   SizeMeasures,
   SizesRequest,
 } from './types'
@@ -232,6 +234,11 @@ export class AvatarView {
   /** The cloth seen at `x`, `y` CSS pixels from the view's top left, if any. */
   pick(x: number, y: number, pixelRatio: number): ClothReading | null {
     return this.#handle.pick(x, y, pixelRatio) as ClothReading | null
+  }
+
+  /** The pieces' edges on the cloth as seen now; null with no cloth on. */
+  outline(pixelRatio: number): SeenEdge[] | null {
+    return this.#handle.outline(pixelRatio) as SeenEdge[] | null
   }
 
   /** Turns round the figure for a drag of `dx`, `dy` CSS pixels. */

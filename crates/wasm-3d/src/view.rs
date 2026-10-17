@@ -336,6 +336,31 @@ impl View {
         }
     }
 
+    /// The pieces' edges on the cloth as seen now (`SeenEdge`s), at
+    /// `pixel_ratio` device pixels to a CSS pixel; null with no cloth on.
+    pub fn outline(&self, pixel_ratio: f32) -> Result<JsValue, JsError> {
+        let (Some(cloth), Some(orbit)) = (&self.cloth, &self.orbit) else {
+            return Ok(JsValue::NULL);
+        };
+        let (width, height) = (self.config.width as f32, self.config.height as f32);
+        let m = orbit.view_projection(self.aspect());
+        let ratio = pixel_ratio.max(0.1);
+        let project = |p: [f32; 3]| {
+            let v = [p[0], p[1], p[2], 1.0];
+            let c = [0, 1, 2, 3].map(|r| (0..4).map(|k| m[k][r] * v[k]).sum::<f32>());
+            (c[3] > 1e-6).then(|| {
+                [
+                    (c[0] / c[3] + 1.0) / 2.0 * width / ratio,
+                    (1.0 - c[1] / c[3]) / 2.0 * height / ratio,
+                ]
+            })
+        };
+        cloth
+            .seen(orbit.eye(), project)
+            .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+            .map_err(error)
+    }
+
     /// Turns round the figure for a drag of `dx`, `dy` CSS pixels.
     pub fn turn(&mut self, dx: f32, dy: f32) {
         if let Some(orbit) = &mut self.orbit {

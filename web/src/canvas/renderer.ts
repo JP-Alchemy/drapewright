@@ -621,7 +621,7 @@ function drawBadge(
  * A handle to drag an edge by: a round button with its picture turned to
  * point out of the piece; filled in while under the pointer or dragged.
  */
-function drawHandle(
+export function drawHandle(
   ctx: CanvasRenderingContext2D,
   kind: EdgeMove,
   at: { x: number; y: number },
@@ -654,7 +654,13 @@ function drawHandle(
   ctx.stroke()
 }
 
-function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, theme: Theme) {
+export function drawPill(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  theme: Theme,
+) {
   ctx.font = PILL_FONT
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'

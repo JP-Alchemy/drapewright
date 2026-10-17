@@ -559,6 +559,18 @@ h2 {
   height: 100%;
 }
 
+/* Over the 3D view, letting the pointer through to it: the pieces' edges
+   while editing on the figure. */
+.avatar-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 .avatar-cannot {
   position: absolute;
   inset: 0;
@@ -844,6 +856,12 @@ h2 {
 .icon-button[data-hovered],
 .zoom-label[data-hovered] {
   background: var(--surface-2);
+}
+
+.button.toggle[data-selected] {
+  background: var(--select);
+  border-color: var(--select);
+  color: #fff;
 }
 
 .button.primary[data-hovered] {

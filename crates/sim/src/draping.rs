@@ -4,8 +4,10 @@
 //! and moved into a pose. The app moves it on a frame at a time (on the
 //! graphics card where it can); the assistants' server until it is done.
 
+use std::sync::Arc;
+
 use drapewright_body::{Body, BodyModel, Pose, Shape};
-use drapewright_pattern_core::Piece;
+use drapewright_pattern_core::{EdgeKind, Id, Piece};
 use drapewright_seams::Seam;
 
 use crate::drape::{Drape, Posable, Stepper};
@@ -46,6 +48,20 @@ pub enum Stage {
     Settled,
     /// Still moving after the longest a drape is given.
     Stopped,
+}
+
+/// One of a piece's edges as draped, on one copy of the piece (a pair has
+/// two, and a piece cut on the fold has each edge but the fold twice): its
+/// points in the cloth, from the edge's start to its end.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClothEdge {
+    pub piece: Id,
+    pub edge: Id,
+    pub kind: EdgeKind,
+    /// A facing's or a lining's: inside the rest.
+    pub inside: bool,
+    /// Indices into the cloth's points.
+    pub points: Vec<u32>,
 }
 
 /// How big the garment is round the body at one of the figure's levels,
@@ -96,6 +112,8 @@ pub struct Draping {
     body: Body,
     /// The pieces sewn to nothing, by id: left out.
     pub left_out: Vec<String>,
+    /// The pieces' edges in the cloth (shared with each look at it).
+    pub edges: Arc<[ClothEdge]>,
     /// The facings and linings sewn to nothing, by id: left out, as they
     /// go inside.
     pub inside: Vec<String>,
@@ -200,10 +218,26 @@ impl Draping {
         if let Some(posable) = Posable::of(model, &body) {
             drape.posable(posable);
         }
+        let edges = garment
+            .panels
+            .iter()
+            .zip(&drape.firsts)
+            .flat_map(|(panel, &first)| {
+                panel.edges.iter().map(move |e| ClothEdge {
+                    piece: panel.piece.clone(),
+                    edge: e.edge.clone(),
+                    kind: e.kind,
+                    inside: panel.inside,
+                    points: e.points.iter().map(|p| first + p).collect(),
+                })
+            })
+            .collect::<Vec<_>>()
+            .into();
         Ok(Draping {
             drape,
             body,
             left_out: draped.alone,
+            edges,
             inside: draped.inside,
             unplaced,
             lined,

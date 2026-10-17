@@ -12,6 +12,49 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 76 — Editing on the figure
+
+The pattern can now be changed where it is worn. With a garment draped,
+press **Edit on the figure** under the avatar: every edge of every piece
+is drawn on the cloth, with a dot at each corner. Edges turned away from
+you are not drawn.
+
+* **Hover an edge** on the figure: it turns blue, there and on the table,
+  with its length and the same two handles as on the table, beside it and
+  pointing out of the piece. Hovering an edge on the table shows it on the
+  figure the same way.
+* **Tap an edge** on the figure: it is chosen, its details (and any moves
+  of it) in the side panel.
+* **Drag a handle** on the figure: the edge moves out or in, extended or
+  extruded, exactly as on the table, one undo step a drag. A dashed line
+  shows where it is going, and the amount is beside the pointer. Let go
+  and the garment drapes again in a moment, the edges following.
+
+Turning, zooming and taps away from the edges work as before; a piece cut
+as a pair (or on the fold) has each edge on the figure twice, and either
+moves it.
+
+**Try it:** open the sample skirt, press **Drape**, then **Edit on the
+figure**. Hover the waist: the front's waist turns blue on the figure and
+on the table, 18.5 cm. Drag the left handle up a little: the front grows
+longer at the top (its sides narrowing as they run), the step appears in
+the side panel, and a moment later the skirt drapes again with the front
+higher. Undo puts it back, and the skirt drapes back.
+
+**How it works:** the drape keeps, for each piece edge, its points in the
+cloth. While editing, the 3D side tells the page after every frame it
+draws where those points are on the view, which of them face the eye
+(the cloth there turned towards it), and which way is out of the piece at
+each edge's middle, along the cloth. The page draws them over the view and
+turns a drag along that way into millimetres.
+
+**Limits:** corners are shown but not yet moved (next). An edge seen end
+on (a hem from straight below) moves slowly for a long drag, rather than
+jumping. Edges hidden behind an arm are still drawn if they face the eye.
+Facings and linings, inside, are left out.
+
+---
+
 ## Step 75 — Dragging an edge out or in, extended or extruded
 
 Moving an edge used to take a menu and a number. Now hover an edge (or

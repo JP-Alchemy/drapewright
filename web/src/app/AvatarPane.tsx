@@ -8,6 +8,7 @@ import type {
   DrapeRequest,
   FabricPreset,
   Measured,
+  SeenEdge,
 } from '@drapewright/engine'
 import type { ViewColours } from '@drapewright/engine/avatar'
 import {
@@ -16,6 +17,7 @@ import {
   Film,
   PanelBottom,
   PanelRight,
+  PencilRuler,
   PersonStanding,
   PictureInPicture2,
   RotateCcw,
@@ -35,6 +37,7 @@ import {
   Switch,
   Select,
   SelectValue,
+  ToggleButton,
 } from 'react-aria-components'
 import { attachOrbitInput } from '../canvas/orbit-input.ts'
 import { useEngineState } from '../state/hooks.ts'
@@ -48,6 +51,8 @@ import { DockEdge, useDocksBelow, useFloatingBox } from './AvatarFrame.tsx'
 import { setAvatarLayout, useAvatarLayout } from './avatar-layout.ts'
 import { FabricDialog } from './FabricDialog.tsx'
 import { FitAdvice } from './FitAdvice.tsx'
+import { edgeNear } from './avatar-edit.ts'
+import { useFigureEditing } from './figure-editing.ts'
 import { canRecord, video } from './turnaround.ts'
 import { fileName, saveBlob } from '../platform/save-file.ts'
 
@@ -244,6 +249,19 @@ export function AvatarPane({ session }: { session: Session }) {
   const [shows, setShows] = useState<ClothShows>('fabric')
   // The cloth where it was last tapped.
   const [reading, setReading] = useState<ClothReading | null>(null)
+  // Editing on the figure: the pieces' edges drawn over it, as last seen.
+  const [editing, setEditing] = useState(false)
+  const overlay = useRef<HTMLCanvasElement>(null)
+  const seen = useRef<SeenEdge[] | null>(null)
+  // Editing, an edge tapped on the figure is chosen: whether one was.
+  const chooseEdge = useRef<(x: number, y: number) => boolean>(() => false)
+  useEffect(() => {
+    chooseEdge.current = (x, y) => {
+      const edge = seen.current ? edgeNear(seen.current, { x, y }) : null
+      if (edge) session.select([edge.piece], { kind: 'edge', piece: edge.piece, edge: edge.edge })
+      return edge !== null
+    }
+  }, [session])
   // A fabric being measured, or the one chosen being changed.
   const [measuring, setMeasuring] = useState<typeof MEASURE | typeof CHANGE | null>(null)
   const units = session.engine.document().settings.displayUnits
@@ -312,6 +330,7 @@ export function AvatarPane({ session }: { session: Session }) {
         sim.note({ note: 'slide', dx, dy, pixelRatio: window.devicePixelRatio || 1 }),
       reset: () => sim.note({ note: 'reset' }),
       tap: (x, y) => {
+        if (chooseEdge.current(x, y)) return
         sim.pick(x, y, window.devicePixelRatio || 1).then(
           (found) => live && setReading(found),
           () => live && setReading(null),
@@ -470,6 +489,7 @@ export function AvatarPane({ session }: { session: Session }) {
     sim.note({ note: 'shows', shows: as })
   }
   const on = drape.kind === 'draping' || drape.kind === 'draped' || drape.kind === 'following'
+  useFigureEditing(session, editing && on && backend !== null, host, overlay, seen)
   const legend =
     shows === 'pull'
       ? t.avatar.pullLegend
@@ -628,6 +648,7 @@ export function AvatarPane({ session }: { session: Session }) {
           aria-label={viewFailed ?? text.viewLabel(measured ? (set?.name ?? null) : null)}
         >
           <span className="avatar-cloth-swatch" aria-hidden="true" />
+          <canvas ref={overlay} className="avatar-overlay" aria-hidden="true" />
           {viewFailed && <p className="avatar-cannot">{viewFailed}</p>}
           {backend && (
             <span className="avatar-backend muted small">
@@ -657,6 +678,7 @@ export function AvatarPane({ session }: { session: Session }) {
               </div>
             )}
             {garmentSaid && <p className="avatar-say small avatar-ease">{garmentSaid}</p>}
+            {editing && on && <p className="avatar-say small">{text.editHint}</p>}
             <p
               className={`avatar-say small${drape.kind === 'failed' ? ' measure-warning' : ''}${drapeSaid ? '' : ' quiet'}`}
               role="status"
@@ -741,6 +763,15 @@ export function AvatarPane({ session }: { session: Session }) {
                 {text.takeOff}
               </Button>
             )}
+            <ToggleButton
+              className="button toggle"
+              isSelected={editing && on}
+              isDisabled={!on}
+              onChange={setEditing}
+            >
+              <PencilRuler size={16} aria-hidden="true" />
+              {text.edit}
+            </ToggleButton>
             {on && (open || (drape.update?.buttons ?? 0) > 0) && (
               <Switch
                 className="switch"

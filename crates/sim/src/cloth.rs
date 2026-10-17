@@ -715,6 +715,12 @@ impl Cloth {
         k >= self.inside_from
     }
 
+    /// Which way each triangle faces out, away from the body: 1 the side
+    /// its corners run anticlockwise round, -1 the other.
+    pub fn facing(&self) -> &[f32] {
+        &self.facing
+    }
+
     /// Which way each triangle faces out, away from the body: the side its
     /// corners run anticlockwise round, or (-1) the other. Each panel (each
     /// piece of cloth joined by its triangles) faces one way, as most of it

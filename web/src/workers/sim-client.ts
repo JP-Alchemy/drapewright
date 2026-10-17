@@ -5,6 +5,7 @@ import type {
   AvatarSettings,
   ClothReading,
   DrapeRequest,
+  SeenEdge,
   Blended,
   BlendRequest,
   FitRequest,
@@ -19,6 +20,7 @@ import {
   type SimMethod,
   type SimMethods,
   type SimNote,
+  type SimOutline,
   type SimRequest,
   type SimResponse,
   type SimUpdate,
@@ -40,12 +42,18 @@ class SimClient {
   readonly #fits = new Map<string, Promise<AvatarFit>>()
   /** The drape asked for last, by request, and who hears how it goes. */
   #drape: { id: number; onUpdate: (update: DrapeUpdate) => void } | null = null
+  /** Who hears the pieces' edges as seen, while editing on the figure. */
+  #outline: ((outline: SeenEdge[] | null) => void) | null = null
 
   #start(): Worker {
     if (this.#worker) return this.#worker
     const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' })
-    worker.onmessage = (event: MessageEvent<SimResponse | SimUpdate>) => {
+    worker.onmessage = (event: MessageEvent<SimResponse | SimUpdate | SimOutline>) => {
       const response = event.data
+      if ('outline' in response) {
+        this.#outline?.(response.outline)
+        return
+      }
       if ('update' in response) {
         if (response.drape === this.#drape?.id) this.#drape.onUpdate(response.update)
         return
@@ -119,6 +127,15 @@ class SimClient {
   /** The steps altering a garment at its side seams to fit. */
   fitSteps(request: FitRequest): Promise<FitSteps> {
     return this.#call('fitSteps', [request])
+  }
+
+  /**
+   * Hears the pieces' edges as seen in the view after each frame drawn
+   * (`pixelRatio` device pixels to a CSS pixel), until called with null.
+   */
+  outline(hear: ((outline: SeenEdge[] | null) => void) | null, pixelRatio = 1): void {
+    this.#outline = hear
+    this.note({ note: 'outline', pixelRatio: hear ? pixelRatio : null })
   }
 
   /** Hands the canvas to the worker for the 3D view; how it draws. */

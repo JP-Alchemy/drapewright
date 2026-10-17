@@ -3,9 +3,11 @@
 
 use drapewright_body::{BodyModel, Pose, Shape};
 pub use drapewright_fabric::{Fabric, FabricPreset, Measured};
-use drapewright_pattern_core::Piece;
+use std::sync::Arc;
+
+use drapewright_pattern_core::{EdgeKind, Piece};
 use drapewright_seams::Seam;
-use drapewright_sim::draping::{self, Stage};
+use drapewright_sim::draping::{self, ClothEdge, Stage};
 use drapewright_sim::garment::GarmentError;
 use drapewright_sim::heatmap;
 use serde::{Deserialize, Serialize};
@@ -385,6 +387,37 @@ pub struct ClothState {
     room: Vec<f32>,
     /// The points from this one on are inside (facings, linings), if any.
     inside_from: Option<usize>,
+    /// The pieces' edges in it.
+    edges: Arc<[ClothEdge]>,
+    /// Which way each triangle faces out of the garment: 1 its corners'
+    /// way round, −1 the other.
+    facing: Vec<f32>,
+}
+
+/// One of the pieces' edges as seen in the view: where its points are, which
+/// of them face the eye, and which way is out of the piece at its middle.
+/// A piece cut as a pair, or on the fold, has its edges seen more than
+/// once.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SeenEdge {
+    pub piece: String,
+    pub edge: String,
+    pub kind: EdgeKind,
+    /// Its points on the view, CSS px from its top left, from the edge's
+    /// start to its end: x, y, then the next point's.
+    pub points: Vec<f32>,
+    /// Whether each point faces the eye: in front of it, and the cloth there
+    /// turned towards it.
+    pub shown: Vec<bool>,
+    /// Which point is its middle.
+    pub middle: u32,
+    /// Out of the piece at its middle point, along the cloth: how far on
+    /// the view each mm goes, CSS px.
+    pub out: [f32; 2],
+    /// How long it is as draped, mm.
+    pub length: f64,
 }
 
 impl Draping {
@@ -399,6 +432,8 @@ impl Draping {
             stretch: strain.stretch,
             room: drape.room().iter().map(|r| r * 1000.0).collect(),
             inside_from: (0..drape.cloth.x.len()).find(|&k| drape.cloth.inside(k)),
+            edges: self.0.edges.clone(),
+            facing: drape.cloth.facing().to_vec(),
         }
     }
 }
@@ -421,6 +456,105 @@ impl ClothState {
             ClothShows::Pull => self.pull.iter().map(|&p| heatmap::pull_colour(p)).collect(),
             ClothShows::Room => self.room.iter().map(|&r| heatmap::room_colour(r)).collect(),
         }
+    }
+
+    /// The pieces' edges as seen from `eye`, `project` taking a point (mm)
+    /// to the view (CSS px), if it is in front of the eye. Facings and
+    /// linings, inside, are left out.
+    pub fn seen(
+        &self,
+        eye: [f32; 3],
+        project: impl Fn([f32; 3]) -> Option<[f32; 2]>,
+    ) -> Vec<SeenEdge> {
+        let sub = |a: [f32; 3], b: [f32; 3]| [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+        let dot = |a: [f32; 3], b: [f32; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        let cross = |a: [f32; 3], b: [f32; 3]| {
+            [
+                a[1] * b[2] - a[2] * b[1],
+                a[2] * b[0] - a[0] * b[2],
+                a[0] * b[1] - a[1] * b[0],
+            ]
+        };
+        let unit = |a: [f32; 3]| {
+            let l = dot(a, a).sqrt();
+            if l > 1e-9 { a.map(|c| c / l) } else { [0.0; 3] }
+        };
+        let edges: Vec<&ClothEdge> = self
+            .edges
+            .iter()
+            .filter(|e| !e.inside && e.points.len() >= 2)
+            .collect();
+        // For each point on an edge: the way the cloth faces there, and the
+        // middle of the cloth round it (inside the piece).
+        let mut slot = vec![u32::MAX; self.points.len()];
+        let mut around: Vec<([f32; 3], [f32; 3], f32)> = Vec::new();
+        for e in &edges {
+            for &k in &e.points {
+                if slot[k as usize] == u32::MAX {
+                    slot[k as usize] = around.len() as u32;
+                    around.push(([0.0; 3], [0.0; 3], 0.0));
+                }
+            }
+        }
+        for (n, t) in self.triangles.iter().enumerate() {
+            if t.iter().all(|&k| slot[k as usize] == u32::MAX) {
+                continue;
+            }
+            let [a, b, c] = t.map(|k| self.points[k as usize]);
+            let out = self.facing.get(n).copied().unwrap_or(1.0);
+            let normal = cross(sub(b, a), sub(c, a)).map(|c| c * out);
+            let middle = [0, 1, 2].map(|i| (a[i] + b[i] + c[i]) / 3.0);
+            for &k in t {
+                if let Some(at) = around.get_mut(slot[k as usize] as usize) {
+                    at.0 = [0, 1, 2].map(|i| at.0[i] + normal[i]);
+                    at.1 = [0, 1, 2].map(|i| at.1[i] + middle[i]);
+                    at.2 += 1.0;
+                }
+            }
+        }
+        edges
+            .iter()
+            .map(|e| {
+                let n = e.points.len();
+                let at = |i: usize| self.points[e.points[i] as usize];
+                let mut points = Vec::with_capacity(2 * n);
+                let mut shown = Vec::with_capacity(n);
+                for (i, &k) in e.points.iter().enumerate() {
+                    let p = at(i);
+                    let seen = project(p);
+                    let [x, y] = seen.unwrap_or([f32::NAN; 2]);
+                    points.extend([x, y]);
+                    let facing = dot(around[slot[k as usize] as usize].0, sub(eye, p)) > 0.0;
+                    shown.push(seen.is_some() && facing);
+                }
+                // Out of the piece at its middle: away from the cloth round
+                // it, square to the edge, along the cloth.
+                let m = n / 2;
+                let p = at(m);
+                let along = unit(sub(at((m + 1).min(n - 1)), at(m.saturating_sub(1))));
+                let (_, middles, count) = around[slot[e.points[m] as usize] as usize];
+                let inward = sub(middles.map(|c| c / count.max(1.0)), p);
+                let across = sub(inward, along.map(|c| c * dot(inward, along)));
+                let way = unit(across).map(|c| -c);
+                let out = match (project(p), project([0, 1, 2].map(|i| p[i] + way[i]))) {
+                    (Some(a), Some(b)) => [b[0] - a[0], b[1] - a[1]],
+                    _ => [0.0; 2],
+                };
+                let length = (1..n)
+                    .map(|i| f64::from(dot(sub(at(i), at(i - 1)), sub(at(i), at(i - 1))).sqrt()))
+                    .sum();
+                SeenEdge {
+                    piece: e.piece.clone(),
+                    edge: e.edge.clone(),
+                    kind: e.kind,
+                    points,
+                    shown,
+                    middle: m as u32,
+                    out,
+                    length,
+                }
+            })
+            .collect()
     }
 
     /// The cloth where the line of sight from `eye` going `way` (a unit

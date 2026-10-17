@@ -19,6 +19,7 @@ use std::collections::BTreeMap;
 
 pub use drape::{
     AvatarPose, ClothReading, ClothShows, DrapeProgress, DrapeRequest, DrapeStage, FabricPreset,
+    SeenEdge,
 };
 use drapewright_body::shape::{OLD, YOUNG};
 use drapewright_body::{BodyModel, Shape, fit};

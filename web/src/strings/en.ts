@@ -1270,6 +1270,9 @@ export const t = {
     drapeAgain: 'Drape again',
     stop: 'Stop',
     takeOff: 'Take off',
+    edit: 'Edit on the figure',
+    editHint:
+      'Hover or tap an edge: its length, and handles to drag it out or in. The garment drapes again after each change.',
     sewing: 'Sewing the seams…',
     settling: 'Letting it settle…',
     posing: 'Moving into the pose…',
