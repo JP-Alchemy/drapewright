@@ -7,7 +7,7 @@
 // the pattern stops changing.
 
 import type { SeenEdge } from '@drapewright/engine'
-import { TUNING } from '@drapewright/input'
+import { type Modifiers, TUNING } from '@drapewright/input'
 import { type RefObject, useEffect } from 'react'
 import { edgeEnds } from '../canvas/edges.ts'
 import {
@@ -30,10 +30,10 @@ import {
 } from '../tools/corner-move.ts'
 import {
   type EdgeMoving,
-  beginEdgeMove,
+  beginEdgesMove,
   cancelEdgeMove,
   endEdgeMove,
-  setEdgeMove,
+  setEdgesMove,
 } from '../tools/edge-move.ts'
 import { sim } from '../workers/sim-client.ts'
 import {
@@ -60,7 +60,7 @@ interface Pressed {
 
 /** A handle on the figure being dragged: an edge's, or a corner's. */
 type Drag =
-  | (Pressed & { of: 'edge'; moving: EdgeMoving; copy: SeenEdge })
+  | (Pressed & { of: 'edge'; movings: EdgeMoving[]; copy: SeenEdge })
   | (Pressed & {
       of: 'corner'
       moving: CornerMoving
@@ -96,16 +96,25 @@ function cornersOf(session: Session, seen: SeenEdge[] | null): SeenCorner[] {
 
 /**
  * What a tap at `p` chooses while editing on the figure: a corner there,
- * else an edge. Whether it chose one.
+ * else an edge; with Shift, the edge added to those chosen (or taken
+ * away); with Ctrl or Alt (Option), the line round the garment it is part
+ * of. Whether it chose one.
  */
-export function chooseOnFigure(session: Session, seen: SeenEdge[] | null, p: Point): boolean {
+export function chooseOnFigure(
+  session: Session,
+  seen: SeenEdge[] | null,
+  p: Point,
+  keys: Modifiers = { shift: false, alt: false, meta: false, ctrl: false },
+): boolean {
   const under = seen ? underPointer(seen, cornersOf(session, seen), p) : null
   if (under && 'corner' in under) {
     const { piece, edge } = under.corner
     session.select([piece], { kind: 'corner', piece, edge })
   } else if (under) {
     const { piece, edge } = under.edge
-    session.select([piece], { kind: 'edge', piece, edge })
+    if (keys.ctrl || keys.alt) session.chooseLine({ piece, edge }, keys.shift)
+    else if (keys.shift) session.toggleEdge({ piece, edge })
+    else session.select([piece], { kind: 'edge', piece, edge })
   }
   return under !== null
 }
@@ -188,13 +197,16 @@ export function useFigureEditing(
       const all = seen.current
       if (!all) return
       const ui = session.ui.get()
-      const refs = (kind: 'edge' | 'corner') =>
-        [ui.hover, ui.part].flatMap((r) =>
+      const refs = (kind: 'edge' | 'corner') => [
+        ...[ui.hover, ui.part].flatMap((r) =>
           r?.kind === kind ? [{ piece: r.piece, edge: r.edge }] : [],
-        )
+        ),
+        ...(kind === 'edge' ? ui.moreEdges : []),
+      ]
       const handles = layout()
       const corner = cornerLayout()
-      const moved = drag?.of === 'edge' && drag.dragging ? drag.moving.by - drag.moving.base : 0
+      const first = drag?.of === 'edge' ? drag.movings[0] : undefined
+      const moved = first && drag?.dragging ? first.by - first.base : 0
       const cornerTo =
         drag?.of === 'corner' && drag.dragging
           ? cornerShown(drag.corner, drag.ways, {
@@ -317,7 +329,7 @@ export function useFigureEditing(
         drag = {
           ...pressed(e, p),
           of: 'edge',
-          moving: beginEdgeMove(session, piece, h.copy.edge, kind),
+          movings: beginEdgesMove(session, { piece: piece.id, edge: h.copy.edge }, kind),
           copy: h.copy,
         }
         active = { piece: piece.id, edge: h.copy.edge, kind }
@@ -353,7 +365,7 @@ export function useFigureEditing(
         }
         const [dx, dy] = [p.x - drag.start.x, p.y - drag.start.y]
         if (drag.of === 'edge') {
-          say({ at: p, text: setEdgeMove(session, drag.moving, mmDragged(drag.copy, dx, dy)) })
+          say({ at: p, text: setEdgesMove(session, drag.movings, mmDragged(drag.copy, dx, dy)) })
         } else {
           const d = cornerDragged(drag.corner, drag.ways, { x: dx, y: dy })
           if (d) say({ at: p, text: setCornerMove(session, drag.moving, d) })
@@ -404,8 +416,10 @@ export function useFigureEditing(
       if (!drag || e.pointerId !== drag.pointer) return
       e.stopImmediatePropagation()
       if (drag.of === 'edge') {
-        if (cancelled) cancelEdgeMove(session, drag.moving)
-        else endEdgeMove(session, drag.moving)
+        for (const m of drag.movings) {
+          if (cancelled) cancelEdgeMove(session, m)
+          else endEdgeMove(session, m)
+        }
       } else if (cancelled) cancelCornerMove(session, drag.moving)
       else endCornerMove(session, drag.moving)
       drag = null
@@ -447,7 +461,7 @@ export function useFigureEditing(
       el.removeEventListener('pointerleave', onLeave)
       cancelAnimationFrame(frame)
       delete handle.drapewrightFigure
-      if (drag?.of === 'edge') cancelEdgeMove(session, drag.moving)
+      if (drag?.of === 'edge') for (const m of drag.movings) cancelEdgeMove(session, m)
       else if (drag) cancelCornerMove(session, drag.moving)
       sim.outline(null)
       unsubscribeUi()

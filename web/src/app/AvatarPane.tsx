@@ -39,6 +39,7 @@ import {
   SelectValue,
   ToggleButton,
 } from 'react-aria-components'
+import type { Modifiers } from '@drapewright/input'
 import { attachOrbitInput } from '../canvas/orbit-input.ts'
 import { useEngineState } from '../state/hooks.ts'
 import type { Session } from '../state/session.ts'
@@ -253,9 +254,9 @@ export function AvatarPane({ session }: { session: Session }) {
   const overlay = useRef<HTMLCanvasElement>(null)
   const seen = useRef<SeenEdge[] | null>(null)
   // Editing, an edge or a corner tapped on the figure is chosen: whether one was.
-  const chooseEdge = useRef<(x: number, y: number) => boolean>(() => false)
+  const chooseEdge = useRef<(x: number, y: number, keys: Modifiers) => boolean>(() => false)
   useEffect(() => {
-    chooseEdge.current = (x, y) => chooseOnFigure(session, seen.current, { x, y })
+    chooseEdge.current = (x, y, keys) => chooseOnFigure(session, seen.current, { x, y }, keys)
   }, [session])
   // A fabric being measured, or the one chosen being changed.
   const [measuring, setMeasuring] = useState<typeof MEASURE | typeof CHANGE | null>(null)
@@ -324,8 +325,8 @@ export function AvatarPane({ session }: { session: Session }) {
       slide: (dx, dy) =>
         sim.note({ note: 'slide', dx, dy, pixelRatio: window.devicePixelRatio || 1 }),
       reset: () => sim.note({ note: 'reset' }),
-      tap: (x, y) => {
-        if (chooseEdge.current(x, y)) return
+      tap: (x, y, keys) => {
+        if (chooseEdge.current(x, y, keys)) return
         sim.pick(x, y, window.devicePixelRatio || 1).then(
           (found) => live && setReading(found),
           () => live && setReading(null),

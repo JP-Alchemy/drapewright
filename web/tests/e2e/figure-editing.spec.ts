@@ -86,6 +86,25 @@ test('an edge is hovered, chosen and dragged out on the figure', async ({ page }
   await expect.poll(async () => (await ui(page)).part).toEqual(['edge', 'p1', 'e2'])
   await expect(page.getByText(/drag the handles beside its length/)).toBeVisible()
 
+  // Ctrl-clicked: its line round the skirt, the back's waist (e7) too.
+  await page.keyboard.down('Control')
+  await page.mouse.click(waist.x, waist.y)
+  await page.keyboard.up('Control')
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).drapewright
+          .chosenEdges()
+          .map((e: { piece: string; edge: string }) => `${e.piece} ${e.edge}`)
+          .sort(),
+      ),
+    )
+    .toEqual(['p1 e2', 'p6 e7'])
+  // Back to the front's waist alone.
+  await page.mouse.click(waist.x, waist.y)
+  await expect.poll(async () => (await ui(page)).part).toEqual(['edge', 'p1', 'e2'])
+
   // Its extend handle dragged up: the front longer, as one step.
   const handle = (await handleOnFigure(page, 'extend'))!
   expect(handle).not.toBeNull()

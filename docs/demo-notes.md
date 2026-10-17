@@ -12,6 +12,41 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 78 — Choosing a whole line of edges, and moving them together
+
+To lengthen a whole skirt, every hem round it has to move: its front's
+and its back's, and in a dress perhaps six panels'. Now they can be
+chosen and moved together, as Blender chooses an edge loop.
+
+* **Shift-click** an edge (on the table, or on the figure while editing
+  there) to add it to the edges chosen, or to take it away.
+* **Ctrl-click** (or **Alt/Option-click**) an edge to choose the whole line
+  it is part of, round the garment: from each end of it, past the corner,
+  across the seam sewing the edge that meets it there, and on along the
+  next piece's edge, until a fold, an edge sewn to nothing there, or back
+  where it began. A skirt's hem is its front's hem and its back's; its
+  waist, its waists; a bodice's armhole, its front's and back's, across
+  the side and shoulder seams. With Shift as well, the line is added.
+* **On an iPad**, tap an edge: its details offer **Choose all along this
+  line (2 edges)**.
+* **Moved together:** drag the handles beside any of the edges chosen
+  (on the table or on the figure) and they all move as far, extended or
+  extruded, each a step on its own piece, one undo step for the lot. The
+  side panel lists them (each can be left out) with one amount for all:
+  **Moved out by** sets it, and shows it while they agree.
+
+**Try it:** open the sample skirt, Ctrl-click the front's hem: both hems
+turn blue, and the side panel says *2 edges*. Type 5 in **Moved out by**:
+the front and the back are both 5 cm longer, their side seams still the
+same length. Drag the handles below the front's hem: both move. One undo
+takes back the drag.
+
+**Limits:** a line goes across seams sewn as far as its corners; one sewn
+only part of the way stops it there. Corners are still moved one at a
+time.
+
+---
+
 ## Step 77 — Moving a corner, on the table and on the figure
 
 A corner can now be moved like an edge. Hover a corner (or tap it): a

@@ -590,6 +590,15 @@ export const t = {
     asDrawn: 'Dashed: the piece as drawn.',
   },
 
+  edges: {
+    heading: (n: number) => `${n} edges`,
+    hint: 'Moved together: drag the handles beside any of them, on the table or on the figure, or set how far here.',
+    by: 'Moved out by',
+    byHint: 'Less than 0 moves them in. Each is a step on its own piece.',
+    leaveOut: (name: string) => `Leave out ${name}`,
+    chooseLine: (n: number) => `Choose all along this line (${n} edges)`,
+  },
+
   cornerMove: {
     hint: 'To move it, drag the handle beside it, on the table or on the figure.',
     handle: 'Drag to move the corner: the edges either side follow',
@@ -603,6 +612,7 @@ export const t = {
       extend: 'Drag to extend: the edges either side carry on as they run',
       extrude: 'Drag to extrude: a strip added, its sides square',
     } as Record<EdgeMove, string>,
+    many: (said: string, n: number) => `${said}, ${n} edges`,
     tip: (mode: EdgeMove, by: number, amount: string) =>
       by === 0
         ? 'As it was'

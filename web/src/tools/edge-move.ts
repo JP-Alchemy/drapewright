@@ -11,7 +11,7 @@ import { TUNING } from '@drapewright/input'
 import { type EdgeHandles, edgeHandles, handleAt } from '../canvas/handles.ts'
 import { placement } from '../canvas/renderer.ts'
 import type { Point } from '../canvas/viewport.ts'
-import type { Session } from '../state/session.ts'
+import type { EdgeRef, Session } from '../state/session.ts'
 import { formatLength, t } from '../strings/en.ts'
 import type { ToolContext } from './tool.ts'
 
@@ -72,24 +72,29 @@ export interface EdgeMoving {
   /** The step being changed; whether this move added it. */
   step: string | null
   added: boolean
+  /** Why it was last refused, if it was. */
+  refused: string | null
   gesture: number
 }
 
 let gestures = 0
 
 /**
- * Starts moving an edge, choosing it. The step changed is its piece's last,
- * if that moves this edge this way; else one is added once it moves.
+ * Starts moving an edge, choosing it (unless `choose` is false). The step
+ * changed is its piece's last, if that moves this edge this way; else one
+ * is added once it moves. Edges moved together share a `gesture`: one undo
+ * step.
  */
 export function beginEdgeMove(
   session: Session,
   piece: Piece,
   edge: string,
   mode: EdgeMove,
+  { choose = true, gesture = ++gestures }: { choose?: boolean; gesture?: number } = {},
 ): EdgeMoving {
   const last = lastStep(piece, edge, mode)
   const base = last?.change.type === 'moveEdge' ? last.change.by : 0
-  session.select([piece.id], { kind: 'edge', piece: piece.id, edge })
+  if (choose) session.select([piece.id], { kind: 'edge', piece: piece.id, edge })
   return {
     piece: piece.id,
     edge,
@@ -98,8 +103,40 @@ export function beginEdgeMove(
     by: base,
     step: last?.id ?? null,
     added: false,
-    gesture: ++gestures,
+    refused: null,
+    gesture,
   }
+}
+
+/**
+ * Starts moving `edge`, and with it every edge chosen with it: all of them
+ * if it is one of several chosen, else it alone (chosen).
+ */
+export function beginEdgesMove(session: Session, edge: EdgeRef, mode: EdgeMove): EdgeMoving[] {
+  const doc = session.engine.document()
+  const piece = (id: string) => doc.pieces.find((p) => p.id === id)
+  const chosen = session.chosenEdges()
+  const together =
+    chosen.length > 1 && chosen.some((e) => e.piece === edge.piece && e.edge === edge.edge)
+  if (!together) {
+    const p = piece(edge.piece)
+    return p ? [beginEdgeMove(session, p, edge.edge, mode)] : []
+  }
+  const gesture = ++gestures
+  // The one dragged first: its amount is the one said.
+  const order = [edge, ...chosen.filter((e) => e.piece !== edge.piece || e.edge !== edge.edge)]
+  return order.flatMap((e) => {
+    const p = piece(e.piece)
+    return p ? [beginEdgeMove(session, p, e.edge, mode, { choose: false, gesture })] : []
+  })
+}
+
+/** Each edge moved `mm` further out than it was: what to say, as `setEdgeMove` (and how many). */
+export function setEdgesMove(session: Session, movings: EdgeMoving[], mm: number): string {
+  const said = movings.map((m) => setEdgeMove(session, m, mm))
+  const refused = movings.find((m) => m.refused)?.refused
+  if (refused) return refused
+  return movings.length > 1 ? t.edgeMove.many(said[0]!, movings.length) : (said[0] ?? '')
 }
 
 /**
@@ -131,7 +168,11 @@ export function setEdgeMove(session: Session, moving: EdgeMoving, mm: number): s
         { type: 'addAlteration', piece: moving.piece, alteration: { id: '', on: true, change } },
         options,
       )
-  if (result.status === 'rejected') return result.error.message
+  if (result.status === 'rejected') {
+    moving.refused = result.error.message
+    return result.error.message
+  }
+  moving.refused = null
   if (!moving.step) {
     const piece = session.engine.document().pieces.find((x) => x.id === moving.piece)
     moving.step = piece?.alterations.at(-1)?.id ?? null
@@ -179,7 +220,8 @@ export function cancelEdgeMove(session: Session, moving: EdgeMoving): void {
 
 /** A handle on the table being dragged. */
 export interface EdgeDrag {
-  moving: EdgeMoving
+  /** The edge dragged, first, and those chosen with it. */
+  movings: EdgeMoving[]
   /** Where the press was, on the table and on screen. */
   start: Point
   screen: Point
@@ -206,11 +248,11 @@ export function startEdgeDrag(
   const a = m.transformPoint(new DOMPoint(mx, my))
   const b = m.transformPoint(new DOMPoint(mx + ev.middleNormal[0], my + ev.middleNormal[1]))
   const n = Math.hypot(b.x - a.x, b.y - a.y) || 1
-  const moving = beginEdgeMove(session, sp.piece, handles.edge, mode)
+  const movings = beginEdgesMove(session, { piece: sp.piece.id, edge: handles.edge }, mode)
   session.setEdgeHandle({ piece: sp.piece.id, edge: handles.edge, kind: mode, dragging: true })
   session.showTip(null)
   return {
-    moving,
+    movings,
     start: ctx.world(p),
     screen: { x: p.x, y: p.y },
     pointer: p.kind,
@@ -228,20 +270,20 @@ export function moveEdgeDrag(ctx: ToolContext, p: ToolPointer, drag: EdgeDrag): 
   }
   const w = ctx.world(p)
   const mm = (w.x - drag.start.x) * drag.out.x + (w.y - drag.start.y) * drag.out.y
-  const text = setEdgeMove(ctx.session, drag.moving, mm)
+  const text = setEdgesMove(ctx.session, drag.movings, mm)
   ctx.session.showTip({ x: p.x, y: p.y, text })
 }
 
 /** Lets go of the handle. */
 export function endEdgeDrag(ctx: ToolContext, drag: EdgeDrag): void {
-  endEdgeMove(ctx.session, drag.moving)
+  for (const m of drag.movings) endEdgeMove(ctx.session, m)
   ctx.session.setEdgeHandle(null)
   ctx.session.showTip(null)
 }
 
 /** The drag called off: the step back as it was. */
 export function cancelEdgeDrag(ctx: ToolContext, drag: EdgeDrag): void {
-  cancelEdgeMove(ctx.session, drag.moving)
+  for (const m of drag.movings) cancelEdgeMove(ctx.session, m)
   ctx.session.setEdgeHandle(null)
   ctx.session.showTip(null)
 }

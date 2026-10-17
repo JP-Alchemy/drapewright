@@ -1,5 +1,12 @@
-import type { DisplayUnits, EdgeKind, Piece, PieceView } from '@drapewright/engine'
-import { ChevronRight, RotateCcw, RotateCw, Trash2 } from 'lucide-react'
+import type {
+  Command,
+  DisplayUnits,
+  EdgeKind,
+  EdgeMove,
+  Piece,
+  PieceView,
+} from '@drapewright/engine'
+import { ChevronRight, RotateCcw, RotateCw, Trash2, X } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import {
   Button,
@@ -15,7 +22,8 @@ import {
 } from 'react-aria-components'
 import { remember, remembered } from '../platform/remember.ts'
 import { useEngineState } from '../state/hooks.ts'
-import type { PartRef, Session } from '../state/session.ts'
+import { edgeLine } from '../state/edge-line.ts'
+import type { EdgeRef, PartRef, Session } from '../state/session.ts'
 import { useStore } from '../state/store.ts'
 import { formatLength, t } from '../strings/en.ts'
 import { CornerChooser } from './CornerChooser.tsx'
@@ -294,6 +302,8 @@ function EdgeSection({
   const sewn = doc.seams
     .map((seam, i) => ({ seam, i }))
     .filter(({ seam }) => here(seam.a) || here(seam.b))
+  // The line round the garment it is part of.
+  const line = edgeLine(doc, ref)
   // Its moves, as dragged by the handles beside its length.
   const moves = piece.alterations.filter(
     (a) => a.change.type === 'moveEdge' && a.change.edge === edgeId,
@@ -322,6 +332,11 @@ function EdgeSection({
         onCommit={(name) => session.dispatch({ type: 'renameEdge', ...ref, name })}
       />
       <p className="muted small">{t.inspector.edgeLength(formatLength(ev.length, units))}</p>
+      {line.length > 1 && (
+        <Button className="link-button" onPress={() => session.chooseLine(ref)}>
+          {t.edges.chooseLine(line.length)}
+        </Button>
+      )}
       {moves.map((a) => (
         <AlterStep key={a.id} session={session} piece={piece} view={view} alteration={a} />
       ))}
@@ -371,6 +386,100 @@ function EdgeSection({
           )}
         </>
       )}
+    </section>
+  )
+}
+
+/** How far an edge's last step moving it `mode` moves it, mm: 0 with none. */
+function movedBy(piece: Piece | undefined, edge: string, mode: EdgeMove): number {
+  const step = piece?.alterations.findLast(
+    (a) => a.change.type === 'moveEdge' && a.change.edge === edge && a.change.mode === mode,
+  )
+  return step?.change.type === 'moveEdge' ? step.change.by : 0
+}
+
+/**
+ * Edges chosen together (a skirt's hem all round, say): each named, to be
+ * left out; and how far they are all moved out, extended or extruded, as a
+ * step on each one's piece.
+ */
+function EdgesSection({ session, edges }: { session: Session; edges: EdgeRef[] }) {
+  const [mode, setMode] = useState<EdgeMove>('extend')
+  const doc = session.engine.document()
+  const units = doc.settings.displayUnits
+  const pieceOf = (id: string) => doc.pieces.find((p) => p.id === id)
+  const amounts = edges.map((e) => movedBy(pieceOf(e.piece), e.edge, mode))
+  const same = amounts.every((a) => Math.abs(a - amounts[0]!) < 0.05)
+  /** Each edge moved `to(its amount)`, as one undo step: its step changed, added or taken away. */
+  const move = (to: (was: number) => number) => {
+    const commands: Command[] = edges.flatMap((e, i): Command[] => {
+      const piece = pieceOf(e.piece)
+      const step = piece?.alterations.findLast(
+        (a) => a.change.type === 'moveEdge' && a.change.edge === e.edge && a.change.mode === mode,
+      )
+      const by = Math.round(to(amounts[i]!) * 10) / 10
+      if (!piece) return []
+      if (step && by === 0) {
+        return [{ type: 'deleteAlteration', piece: piece.id, alteration: step.id }]
+      }
+      const change = { type: 'moveEdge' as const, edge: e.edge, by, mode }
+      if (step) {
+        return [{ type: 'setAlteration', piece: piece.id, alteration: { ...step, change } }]
+      }
+      return by === 0
+        ? []
+        : [{ type: 'addAlteration', piece: piece.id, alteration: { id: '', on: true, change } }]
+    })
+    if (commands.length > 0) session.dispatchAll(commands)
+  }
+  return (
+    <section className="panel-section inspector" aria-labelledby="edges-heading">
+      <h2 id="edges-heading">{t.edges.heading(edges.length)}</h2>
+      <ul className="chosen-edges">
+        {edges.map((e) => {
+          const piece = pieceOf(e.piece)
+          const name = piece ? `${piece.name} · ${edgeLabel(piece, e.edge)}` : e.edge
+          return (
+            <li key={`${e.piece} ${e.edge}`}>
+              <span>{name}</span>
+              <Button
+                className="icon-button"
+                aria-label={t.edges.leaveOut(name)}
+                onPress={() => session.toggleEdge(e)}
+              >
+                <X size={16} aria-hidden="true" />
+              </Button>
+            </li>
+          )
+        })}
+      </ul>
+      <p className="muted small">{t.edges.hint}</p>
+      <RadioGroup
+        className="segmented"
+        orientation="horizontal"
+        aria-label={t.alter.sides}
+        value={mode}
+        onChange={(m) => setMode(m as EdgeMove)}
+      >
+        <Label className="group-label">{t.alter.sides}</Label>
+        <div className="segments">
+          <Radio value="extend" className="segment">
+            {t.alter.extend}
+          </Radio>
+          <Radio value="extrude" className="segment">
+            {t.alter.extrude}
+          </Radio>
+        </div>
+      </RadioGroup>
+      <LengthField
+        label={t.edges.by}
+        value={same ? amounts[0]! : null}
+        units={units}
+        min={-1000}
+        description={t.edges.byHint}
+        onChange={(mm) => move(() => mm)}
+        onStep={(mm) => move((was) => was + mm)}
+      />
     </section>
   )
 }
@@ -426,7 +535,7 @@ function CornerSection({
  * new choice shows from the top.
  */
 export function Inspector({ session }: { session: Session }) {
-  const { selection, part, seam } = useStore(session.ui)
+  const { selection, part, seam, moreEdges } = useStore(session.ui)
   useEngineState(session)
   const top = useRef<HTMLDivElement>(null)
   const chosen = [...selection].sort().join(',')
@@ -442,6 +551,19 @@ export function Inspector({ session }: { session: Session }) {
       <section className="panel-section">
         <p className="muted small">{t.inspector.nothing}</p>
       </section>
+    )
+  } else if (moreEdges.length > 0) {
+    // Several edges chosen together, on one piece or several.
+    const [only] = scene
+    body = (
+      <>
+        <EdgesSection session={session} edges={session.chosenEdges()} />
+        {scene.length > 1 || !only ? (
+          <ManyPiecesSection session={session} pieces={scene.map((sp) => sp.piece)} />
+        ) : (
+          <PieceSection session={session} piece={only.piece} view={only.view} />
+        )}
+      </>
     )
   } else if (scene.length > 1) {
     body = <ManyPiecesSection session={session} pieces={scene.map((sp) => sp.piece)} />

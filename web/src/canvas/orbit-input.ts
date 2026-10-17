@@ -4,7 +4,7 @@
 // double tap, or 0, shows it whole again; the arrow keys turn it. A tap
 // that doesn't move points at what is there.
 
-import { InputRouter, type RawPointer, type ToolPointer } from '@drapewright/input'
+import { InputRouter, type Modifiers, type RawPointer, type ToolPointer } from '@drapewright/input'
 import { isTyping } from '../app/shortcuts.ts'
 import { rawPointer } from './input.ts'
 
@@ -15,8 +15,8 @@ export interface Orbiting {
   /** Slide for a drag of `dx`, `dy` CSS pixels. */
   slide(dx: number, dy: number): void
   reset(): void
-  /** A tap at `x`, `y` CSS pixels from the view's top left. */
-  tap?(x: number, y: number): void
+  /** A tap at `x`, `y` CSS pixels from the view's top left, keys held as it was pressed. */
+  tap?(x: number, y: number, modifiers: Modifiers): void
 }
 
 interface SafariGestureEvent extends UIEvent {
@@ -31,7 +31,7 @@ const TAP_SLOP = 6
 export function attachOrbitInput(el: HTMLElement, view: Orbiting): () => void {
   let last: ToolPointer | null = null
   // Where a press began, and whether it has moved off it: a tap if not.
-  let pressed: { x: number; y: number; moved: boolean } | null = null
+  let pressed: { x: number; y: number; moved: boolean; modifiers: Modifiers } | null = null
   const router = new InputRouter(
     {
       pan: (dx, dy) => view.slide(dx, dy),
@@ -40,7 +40,7 @@ export function attachOrbitInput(el: HTMLElement, view: Orbiting): () => void {
       redo: () => {},
       toolDown: (p) => {
         last = p
-        pressed = { x: p.x, y: p.y, moved: false }
+        pressed = { x: p.x, y: p.y, moved: false, modifiers: p.modifiers }
       },
       toolMove: (p) => {
         if (last) view.turn(p.x - last.x, p.y - last.y)
@@ -48,7 +48,7 @@ export function attachOrbitInput(el: HTMLElement, view: Orbiting): () => void {
         if (pressed && Math.hypot(p.x - pressed.x, p.y - pressed.y) > TAP_SLOP) pressed.moved = true
       },
       toolUp: () => {
-        if (pressed && !pressed.moved) view.tap?.(pressed.x, pressed.y)
+        if (pressed && !pressed.moved) view.tap?.(pressed.x, pressed.y, pressed.modifiers)
         last = null
         pressed = null
       },

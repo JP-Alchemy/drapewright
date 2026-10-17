@@ -2,7 +2,11 @@
 // pieces on the table; drag across the table from where there is no piece
 // to choose every piece the box touches, as files in a folder; hold an edge
 // to see its length; drag the handles beside an edge's length to move the
-// edge out or in. Shift (or Command, or Ctrl) adds to what is chosen.
+// edge out or in (every edge chosen with it, too), or beside a corner to
+// move it. Shift (or Command, or Ctrl) adds a piece to what is chosen. On
+// an edge, Shift adds the edge to the edges chosen (or takes it away), and
+// Ctrl or Alt (Option) chooses the line round the garment it is part of,
+// as Blender chooses an edge loop; with Shift as well, adding it.
 
 import type { ToolPointer } from '@drapewright/input'
 import { TUNING } from '@drapewright/input'
@@ -109,6 +113,16 @@ export function selectTool(): Tool {
         return
       }
       const piece = hit.piece
+      if (hit.kind === 'edge' && (p.modifiers.ctrl || p.modifiers.alt)) {
+        session.chooseLine({ piece, edge: hit.edge }, p.modifiers.shift)
+        state = { kind: 'idle' }
+        return
+      }
+      if (hit.kind === 'edge' && p.modifiers.shift) {
+        session.toggleEdge({ piece, edge: hit.edge })
+        state = { kind: 'idle' }
+        return
+      }
       let ids: string[]
       if (adding(p)) {
         const next = new Set(ui.selection)

@@ -149,11 +149,29 @@ test('a chosen edge is dragged by a finger on its handle', async ({ page }) => {
     }
   }, middle)
   await expect(page.getByText(/drag the handles beside its length/)).toBeVisible()
+  // Its whole line, the back's hem too, chosen by a button: no Ctrl here.
+  await page.getByRole('button', { name: 'Choose all along this line (2 edges)' }).click()
+  await expect(page.getByRole('heading', { name: '2 edges' })).toBeVisible()
   const at = await handleOf(page, 0, 'e6', 'extrude')
   const mm = await pxPerMm(page)
   await fingerDrag(page, at, { x: at.x, y: at.y + 20.3 * mm })
   await expect(front).toContainText('25.5 cm × 62.0 cm')
-  await expect(page.getByRole('switch', { name: 'The hem extruded 2.0 cm' }).first()).toBeChecked()
+  await expect(
+    page
+      .getByRole('treegrid', { name: 'Pieces' })
+      .getByRole('row', { name: /Blouse back/, level: 1 }),
+  ).toContainText('× 62.0 cm')
+  // Each hem extruded 2 cm: a step on each piece.
+  const steps = await page.evaluate(() =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).drapewright.engine
+      .document()
+      .pieces.map((p: { alterations: { change: unknown }[] }) =>
+        p.alterations.map((a) => a.change),
+      ),
+  )
+  expect(steps[0]).toEqual([{ type: 'moveEdge', edge: 'e6', by: 20, mode: 'extrude' }])
+  expect(steps[1]).toEqual([{ type: 'moveEdge', edge: 'e13', by: 20, mode: 'extrude' }])
 })
 
 test('a corner is moved by the handle beside it, its edges following', async ({ page }, info) => {
@@ -205,4 +223,51 @@ test('a corner is moved by the handle beside it, its edges following', async ({ 
   ).toBeChecked()
   await page.getByRole('button', { name: 'Undo alter piece' }).click()
   await expect(front).toContainText('25.5 cm × 60.0 cm')
+})
+
+test('a whole hem is chosen with Ctrl, moved by one amount, and dragged as one', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name === 'ipad-webkit', 'Ctrl-click')
+  await page.goto('/app/?debug')
+  await openBackup(page, 'blouse.drapewright', 3)
+  const rows = page.getByRole('treegrid', { name: 'Pieces' })
+  const front = rows.getByRole('row', { name: /Blouse front/, level: 1 })
+  const back = rows.getByRole('row', { name: /Blouse back/, level: 1 })
+  await centreOnFront(page)
+  // The front's hem (e6), Ctrl-clicked: its line round the blouse, the
+  // back's hem (e13) with it, across the side seams.
+  const hem = await edgeMiddle(page, 0, 'e6')
+  await page.keyboard.down('Control')
+  await page.mouse.click(hem.x, hem.y)
+  await page.keyboard.up('Control')
+  const chosen = () =>
+    page.evaluate(() =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).drapewright
+        .chosenEdges()
+        .map((e: { piece: string; edge: string }) => `${e.piece} ${e.edge}`),
+    )
+  expect((await chosen()).sort()).toEqual(['p1 e6', 'p8 e13'])
+  const edges = page.getByRole('region', { name: '2 edges' })
+  await expect(edges.getByText('Blouse back · the hem')).toBeVisible()
+
+  // Both 3 cm longer, as one undo step.
+  const by = edges.getByRole('textbox', { name: 'Moved out by' })
+  await by.fill('3')
+  await by.press('Enter')
+  await expect(front).toContainText('× 63.0 cm')
+  await expect(back).toContainText('× 63.0 cm')
+  await page.getByRole('button', { name: 'Undo alter piece' }).click()
+  await expect(front).toContainText('× 60.0 cm')
+  await expect(back).toContainText('× 60.0 cm')
+
+  // Dragged by the front's handle, both move.
+  await dragHandle(page, 'e6', 'extend', 0, 20.3)
+  await expect(front).toContainText('× 62.0 cm')
+  await expect(back).toContainText('× 62.0 cm')
+  expect((await chosen()).sort()).toEqual(['p1 e6', 'p8 e13'])
+  await page.getByRole('button', { name: /^Undo/ }).click()
+  await expect(front).toContainText('× 60.0 cm')
+  await expect(back).toContainText('× 60.0 cm')
 })

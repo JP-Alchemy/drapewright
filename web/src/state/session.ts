@@ -32,7 +32,10 @@ import { t } from '../strings/en.ts'
 import { saveScreenScale } from '../platform/screen.ts'
 import type { Projects } from '../storage/projects.ts'
 import type { IoClient } from '../workers/io-client.ts'
+import { type EdgeRef, edgeLine } from './edge-line.ts'
 import { type Store, createStore } from './store.ts'
+
+export type { EdgeRef } from './edge-line.ts'
 
 export type ToolId = 'select' | 'notch' | 'grainline' | 'pick'
 
@@ -161,6 +164,11 @@ export interface UiState {
   hover: Hit | null
   /** The edge handle under the pointer, or being dragged. */
   edgeHandle: EdgeHandleRef | null
+  /**
+   * Other edges chosen with the part's (an edge), on its piece or others:
+   * moved together with it.
+   */
+  moreEdges: EdgeRef[]
   preview: MovePreview | null
   marquee: Marquee | null
   grainPreview: GrainPreview | null
@@ -225,6 +233,7 @@ export class Session {
       part: null,
       hover: null,
       edgeHandle: null,
+      moreEdges: [],
       preview: null,
       marquee: null,
       grainPreview: null,
@@ -281,11 +290,19 @@ export class Session {
       (part.kind === 'notch'
         ? partPiece.notches.some((n) => n.id === part.notch)
         : partPiece.outline.edges.some((e) => e.id === part.edge))
-    if (selection.length !== ui.selection.size || (ui.part && !partAlive)) {
+    const there = (r: EdgeRef) =>
+      doc.pieces.find((p) => p.id === r.piece)?.outline.edges.some((e) => e.id === r.edge) ?? false
+    const moreEdges = ui.moreEdges.filter(there)
+    if (
+      selection.length !== ui.selection.size ||
+      (ui.part && !partAlive) ||
+      moreEdges.length !== ui.moreEdges.length
+    ) {
       this.ui.set((s) => ({
         ...s,
         selection: new Set(selection),
         part: partAlive ? s.part : null,
+        moreEdges: partAlive ? moreEdges : [],
       }))
     }
     if (ui.seam && !doc.seams.some((s) => s.id === ui.seam)) {
@@ -390,12 +407,53 @@ export class Session {
         ...s,
         selection,
         part,
+        moreEdges: [],
         // The picked seam stays while one of its pieces is chosen on its
         // own, none of its parts chosen: moved, say, to lie by the other.
         seam: picked && part === null && only !== undefined && sews(picked, only) ? s.seam : null,
         suggestion: selection.size > 0 ? s.suggestion : null,
       }
     })
+  }
+
+  /** The edges chosen: the part's, if an edge, then the others chosen with it. */
+  chosenEdges(): EdgeRef[] {
+    const { part, moreEdges } = this.ui.get()
+    return part?.kind === 'edge' ? [{ piece: part.piece, edge: part.edge }, ...moreEdges] : []
+  }
+
+  /**
+   * Chooses these edges together, their pieces with them: `primary` the
+   * one whose details show (and whose handles show on the table).
+   */
+  chooseEdges(edges: EdgeRef[], primary: EdgeRef): void {
+    const same = (a: EdgeRef) => a.piece === primary.piece && a.edge === primary.edge
+    const others = edges.filter(
+      (e, i) => !same(e) && edges.findIndex((f) => f.piece === e.piece && f.edge === e.edge) === i,
+    )
+    this.select([primary.piece, ...others.map((e) => e.piece)], { kind: 'edge', ...primary })
+    this.ui.set((s) => ({ ...s, moreEdges: others }))
+  }
+
+  /** Adds an edge to those chosen; one chosen already, takes it away. */
+  toggleEdge(edge: EdgeRef): void {
+    const same = (a: EdgeRef) => a.piece === edge.piece && a.edge === edge.edge
+    const chosen = this.chosenEdges()
+    if (!chosen.some(same)) {
+      this.chooseEdges([...chosen, edge], edge)
+      return
+    }
+    const rest = chosen.filter((e) => !same(e))
+    if (rest.length > 0) this.chooseEdges(rest, rest.at(-1)!)
+    else this.select([edge.piece])
+  }
+
+  /** Chooses the line round the garment that `edge` is part of; `adding` it to those chosen. */
+  chooseLine(edge: EdgeRef, adding = false): void {
+    const length = (side: { piece: string; edge: string }) =>
+      this.scenePiece(side.piece)?.view.edges.find((e) => e.id === side.edge)?.length ?? null
+    const line = edgeLine(this.engine.document(), edge, length)
+    this.chooseEdges(adding ? [...this.chosenEdges(), ...line] : line, edge)
   }
 
   /**

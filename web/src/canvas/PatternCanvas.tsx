@@ -51,6 +51,7 @@ export function PatternCanvas({ session }: { session: Session }) {
           join: seamJoin(seams, ui.seam, ui.suggestion),
           handles: ui.tool === 'select',
           edgeHandle: ui.edgeHandle,
+          moreEdges: ui.moreEdges,
         },
         theme,
       )

@@ -51,6 +51,8 @@ export interface Scene {
   handles?: boolean
   /** The handle under the pointer, or being dragged. */
   edgeHandle?: EdgeHandleRef | null
+  /** Other edges chosen with the part's, moved with it: drawn as strongly. */
+  moreEdges?: { piece: string; edge: string }[]
 }
 
 /** An edge of a piece, or the part of it from and to how far along it, mm. */
@@ -457,6 +459,7 @@ export function draw(
   const part = scene.part
   if (part?.kind === 'notch') highlight(part.piece, `notch:${part.notch}`, false, true)
   else if (part) highlight(part.piece, part.edge, part.kind === 'corner', true)
+  for (const e of scene.moreEdges ?? []) highlight(e.piece, e.edge, false, true)
 
   // The picked seam's edges (or a suggested seam's) joined by a line, so
   // which edges are sewn together shows at a glance.
