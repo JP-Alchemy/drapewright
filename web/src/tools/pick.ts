@@ -4,8 +4,8 @@
 // point, then where the armhole hinges and where the side seam is slashed
 // (both on the edge); a pivot takes the dart to move (unless the piece has
 // only one), then where on the edge it goes; a swayback, shoulder, bust at
-// the side, waist or hip adjustment takes two points on the edge; truing up takes the edge
-// tapped. Points on the edge snap to it.
+// the side, waist or hip adjustment takes two points on the edge; truing up
+// and moving an edge take the edge tapped. Points on the edge snap to it.
 
 import type { Alteration, Piece } from '@drapewright/engine'
 import type { ToolPointer } from '@drapewright/input'
@@ -23,6 +23,7 @@ export const ON_EDGE: Record<PickFor, boolean[]> = {
   waist: [true, true],
   hip: [true, true],
   trueUp: [],
+  moveEdge: [],
 }
 
 /** Whether an edge runs within 6 mm of the line between its ends: one to true straight. */
@@ -107,8 +108,9 @@ export function pickTool(): Tool {
       pressed = null
       const picking = ctx.session.ui.get().picking
       if (!start || !picking || Math.hypot(p.x - start.x, p.y - start.y) > TAP_SLOP) return
-      if (picking.for === 'trueUp') {
-        // The edge tapped: trued straight if it nearly is, else smooth.
+      if (picking.for === 'trueUp' || picking.for === 'moveEdge') {
+        // The edge tapped: trued straight if it nearly is, else smooth; or
+        // moved out 1 cm, extended.
         const hit = ctx.hit(p)
         const piece = ctx.session.engine.document().pieces.find((q) => q.id === picking.piece)
         if (!piece || hit?.piece !== piece.id || (hit.kind !== 'edge' && hit.kind !== 'corner'))
@@ -117,11 +119,11 @@ export function pickTool(): Tool {
         ctx.session.dispatch({
           type: 'addAlteration',
           piece: piece.id,
-          alteration: step({
-            type: 'trueUp',
-            edge: hit.edge,
-            straight: nearlyStraight(piece, hit.edge),
-          }),
+          alteration: step(
+            picking.for === 'trueUp'
+              ? { type: 'trueUp', edge: hit.edge, straight: nearlyStraight(piece, hit.edge) }
+              : { type: 'moveEdge', edge: hit.edge, by: 10, mode: 'extend' },
+          ),
         })
         return
       }

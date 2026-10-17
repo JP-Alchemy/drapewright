@@ -8,6 +8,7 @@ import type {
   DisplayUnits,
   ClothShows,
   EdgeKind,
+  EdgeMove,
   FabricPreset,
   ImportNote,
   LayNote,
@@ -405,6 +406,7 @@ export const t = {
         '',
       ],
       trueUp: ['Tap the edge to true.', ''],
+      moveEdge: ['Tap the edge to move.', ''],
     },
     whichDart: 'Tap the dart to move.',
     cancel: 'Cancel',
@@ -471,6 +473,7 @@ export const t = {
     add: 'Add a step',
     kinds: {
       lengthen: ['Lengthen or shorten', 'Across a line'],
+      moveEdge: ['Move an edge', 'Out or in, the edges either side carried on to meet it'],
       spread: ['Slash and spread', 'Open or close a slash'],
       bust: ['Bust adjustment', 'Full or small bust, on a front'],
       shoulder: ['Shoulders', 'Broader or narrower'],
@@ -540,6 +543,18 @@ export const t = {
       'At this side seam. A front and a back, each cut on the fold, change the whole garment by four times as much.',
     trueStep: (edge: string, straight: boolean) =>
       `${edge.charAt(0).toUpperCase()}${edge.slice(1)} trued ${straight ? 'straight' : 'smooth'}`,
+    moveStep: (edge: string, mode: EdgeMove, by: number, amount: string) =>
+      `${edge.charAt(0).toUpperCase()}${edge.slice(1)} ${by < 0 ? 'moved in' : mode === 'extend' ? 'extended' : 'extruded'} ${amount}`,
+    moveWay: 'Out or in',
+    out: 'Out',
+    in: 'In',
+    sides: 'The edges either side',
+    extend: 'Extend',
+    extrude: 'Extrude',
+    moveHint: (out: boolean) =>
+      out
+        ? 'Extend: they carry on the way they run. Extrude: straight out, square to the edge, a strip added.'
+        : 'Moved in, they are cut back along themselves, either way.',
     trueWay: 'Straight or smooth',
     straight: 'Straight',
     smooth: 'Smooth',
@@ -564,6 +579,20 @@ export const t = {
     fromTop: 'From the top',
     remove: (step: string) => `Remove the step “${step}”`,
     asDrawn: 'Dashed: the piece as drawn.',
+  },
+
+  edgeMove: {
+    hint: 'To move it out or in, drag the handles beside its length on the table.',
+    handle: {
+      extend: 'Drag to extend: the edges either side carry on as they run',
+      extrude: 'Drag to extrude: a strip added, its sides square',
+    } as Record<EdgeMove, string>,
+    tip: (mode: EdgeMove, by: number, amount: string) =>
+      by === 0
+        ? 'As it was'
+        : by < 0
+          ? `${amount} in`
+          : `${mode === 'extend' ? 'Extended' : 'Extruded'} ${amount}`,
   },
 
   cut: {

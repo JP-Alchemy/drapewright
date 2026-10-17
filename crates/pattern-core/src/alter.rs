@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::Pt;
+pub use crate::edge_move::EdgeMove;
+use crate::edge_move::move_edge;
 use crate::geom::{
     EdgeGeom, SAME_POINT, flatten_segs, point_in_polygon, polygon_area, segs_of, unit_tangent,
 };
@@ -169,6 +171,20 @@ pub enum Change {
     /// `straight`; otherwise each jog and corner along it (not at its ends
     /// or its darts) blended into a curve, the rest of it kept.
     TrueUp { edge: Id, straight: bool },
+    /// An edge moved out by `by` mm (in where less than 0) as a parallel
+    /// curve, each point of it square to it: dragged on the table. Moved
+    /// out, the edges either side carry on to meet it: on the way they run
+    /// at its ends (`extend`), or straight out square to it (`extrude`, a
+    /// strip `by` wide added with square ends); a fold always on along
+    /// itself. Moved in, they are cut back along themselves to meet it,
+    /// either way. Its darts keep their tips, their legs carried on or cut
+    /// back to meet it.
+    MoveEdge {
+        edge: Id,
+        by: f64,
+        #[serde(default)]
+        mode: EdgeMove,
+    },
 }
 
 impl Change {
@@ -221,7 +237,7 @@ impl Change {
                 *at = f(*at);
                 *to = f(*to);
             }
-            Change::TrueUp { .. } | Change::Stretch { .. } => {}
+            Change::TrueUp { .. } | Change::Stretch { .. } | Change::MoveEdge { .. } => {}
         }
     }
 
@@ -236,10 +252,10 @@ impl Change {
         }
     }
 
-    /// The piece's edge it trues, if one.
+    /// The piece's edge it trues or moves, if one.
     pub fn own_edge(&mut self) -> Option<&mut Id> {
         match self {
-            Change::TrueUp { edge, .. } => Some(edge),
+            Change::TrueUp { edge, .. } | Change::MoveEdge { edge, .. } => Some(edge),
             _ => None,
         }
     }
@@ -310,8 +326,16 @@ pub enum AlterError {
     OnFold,
     #[error("Both points must be on the same seam, apart.")]
     NotOneSeam,
-    #[error("The edge to true is no longer on the piece.")]
+    #[error("The edge is no longer on the piece.")]
     NoEdge { edge: Id },
+    #[error(
+        "This piece's outline is one edge all round: there are no edges either side of it to carry on."
+    )]
+    AllRound,
+    #[error("Moved that far, the edges either side no longer meet it.")]
+    NoMeeting,
+    #[error("Moved that far in, the piece would turn inside out.")]
+    InsideOut,
 }
 
 /// The shape `drawn` with `alterations` applied in order (those switched
@@ -372,6 +396,7 @@ pub fn alter(drawn: &Drawn, alterations: &[Alteration]) -> Result<Drawn, AlterEr
             | Change::Waist { at, to, by }
             | Change::Hip { at, to, by } => widen(&shape, (*at).into(), (*to).into(), *by)?,
             Change::TrueUp { edge, straight } => true_up(&shape, edge, *straight)?,
+            Change::MoveEdge { edge, by, mode } => move_edge(&shape, edge, *by, *mode)?,
             Change::Stretch {
                 pattern,
                 fabric,
@@ -407,11 +432,11 @@ fn moved(seg: PathSeg, a: Affine) -> PathSeg {
     }
 }
 
-fn cubic(p: [Point; 4]) -> PathSeg {
+pub(crate) fn cubic(p: [Point; 4]) -> PathSeg {
     PathSeg::Cubic(kurbo::CubicBez::new(p[0], p[1], p[2], p[3]))
 }
 
-fn seg_len_zero(seg: &PathSeg) -> bool {
+pub(crate) fn seg_len_zero(seg: &PathSeg) -> bool {
     match seg {
         PathSeg::Line(l) => l.p0.distance(l.p1) < 1e-9,
         PathSeg::Quad(q) => q.p0.distance(q.p1) + q.p1.distance(q.p2) < 1e-9,
@@ -421,7 +446,7 @@ fn seg_len_zero(seg: &PathSeg) -> bool {
 
 /// Where curves `a` and `b` cross, nearest `b`'s start, as a parameter in
 /// each: found on them flattened finely.
-fn crossing(a: &PathSeg, b: &PathSeg) -> Option<(f64, f64)> {
+pub(crate) fn crossing(a: &PathSeg, b: &PathSeg) -> Option<(f64, f64)> {
     const STEPS: usize = 64;
     let points = |s: &PathSeg| -> Vec<Point> {
         (0..=STEPS)
@@ -506,7 +531,7 @@ fn cut_path(cut: &dyn Cut, segs: &[PathSeg], from: Option<Point>) -> Vec<PathSeg
 }
 
 /// `seg` starting exactly at `p` (a point it nearly starts at).
-fn with_start(seg: PathSeg, p: Point) -> PathSeg {
+pub(crate) fn with_start(seg: PathSeg, p: Point) -> PathSeg {
     match seg {
         PathSeg::Line(l) => PathSeg::Line(Line::new(p, l.p1)),
         PathSeg::Quad(q) => {
@@ -517,7 +542,7 @@ fn with_start(seg: PathSeg, p: Point) -> PathSeg {
     }
 }
 
-fn to_segments(segs: &[PathSeg]) -> Vec<Segment> {
+pub(crate) fn to_segments(segs: &[PathSeg]) -> Vec<Segment> {
     segs.iter().map(|s| Segment::from_path_seg(*s)).collect()
 }
 
@@ -1786,7 +1811,7 @@ const BLEND: f64 = 25.0;
 
 /// The curves of `segs` (measured by `geom`) between `from` and `to` mm
 /// along them.
-fn stretch(geom: &EdgeGeom, segs: &[PathSeg], from: f64, to: f64) -> Vec<PathSeg> {
+pub(crate) fn stretch(geom: &EdgeGeom, segs: &[PathSeg], from: f64, to: f64) -> Vec<PathSeg> {
     if to - from <= SAME_POINT {
         return Vec::new();
     }

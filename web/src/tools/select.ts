@@ -1,17 +1,29 @@
 // The select tool: tap to select a piece or one of its edges; drag to move
 // pieces on the table; drag across the table from where there is no piece
 // to choose every piece the box touches, as files in a folder; hold an edge
-// to see its length. Shift (or Command, or Ctrl) adds to what is chosen.
+// to see its length; drag the handles beside an edge's length to move the
+// edge out or in. Shift (or Command, or Ctrl) adds to what is chosen.
 
 import type { ToolPointer } from '@drapewright/input'
 import { TUNING } from '@drapewright/input'
+import { HANDLE_RADIUS, towardHandles } from '../canvas/handles.ts'
 import { piecesTouching } from '../canvas/marquee.ts'
 import type { Point } from '../canvas/viewport.ts'
-import { formatLength } from '../strings/en.ts'
+import { formatLength, t } from '../strings/en.ts'
+import {
+  type EdgeDrag,
+  cancelEdgeDrag,
+  endEdgeDrag,
+  handleUnder,
+  moveEdgeDrag,
+  shownHandles,
+  startEdgeDrag,
+} from './edge-move.ts'
 import type { Tool, ToolContext } from './tool.ts'
 
 type State =
   | { kind: 'idle' }
+  | { kind: 'edge'; drag: EdgeDrag }
   | {
       kind: 'press'
       start: Point
@@ -56,6 +68,12 @@ export function selectTool(): Tool {
   return {
     down(p, ctx) {
       const { session } = ctx
+      const handle = handleUnder(session, p)
+      const drag = handle && startEdgeDrag(ctx, p, handle.handles, handle.kind)
+      if (drag) {
+        state = { kind: 'edge', drag }
+        return
+      }
       const hit = ctx.hit(p)
       const ui = session.ui.get()
       session.showTip(null)
@@ -105,6 +123,10 @@ export function selectTool(): Tool {
     },
 
     move(p, ctx) {
+      if (state.kind === 'edge') {
+        moveEdgeDrag(ctx, p, state.drag)
+        return
+      }
       if (state.kind === 'table') {
         const travel = Math.hypot(p.x - state.screen.x, p.y - state.screen.y)
         if (!state.boxing && travel <= TUNING.dragSlop[state.pointer]) return
@@ -132,7 +154,8 @@ export function selectTool(): Tool {
     },
 
     up(p, ctx) {
-      if (state.kind === 'table') ctx.session.setMarquee(null)
+      if (state.kind === 'edge') endEdgeDrag(ctx, state.drag)
+      else if (state.kind === 'table') ctx.session.setMarquee(null)
       else if (state.kind === 'drag') finishDrag(ctx, ctx.world(p))
       // A tap (no drag) on one piece of a group selects just that piece.
       else if (state.kind === 'press' && state.narrowTo) ctx.session.select([state.narrowTo])
@@ -140,6 +163,7 @@ export function selectTool(): Tool {
     },
 
     cancel(ctx) {
+      if (state.kind === 'edge') cancelEdgeDrag(ctx, state.drag)
       // A box called off (a second finger down, say) leaves the choice as it was.
       if (state.kind === 'table') {
         ctx.session.setMarquee(null)
@@ -150,7 +174,39 @@ export function selectTool(): Tool {
     },
 
     hover(p, ctx) {
-      ctx.session.setHover(p ? ctx.hit(p) : null)
+      const { session } = ctx
+      if (!p) {
+        session.setHover(null)
+        if (session.ui.get().edgeHandle) {
+          session.setEdgeHandle(null)
+          session.showTip(null)
+        }
+        return
+      }
+      // Over a handle: say what dragging it does.
+      const handle = handleUnder(session, p)
+      if (handle) {
+        const { handles, kind } = handle
+        const at = handles[kind]
+        session.setEdgeHandle({ piece: handles.piece, edge: handles.edge, kind, dragging: false })
+        session.showTip({ x: at.x, y: at.y - HANDLE_RADIUS, text: t.edgeMove.handle[kind] })
+        return
+      }
+      if (session.ui.get().edgeHandle) {
+        session.setEdgeHandle(null)
+        session.showTip(null)
+      }
+      // On the way from an edge to its handles, over nothing else, the
+      // edge stays shown.
+      const hit = ctx.hit(p)
+      const hover = session.ui.get().hover
+      const onTheWay =
+        hover?.kind === 'edge' &&
+        (!hit || (hit.kind === 'piece' && hit.piece === hover.piece)) &&
+        shownHandles(session).some(
+          (h) => h.piece === hover.piece && h.edge === hover.edge && towardHandles(h, p),
+        )
+      if (!onTheWay) session.setHover(hit)
     },
 
     hold(p, ctx) {

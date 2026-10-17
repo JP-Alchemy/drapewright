@@ -20,7 +20,7 @@ import { useStore } from '../state/store.ts'
 import { formatLength, t } from '../strings/en.ts'
 import { CornerChooser } from './CornerChooser.tsx'
 import { LengthField } from './LengthField.tsx'
-import { AlterSection, alterSummary } from './AlterSection.tsx'
+import { AlterSection, AlterStep, alterSummary } from './AlterSection.tsx'
 import {
   CutSection,
   GrainSection,
@@ -293,6 +293,10 @@ function EdgeSection({
   const sewn = doc.seams
     .map((seam, i) => ({ seam, i }))
     .filter(({ seam }) => here(seam.a) || here(seam.b))
+  // Its moves, as dragged by the handles beside its length.
+  const moves = piece.alterations.filter(
+    (a) => a.change.type === 'moveEdge' && a.change.edge === edgeId,
+  )
   return (
     <section className="panel-section inspector" aria-labelledby="edge-heading">
       <h2 id="edge-heading">{t.inspector.edge}</h2>
@@ -317,6 +321,10 @@ function EdgeSection({
         onCommit={(name) => session.dispatch({ type: 'renameEdge', ...ref, name })}
       />
       <p className="muted small">{t.inspector.edgeLength(formatLength(ev.length, units))}</p>
+      {moves.map((a) => (
+        <AlterStep key={a.id} session={session} piece={piece} view={view} alteration={a} />
+      ))}
+      {moves.length === 0 && <p className="muted small">{t.edgeMove.hint}</p>}
       <RadioGroup
         className="segmented"
         orientation="horizontal"

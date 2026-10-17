@@ -406,7 +406,8 @@ fn checked_alteration(alteration: &Alteration) -> Result<(), CommandError> {
         | Change::Shoulder { by, .. }
         | Change::BustSide { by, .. }
         | Change::Waist { by, .. }
-        | Change::Hip { by, .. } => {
+        | Change::Hip { by, .. }
+        | Change::MoveEdge { by, .. } => {
             if !by.is_finite() || by.abs() > MOST_ALTERED {
                 return Err(CommandError::Rejected {
                     message: "A piece can be lengthened or shortened by up to a metre.".into(),

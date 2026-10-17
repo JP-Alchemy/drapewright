@@ -12,6 +12,58 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 75 — Dragging an edge out or in, extended or extruded
+
+Moving an edge used to take a menu and a number. Now hover an edge (or
+tap it): beside its length, two handles appear. Press and drag either to
+move the edge out of the piece or into it, as in Blender: the piece
+changes as you drag, the amount shown beside the pointer.
+
+* **Extend** (the handle drawn with flaring sides, on the left): the edges
+  either side carry on the way they run. Lengthen an A-line skirt by its
+  hem and the sides flare on, the hem wider.
+* **Extrude** (the handle with square sides, on the right): the edges
+  either side carry straight out, square to the edge. A strip is added
+  with square ends: a button stand, a facing, a band, more at the fold.
+
+Dragged in, either handle takes the piece in, cutting the edges either
+side back along themselves. A curved edge (a circle skirt's hem) moves as
+a parallel curve; a fold carries on along itself, staying straight; a
+dart in the edge keeps its tip, its legs carried on.
+
+**Try it:** open the sample skirt, close the figure, and hover the Skirt
+back's hem: the length, with a handle either side. Hover a handle to see
+what it does. Drag the left one down 5 cm: the back is 5 cm longer, its
+side seams flaring on, and its side seam, under it in the pieces list,
+says the sides no longer match. Drag it back up 2 cm: the same step, now
+3 cm. Undo takes back a whole drag. With the edge chosen, the side panel
+shows the step under the edge's length: type an exact amount there, or
+switch between Extend and Extrude. On an iPad, tap the edge, then drag a
+handle with a finger.
+
+**What changed:**
+
+* **A new kind of step** (`moveEdge`, `docs/file-format.md` §4.13): an
+  edge moved by an amount, extended or extruded, kept with the piece's
+  other alterations, so it can be switched off, changed or taken away;
+  the piece as drawn is kept. It is also in **Add a step** as *Move an
+  edge* (tap the edge: 1 cm out, extended). No new schema version: a new
+  kind of change, as before.
+* **One undo step a drag.** Dragging the same edge the same way again,
+  while that is the piece's last step, changes that step rather than
+  adding another; dragged back to nothing, the step goes.
+* **Moved too far**, the edges either side no longer meet it (or the piece
+  would turn inside out): the drag stops at the last amount that worked
+  and says why beside the pointer.
+* The handles stay on the view for an edge at its side.
+
+**Limits:** the handles show with the select tool only. An edge's
+handles can sit under the zoom or tool buttons in a corner of the table;
+pan a little. Seams sewn to a moved edge are not moved with it: the seam says by
+how much the sides now differ.
+
+---
+
 ## Step 74 — Seams under the pieces they sew, joined on the table
 
 The side panel listed the pieces, then every seam apart from them: to see

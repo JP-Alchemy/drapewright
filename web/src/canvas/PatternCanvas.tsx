@@ -49,9 +49,14 @@ export function PatternCanvas({ session }: { session: Session }) {
           picking: ui.picking,
           seams: seamMarks(seams, ui.seam, ui.sewing, ui.suggestion),
           join: seamJoin(seams, ui.seam, ui.suggestion),
+          handles: ui.tool === 'select',
+          edgeHandle: ui.edgeHandle,
         },
         theme,
       )
+      // Over a handle, it can be taken hold of.
+      const grab = ui.edgeHandle ? (ui.edgeHandle.dragging ? 'grabbing' : 'grab') : ''
+      if (canvas.style.cursor !== grab) canvas.style.cursor = grab
     }
     const invalidate = () => {
       frame ||= requestAnimationFrame(render)

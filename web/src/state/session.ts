@@ -7,6 +7,7 @@ import type {
   Command,
   CutInstruction,
   DispatchOptions,
+  EdgeMove,
   Engine,
   FabricPreset,
   Hit,
@@ -37,7 +38,16 @@ export type ToolId = 'select' | 'notch' | 'grainline' | 'pick'
 
 /** What points are tapped on a piece for: an alteration placed by them. */
 export type PickFor =
-  'spread' | 'bust' | 'pivot' | 'swayback' | 'shoulder' | 'bustSide' | 'waist' | 'hip' | 'trueUp'
+  | 'spread'
+  | 'bust'
+  | 'pivot'
+  | 'swayback'
+  | 'shoulder'
+  | 'bustSide'
+  | 'waist'
+  | 'hip'
+  | 'trueUp'
+  | 'moveEdge'
 
 /** Points being tapped on a piece (its own coordinates), and what for. */
 export interface Picking {
@@ -52,6 +62,15 @@ export interface Picking {
 export type PartRef =
   | { kind: 'edge' | 'corner'; piece: string; edge: string }
   | { kind: 'notch'; piece: string; notch: string }
+
+/** One of the handles beside an edge's length, to drag the edge by. */
+export interface EdgeHandleRef {
+  piece: string
+  edge: string
+  kind: EdgeMove
+  /** Being dragged, not only under the pointer. */
+  dragging: boolean
+}
 
 /** A grainline being drawn, in the piece's own coordinates. */
 export interface GrainPreview {
@@ -139,6 +158,8 @@ export interface UiState {
   /** The selected edge or corner, shown in the inspector. */
   part: PartRef | null
   hover: Hit | null
+  /** The edge handle under the pointer, or being dragged. */
+  edgeHandle: EdgeHandleRef | null
   preview: MovePreview | null
   marquee: Marquee | null
   grainPreview: GrainPreview | null
@@ -202,6 +223,7 @@ export class Session {
       selection: new Set(),
       part: null,
       hover: null,
+      edgeHandle: null,
       preview: null,
       marquee: null,
       grainPreview: null,
@@ -332,6 +354,7 @@ export class Session {
       marquee: null,
       grainPreview: null,
       hover: null,
+      edgeHandle: null,
       tip: null,
       picking: tool === 'pick' ? s.picking : null,
     }))
@@ -456,6 +479,12 @@ export class Session {
     const current = this.ui.get().hover
     if (JSON.stringify(current) === JSON.stringify(hover)) return
     this.ui.set((s) => ({ ...s, hover }))
+  }
+
+  setEdgeHandle(edgeHandle: EdgeHandleRef | null): void {
+    const current = this.ui.get().edgeHandle
+    if (JSON.stringify(current) === JSON.stringify(edgeHandle)) return
+    this.ui.set((s) => ({ ...s, edgeHandle }))
   }
 
   setPreview(preview: MovePreview | null): void {

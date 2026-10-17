@@ -8,6 +8,7 @@ pub mod allowance;
 pub mod alter;
 pub mod blend;
 pub mod build;
+mod edge_move;
 pub mod geom;
 pub mod lay;
 pub mod model;
@@ -20,7 +21,7 @@ pub mod validate;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
-pub use alter::{AlterError, AlterLine, Alteration, Change, Drawn, alter};
+pub use alter::{AlterError, AlterLine, Alteration, Change, Drawn, EdgeMove, alter};
 pub use geom::{EdgeGeom, EdgeNearest};
 pub use model::*;
 pub use point::Pt;

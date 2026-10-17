@@ -503,6 +503,32 @@
             "edge",
             "straight"
           ]
+        },
+        {
+          "description": "An edge moved out by `by` mm (in where less than 0) as a parallel\ncurve, each point of it square to it: dragged on the table. Moved\nout, the edges either side carry on to meet it: on the way they run\nat its ends (`extend`), or straight out square to it (`extrude`, a\nstrip `by` wide added with square ends); a fold always on along\nitself. Moved in, they are cut back along themselves to meet it,\neither way. Its darts keep their tips, their legs carried on or cut\nback to meet it.",
+          "type": "object",
+          "properties": {
+            "by": {
+              "type": "number",
+              "format": "double"
+            },
+            "edge": {
+              "type": "string"
+            },
+            "mode": {
+              "$ref": "#/$defs/EdgeMove",
+              "default": "extend"
+            },
+            "type": {
+              "type": "string",
+              "const": "moveEdge"
+            }
+          },
+          "required": [
+            "type",
+            "edge",
+            "by"
+          ]
         }
       ]
     },
@@ -761,6 +787,21 @@
           "description": "Placed on the fabric fold; no allowance. Must be straight.",
           "type": "string",
           "const": "fold"
+        }
+      ]
+    },
+    "EdgeMove": {
+      "description": "How the edges either side of an edge moved out carry on to meet it.",
+      "oneOf": [
+        {
+          "description": "On the way they run where they meet it, as a pattern maker\nextends a line.",
+          "type": "string",
+          "const": "extend"
+        },
+        {
+          "description": "Straight out, square to it: a strip as wide as the move added, with\nsquare ends.",
+          "type": "string",
+          "const": "extrude"
         }
       ]
     },

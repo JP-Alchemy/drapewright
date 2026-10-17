@@ -6,6 +6,7 @@ import type {
   Alteration,
   Change,
   DisplayUnits,
+  EdgeMove,
   Piece,
   PieceView,
 } from '@drapewright/engine'
@@ -133,6 +134,7 @@ export function alterSummary(piece: Piece): string {
 /** The kinds of step, in the order offered. */
 const KINDS = [
   'lengthen',
+  'moveEdge',
   'spread',
   'bust',
   'shoulder',
@@ -146,7 +148,11 @@ const KINDS = [
 ] as const
 
 /** What a step that changes by an amount says it does, and the two ways it can go (more, or less). */
-function wording(change: Exclude<Change, { type: 'pivot' | 'trueUp' | 'stretch' }>, by: string) {
+function wording(
+  change: Exclude<Change, { type: 'pivot' | 'trueUp' | 'stretch' }>,
+  by: string,
+  edge?: string,
+) {
   const more = change.by >= 0
   switch (change.type) {
     case 'swayback':
@@ -176,6 +182,13 @@ function wording(change: Exclude<Change, { type: 'pivot' | 'trueUp' | 'stretch' 
         ways: [t.alter.letOut, t.alter.takeOut],
         hint: t.alter.sideHint,
       }
+    case 'moveEdge':
+      return {
+        said: t.alter.moveStep(edge ?? '', change.mode, change.by, by),
+        way: t.alter.moveWay,
+        ways: [t.alter.out, t.alter.in],
+        hint: undefined,
+      }
     case 'lengthen':
       return {
         said: t.alter.step(more, by),
@@ -200,7 +213,8 @@ function wording(change: Exclude<Change, { type: 'pivot' | 'trueUp' | 'stretch' 
   }
 }
 
-function AlterStep({
+/** One step: switched on or off, changed, or taken away. */
+export function AlterStep({
   session,
   piece,
   view,
@@ -231,7 +245,11 @@ function AlterStep({
               Math.round((stretchFactor(change.pattern, change.fabric) - 1) * 100),
               change.bothWays,
             )
-          : wording(change, formatLength(Math.abs(change.by), units)).said
+          : wording(
+              change,
+              formatLength(Math.abs(change.by), units),
+              change.type === 'moveEdge' ? edgeLabel(piece, change.edge) : undefined,
+            ).said
   return (
     <div className="alter-step">
       <div className="alter-step-head">
@@ -306,6 +324,26 @@ function AlterStep({
       )}
       {change.type === 'lengthen' && (
         <LineChoice session={session} piece={piece} view={view} alteration={alteration} />
+      )}
+      {change.type === 'moveEdge' && (
+        <RadioGroup
+          className="segmented"
+          orientation="horizontal"
+          aria-label={t.alter.sides}
+          value={change.mode}
+          onChange={(mode) => withChange({ ...change, mode: mode as EdgeMove })}
+        >
+          <Label>{t.alter.sides}</Label>
+          <div className="segments">
+            <Radio value="extend" className="segment">
+              {t.alter.extend}
+            </Radio>
+            <Radio value="extrude" className="segment">
+              {t.alter.extrude}
+            </Radio>
+          </div>
+          <p className="muted small">{t.alter.moveHint(change.by >= 0)}</p>
+        </RadioGroup>
       )}
       {change.type === 'spread' && (
         <Button

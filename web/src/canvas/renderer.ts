@@ -1,12 +1,20 @@
 // Draws the work table: a cutting mat with a true-size centimetre grid and
 // the pieces laid on it like pattern paper.
 
-import type { Hit, Piece, PieceView, Seam, SeamSide } from '@drapewright/engine'
+import type { EdgeMove, Hit, Piece, PieceView, Seam, SeamSide } from '@drapewright/engine'
 import type { DisplayUnits } from '@drapewright/engine'
-import type { GrainPreview, Marquee, MovePreview, PartRef, Picking } from '../state/session.ts'
+import type {
+  EdgeHandleRef,
+  GrainPreview,
+  Marquee,
+  MovePreview,
+  PartRef,
+  Picking,
+} from '../state/session.ts'
 import { cutSummary } from '../app/PieceDetails.tsx'
 import { formatLength } from '../strings/en.ts'
 import { edgePoints, joinCurve, stretch } from './edges.ts'
+import { HANDLE_RADIUS, PILL_FONT, PILL_HEIGHT, edgeHandles, handleGlyph } from './handles.ts'
 import { type PiecePaths, addSegment } from './paths.ts'
 import { type Rect, type ViewportState, scaleOf, toScreen, visibleWorld } from './viewport.ts'
 
@@ -31,6 +39,10 @@ export interface Scene {
   seams?: SeamMark[]
   /** The picked seam's edges, or a suggested seam's, joined across the table. */
   join?: SeamJoin | null
+  /** Handles beside the lengths shown, to drag those edges out or in. */
+  handles?: boolean
+  /** The handle under the pointer, or being dragged. */
+  edgeHandle?: EdgeHandleRef | null
 }
 
 /** An edge of a piece, or the part of it from and to how far along it, mm. */
@@ -173,7 +185,8 @@ function drawGrid(ctx: CanvasRenderingContext2D, v: ViewportState, theme: Theme)
   else lines(500, theme.matLineMajor, 1.25)
 }
 
-function placement(piece: Piece, preview?: MovePreview | null): DOMMatrix {
+/** A piece's own coordinates to the table's, mm. */
+export function placement(piece: Piece, preview?: MovePreview | null): DOMMatrix {
   const { x, y, rotation } = piece.placement
   const moving = preview?.ids.has(piece.id)
   return new DOMMatrix()
@@ -450,14 +463,14 @@ export function draw(
     const sp = scene.pieces.find((p) => p.piece.id === ref.piece)
     const ev = sp?.view.edges.find((e) => e.id === ref.edge)
     if (!sp || !ev) continue
-    const out = ev.allowance + 14 / s
-    const local = new DOMPoint(
-      ev.middle[0] + ev.middleNormal[0] * out,
-      ev.middle[1] + ev.middleNormal[1] * out,
-    )
-    const m = placement(sp.piece, scene.preview).transformPoint(local)
-    const at = toScreen(v, { x: m.x, y: m.y })
-    drawPill(ctx, formatLength(ev.length, scene.units ?? 'cm'), at.x, at.y, theme)
+    const label = formatLength(ev.length, scene.units ?? 'cm')
+    const h = edgeHandles(sp.piece.id, ev, placement(sp.piece, scene.preview), v, label)
+    drawPill(ctx, label, h.pill.x, h.pill.y, theme)
+    if (!scene.handles) continue
+    const active = scene.edgeHandle
+    const on = active?.piece === ref.piece && active.edge === ref.edge ? active.kind : null
+    drawHandle(ctx, 'extend', h.extend, h.out, on === 'extend', theme)
+    drawHandle(ctx, 'extrude', h.extrude, h.out, on === 'extrude', theme)
   }
 
   // Seam numbers, just inside each sewn edge.
@@ -604,12 +617,49 @@ function drawBadge(
   ctx.fillText(text, x, y + 0.5)
 }
 
+/**
+ * A handle to drag an edge by: a round button with its picture turned to
+ * point out of the piece; filled in while under the pointer or dragged.
+ */
+function drawHandle(
+  ctx: CanvasRenderingContext2D,
+  kind: EdgeMove,
+  at: { x: number; y: number },
+  out: { x: number; y: number },
+  active: boolean,
+  theme: Theme,
+) {
+  ctx.beginPath()
+  ctx.arc(at.x, at.y, HANDLE_RADIUS, 0, Math.PI * 2)
+  ctx.fillStyle = active ? theme.select : theme.paper
+  ctx.fill()
+  ctx.lineWidth = 1.5
+  ctx.strokeStyle = theme.select
+  ctx.stroke()
+  // x along the edge, y out of the piece.
+  const point = ([a, b]: [number, number]) =>
+    [at.x - out.y * a + out.x * b, at.y + out.x * a + out.y * b] as const
+  ctx.beginPath()
+  for (const stroke of handleGlyph(kind)) {
+    stroke.forEach((p, k) => {
+      const [x, y] = point(p)
+      if (k === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    })
+  }
+  ctx.strokeStyle = active ? '#fff' : theme.select
+  ctx.lineWidth = 1.75
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.stroke()
+}
+
 function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, theme: Theme) {
-  ctx.font = '600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  ctx.font = PILL_FONT
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   const w = ctx.measureText(text).width + 14
-  const h = 22
+  const h = PILL_HEIGHT
   ctx.beginPath()
   ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2)
   ctx.fillStyle = theme.select

@@ -441,6 +441,25 @@ where jogs are close together), leaving and arriving as the edge does
 there, and the rest of the edge is kept. Its ends and its darts stay as
 they are; its notches stay where they were on it.
 
+**Change** `moveEdge` — `{ "type": "moveEdge", "edge": id, "by": mm,
+"mode": "extend" | "extrude" }`: an edge moved out of the piece by `by`
+(in, where less than 0), as dragged on the table: drawn again as a
+parallel curve, each point of it `by` further out, square to it (a corner
+inside the edge is carried on to a point where the parts no longer meet,
+or cut where they cross). Moved out, the edges either side carry on to
+meet it: with `extend`, on the way they run where they met it (as a
+pattern maker extends a line: a flared side flares on); with `extrude`,
+straight out from where they ended, square to the moved edge at that end
+(a strip `by` wide added, with square ends). A fold always carries on
+along itself, staying straight. Moved in, the edges either side are cut
+back along themselves to meet it, whichever the mode. A dart in the
+moved edge keeps its tip where it is, its legs carried on (or cut back)
+to meet the moved edge either side. Notches stay where they were on
+their edges' cloth, moving with the moved edge; edge ids stay the same.
+Refused if the edges either side never meet it (moved in further than
+they are long, or carried on nearly along it), or if the piece would turn
+inside out. `mode` defaults to `extend`.
+
 **AlterLine** — `{ "type": "own", "line": id }`: one of the piece's
 internal lines (normally its lengthen or shorten line), straight from its
 start to its end; or `{ "type": "through", "from": [x, y], "to": [x, y] }`:
