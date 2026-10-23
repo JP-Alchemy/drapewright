@@ -17,7 +17,17 @@ const HARMLESS = [
   /Cross-Origin-Embedder-Policy|due to access control checks/,
 ]
 
-export const test = base.extend<{ consoleErrors: string[] }>({
+/** What a project in playwright.config.ts can ask of the tests. */
+export interface Options {
+  /**
+   * WebGPU asked for (the chromium-webgpu project): the avatar must be drawn
+   * and draped with it, not on the processor.
+   */
+  webgpu: boolean
+}
+
+export const test = base.extend<{ consoleErrors: string[] } & Options>({
+  webgpu: [false, { option: true }],
   consoleErrors: [
     async ({ page }, use) => {
       const errors: string[] = []

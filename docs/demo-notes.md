@@ -12,6 +12,54 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 79 — CI on your own computer, with the drape on the graphics card
+
+GitHub's CI for this repo has stopped (its Actions budget ran out on
+2026-10-15), so changes have been checked by running its steps by hand.
+Now one command runs them all, and also something CI never could: the
+drape on the graphics card, as most seamstresses' browsers do it.
+
+**Try it:** `pnpm ci:local`. Each step prints its name and command, then
+its output. At the end, a list of every step, each passed, failed or
+skipped, with its time. On an M3 Pro the whole run takes about 10 minutes
+from a warm build: the Rust tests and the end-to-end tests about 2½ each,
+the WebAssembly build 2, the drape tests with WebGPU 20 seconds.
+
+* **CI's steps, in CI's order:** Rust formatting, Clippy (also built for
+  the browser), the Rust tests, the generated files, the licences, the
+  WebAssembly build and its size budget, types, lint, formatting, unit
+  tests and the end-to-end tests. Like CI, the end-to-end tests may not
+  contain `test.only`, and a failed test is tried once more.
+* **The drape with WebGPU:** if Chromium has WebGPU here, the drape tests
+  run again in full Chromium (the `chromium-webgpu` project). The usual
+  e2e browsers draw with WebGL2 and drape on the processor. Here the
+  avatar must say *Drawn with WebGPU* when opened. After every drape it
+  must say *Drawn and draped with WebGPU*: a drape that quietly fell back
+  to the processor fails. To run them alone:
+  `E2E_WEBGPU=1 pnpm e2e --project=chromium-webgpu`.
+* **Its own build, nobody else's:** if a server already holds port 4173
+  or 4174 (another worktree's `pnpm preview`, say), Playwright would test
+  that build instead. The script stops first, and says which process holds
+  the port and the folder it runs from.
+
+**Try a failure:** start `pnpm preview` in another terminal, then run
+`pnpm ci:local`. It stops at the end-to-end tests and names the preview.
+Or add a stray space to a Rust file: it stops at the first step.
+
+**What changed:** `scripts/ci-local.sh` (`pnpm ci:local`);
+`scripts/wasm-size.sh`, the size budget, now shared by CI and the script;
+`web/tests/has-webgpu.mjs`, which asks Chromium for a WebGPU adapter; an
+opt-in `chromium-webgpu` project in `web/playwright.config.ts`
+(`E2E_WEBGPU=1`), with a `webgpu` option the drape tests check. CI and
+plain `pnpm e2e` run as before.
+
+**Limits:** the Rust licence and advisory check needs `cargo-deny`
+installed; without it, that step is skipped (and says how to install it).
+CI's Linux runners check Rust's graphics-card tests on Mesa's software
+Vulkan; here they run on the computer's own card.
+
+---
+
 ## Step 78 — Choosing a whole line of edges, and moving them together
 
 To lengthen a whole skirt, every hem round it has to move: its front's

@@ -45,6 +45,31 @@ pnpm test                # TypeScript unit tests
 pnpm e2e                 # Playwright, Chromium + WebKit
 ```
 
+Everything CI runs, on your own computer, before pushing:
+
+```bash
+pnpm ci:local
+```
+
+It runs the steps in `.github/workflows/ci.yml` in CI's order: Rust
+formatting, Clippy, tests, the generated files, the licences, the
+WebAssembly build and its size budget, types, lint, formatting, unit and
+end-to-end tests. It stops at the first step that fails, then lists each
+step's result and time.
+
+- **The drape on the graphics card:** then, if Chromium has WebGPU here, it
+  runs the drape tests again in full Chromium with WebGPU. CI can't: its
+  runners have no graphics card. A drape that quietly falls back to the
+  processor fails them. To run them alone:
+  `E2E_WEBGPU=1 pnpm e2e --project=chromium-webgpu`.
+- **Ports 4173 and 4174 must be free.** Outside CI, Playwright reuses a
+  server already on them, so it would test another worktree's build. The
+  script says which process holds them.
+- **Generated files:** as in CI, the files `cargo test` writes must match
+  what is committed (or staged).
+- **Rust licences and advisories** need `cargo install --locked cargo-deny`;
+  without it, that step is skipped.
+
 ## AI assistants (MCP)
 
 `drapewright-mcp` lets an AI assistant work on Drapewright projects on your
