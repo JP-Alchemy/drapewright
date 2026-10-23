@@ -13,7 +13,7 @@ import type {
 } from '../state/session.ts'
 import { cutSummary } from '../app/PieceDetails.tsx'
 import { formatLength } from '../strings/en.ts'
-import { edgePoints, joinCurve, stretch } from './edges.ts'
+import { edgePoints, joinCurve, linePoints, stretch } from './edges.ts'
 import {
   HANDLE_RADIUS,
   type HandleKind,
@@ -55,10 +55,14 @@ export interface Scene {
   moreEdges?: { piece: string; edge: string }[]
 }
 
-/** An edge of a piece, or the part of it from and to how far along it, mm. */
+/**
+ * An edge of a piece, or the part of it from and to how far along it, mm;
+ * or the part of a line inside the piece (`line`), where a pocket is sewn.
+ */
 interface EdgePart {
   piece: string
   edge: string
+  line?: string | null
   from?: number | null
   to?: number | null
 }
@@ -95,6 +99,7 @@ export function seamMarks(
     mirror: side.mirror,
     strong,
     suggested,
+    line: side.line,
     from: side.from,
     to: side.to,
   })
@@ -127,9 +132,20 @@ export function seamJoin(
 
 /**
  * The part of its edge a seam's side sews, in its piece's coordinates,
- * where it sews only part of it.
+ * where it sews only part of it; or the part of a line inside the piece.
  */
 function partSewn(pieces: ScenePiece[], side: EdgePart) {
+  if (side.line) {
+    const sp = pieces.find((p) => p.piece.id === side.piece)
+    const points = sp && linePoints(sp.piece, side.line)
+    if (!points) return null
+    let total = 0
+    for (let k = 1; k < points.length; k++) {
+      total += Math.hypot(points[k]![0] - points[k - 1]![0], points[k]![1] - points[k - 1]![1])
+    }
+    if (total <= 0) return null
+    return stretch(points, (side.from ?? 0) / total, (side.to ?? total) / total)
+  }
   if (side.from == null && side.to == null) return null
   const sp = pieces.find((p) => p.piece.id === side.piece)
   const ev = sp?.view.edges.find((e) => e.id === side.edge)
@@ -576,9 +592,9 @@ function drawJoin(
   const end = (side: SeamSide) => {
     const sp = scene.pieces.find((p) => p.piece.id === side.piece)
     const ev = sp?.view.edges.find((e) => e.id === side.edge)
-    if (!sp || !ev) return null
     const part = partSewn(scene.pieces, side)
-    const [middle, out] = part ? [part.middle, part.out] : [ev.middle, ev.middleNormal]
+    if (!sp || (!ev && !part)) return null
+    const [middle, out] = part ? [part.middle, part.out] : [ev!.middle, ev!.middleNormal]
     const m = placement(sp.piece, scene.preview)
     const at = m.transformPoint(new DOMPoint(middle[0], middle[1]))
     const beyond = m.transformPoint(new DOMPoint(middle[0] + out[0], middle[1] + out[1]))

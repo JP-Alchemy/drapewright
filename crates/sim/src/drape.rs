@@ -243,13 +243,20 @@ impl Drape {
         for [(pa, a), (pb, b)] in &garment.stitches {
             builder.stitch(firsts[*pa] + a, firsts[*pb] + b);
         }
-        // Facings and linings, the last panels, go inside the rest, each
-        // behind the panel it lies on.
-        if let Some(p) = garment.panels.iter().position(|p| p.inside)
-            && garment.panels[p..].iter().all(|q| q.inside)
+        // Facings and linings, then the pieces sewn onto the garment, are
+        // the last panels: the first go inside the rest, each behind the
+        // panel it lies on; the others over the panel they are sewn onto.
+        let layered = |q: &crate::garment::Panel| q.inside || q.sewn_on;
+        if let Some(p) = garment.panels.iter().position(layered)
+            && garment.panels[p..].iter().all(layered)
             && p > 0
         {
             builder.inside_from(firsts[p]);
+            if let Some(q) = garment.panels.iter().position(|q| q.sewn_on)
+                && garment.panels[q..].iter().all(|q| q.sewn_on)
+            {
+                builder.on_from(firsts[q]);
+            }
             let points =
                 |k: usize| firsts[k]..firsts[k] + garment.panels[k].mesh.points.len() as u32;
             for (k, panel) in garment.panels.iter().enumerate().skip(p) {

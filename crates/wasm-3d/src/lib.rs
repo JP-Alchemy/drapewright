@@ -231,6 +231,21 @@ impl Draping {
         self.0.lined().to_vec()
     }
 
+    /// The pieces sewn onto others (patch pockets) left out, by id: sewn
+    /// onto a piece not draped, or onto a lining.
+    #[wasm_bindgen(getter)]
+    pub fn off(&self) -> Vec<String> {
+        self.0.off().to_vec()
+    }
+
+    /// The pieces sewn onto others left out as they couldn't be laid on
+    /// the piece they are sewn onto (a pocket whose placement runs over its
+    /// edge), by id.
+    #[wasm_bindgen(getter, js_name = notLaid)]
+    pub fn not_laid(&self) -> Vec<String> {
+        self.0.not_laid().to_vec()
+    }
+
     /// How many buttons the garment has, done up or not.
     #[wasm_bindgen(getter)]
     pub fn buttons(&self) -> usize {

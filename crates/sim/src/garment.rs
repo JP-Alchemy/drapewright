@@ -11,12 +11,13 @@ use std::fmt;
 
 use drapewright_pattern_core::geom::{flatten_segs, segs_of};
 use drapewright_pattern_core::stitching::{
-    closed_along, dart_spans, opened_along, stitching_edges,
+    closed_along, dart_spans, line_points, opened_along, stitching_edges,
 };
-use drapewright_pattern_core::{EdgeKind, Id, MarkKind, Piece};
+use drapewright_pattern_core::upright::{quarter_turned, upright_turns};
+use drapewright_pattern_core::{EdgeKind, Id, LineKind, MarkKind, Piece};
 use drapewright_seams::Seam;
 
-use crate::mesh::{MeshError, PanelMesh, mesh};
+use crate::mesh::{MeshError, PanelMesh, inside_panel, line_clearance, mesh_inside};
 
 /// Which copy of its piece a panel is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -69,6 +70,9 @@ pub struct Panel {
     /// Sewn into the garment's seams, joined to it only so (a cape sewn
     /// into the princess seams): it hangs outside the rest.
     pub outside: bool,
+    /// Sewn onto the face of the panel it lies on (`over`), a patch pocket:
+    /// it lies outside that panel.
+    pub sewn_on: bool,
 }
 
 impl Panel {
@@ -98,6 +102,52 @@ pub struct Garment {
 }
 
 impl Garment {
+    /// The garment of its first `n` panels only, as sewn among themselves.
+    pub fn first(&self, n: usize) -> Garment {
+        let keep: Vec<bool> = (0..self.panels.len()).map(|p| p < n).collect();
+        self.keeping(&keep)
+    }
+
+    /// The garment without the panels `keep` says no to, and their
+    /// stitches.
+    pub fn keeping(&self, keep: &[bool]) -> Garment {
+        let mut index = vec![None; self.panels.len()];
+        let mut panels = Vec::new();
+        for (p, panel) in self.panels.iter().enumerate() {
+            if keep.get(p).copied().unwrap_or(false) {
+                index[p] = Some(panels.len());
+                panels.push(panel.clone());
+            }
+        }
+        let moved = |(p, i): (usize, u32)| index[p].map(|q| (q, i));
+        let stitch = |s: &[(usize, u32); 2]| Some([moved(s[0])?, moved(s[1])?]);
+        let (sewn, done_up) = self.stitches.split_at(self.stitches.len() - self.buttons);
+        let mut stitches: Vec<_> = sewn.iter().filter_map(stitch).collect();
+        let buttons: Vec<_> = done_up.iter().filter_map(stitch).collect();
+        let count = buttons.len();
+        stitches.extend(buttons);
+        for panel in &mut panels {
+            panel.over = panel.over.and_then(|o| index[o]);
+        }
+        let links = self
+            .links
+            .iter()
+            .filter_map(|l| {
+                Some(Link {
+                    a: (index[l.a.0]?, l.a.1.clone(), l.a.2),
+                    b: (index[l.b.0]?, l.b.1.clone(), l.b.2),
+                    name: l.name.clone(),
+                })
+            })
+            .collect();
+        Garment {
+            panels,
+            stitches,
+            links,
+            buttons: count,
+        }
+    }
+
     /// The garment with its buttons undone: worn open.
     pub fn unbuttoned(&self) -> Garment {
         let mut open = self.clone();
@@ -179,6 +229,9 @@ struct Layout {
     waist: Option<f64>,
     /// Its line named for the centre front, where it is on the panel.
     centre: Option<Vec<P2>>,
+    /// The lines drawn inside it that a piece may be sewn onto (a pocket's
+    /// placement), each from its start, as `edges` are.
+    lines: Vec<(Id, Half, Vec<P2>)>,
 }
 
 fn reflect(p: P2, a: P2, b: P2) -> P2 {
@@ -228,75 +281,6 @@ fn counter_clockwise(
     }
 }
 
-/// `p` turned a quarter `quarters` times, counter-clockwise (y up).
-fn quarter_turned(p: P2, quarters: u8) -> P2 {
-    match quarters % 4 {
-        0 => p,
-        1 => [-p[1], p[0]],
-        2 => [-p[0], -p[1]],
-        _ => [p[1], -p[0]],
-    }
-}
-
-/// A hem's allowance is at least this much more than a seam's.
-const HEM_DEEPER: f64 = 1.5;
-
-/// How many quarter turns, counter-clockwise (y up), stand a piece upright
-/// as worn: its grain up and down the body and its hems at the bottom.
-/// Pattern CAD lays long pieces on their side to fit the sheet. A piece is
-/// taken as drawn unless its grain or its hems say otherwise; one lying on
-/// its side whose hems don't say which way is up is stood with its grain's
-/// arrow (at `to`) pointing down, as CAD draws it. `lines` are its edges'
-/// stitching lines, y up.
-fn upright(piece: &Piece, lines: &[Vec<P2>]) -> u8 {
-    let grain = piece.grainline.as_ref().map(|g| {
-        let d = [g.to.x - g.from.x, -(g.to.y - g.from.y)];
-        let l = d[0].hypot(d[1]).max(1e-9);
-        [d[0] / l, d[1] / l]
-    });
-    // Hems: marked as such, or given a deeper allowance than the seams.
-    let seam = piece.allowance.seam.max(1.0);
-    let hems: Vec<P2> = (0..lines.len())
-        .filter(|&e| {
-            piece.outline.edges[e].kind == EdgeKind::Hem
-                || (piece.outline.edges[e].kind == EdgeKind::Seam
-                    && piece.edge_allowance(e) >= HEM_DEEPER * seam
-                    && piece.edge_allowance(e) >= 15.0)
-        })
-        .map(|e| at_length(&lines[e], length(&lines[e]) / 2.0))
-        .collect();
-    let all: Vec<P2> = lines.iter().flatten().copied().collect();
-    let score = |quarters: u8| {
-        let mut score = if quarters == 0 { 1.0 } else { 0.0 };
-        if let Some(g) = grain {
-            let g = quarter_turned(g, quarters);
-            if g[1].abs() > std::f64::consts::FRAC_1_SQRT_2 {
-                score += 2.0;
-            }
-            if g[1] < -0.5 {
-                score += 0.75;
-            }
-        }
-        let ys: Vec<f64> = all
-            .iter()
-            .map(|&p| quarter_turned(p, quarters)[1])
-            .collect();
-        let (low, high) = ys
-            .iter()
-            .fold((f64::MAX, f64::MIN), |(l, h), &y| (l.min(y), h.max(y)));
-        if high > low {
-            for &hem in &hems {
-                let height = (quarter_turned(hem, quarters)[1] - low) / (high - low);
-                score += 2.0 * (1.0 - 2.0 * height);
-            }
-        }
-        score
-    };
-    (0..4u8)
-        .max_by(|&a, &b| score(a).total_cmp(&score(b)).then(b.cmp(&a)))
-        .unwrap_or(0)
-}
-
 fn layouts(pieces: &[Piece]) -> Vec<Layout> {
     let mut out = Vec::new();
     for (k, piece) in pieces.iter().enumerate() {
@@ -309,7 +293,7 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
             .map(|e| e.into_iter().map(|p| [p.x, -p.y]).collect())
             .collect();
         // Stood upright, so that up the panel is up the body.
-        let quarters = upright(piece, &lines);
+        let quarters = upright_turns(piece);
         let lines: Vec<Vec<P2>> = lines
             .into_iter()
             .map(|e| e.into_iter().map(|p| quarter_turned(p, quarters)).collect())
@@ -368,6 +352,24 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                     .map(|p| quarter_turned([p.x, -p.y], quarters))
                     .collect()
             });
+        // Lines a piece may be sewn onto, stood upright as the edges are.
+        let inner: Vec<(Id, Vec<P2>)> = piece
+            .lines
+            .iter()
+            .filter(|l| {
+                matches!(
+                    l.kind,
+                    LineKind::Line | LineKind::Placement | LineKind::Stitch
+                )
+            })
+            .map(|l| {
+                let points = line_points(l)
+                    .iter()
+                    .map(|p| quarter_turned([p.x, -p.y], quarters))
+                    .collect();
+                (l.id.clone(), points)
+            })
+            .collect();
         let fold = kinds.iter().position(|(_, kind)| *kind == EdgeKind::Fold);
         let on_fold = cut.on_fold.unwrap_or(fold.is_some()) && fold.is_some();
         let pair = cut.quantity >= 2 && cut.mirrored.unwrap_or(true);
@@ -405,6 +407,15 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                 marks: marks.clone(),
                 waist,
                 centre: None,
+                // On each half: as drawn, then mirrored in the fold.
+                lines: inner
+                    .iter()
+                    .map(|(id, l)| (id.clone(), Half::A, l.clone()))
+                    .chain(inner.iter().map(|(id, l)| {
+                        let mirrored = l.iter().map(|&p| reflect(p, a, b)).collect();
+                        (id.clone(), Half::B, mirrored)
+                    }))
+                    .collect(),
             });
             continue;
         }
@@ -440,6 +451,13 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                 centre: centre
                     .as_ref()
                     .map(|c| c.iter().map(|m| [flip * m[0], m[1]]).collect()),
+                lines: inner
+                    .iter()
+                    .map(|(id, l)| {
+                        let points = l.iter().map(|p| [flip * p[0], p[1]]).collect();
+                        (id.clone(), half, points)
+                    })
+                    .collect(),
             });
         }
     }
@@ -458,20 +476,24 @@ fn mirrors(x: &[P2], y: &[P2], a: P2, b: P2) -> bool {
 
 /// Meshes chains running round either way, giving the chains' points in
 /// the way they were given.
-fn mesh_either_way(chains: &[Vec<P2>], spacing: f64) -> Result<PanelMesh, MeshError> {
+fn mesh_either_way(
+    chains: &[Vec<P2>],
+    inner: &[Vec<P2>],
+    spacing: f64,
+) -> Result<PanelMesh, MeshError> {
     let round: Vec<P2> = chains
         .iter()
         .flat_map(|c| c[..c.len() - 1].iter().copied())
         .collect();
     if twice_area(&round) > 0.0 {
-        return mesh(chains, spacing);
+        return mesh_inside(chains, inner, spacing);
     }
     let backwards: Vec<Vec<P2>> = chains
         .iter()
         .rev()
         .map(|c| c.iter().rev().copied().collect())
         .collect();
-    let mut m = mesh(&backwards, spacing)?;
+    let mut m = mesh_inside(&backwards, inner, spacing)?;
     m.chains = m
         .chains
         .into_iter()
@@ -513,11 +535,12 @@ fn reflected(m: &PanelMesh, a: P2, b: P2, keep: &[u32]) -> (Vec<P2>, Vec<[u32; 3
 /// sides (a piece unfolded, or a pair) are meshed alike: alike
 /// triangulations meet a body alike on either side, and a garment cut
 /// alike on both sides hangs alike. `None` where its sides are sewn
-/// differently, and it is meshed whole.
+/// differently, and it is meshed whole. The lines inside it (`inner`, half A's
+/// first) are mirrored too.
 fn mirrored_mesh(
     p: usize,
     layouts: &[Layout],
-    sampled: &[Vec<Vec<P2>>],
+    (sampled, inner): (&[Vec<Vec<P2>>], &[Chains]),
     panels: &[Panel],
     spacing: f64,
 ) -> Result<Option<PanelMesh>, MeshError> {
@@ -543,6 +566,26 @@ fn mirrored_mesh(
             if !(0..half).all(|j| mirrors(&sampled[p][half + j], &sampled[p][half - 1 - j], a, b)) {
                 return Ok(None);
             }
+            // The lines inside: each on half B half A's mirrored, none on
+            // the fold.
+            let (on_a, on_b): (Vec<_>, Vec<_>) = inner[p].iter().partition(|(h, _)| *h == Half::A);
+            let on_a: Vec<Vec<P2>> = on_a.into_iter().map(|(_, c)| c.clone()).collect();
+            let fold_off = |q: P2| {
+                let d = [b[0] - a[0], b[1] - a[1]];
+                ((q[0] - a[0]) * d[1] - (q[1] - a[1]) * d[0]).abs() / d[0].hypot(d[1]).max(1e-9)
+            };
+            if on_a.len() != on_b.len()
+                || !on_a
+                    .iter()
+                    .zip(&on_b)
+                    .all(|(x, (_, y))| mirrors(y, x, a, b))
+                || on_a
+                    .iter()
+                    .flatten()
+                    .any(|&q| fold_off(q) < line_clearance(spacing))
+            {
+                return Ok(None);
+            }
             // Half A, from the fold's end round to its start, then along
             // the fold.
             let along = (a[0] - b[0]).hypot(a[1] - b[1]);
@@ -553,7 +596,7 @@ fn mirrored_mesh(
                 along,
                 (along / spacing).round().max(1.0) as usize,
             ));
-            let m = mesh_either_way(&chains, spacing)?;
+            let m = mesh_either_way(&chains, &on_a, spacing)?;
             let fold = m.chains[half].clone();
             let (more, triangles, index) = reflected(&m, a, b, &fold);
             let edge_points = |e: usize| -> Vec<u32> {
@@ -571,10 +614,18 @@ fn mirrored_mesh(
             points.extend(more);
             let mut all = m.triangles.clone();
             all.extend(triangles);
+            let mirrored: Vec<Vec<u32>> = m
+                .inner
+                .iter()
+                .map(|c| c.iter().map(|&i| index[i as usize]).collect())
+                .collect();
+            let mut lines = m.inner.clone();
+            lines.extend(mirrored);
             Ok(Some(PanelMesh {
                 points,
                 triangles: all,
                 chains,
+                inner: lines,
             }))
         }
         (Copy::Mirror, _) if p > 0 => {
@@ -584,6 +635,11 @@ fn mirrored_mesh(
                 || layouts[original].piece != layout.piece
                 || !(0..layout.edges.len())
                     .all(|e| mirrors(&sampled[p][e], &sampled[original][e], a, b))
+                || inner[p].len() != inner[original].len()
+                || !inner[p]
+                    .iter()
+                    .zip(&inner[original])
+                    .all(|((_, x), (_, y))| mirrors(x, y, a, b))
             {
                 return Ok(None);
             }
@@ -597,6 +653,7 @@ fn mirrored_mesh(
                 points,
                 triangles,
                 chains,
+                inner: m.inner.clone(),
             }))
         }
         _ => Ok(None),
@@ -778,6 +835,87 @@ fn layered(mut seams: Vec<(Side, Side, bool, String)>) -> Vec<(Side, Side, bool,
     seams
 }
 
+/// Where a stretch of a line sewn onto is in its panel's chains: (panel,
+/// chain, its first point in the chain, 1 if recorded backwards).
+type LineRun = (usize, usize, usize, usize);
+
+/// Chains of points along lines inside a panel, and the half each is on.
+type Chains = Vec<(Half, Vec<P2>)>;
+
+/// The lines sewn onto (`onto`'s line sides, each in `steps` steps),
+/// sampled: each panel's chains of points (each one or more stretches end
+/// to end, a closed line's last joined to its first round its start), and
+/// where each seam's stretch is in them. A stretch over one already sampled
+/// is left out.
+fn sample_lines(
+    layouts: &[Layout],
+    onto: &[(Side, Side, bool)],
+    steps_of: &[usize],
+) -> (Vec<Chains>, HashMap<usize, LineRun>) {
+    let mut inner: Vec<Chains> = vec![Vec::new(); layouts.len()];
+    let mut runs: HashMap<usize, LineRun> = HashMap::new();
+    let same = |a: P2, b: P2| (a[0] - b[0]).hypot(a[1] - b[1]) < 1e-6;
+    for (p, layout) in layouts.iter().enumerate() {
+        for (k, (_, half, points)) in layout.lines.iter().enumerate() {
+            let mut asked: Vec<(f64, f64, usize, usize)> = onto
+                .iter()
+                .enumerate()
+                .filter(|(_, (_, l, _))| l.panel == p && l.edge == k)
+                .map(|(j, (_, l, _))| (l.from, l.to, steps_of[j], j))
+                .collect();
+            if asked.is_empty() {
+                continue;
+            }
+            asked.sort_by(|x, y| x.0.min(x.1).total_cmp(&y.0.min(y.1)));
+            let first = inner[p].len();
+            let mut at = f64::NEG_INFINITY;
+            for (from, to, n, j) in asked {
+                let (lo, hi) = (from.min(to), from.max(to));
+                if lo < at - 1e-6 {
+                    continue;
+                }
+                let way = usize::from(from > to);
+                let stretch = steps(points, lo, hi, n);
+                if (lo - at).abs() <= 1e-6 {
+                    let c = inner[p].len() - 1;
+                    let chain = &mut inner[p][c].1;
+                    let start = chain.len() - 1;
+                    chain.extend(stretch.into_iter().skip(1));
+                    runs.insert(j, (p, c, start, way));
+                } else {
+                    inner[p].push((*half, stretch));
+                    runs.insert(j, (p, inner[p].len() - 1, 0, way));
+                }
+                at = hi;
+            }
+            // Round a closed line, past its start: its last chain, ending
+            // where it ends, goes on into its first, starting where it
+            // starts.
+            let last = inner[p].len() - 1;
+            let closed = points.len() > 2 && same(points[0], points[points.len() - 1]);
+            if closed
+                && last > first
+                && same(inner[p][first].1[0], points[0])
+                && same(*inner[p][last].1.last().expect("points"), points[0])
+            {
+                let head = inner[p].remove(first).1;
+                let last = last - 1;
+                let offset = inner[p][last].1.len() - 1;
+                inner[p][last].1.extend(head.into_iter().skip(1));
+                for r in runs.values_mut().filter(|r| r.0 == p) {
+                    if r.1 == first {
+                        r.1 = last;
+                        r.2 += offset;
+                    } else if r.1 > first {
+                        r.1 -= 1;
+                    }
+                }
+            }
+        }
+    }
+    (inner, runs)
+}
+
 fn past_dart(layouts: &[Layout], x: &Side, y: &Side, reversed: bool) -> Option<Vec<(Side, Side)>> {
     const SHORT: f64 = 1e-6;
     let spans = &layouts[x.panel].darts[x.edge];
@@ -874,18 +1012,53 @@ pub struct Draped {
     pub sewn: Vec<Piece>,
     /// Facings and linings sewn by confirmed seams: inside it.
     pub lined: Vec<Piece>,
+    /// Pieces sewn onto lines inside the garment's own (patch pockets onto
+    /// their placements), and by nothing else: over them.
+    pub on: Vec<Piece>,
     /// Sewn to nothing.
     pub alone: Vec<Id>,
     /// Facings and linings sewn to nothing: left out, as they go inside.
     pub inside: Vec<Id>,
+    /// Sewn onto a piece that isn't draped, or is a facing or a lining (a
+    /// pocket inside a coat, which would face the body): left out.
+    pub off: Vec<Id>,
 }
 
 /// What a drape is made of: the pieces sewn by confirmed seams, facings
-/// and linings apart; and those left out.
+/// and linings apart, and pieces sewn onto others apart; and those left
+/// out.
 pub fn draped_pieces(pieces: &[Piece], seams: &[Seam]) -> Draped {
     let mut out = Draped::default();
+    let confirmed: Vec<&Seam> = seams.iter().filter(|s| s.confirmed).collect();
+    // Each piece's pieces it is sewn onto, if it is sewn onto lines alone.
+    let onto = |piece: &Piece| -> Option<Vec<&str>> {
+        let mine: Vec<&&Seam> = confirmed.iter().filter(|s| s.touches(&piece.id)).collect();
+        let hosts: Option<Vec<&str>> = mine
+            .iter()
+            .map(|s| {
+                let (me, other) = if s.a.piece == piece.id && !s.a.is_line() {
+                    (&s.a, &s.b)
+                } else {
+                    (&s.b, &s.a)
+                };
+                (me.piece == piece.id
+                    && !me.is_line()
+                    && other.is_line()
+                    && other.piece != piece.id)
+                    .then_some(other.piece.as_str())
+            })
+            .collect();
+        hosts.filter(|h| !h.is_empty())
+    };
+    let mut sewn_on: Vec<(&Piece, Vec<&str>)> = Vec::new();
     for piece in pieces {
-        let sewn = seams.iter().any(|s| s.confirmed && s.touches(&piece.id));
+        let sewn = confirmed.iter().any(|s| s.touches(&piece.id));
+        if !inside(piece)
+            && let Some(hosts) = onto(piece)
+        {
+            sewn_on.push((piece, hosts));
+            continue;
+        }
         match (inside(piece), sewn) {
             (true, true) => out.lined.push(piece.clone()),
             (true, false) => out.inside.push(piece.id.clone()),
@@ -893,7 +1066,32 @@ pub fn draped_pieces(pieces: &[Piece], seams: &[Seam]) -> Draped {
             (false, false) => out.alone.push(piece.id.clone()),
         }
     }
+    // On the garment's own pieces only.
+    for (piece, hosts) in sewn_on {
+        if hosts.iter().all(|h| out.sewn.iter().any(|p| p.id == *h)) {
+            out.on.push(piece.clone());
+        } else {
+            out.off.push(piece.id.clone());
+        }
+    }
     out
+}
+
+/// The garment as seen from outside, to place round the body and measure:
+/// its own pieces (`draped.sewn`) meshed as the whole garment meshes them,
+/// with the lines pieces are sewn onto, but without those pieces.
+pub fn shell(draped: &Draped, seams: &[Seam], spacing: f64) -> Result<Garment, GarmentError> {
+    if draped.on.is_empty() {
+        return assemble(&draped.sewn, seams, spacing);
+    }
+    let all: Vec<Piece> = draped.sewn.iter().chain(&draped.on).cloned().collect();
+    let whole = assemble(&all, seams, spacing)?;
+    let own = whole
+        .panels
+        .iter()
+        .take_while(|p| draped.sewn.iter().any(|s| s.id == p.piece))
+        .count();
+    Ok(whole.first(own))
 }
 
 /// Lays out the pieces, sews them by `seams` (confirmed ones only), and
@@ -916,9 +1114,26 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
                 .flatten()
         })
     };
+    // And which of its lines is a given line's half.
+    let find_line = |piece: &str, line: &str, half: Half| -> Option<(usize, usize)> {
+        layouts.iter().enumerate().find_map(|(i, l)| {
+            (pieces[l.piece].id == piece)
+                .then(|| {
+                    l.lines
+                        .iter()
+                        .position(|x| x.0 == line && x.1 == half)
+                        .map(|k| (i, k))
+                })
+                .flatten()
+        })
+    };
     // The seams on panels: each seam on both sides of the body where its
     // pieces are in pairs, once where it names a mirror copy itself.
     let mut sewn: Vec<(Side, Side, bool, String)> = Vec::new();
+    // Edges sewn onto lines inside panels (a pocket onto its placement):
+    // the edge's side, the line's (its `edge` the line's index), and
+    // whether sewn the other way round.
+    let mut onto: Vec<(Side, Side, bool)> = Vec::new();
     for seam in seams.iter().filter(|s| s.confirmed) {
         let explicit = seam.a.mirror || seam.b.mirror;
         let halves: &[(Half, Half)] = if explicit {
@@ -945,6 +1160,29 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             };
             if let (Some(a), Some(b)) = (side(&seam.a, ha), side(&seam.b, hb)) {
                 sewn.push((a, b, seam.reversed, seam.name.clone()));
+            }
+            let on_line = |s: &drapewright_seams::SeamSide, half: Half| -> Option<Side> {
+                let half = if explicit {
+                    if s.mirror { Half::B } else { Half::A }
+                } else {
+                    half
+                };
+                let (panel, line) = find_line(&s.piece, s.line.as_ref()?, half)?;
+                let total = length(&layouts[panel].lines[line].2);
+                Some(Side {
+                    panel,
+                    edge: line,
+                    from: s.from.unwrap_or(0.0).clamp(0.0, total),
+                    to: s.to.unwrap_or(total).clamp(0.0, total),
+                })
+            };
+            let pair = match (seam.a.is_line(), seam.b.is_line()) {
+                (false, true) => side(&seam.a, ha).zip(on_line(&seam.b, hb)),
+                (true, false) => side(&seam.b, hb).zip(on_line(&seam.a, ha)),
+                _ => None,
+            };
+            if let Some((edge, line)) = pair {
+                onto.push((edge, line, seam.reversed));
             }
         }
     }
@@ -1030,6 +1268,23 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             .or_default()
             .push((b.from, b.to, n, k, true));
     }
+    // Each edge sewn onto a line, in as many steps as its stretch of the
+    // line takes: the line's points are then the same whatever is sewn
+    // onto it, or whether it is there at all.
+    let base = sewn.len();
+    let onto_steps: Vec<usize> = onto
+        .iter()
+        .map(|(_, l, _)| ((l.to - l.from).abs() / spacing).round().max(1.0) as usize)
+        .collect();
+    for (j, (e, _, _)) in onto.iter().enumerate() {
+        wanted.entry((e.panel, e.edge)).or_default().push((
+            e.from,
+            e.to,
+            onto_steps[j],
+            base + j,
+            false,
+        ));
+    }
     // Sampled edges: their points, and where each seam side's run is.
     let mut sampled: Vec<Vec<Vec<P2>>> = Vec::new();
     let mut runs: HashMap<(usize, bool), (usize, usize, usize, usize)> = HashMap::new();
@@ -1077,27 +1332,62 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
         }
         sampled.push(edges);
     }
+    // The lines sewn onto, sampled: chains of points, each one or more
+    // stretches end to end, and where each seam's stretch is in them.
+    let (inner, line_runs) = sample_lines(&layouts, &onto, &onto_steps);
+    // Each panel's boundary, round it.
+    let boundaries: Vec<Vec<Vec<P2>>> = layouts
+        .iter()
+        .enumerate()
+        .map(|(p, layout)| {
+            layout
+                .order
+                .iter()
+                .map(|&(e, back)| {
+                    let mut c = sampled[p][e].clone();
+                    if back {
+                        c.reverse();
+                    }
+                    c
+                })
+                .collect()
+        })
+        .collect();
+    // Only the chains inside their panels, clear of its edge: a pocket
+    // whose placement runs over the edge is not sewn there. Each chain's
+    // place among those kept.
+    let mut kept: Vec<Chains> = Vec::new();
+    let mut kept_as: Vec<Vec<Option<usize>>> = Vec::new();
+    for (p, chains) in inner.into_iter().enumerate() {
+        let mut here = Vec::new();
+        let mut places = Vec::new();
+        for (half, c) in chains {
+            if inside_panel(&boundaries[p], &c, spacing) {
+                places.push(Some(here.len()));
+                here.push((half, c));
+            } else {
+                places.push(None);
+            }
+        }
+        kept.push(here);
+        kept_as.push(places);
+    }
     // Meshed, each edge's points found in the mesh.
     let mut panels = Vec::new();
     for (p, layout) in layouts.iter().enumerate() {
-        let chains: Vec<Vec<P2>> = layout
-            .order
-            .iter()
-            .map(|&(e, back)| {
-                let mut c = sampled[p][e].clone();
-                if back {
-                    c.reverse();
-                }
-                c
-            })
-            .collect();
+        let chains = &boundaries[p];
         let failed = |error| GarmentError::Mesh {
             piece: pieces[layout.piece].name.clone(),
             error,
         };
-        let m = match mirrored_mesh(p, &layouts, &sampled, &panels, spacing).map_err(failed)? {
+        let m = match mirrored_mesh(p, &layouts, (&sampled, &kept), &panels, spacing)
+            .map_err(failed)?
+        {
             Some(m) => m,
-            None => mesh(&chains, spacing).map_err(failed)?,
+            None => {
+                let lines: Vec<Vec<P2>> = kept[p].iter().map(|(_, c)| c.clone()).collect();
+                mesh_inside(chains, &lines, spacing).map_err(failed)?
+            }
         };
         let mut edges: Vec<PanelEdge> = Vec::new();
         for (chain, &(e, back)) in m.chains.iter().zip(&layout.order) {
@@ -1129,6 +1419,7 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             inside: inside(&pieces[layout.piece]),
             over: None,
             outside: outside[p],
+            sewn_on: false,
         });
     }
     // Stitches: the two runs of each seam, point for point.
@@ -1169,6 +1460,33 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
         if !links.contains(&link) {
             links.push(link);
         }
+    }
+    // Edges sewn onto lines, point for point.
+    for (j, (e, _, reversed)) in onto.iter().enumerate() {
+        let (Some(&(p, edge, start, backwards)), Some(&(q, chain, at, way))) =
+            (runs.get(&(base + j, false)), line_runs.get(&j))
+        else {
+            continue;
+        };
+        let Some(chain) = kept_as[q][chain] else {
+            continue;
+        };
+        debug_assert_eq!((p, edge), (e.panel, e.edge));
+        let n = onto_steps[j];
+        let points = &panels[p].edges[edge].points;
+        let mut va: Vec<(usize, u32)> = (start..=start + n).map(|i| (p, points[i])).collect();
+        if backwards == 1 {
+            va.reverse();
+        }
+        let line = &panels[q].mesh.inner[chain];
+        let mut vb: Vec<(usize, u32)> = (at..=at + n).map(|i| (q, line[i])).collect();
+        if way == 1 {
+            vb.reverse();
+        }
+        if *reversed {
+            va.reverse();
+        }
+        stitches.extend(va.into_iter().zip(vb).map(|(x, y)| [x, y]));
     }
     let buttons = buttons(&layouts, pieces, &panels, &sewn[..seams_sewn]);
     let done_up = buttons.len();

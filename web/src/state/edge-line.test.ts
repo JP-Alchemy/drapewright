@@ -15,8 +15,8 @@ const seam = (
 ): Seam => ({
   id: `${a.join('')}-${b.join('')}`,
   name: '',
-  a: { piece: a[0], edge: a[1], from: null, to, mirror: false },
-  b: { piece: b[0], edge: b[1], from: null, to: null, mirror },
+  a: { piece: a[0], edge: a[1], line: null, from: null, to, mirror: false },
+  b: { piece: b[0], edge: b[1], line: null, from: null, to: null, mirror },
   reversed,
   ease: 'even',
   confirmed: true,

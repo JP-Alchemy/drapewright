@@ -97,6 +97,11 @@ export function selectTool(): Tool {
       const hit = ctx.hit(p)
       const ui = session.ui.get()
       session.showTip(null)
+      // A pocket waiting to be sewn on: onto the line tapped.
+      if (hit && session.sewOntoAt(hit.piece, ctx.world(p))) {
+        state = { kind: 'idle' }
+        return
+      }
       if (!hit) {
         const before = [...ui.selection]
         const base = adding(p) ? before : []

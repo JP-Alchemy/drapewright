@@ -28,7 +28,9 @@ const EARLIER_FORMAT: &str = "soom-project";
 type Migration = fn(&mut Value) -> Result<(), String>;
 
 /// `MIGRATIONS[i]` upgrades version `i + 1` to `i + 2`.
-const MIGRATIONS: &[Migration] = &[v1_to_v2, v2_to_v3, v3_to_v4, v4_to_v5, v5_to_v6, v6_to_v7];
+const MIGRATIONS: &[Migration] = &[
+    v1_to_v2, v2_to_v3, v3_to_v4, v4_to_v5, v5_to_v6, v6_to_v7, v7_to_v8,
+];
 
 /// Version 2 adds people's measurements: none yet.
 fn v1_to_v2(value: &mut Value) -> Result<(), String> {
@@ -77,6 +79,12 @@ fn v5_to_v6(value: &mut Value) -> Result<(), String> {
 /// Version 7 keeps the words printed on an imported piece with its source:
 /// none kept before.
 fn v6_to_v7(_: &mut Value) -> Result<(), String> {
+    Ok(())
+}
+
+/// Version 8 lets a seam's side be a line inside a piece (a patch pocket
+/// sewn onto its placement): before, every side was an edge.
+fn v7_to_v8(_: &mut Value) -> Result<(), String> {
     Ok(())
 }
 

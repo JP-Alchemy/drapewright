@@ -1093,12 +1093,20 @@ export const t = {
       fitsOpening: 'fits round the opening',
       fitsAlong: 'fits along the opening',
       sewnInto: 'sewn into the seam',
+      onPlacement: 'where its placement is drawn',
     } satisfies Record<Reason, string>,
     sewTo: 'Sew to another edge…',
     sewingHint: (edge: string) =>
       `Tap the edge to sew to ${edge}. Tap it again to sew it to the other half of a pair.`,
     cancel: 'Cancel',
     sewnTo: (other: string) => `Sewn to ${other}`,
+    sewOnto: 'Sew onto a placement…',
+    sewOntoHint: 'Sew this piece (a pocket) onto a line drawn on another, where it goes.',
+    sewingOntoHint: (piece: string) => `Tap the line on the panel where ${piece} goes.`,
+    noLine: 'That piece has no line drawn on it to sew onto.',
+    notItsShape: (piece: string) => `${piece} isn’t the shape of that line.`,
+    sewnOn: (piece: string) => `${piece} sewn on. Its seams are numbered on both pieces.`,
+    lineInside: 'line drawn on it',
   },
 
   measure: {
@@ -1332,6 +1340,18 @@ export const t = {
         n,
         'A facing or lining is sewn, but has nothing to lie on inside the garment yet, so it’s left off.',
         '# facings and linings are sewn, but have nothing to lie on inside the garment yet, so they’re left off.',
+      ),
+    sewnOntoOff: (n: number) =>
+      plural(
+        n,
+        'A pocket is sewn onto a piece that isn’t draped, or onto a lining, so it’s left off.',
+        '# pockets are sewn onto pieces that aren’t draped, or onto linings, so they’re left off.',
+      ),
+    notLaid: (n: number) =>
+      plural(
+        n,
+        'A pocket can’t be laid where it’s sewn on (its placement runs over the edge of its piece), so it’s left off.',
+        '# pockets can’t be laid where they’re sewn on (their placements run over the edges of their pieces), so they’re left off.',
       ),
     lined: (names: string[]) =>
       `Inside, shown paler: ${new Intl.ListFormat('en', { type: 'conjunction' }).format(names)}.`,

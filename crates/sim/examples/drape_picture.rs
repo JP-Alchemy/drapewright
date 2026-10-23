@@ -29,7 +29,7 @@ use drapewright_project::migrate::load;
 use drapewright_seams::Seam;
 use drapewright_sim::drape::{Drape, Posable};
 use drapewright_sim::fabric::preset;
-use drapewright_sim::garment::{assemble, draped_pieces};
+use drapewright_sim::garment::draped_pieces;
 use drapewright_sim::place::{Figure, place};
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Transform};
 
@@ -39,13 +39,32 @@ const SCALE: f32 = 0.35;
 /// A triangle to draw: its depth, corners and colour.
 type Drawn = (f32, [(f32, f32); 3], [u8; 3]);
 
+/// Which cloth a point is: the garment's outside, inside it, or sewn onto
+/// it.
+#[derive(Clone, Copy)]
+enum Layer {
+    Outside,
+    Inside,
+    SewnOn,
+}
+
+fn layer_of(drape: &Drape, k: usize) -> Layer {
+    if drape.cloth.inside(k) {
+        Layer::Inside
+    } else if drape.cloth.sewn_on(k) {
+        Layer::SewnOn
+    } else {
+        Layer::Outside
+    }
+}
+
 fn picture(
     path: &str,
     body: &[[f64; 3]],
     body_triangles: &[[u32; 3]],
     cloth: &[[f32; 3]],
     cloth_triangles: &[[u32; 3]],
-    inside_from: usize,
+    layer: &dyn Fn(usize) -> Layer,
 ) {
     let top = body.iter().map(|p| p[1]).fold(0.0, f64::max) as f32 + 60.0;
     let (w, h) = ((2000.0 * SCALE) as u32, (top * SCALE) as u32);
@@ -96,11 +115,11 @@ fn picture(
             let [a, b, c] = t.map(|i| cloth[i as usize].map(|v| v * 1000.0));
             if let Some(light) = shade(a, b, c, true) {
                 let (pa, pb, pc) = (project(a), project(b), project(c));
-                // Facings and linings in orange.
-                let base = if t[0] as usize >= inside_from {
-                    [230.0, 140.0, 60.0]
-                } else {
-                    [60.0, 110.0, 190.0]
+                // Facings and linings in orange, pockets sewn on darker.
+                let base = match layer(t[0] as usize) {
+                    Layer::Inside => [230.0, 140.0, 60.0],
+                    Layer::SewnOn => [40.0, 70.0, 140.0],
+                    Layer::Outside => [60.0, 110.0, 190.0],
                 };
                 let colour = base.map(|c| (c * light) as u8);
                 tris.push((
@@ -216,12 +235,22 @@ fn sewn(pieces: Vec<Piece>, seams: Vec<Seam>) -> (Vec<Piece>, Vec<Seam>) {
     }
     let draped = draped_pieces(&pieces, &seams);
     eprintln!(
-        "left out: {} sewn to nothing, {} inside; {} draped inside",
+        "left out: {} sewn to nothing, {} inside, {} sewn onto them; {} draped inside, {} sewn on",
         draped.alone.len(),
         draped.inside.len(),
-        draped.lined.len()
+        draped.off.len(),
+        draped.lined.len(),
+        draped.on.len()
     );
-    (draped.sewn.into_iter().chain(draped.lined).collect(), seams)
+    (
+        draped
+            .sewn
+            .into_iter()
+            .chain(draped.lined)
+            .chain(draped.on)
+            .collect(),
+        seams,
+    )
 }
 
 fn main() {
@@ -244,7 +273,7 @@ fn main() {
     let [asset, out, rest @ ..] = args.as_slice() else {
         eprintln!(
             "usage: drape_picture <body file> <out> [fabric] \
-             [skirt|blouse|long|bust|armhole|yoked|trousers|cape|<project file> [suggest]]"
+             [skirt|blouse|long|bust|armhole|yoked|trousers|cape|pockets|<project file> [suggest]]"
         );
         std::process::exit(2);
     };
@@ -267,22 +296,18 @@ fn main() {
         }
         "trousers" => sewn_as_found(drapewright_pattern_core::testing::garments::trousers()),
         "cape" => sewn_as_found(drapewright_pattern_core::testing::garments::cape_coat()),
+        "pockets" => sewn_as_found(drapewright_pattern_core::testing::garments::pocket_skirt()),
         path => project(path, rest.get(2).is_some_and(|s| s == "suggest")),
     };
     let draped = draped_pieces(&pieces, &seams);
-    let shell = assemble(&draped.sewn, &seams, 20.0).expect("a garment");
+    let shell = drapewright_sim::garment::shell(&draped, &seams, 20.0).expect("a garment");
     if drapewright_sim::place::half_round(&shell) {
         eprintln!("only half way round: cut as pairs?");
     }
     let starts = place(&shell, &figure);
-    let (garment, starts) = drapewright_sim::inside::with_inside(
-        &shell,
-        &starts,
-        (&draped.sewn, &draped.lined),
-        &seams,
-        20.0,
-    )
-    .unwrap_or((shell, starts));
+    let (garment, starts) =
+        drapewright_sim::inside::with_inside(&shell, &starts, &draped, &seams, 20.0)
+            .unwrap_or((shell, starts));
     let mut drape = Drape::new(&garment, &starts, fabric, (&body.vertices, &triangles));
     let draw = |name: &str, drape: &Drape| {
         picture(
@@ -291,9 +316,7 @@ fn main() {
             &triangles,
             &drape.cloth.x,
             &drape.cloth.triangles,
-            (0..drape.cloth.x.len())
-                .find(|&k| drape.cloth.inside(k))
-                .unwrap_or(usize::MAX),
+            &|k| layer_of(drape, k),
         );
     };
     draw("placed", &drape);
@@ -397,9 +420,7 @@ fn main() {
                     &triangles,
                     &drape.cloth.x,
                     &drape.cloth.triangles,
-                    (0..drape.cloth.x.len())
-                        .find(|&k| drape.cloth.inside(k))
-                        .unwrap_or(usize::MAX),
+                    &|k| layer_of(&drape, k),
                 );
             }
         }
@@ -430,9 +451,7 @@ fn main() {
             &triangles,
             &drape.cloth.x,
             &drape.cloth.triangles,
-            (0..drape.cloth.x.len())
-                .find(|&k| drape.cloth.inside(k))
-                .unwrap_or(usize::MAX),
+            &|k| layer_of(&drape, k),
         );
     }
 }

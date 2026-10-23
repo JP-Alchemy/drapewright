@@ -317,6 +317,25 @@ test('a shirt drapes with its facing inside, buttoned and then open', async ({ p
     .toBeGreaterThan(0.002)
 })
 
+test('patch pockets sewn on by Find seams drape over the skirt', async ({ page, webgpu }) => {
+  test.setTimeout(240_000)
+  await page.goto('/app/')
+  await openBackup(page, 'pocket-skirt.drapewright', 3)
+  await page.getByRole('button', { name: 'Find seams' }).click()
+  await page.getByRole('button', { name: 'Sew all 5' }).click()
+  test.skip(!(await openTheAvatar(page, webgpu)), 'Draping is seen in the 3D view')
+  const pane = page.getByRole('region', { name: 'Avatar' })
+  await expect(pane.getByRole('status').first()).toHaveText(/standard figure/, {
+    timeout: 60_000,
+  })
+  await pane
+    .getByRole('group', { name: 'Drape the garment' })
+    .getByRole('button', { name: 'Drape', exact: true })
+    .click()
+  // Nothing left off: the pockets are on it.
+  await settles(pane, 'Draped in poplin.', webgpu)
+})
+
 test('a lined skirt drapes with its lining inside', async ({ page, webgpu }) => {
   test.setTimeout(240_000)
   await page.goto('/app/')

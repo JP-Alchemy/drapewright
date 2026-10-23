@@ -257,6 +257,18 @@ impl Draping {
         &self.0.lined
     }
 
+    /// The pieces sewn onto others (pockets) left out, by id: sewn onto a
+    /// piece not draped, or onto a lining.
+    pub fn off(&self) -> &[String] {
+        &self.0.off
+    }
+
+    /// The pieces sewn onto others left out as they couldn't be laid on
+    /// the piece they are sewn onto, by id.
+    pub fn not_laid(&self) -> &[String] {
+        &self.0.not_laid
+    }
+
     /// How many buttons it has, done up or not.
     pub fn buttons(&self) -> usize {
         self.0.buttons
@@ -385,8 +397,8 @@ pub struct ClothState {
     stretch: Vec<f32>,
     /// mm.
     room: Vec<f32>,
-    /// The points from this one on are inside (facings, linings), if any.
-    inside_from: Option<usize>,
+    /// The points inside (facings, linings): none, or these.
+    inside: std::ops::Range<usize>,
     /// The pieces' edges in it.
     edges: Arc<[ClothEdge]>,
     /// Which way each triangle faces out of the garment: 1 its corners'
@@ -437,7 +449,11 @@ impl Draping {
             pull: strain.pull,
             stretch: strain.stretch,
             room: drape.room().iter().map(|r| r * 1000.0).collect(),
-            inside_from: (0..drape.cloth.x.len()).find(|&k| drape.cloth.inside(k)),
+            inside: {
+                let n = drape.cloth.x.len();
+                let first = (0..n).find(|&k| drape.cloth.inside(k)).unwrap_or(n);
+                first..(first..n).find(|&k| !drape.cloth.inside(k)).unwrap_or(n)
+            },
             edges: self.0.edges.clone(),
             facing: drape.cloth.facing().to_vec(),
         }
@@ -449,10 +465,11 @@ impl ClothState {
     /// (sRGB, 0 to 1).
     pub fn colours(&self, shows: ClothShows, fabric: [f32; 3]) -> Vec<[f32; 3]> {
         match shows {
-            // Facings and linings paler: seen inside the garment.
+            // Facings and linings paler: seen inside the garment. Pockets
+            // sewn on are the garment's own fabric.
             ClothShows::Fabric => (0..self.points.len())
                 .map(|k| {
-                    if self.inside_from.is_some_and(|first| k >= first) {
+                    if self.inside.contains(&k) {
                         fabric.map(|c| c + (1.0 - c) * INSIDE_PALER)
                     } else {
                         fabric

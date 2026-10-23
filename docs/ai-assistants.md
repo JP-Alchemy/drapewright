@@ -103,7 +103,7 @@ assistant that file.
 | `get_measurements`, `set_measurements` | People's body measurements kept in the project; values outside the usual range are pointed out |
 | `fit_avatar` | Fits the avatar to a person's measurements and says how close it comes to each |
 | `drape` | Drapes the garment on the avatar (fitted to a person, or the standard figure) in a fabric, done up or open, and in a pose if asked: a picture of it worn (or a heatmap of where it pulls, or of the room it leaves), and at the bust, waist and hip its size, the ease, how hard it pulls and how much room it leaves |
-| `get_seams`, `sew_edges`, `unpick_seams` | Which edges are sewn together, each side's length and how the notches meet; seams Drapewright suggests (to confirm with the user) |
+| `get_seams`, `sew_edges`, `unpick_seams` | Which edges are sewn together, each side's length and how the notches meet; seams Drapewright suggests (to confirm with the user), patch pockets onto their placements among them. A side can be part of a line drawn inside a piece (a pocket's placement) instead of an edge |
 | `undo`, `redo` | One tool call is one step |
 | `print_settings` | How the project prints, and its print settings |
 | `export_pdf`, `export_svg` | The tiled true-size PDF, or a true-size SVG |

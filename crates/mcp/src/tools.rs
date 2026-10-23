@@ -340,7 +340,7 @@ pub fn all() -> Vec<Tool> {
             "sew_edges",
             "Sew edges",
             Edits,
-            "Sews pairs of edges together (adds seams). Each side is a piece id and edge id, optionally a part of the edge (from_mm, to_mm along its stitching line) or the piece's mirror copy (mirror: true, for a piece cut as a pair sewn to itself at the centre back). reversed: true when one side's start meets the other's end.",
+            "Sews pairs of edges together (adds seams). Each side is a piece id and edge id, optionally a part of the edge (from_mm, to_mm along its stitching line) or the piece's mirror copy (mirror: true, for a piece cut as a pair sewn to itself at the centre back). reversed: true when one side's start meets the other's end. A side can instead be part of a line drawn inside a piece (line, from_mm, to_mm), where a patch pocket is sewn onto its placement: one seam for each of the pocket's sewn edges. get_seams suggests pockets onto their placements itself.",
             sew_edges,
         ),
         tool(
@@ -2022,6 +2022,14 @@ fn arrange_pieces(session: &mut Session, a: ArrangeArgs) -> Result<Output, ToolE
 fn side_label(doc: &Document, side: &drapewright_seams::SeamSide) -> String {
     let piece = doc.piece(&side.piece);
     let edge = piece.and_then(|p| {
+        if let Some(id) = &side.line {
+            let line = p.lines.iter().find(|l| l.id == *id)?;
+            return Some(
+                line.label
+                    .clone()
+                    .unwrap_or_else(|| "line inside it".into()),
+            );
+        }
         let i = p.outline.edge_index(&side.edge)?;
         let name = &p.outline.edges[i].name;
         Some(if name.is_empty() {
@@ -2042,6 +2050,7 @@ fn side_json(doc: &Document, side: &drapewright_seams::SeamSide) -> Value {
     json!({
         "piece": side.piece,
         "edge": side.edge,
+        "line": side.line,
         "label": side_label(doc, side),
         "fromMm": side.from.map(r1),
         "toMm": side.to.map(r1),
@@ -2108,9 +2117,15 @@ fn get_seams(session: &mut Session, _: NoArgs) -> Result<Output, ToolError> {
 struct SideArgs {
     /// Piece id.
     piece: String,
-    /// Edge id (render_preview with labels "edges" shows them).
+    /// Edge id (render_preview with labels "edges" shows them). Leave it
+    /// out to give `line` instead.
+    #[serde(default)]
     edge: String,
-    /// Sewn from this far along the edge's stitching line, mm.
+    /// A line drawn inside the piece (a pocket's placement, from
+    /// get_piece) sewn instead of an edge: the other side, a pocket's edge,
+    /// is sewn onto the piece's face there. Needs from_mm and to_mm.
+    line: Option<String>,
+    /// Sewn from this far along the edge's stitching line (or the line), mm.
     from_mm: Option<f64>,
     /// Sewn up to this far along, mm.
     to_mm: Option<f64>,
@@ -2144,6 +2159,7 @@ fn sew_edges(session: &mut Session, a: SewArgs) -> Result<Output, ToolError> {
     let side = |s: SideArgs| drapewright_seams::SeamSide {
         piece: s.piece,
         edge: s.edge,
+        line: s.line,
         from: s.from_mm,
         to: s.to_mm,
         mirror: s.mirror,

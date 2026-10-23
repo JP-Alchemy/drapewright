@@ -209,7 +209,7 @@ function Workspace({
   actions: ProjectActions
 }) {
   const fileInput = useRef<HTMLInputElement>(null)
-  const { busy, notice, toast, tip, sewing, avatar, projector } = useStore(session.ui)
+  const { busy, notice, toast, tip, sewing, sewingOnto, avatar, projector } = useStore(session.ui)
   // The avatar beside (or under) the table, or floating over it.
   const avatarLayout = useAvatarLayout()
   const docked = avatar && !avatarLayout.floating
@@ -309,10 +309,23 @@ function Workspace({
                 {t.seams.sewingHint(
                   sideLabel(session.engine.document(), {
                     ...sewing,
+                    line: null,
                     from: null,
                     to: null,
                     mirror: false,
                   }),
+                )}
+              </span>
+              <Button className="link-button" onPress={() => session.cancelSewing()}>
+                {t.seams.cancel}
+              </Button>
+            </div>
+          )}
+          {sewingOnto && (
+            <div className="status-bar" role="status">
+              <span>
+                {t.seams.sewingOntoHint(
+                  session.engine.document().pieces.find((p) => p.id === sewingOnto)?.name ?? '',
                 )}
               </span>
               <Button className="link-button" onPress={() => session.cancelSewing()}>

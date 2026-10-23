@@ -203,8 +203,13 @@ function PieceSection({
   piece: Piece
   view: PieceView
 }) {
-  const units = session.engine.document().settings.displayUnits
+  const doc = session.engine.document()
+  const units = doc.settings.displayUnits
   const [x0, y0, x1, y1] = view.outlineBounds
+  // A piece sewn to nothing yet, and lines drawn on another to sew it onto.
+  const canSewOnto =
+    !doc.seams.some((s) => s.a.piece === piece.id || s.b.piece === piece.id) &&
+    doc.pieces.some((p) => p.id !== piece.id && p.lines.length > 0)
   return (
     <section className="panel-section inspector" aria-labelledby="inspector-heading">
       <h2 id="inspector-heading">{t.inspector.heading}</h2>
@@ -219,6 +224,15 @@ function PieceSection({
       <p className="muted small">
         {t.pieces.size(formatLength(x1 - x0, units), formatLength(y1 - y0, units))}
       </p>
+      {canSewOnto && (
+        <Button
+          className="button"
+          aria-description={t.seams.sewOntoHint}
+          onPress={() => session.startSewingOnto(piece.id)}
+        >
+          {t.seams.sewOnto}
+        </Button>
+      )}
       <CutSection session={session} piece={piece} />
       <DetailsPart
         id="allowance"

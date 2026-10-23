@@ -3,8 +3,9 @@
 // their velocity and gravity; edges, bends and stitches are held, a colour
 // at a time (no two constraints of a colour share a point, so each colour
 // is solved at once); the cloth is kept off the body, with friction; cloth
-// inside (facings, linings) is kept behind the cloth over it, where the two
-// face the same way; the stitches are held again (so the body's friction
+// inside (facings, linings) is kept behind the cloth over it, and cloth
+// sewn onto it (patch pockets) in front, where the two face the same way;
+// the stitches are held again (so the body's friction
 // cannot hold a seam open); and the velocities are what the points did.
 // Metres, seconds.
 
@@ -23,7 +24,8 @@ struct Params {
     a: vec4<f32>,
     // How far inside cloth is kept behind the cloth over it, and within how far.
     b: vec4<f32>,
-    // Points, the first inside one, 1 if there is a field b.
+    // Points, the first inside one, 1 if there is a field b, the first sewn
+    // onto the outside (kept in front of it, not behind).
     counts: vec4<u32>,
 }
 
@@ -377,12 +379,19 @@ fn face_out(@builtin(global_invocation_id) id: vec3<u32>) {
     outward[k] = vec4<f32>(select(vec3<f32>(0.0), sum / l, l > 0.0), 0.0);
 }
 
+// Which way inside point `i` is kept from the cloth it lies on: behind it
+// (1), or in front of it (-1) where it is sewn on.
+fn side_of(i: u32) -> f32 {
+    return select(1.0, -1.0, i >= params.counts.w);
+}
+
 // How far inside point `xi` (outward normal `m`) falls short of being
-// behind outside point `xj` (outward normal `n`) by `apart`; 0 where they
-// are apart enough, or not over each other, or face opposite ways (one has
-// folded over, and which is behind which can't be told: as on the
-// processor, they are left be until the fold opens).
-fn short_of(xi: vec3<f32>, m: vec3<f32>, xj: vec3<f32>, n: vec3<f32>) -> f32 {
+// behind outside point `xj` (outward normal `n`) by `apart`, or in front of
+// it for `side` -1; 0 where they are apart enough, or not over each other,
+// or face opposite ways (one has folded over, and which is behind which
+// can't be told: as on the processor, they are left be until the fold
+// opens).
+fn short_of(xi: vec3<f32>, m: vec3<f32>, xj: vec3<f32>, n: vec3<f32>, side: f32) -> f32 {
     let apart = params.b.x;
     let reach = params.b.y;
     if dot(n, n) == 0.0 || dot(m, n) < 0.0 {
@@ -390,10 +399,11 @@ fn short_of(xi: vec3<f32>, m: vec3<f32>, xj: vec3<f32>, n: vec3<f32>) -> f32 {
     }
     let off = xi - xj;
     let along = dot(off, n);
-    if along < -apart || along > reach || length(off - n * along) > reach {
+    let ahead = side * along;
+    if ahead < -apart || ahead > reach || length(off - n * along) > reach {
         return 0.0;
     }
-    return along + apart;
+    return ahead + apart;
 }
 
 // Friction between two layers pressed together `short` along `n`: of
@@ -409,8 +419,8 @@ fn held_slip(moved: vec3<f32>, n: vec3<f32>, short: f32) -> vec3<f32> {
     return min(params.a.z * short / slide, 1.0) * slip;
 }
 
-// The outside cloth pushed out from the cloth inside it near it, by its
-// share (by mass).
+// The outside cloth pushed out from the cloth inside it near it (or in from
+// the cloth sewn onto it), by its share (by mass).
 @compute @workgroup_size(64)
 fn order_layers_out(@builtin(global_invocation_id) id: vec3<u32>) {
     let j = id.x;
@@ -428,10 +438,11 @@ fn order_layers_out(@builtin(global_invocation_id) id: vec3<u32>) {
     for (var q = layers_out[j]; q < layers_out[j + 1u]; q = q + 1u) {
         let i = layers_out[q];
         let xi = x[i];
-        let short = short_of(xi.xyz, outward[i].xyz, at, n);
+        let side = side_of(i);
+        let short = short_of(xi.xyz, outward[i].xyz, at, n, side);
         if short > 0.0 {
             let share = xj.w / (xi.w + xj.w);
-            at = at + short * share * n;
+            at = at + side * short * share * n;
             at = at + share * held_slip(xi.xyz - p[i].xyz - (at - pj), n, short);
             pushed = true;
         }
@@ -443,8 +454,8 @@ fn order_layers_out(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 }
 
-// The inside cloth pushed in behind the outside cloth near it, by its
-// share (by mass).
+// The inside cloth pushed in behind the outside cloth near it (or the cloth
+// sewn onto it out in front), by its share (by mass).
 @compute @workgroup_size(64)
 fn order_layers(@builtin(global_invocation_id) id: vec3<u32>) {
     let first = params.counts.y;
@@ -458,14 +469,15 @@ fn order_layers(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     var at = xi.xyz;
     let m = outward[i].xyz;
+    let side = side_of(i);
     for (var q = layers[id.x]; q < layers[id.x + 1u]; q = q + 1u) {
         let j = layers[q];
         let xj = x[j];
         let n = outward[j].xyz;
-        let short = short_of(at, m, xj.xyz, n);
+        let short = short_of(at, m, xj.xyz, n, side);
         if short > 0.0 {
             let share = xi.w / (xi.w + xj.w);
-            at = at - short * share * n;
+            at = at - side * short * share * n;
             at = at - share * held_slip(at - p[i].xyz - (xj.xyz - p[j].xyz), n, short);
             layered[i] = vec4<f32>(n, 1.0);
         }

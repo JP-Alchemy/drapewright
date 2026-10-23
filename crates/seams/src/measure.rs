@@ -4,7 +4,7 @@
 use std::borrow::Borrow;
 
 use drapewright_pattern_core::stitching::{
-    along_polyline, closed_along, dart_spans, polyline_length, stitching_edges,
+    along_polyline, closed_along, dart_spans, line_points, polyline_length, stitching_edges,
 };
 use drapewright_pattern_core::{AllowanceMode, Id, NotchFrom, NotchKind, Piece};
 use schemars::JsonSchema;
@@ -49,6 +49,10 @@ pub enum SeamProblem {
     MissingEdge { piece: Id, edge: Id },
     /// The part of the edge it sews is not all on the edge.
     OutsideEdge { piece: Id, edge: Id },
+    /// A line inside a piece it sews is gone.
+    MissingLine { piece: Id, line: Id },
+    /// The part of the line it sews is not all on the line.
+    OutsideLine { piece: Id, line: Id },
 }
 
 /// What a seam measures.
@@ -122,6 +126,9 @@ fn measure_side<P: Borrow<Piece>>(
         .ok_or_else(|| SeamProblem::MissingPiece {
             piece: side.piece.clone(),
         })?;
+    if let Some(id) = &side.line {
+        return measure_line(piece, id, side);
+    }
     let index = piece
         .outline
         .edge_index(&side.edge)
@@ -189,6 +196,33 @@ fn measure_side<P: Borrow<Piece>>(
         .filter(|n| !part || (SAME_PLACE..=length - SAME_PLACE).contains(&n.at))
         .collect();
     Ok(Measured { length, notches })
+}
+
+/// A side along a line inside a piece: its length, as drawn. Lines have no
+/// notches.
+fn measure_line(piece: &Piece, id: &Id, side: &SeamSide) -> Result<Measured, SeamProblem> {
+    let problem = |missing: bool| {
+        let (piece, line) = (side.piece.clone(), id.clone());
+        if missing {
+            SeamProblem::MissingLine { piece, line }
+        } else {
+            SeamProblem::OutsideLine { piece, line }
+        }
+    };
+    let line = piece
+        .lines
+        .iter()
+        .find(|l| l.id == *id)
+        .ok_or_else(|| problem(true))?;
+    let full = polyline_length(&line_points(line));
+    let (from, to) = (side.from.unwrap_or(0.0), side.to.unwrap_or(full));
+    if from < -0.1 || to > full + 0.1 || from >= to {
+        return Err(problem(false));
+    }
+    Ok(Measured {
+        length: to.min(full) - from.max(0.0),
+        notches: Vec::new(),
+    })
 }
 
 /// The notches of the two sides paired up: in order when there are as many

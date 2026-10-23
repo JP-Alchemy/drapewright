@@ -366,6 +366,42 @@ fn the_same_project_prints_the_same_bytes() {
 }
 
 #[test]
+fn a_skirt_with_patch_pockets_prints_the_same_sewn_on_or_not() {
+    let mut pieces = drapewright_pattern_core::testing::garments::pocket_skirt();
+    for (piece, x) in pieces.iter_mut().zip([0.0, 400.0, 800.0]) {
+        piece.placement.x = x;
+    }
+    let mut doc = document(pieces.clone());
+    let plain = export_pdf(&doc, &texts()).unwrap();
+    doc.seams = drapewright_seams::suggest(&pieces, &[])
+        .into_iter()
+        .map(|s| drapewright_seams::Seam {
+            confirmed: true,
+            ..s.seam
+        })
+        .collect();
+    assert!(doc.seams.iter().any(|s| s.b.is_line()));
+    assert_eq!(export_pdf(&doc, &texts()).unwrap(), plain);
+    // The pocket's placement printed dash-dot on the front, as a placement
+    // line is.
+    let pdf = lopdf::Document::load_mem(&plain).unwrap();
+    let dash_dot = pdf
+        .get_pages()
+        .values()
+        .flat_map(|&id| pdf.get_and_decode_page_content(id).unwrap().operations)
+        .filter(|op| {
+            op.operator == "d"
+                && op
+                    .operands
+                    .first()
+                    .and_then(|a| a.as_array().ok())
+                    .is_some_and(|a| a.len() == 4)
+        })
+        .count();
+    assert!(dash_dot > 0, "no placement printed");
+}
+
+#[test]
 fn settings_that_cannot_print_are_refused() {
     let mut doc = document(vec![]);
     assert_eq!(plan_print(&doc), Err(PrintError::NothingToPrint));

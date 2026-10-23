@@ -127,6 +127,20 @@ fn the_corset_project_is_up_to_date() {
 }
 
 #[test]
+fn the_pocket_skirt_project_is_up_to_date() {
+    // The skirt with patch pockets and their placement drawn on its front,
+    // nothing sewn yet: Find seams sews the pockets on where they go.
+    let pieces = drapewright_pattern_core::testing::garments::pocket_skirt();
+    let (json, _) = project(
+        ("pocket-skirt", "Test pocket skirt"),
+        pieces,
+        Vec::new(),
+        &[0.0, 400.0, 800.0],
+    );
+    write("pocket-skirt.drapewright", &json);
+}
+
+#[test]
 fn the_lined_skirt_project_is_up_to_date() {
     let (pieces, seams) = common::lined_skirt();
     let (json, differences) = project(

@@ -12,7 +12,7 @@ use drapewright_sim::cloth::V3;
 use drapewright_sim::collide::{BodyField, Seat};
 use drapewright_sim::drape::{Drape, Felt, Posable, Stepper};
 use drapewright_sim::fabric::preset;
-use drapewright_sim::garment::{assemble, draped_pieces};
+use drapewright_sim::garment::{draped_pieces, shell};
 use drapewright_sim::inside::with_inside;
 use drapewright_sim::mesh::{PanelMesh, mesh};
 use drapewright_sim::place::{Figure, place};
@@ -55,21 +55,34 @@ fn avatar() -> BodyModel {
     BodyModel::from_bytes(&std::fs::read(path).unwrap()).unwrap()
 }
 
-/// A test project's pieces and confirmed seams.
+/// A test project's pieces and confirmed seams; one with none sewn (the
+/// pocket skirt) sewn by the seams Find seams suggests.
 fn project(name: &str) -> (Vec<drapewright_pattern_core::Piece>, Vec<Seam>) {
     let path = format!(
         "{}/../../fixtures/drapewright/{name}.drapewright",
         env!("CARGO_MANIFEST_DIR")
     );
     let file = load(&unpack(&std::fs::read(path).unwrap()).unwrap().project_json).unwrap();
-    let pieces = file.document.pieces.iter().map(|p| (**p).clone()).collect();
-    let seams = file
+    let pieces: Vec<drapewright_pattern_core::Piece> =
+        file.document.pieces.iter().map(|p| (**p).clone()).collect();
+    let mut seams: Vec<Seam> = file
         .document
         .seams
         .iter()
         .filter(|s| s.confirmed)
         .cloned()
         .collect();
+    if seams.is_empty() {
+        seams = drapewright_seams::suggest(&pieces, &[])
+            .into_iter()
+            .enumerate()
+            .map(|(k, s)| Seam {
+                id: format!("s{k}"),
+                confirmed: true,
+                ..s.seam
+            })
+            .collect();
+    }
     (pieces, seams)
 }
 
@@ -86,16 +99,10 @@ fn drape(
     let body = model.shape(&Shape::default());
     let figure = Figure::of(model, &body);
     let draped = draped_pieces(&pieces, &seams);
-    let shell = assemble(&draped.sewn, &seams, spacing).unwrap();
+    let shell = shell(&draped, &seams, spacing).unwrap();
     let starts = place(&shell, &figure);
-    let (garment, starts) = with_inside(
-        &shell,
-        &starts,
-        (&draped.sewn, &draped.lined),
-        &seams,
-        spacing,
-    )
-    .unwrap_or((shell, starts));
+    let (garment, starts) =
+        with_inside(&shell, &starts, &draped, &seams, spacing).unwrap_or((shell, starts));
     let mut drape = Drape::new(
         &garment,
         &starts,
@@ -245,10 +252,15 @@ enum Waiting {
     NowAndThen,
 }
 
-/// The lined skirt settled on the card, moved into a pose and settled
+/// The garment `name` settled on the card, moved into a pose and settled
 /// again, waited for so.
-fn waited(model: &BodyModel, card: &(wgpu::Device, wgpu::Queue), waiting: Waiting) -> Drape {
-    let mut gpu = drape(model, "lined-skirt", 12.0, Some(card), None);
+fn waited(
+    model: &BodyModel,
+    card: &(wgpu::Device, wgpu::Queue),
+    name: &str,
+    waiting: Waiting,
+) -> Drape {
+    let mut gpu = drape(model, name, 12.0, Some(card), None);
     let mut h = 0x9E37_79B9_7F4A_7C15u64;
     for pose in [None, Some(Pose::Stepping)] {
         if let Some(pose) = pose {
@@ -293,44 +305,110 @@ fn the_card_drapes_alike_however_long_its_cloth_takes_to_come_back() {
     // In the browser nothing can be waited for: the cloth's points come
     // back as they do, and the next frame is taken when it can be. What is
     // worked out from them (which of the lining's points are kept behind
-    // which of the skirt's, when it has settled, the body's field as it
-    // moves) comes from the same frames however long that takes.
+    // which of the skirt's, which of a pocket's in front of which, when it
+    // has settled, the body's field as it moves) comes from the same frames
+    // however long that takes.
     let model = avatar();
-    let mut drapes = [Waiting::EveryFrame, Waiting::Eagerly, Waiting::NowAndThen]
-        .map(|waiting| {
-            let start = Instant::now();
-            let gpu = waited(&model, &card, waiting);
-            eprintln!(
-                "{waiting:?}: {:.2} s of cloth in {:.2} s",
-                gpu.time,
-                start.elapsed().as_secs_f64()
+    for name in ["lined-skirt", "pocket-skirt"] {
+        let mut drapes = [Waiting::EveryFrame, Waiting::Eagerly, Waiting::NowAndThen]
+            .map(|waiting| {
+                let start = Instant::now();
+                let gpu = waited(&model, &card, name, waiting);
+                eprintln!(
+                    "{name}, {waiting:?}: {:.2} s of cloth in {:.2} s",
+                    gpu.time,
+                    start.elapsed().as_secs_f64()
+                );
+                gpu
+            })
+            .into_iter();
+        let first = drapes.next().unwrap();
+        assert!(first.settled(), "{name} still moving");
+        for again in drapes {
+            assert_eq!(
+                again.time.to_bits(),
+                first.time.to_bits(),
+                "{name} settled at another frame"
             );
-            gpu
-        })
-        .into_iter();
-    let first = drapes.next().unwrap();
-    assert!(first.settled(), "still moving");
-    for again in drapes {
-        assert_eq!(
-            again.time.to_bits(),
-            first.time.to_bits(),
-            "settled at another frame"
-        );
-        // Bit for bit.
-        let differ = first
-            .cloth
-            .x
-            .iter()
-            .zip(&again.cloth.x)
-            .filter(|(a, b)| a.map(f32::to_bits) != b.map(f32::to_bits))
-            .count();
-        assert_eq!(
-            differ,
-            0,
-            "{differ} of {} points elsewhere",
-            first.cloth.x.len()
-        );
+            // Bit for bit.
+            let differ = first
+                .cloth
+                .x
+                .iter()
+                .zip(&again.cloth.x)
+                .filter(|(a, b)| a.map(f32::to_bits) != b.map(f32::to_bits))
+                .count();
+            assert_eq!(
+                differ,
+                0,
+                "{name}: {differ} of {} points elsewhere",
+                first.cloth.x.len()
+            );
+        }
     }
+}
+
+/// The share of the points sewn on (pockets) not in front of the cloth
+/// they lie on (the panel before them): no further from the body than its
+/// nearest point, where they are on it.
+fn behind(drape: &Drape, under: std::ops::Range<usize>) -> f32 {
+    let x = &drape.cloth.x;
+    let d = |p: [f32; 3], q: [f32; 3]| (0..3).map(|k| (p[k] - q[k]).powi(2)).sum::<f32>().sqrt();
+    let near: Vec<usize> = (0..x.len())
+        .filter(|&i| drape.cloth.sewn_on(i))
+        .filter(|&i| under.clone().any(|j| d(x[i], x[j]) < 0.01))
+        .collect();
+    let wrong = near
+        .iter()
+        .filter(|&&i| {
+            let j = under
+                .clone()
+                .min_by(|&a, &b| d(x[i], x[a]).total_cmp(&d(x[i], x[b])))
+                .expect("cloth under");
+            drape.clearance(x[i]) < drape.clearance(x[j]) - 0.0005
+        })
+        .count();
+    wrong as f32 / near.len().max(1) as f32
+}
+
+#[test]
+fn the_pockets_drape_over_the_skirt_on_the_card_as_on_the_processor() {
+    let Some(card) = card() else {
+        eprintln!("no graphics card: skipped");
+        return;
+    };
+    let model = avatar();
+    let mut cpu = drape(&model, "pocket-skirt", 20.0, None, None);
+    settle(&mut cpu, 10.0);
+    let mut gpu = drape(&model, "pocket-skirt", 20.0, Some(&card), None);
+    let took = settle(&mut gpu, 10.0);
+    // The front first, then the back's two copies, then the pockets.
+    let front = 0..gpu.firsts[1] as usize;
+    let pockets = gpu.firsts[3] as usize..gpu.cloth.x.len();
+    let middle = |drape: &Drape| {
+        let n = pockets.len() as f32;
+        pockets.clone().fold([0.0f32; 3], |m, k| {
+            let p = drape.cloth.x[k];
+            [m[0] + p[0] / n, m[1] + p[1] / n, m[2] + p[2] / n]
+        })
+    };
+    let (a, b) = (middle(&cpu), middle(&gpu));
+    eprintln!(
+        "card: settled in {took:.2} s; widest stitch {:.1} mm; {:.4} of the pockets behind the front; pockets' middle {b:?} (processor {a:?})",
+        gpu.cloth.widest_stitch() * 1000.0,
+        behind(&gpu, front.clone()),
+    );
+    assert!(pockets.clone().all(|k| gpu.cloth.sewn_on(k)));
+    assert!(gpu.settled(), "still moving on the card");
+    assert!(gpu.cloth.widest_stitch() < 0.005);
+    assert!(behind(&gpu, front) < 0.02);
+    assert!((0..3).all(|k| (a[k] - b[k]).abs() < 0.01), "{a:?} {b:?}");
+    // Posed, still over the front.
+    gpu.pose(Pose::Stepping);
+    settle(&mut gpu, 10.0);
+    assert!(gpu.settled() && !gpu.moving(), "still moving, stepping");
+    assert!(gpu.cloth.widest_stitch() < 0.005);
+    assert!(behind(&gpu, 0..gpu.firsts[1] as usize) < 0.02);
 }
 
 #[test]

@@ -1,5 +1,6 @@
-// Points along a piece's edge, and stretches of it: for marking part of an
-// edge (a seam sewing only part of it).
+// Points along a piece's edge (or a line drawn inside it), and stretches of
+// it: for marking part of an edge (a seam sewing only part of it, or a
+// pocket sewn onto part of its placement).
 
 import type { Piece } from '@drapewright/engine'
 
@@ -14,9 +15,21 @@ export function edgePoints(piece: Piece, edgeId: string): P[] | null {
   const i = edges.findIndex((e) => e.id === edgeId)
   if (i < 0) return null
   const prev = i === 0 ? null : edges[i - 1]?.segments.at(-1)
-  let at: P = prev ? [prev.to[0], prev.to[1]] : [piece.outline.start[0], piece.outline.start[1]]
+  const at: P = prev ? [prev.to[0], prev.to[1]] : [piece.outline.start[0], piece.outline.start[1]]
+  return segmentPoints(at, edges[i]!.segments)
+}
+
+/** A line drawn inside a piece as points along it, in piece coordinates. */
+export function linePoints(piece: Piece, lineId: string): P[] | null {
+  const line = piece.lines.find((l) => l.id === lineId)
+  return line ? segmentPoints([line.start[0], line.start[1]], line.segments) : null
+}
+
+/** Points along segments from `at`. */
+function segmentPoints(start: P, segments: Piece['outline']['edges'][number]['segments']): P[] {
+  let at = start
   const points: P[] = [at]
-  for (const seg of edges[i]!.segments) {
+  for (const seg of segments) {
     if ('c1' in seg) {
       const [a, b, c, d] = [at, seg.c1, seg.c2, seg.to]
       for (let k = 1; k <= CURVE_STEPS; k++) {

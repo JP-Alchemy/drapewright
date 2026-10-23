@@ -196,6 +196,8 @@ pub struct GpuCloth {
     queue: wgpu::Queue,
     n: u32,
     inside_from: u32,
+    /// The first point sewn onto the outside (a patch pocket's).
+    on_from: u32,
     params: wgpu::Buffer,
     grids: wgpu::Buffer,
     x: wgpu::Buffer,
@@ -450,6 +452,7 @@ impl GpuCloth {
             queue: queue.clone(),
             n: n as u32,
             inside_from: parts.inside_from.min(n) as u32,
+            on_from: parts.on_from.min(n) as u32,
             params,
             grids,
             x: x_buf,
@@ -778,7 +781,7 @@ impl Stepper for GpuCloth {
                 self.n,
                 self.inside_from,
                 u32::from(felt.towards.is_some()),
-                0,
+                self.on_from,
             ],
         };
         self.queue

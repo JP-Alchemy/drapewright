@@ -72,7 +72,7 @@ single exception of sidecars it references explicitly.
 | Field | Type | Notes |
 |---|---|---|
 | `format` | `"drapewright-project"` | Identifies the file type. |
-| `schemaVersion` | integer | `6` for this document. See §8. |
+| `schemaVersion` | integer | `8` for this document. See §8. |
 | `generator` | string | Free text naming the program that wrote the file. |
 | `meta.id` | string | Stable project identifier. |
 | `meta.name` | string | Shown to the user. |
@@ -571,6 +571,7 @@ Non-semantic: readers may ignore it.
 | 5 | A piece's `alterations` and `drawn` (§4.13), and its `darts` (§4.14). Earlier pieces have none. |
 | 6 | `fabrics` (§10.5): fabrics of one's own. Earlier files have none. |
 | 7 | A piece source's `words` (§4.12): the text printed on it in its file. Earlier pieces keep none. |
+| 8 | A seam side's `line` (§10.4): a line inside a piece sewn instead of an edge, where a patch pocket goes. Earlier seams sew edges only. |
 
 ## 9. Validation
 
@@ -700,6 +701,13 @@ No longer a draft: written since schema version 3.
   "reversed": false,
   "ease": "even",
   "confirmed": true
+}, {
+  "id": "s13", "name": "Patch pocket",
+  "a": { "piece": "p3", "edge": "e10", "line": null, "from": null, "to": null, "mirror": false },
+  "b": { "piece": "p1", "edge": "", "line": "l4", "from": 130, "to": 270, "mirror": false },
+  "reversed": false,
+  "ease": "even",
+  "confirmed": true
 }]
 ```
 
@@ -708,8 +716,9 @@ No longer a draft: written since schema version 3.
 | `id` | string | Unique in the project. |
 | `name` | string | Default `""`. |
 | `a`, `b` | SeamSide | The two sides sewn together. |
-| `a.piece`, `a.edge` | string | A piece and one of its edges. |
-| `a.from`, `a.to` | number \| null | The part of the edge sewn, mm along its stitching line from its start. `null`: from its start, to its end. |
+| `a.piece`, `a.edge` | string | A piece and one of its edges. `edge` is `""` where `line` is given. |
+| `a.line` | string \| null | A line inside the piece (one of its `lines`, §4.9) sewn instead of an edge: the other side is sewn onto the piece's face there, as a patch pocket is sewn onto its placement. Default `null`. Version 8. |
+| `a.from`, `a.to` | number \| null | The part of the edge sewn, mm along its stitching line from its start (along a `line`, mm along it as drawn; a closed line from its start once round). `null`: from its start, to its end. Always `from` < `to`. |
 | `a.mirror` | boolean | The piece's mirror copy, its other half (a back cut as a pair, sewn to itself at the centre back). Default `false`. |
 | `reversed` | boolean | `a`'s start is sewn to `b`'s end, not its start. Default `false`. |
 | `ease` | `"even"` | How a difference in length is spread: evenly. Default `"even"`. |
@@ -720,7 +729,13 @@ always derived, on the stitching line with darts closed (§4.14): where an
 outline is the cutting line (allowance included), each edge is first moved
 in by its allowance.
 
-A seam must not sew a side to itself, and every side must lie on its edge.
+A patch pocket is sewn on by one seam for each of its edges sewn (its
+sides and bottom, its top left open), each onto its stretch of the
+placement; an edge running on past a closed placement's start is sewn by
+two. A side on a line has no notches.
+
+A seam must not sew a side to itself, and every side must lie on its edge
+(or line).
 The reference implementation removes a piece's seams with the piece, and
 refuses to add or remove a corner on a sewn edge until its seam is unpicked.
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Piece } from '@drapewright/engine'
-import { cornerOf, edgeEnds, joinCurve, stretch } from './edges.ts'
+import { cornerOf, edgeEnds, joinCurve, linePoints, stretch } from './edges.ts'
 
 describe('stretch', () => {
   // The top of a square drawn clockwise on screen, left to right.
@@ -73,5 +73,25 @@ describe('corners', () => {
     expect(c.at).toEqual([100, 0])
     expect(c.out[0]).toBeCloseTo(Math.SQRT1_2)
     expect(c.out[1]).toBeCloseTo(-Math.SQRT1_2)
+  })
+})
+
+describe('linePoints', () => {
+  it('follows a line drawn inside a piece from its start', () => {
+    const piece = {
+      lines: [
+        {
+          id: 'l1',
+          start: [60, 120],
+          segments: [{ to: [190, 120] }, { c1: [190, 140], c2: [190, 160], to: [190, 180] }],
+        },
+      ],
+    } as unknown as Piece
+    const points = linePoints(piece, 'l1')!
+    expect(points[0]).toEqual([60, 120])
+    expect(points[1]).toEqual([190, 120])
+    expect(points.at(-1)).toEqual([190, 180])
+    expect(points).toHaveLength(2 + 24)
+    expect(linePoints(piece, 'gone')).toBeNull()
   })
 })

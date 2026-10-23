@@ -51,7 +51,7 @@ export function seamTrouble(report: SeamReport, units: DisplayUnits): string | n
 
 /** The same two sides, whichever way round. */
 const sideKey = (s: SeamSide) =>
-  `${s.piece}:${s.edge}:${s.mirror ? 1 : 0}:${s.from ?? ''}:${s.to ?? ''}`
+  `${s.piece}:${s.edge}:${s.line ?? ''}:${s.mirror ? 1 : 0}:${s.from ?? ''}:${s.to ?? ''}`
 const sidesKey = (seam: Seam) => [sideKey(seam.a), sideKey(seam.b)].sort().join('|')
 
 /**

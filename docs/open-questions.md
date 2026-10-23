@@ -202,6 +202,11 @@ matters.
     draping a piece partly worn outside and partly inside isn't possible
     yet. *Provisional (2026-10-14): Sasha is drafted without its pockets,
     and the sample dress is that.* Should pockets be sewn in, and shown?
+    *Note (2026-10-23):* patch pockets are now sewn onto their placement
+    and draped over the panel (Step 80), but this is a different case: one
+    panel that is the garment's outside in one part and behind another
+    panel in another. The drape keeps layers by panel, so it would need
+    each point to know its own layer (`docs/design-pockets.md` §5).
 37. ☐ **Fronts done up with nothing marked.** A coat done up with snaps
     often marks neither snaps nor buttonholes: the instructions say how
     many, and the centre front line drawn on each front says where.
@@ -221,3 +226,12 @@ matters.
     "back" marking its line). *Provisional: imported as the shorter bag and
     a narrow strip, the difference, which can be deleted.* Should both bags
     be made?
+40. ☐ **Pocket placements marked by dots only.** Many patterns mark only a
+    patch pocket's top corners with dots, not its outline. *Provisional
+    (2026-10-23): not found; a pocket is sewn on only where a line is drawn
+    on the panel.* Should a pocket be placed by its top corners' dots?
+41. ☐ **A pocket's turn-down when it isn't marked.** A patch pocket's top is
+    turned down, so its sides are longer than its placement's. *Provisional
+    (2026-10-23): the turn-down is the difference, shared between its two
+    sides, up to 3 cm each; the side seams stop there.* Is that how she
+    reads a pocket with no fold line drawn?

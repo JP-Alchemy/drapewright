@@ -3,7 +3,8 @@ import type { Ease } from "./Ease";
 import type { SeamSide } from "./SeamSide";
 
 /**
- * Two edges (or parts of edges) sewn together.
+ * Two edges (or parts of edges) sewn together, or an edge sewn onto a
+ * line inside another piece.
  */
 export type Seam = { id: string, 
 /**

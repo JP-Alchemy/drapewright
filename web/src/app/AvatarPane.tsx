@@ -203,12 +203,16 @@ function drapeText(drape: Drape, named: (ids: string[]) => string[]): string {
       const left = update?.leftOut.length ?? 0
       const inside = update?.inside.length ?? 0
       const unplaced = update?.unplaced.length ?? 0
+      const off = update?.off.length ?? 0
+      const notLaid = update?.notLaid.length ?? 0
       const lined = named(update?.lined ?? [])
       return [
         said,
         left > 0 ? text.leftOut(left) : '',
         inside > 0 ? text.inside(inside) : '',
         unplaced > 0 ? text.unplaced(unplaced) : '',
+        off > 0 ? text.sewnOntoOff(off) : '',
+        notLaid > 0 ? text.notLaid(notLaid) : '',
         lined.length > 0 ? text.lined(lined) : '',
       ]
         .filter(Boolean)

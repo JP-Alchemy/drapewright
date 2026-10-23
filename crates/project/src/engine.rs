@@ -265,6 +265,19 @@ impl Engine {
         drapewright_seams::suggest(&doc.pieces, &doc.seams)
     }
 
+    /// The seams sewing `pocket` onto the line `line` inside `piece`, as it
+    /// best fits there (one for each of its edges sewn), to add as one
+    /// change; none if it is not about the line's shape.
+    pub fn pocket_seams(
+        &self,
+        pocket: &str,
+        piece: &str,
+        line: &str,
+    ) -> Option<Vec<drapewright_seams::Seam>> {
+        let doc = self.document();
+        drapewright_seams::sew_onto(&doc.pieces, &doc.seams, pocket, piece, line)
+    }
+
     /// The pieces drawn for one side of the body and cut once: each is to
     /// be cut as a mirrored pair (see `drapewright_seams::drawn_for_one_side`).
     pub fn drawn_for_one_side(&self) -> Vec<Id> {
@@ -279,6 +292,28 @@ impl Engine {
         let i = piece.outline.edge_index(edge)?;
         let local = crate::hit::placement_affine(piece).inverse() * Point::from(world);
         piece.outline.edge_geom(i).nearest(local)
+    }
+
+    /// The line drawn inside a piece nearest to `world` (work-table mm), to
+    /// sew a pocket onto: a placement, a plain line or a stitching line.
+    pub fn nearest_line(&self, piece: &str, world: Pt) -> Option<Id> {
+        use drapewright_pattern_core::LineKind;
+        use drapewright_pattern_core::geom::distance_to_polyline;
+        use drapewright_pattern_core::stitching::line_points;
+        let piece = self.document().piece(piece)?;
+        let local = crate::hit::placement_affine(piece).inverse() * Point::from(world);
+        piece
+            .lines
+            .iter()
+            .filter(|l| {
+                matches!(
+                    l.kind,
+                    LineKind::Line | LineKind::Placement | LineKind::Stitch
+                )
+            })
+            .map(|l| (l, distance_to_polyline(local, &line_points(l), false)))
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(l, _)| l.id.clone())
     }
 
     /// The dart in a piece's edge at `world` (work-table mm): one whose legs

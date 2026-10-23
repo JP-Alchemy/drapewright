@@ -3,4 +3,4 @@
 /**
  * Why a seam can't be measured.
  */
-export type SeamProblem = { "kind": "missingPiece", piece: string, } | { "kind": "missingEdge", piece: string, edge: string, } | { "kind": "outsideEdge", piece: string, edge: string, };
+export type SeamProblem = { "kind": "missingPiece", piece: string, } | { "kind": "missingEdge", piece: string, edge: string, } | { "kind": "outsideEdge", piece: string, edge: string, } | { "kind": "missingLine", piece: string, line: string, } | { "kind": "outsideLine", piece: string, line: string, };

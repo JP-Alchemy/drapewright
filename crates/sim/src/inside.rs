@@ -1,12 +1,14 @@
 //! Where facings and linings start: each laid flat on the piece it was
 //! traced from (the one it is sewn to, or sewn to by way of another facing),
 //! as its stitches say, and started where that piece is on the body. The
-//! cloth then keeps them inside it.
+//! cloth then keeps them inside it. Pieces sewn onto the garment's face
+//! (patch pockets) start so too, laid on the panel they are sewn onto, and
+//! are kept outside it.
 
-use drapewright_pattern_core::Piece;
+use drapewright_pattern_core::{Id, Piece};
 use drapewright_seams::Seam;
 
-use crate::garment::{Garment, assemble};
+use crate::garment::{Draped, Garment, assemble};
 
 type P2 = [f64; 2];
 type V3 = [f64; 3];
@@ -164,13 +166,12 @@ fn nearest_in(p: P2, t: [P2; 3]) -> (f64, [f64; 3]) {
     }
 }
 
-/// Where each panel of `g` starts (mm): the first `starts.len()`, the
-/// garment seen from outside, as placed; the rest (its facings and
-/// linings) where the cloth they lie against is. None if one can't be
-/// told how it lies: sewn to nothing placed, or only at a point.
-///
-/// Also gives the panel each of the rest lies on.
-pub fn place_inside(g: &Garment, starts: &[Vec<V3>]) -> Option<(Vec<Vec<V3>>, Vec<usize>)> {
+/// Where each panel of `g` after the first `starts.len()` (the garment seen
+/// from outside, as placed) starts (mm): its facings and linings, and the
+/// pieces sewn onto it, where the cloth they lie against is; and the panel
+/// each lies on. None for one that can't be told how it lies: sewn to
+/// nothing placed, or only at a point.
+pub fn place_inside(g: &Garment, starts: &[Vec<V3>]) -> Vec<Option<(Vec<V3>, usize)>> {
     let n = g.panels.len();
     let placed = starts.len();
     // Where each pair of panels is stitched together, flat.
@@ -247,71 +248,168 @@ pub fn place_inside(g: &Garment, starts: &[Vec<V3>]) -> Option<(Vec<Vec<V3>>, Ve
             break;
         }
     }
-    let mut out = starts.to_vec();
-    let mut over = Vec::new();
-    for slot in on.iter().skip(placed) {
-        let (base, flat) = (*slot)?;
-        over.push(base);
-        let q = out.len();
-        let mesh = &g.panels[base].mesh;
-        let tris: Vec<[P2; 3]> = mesh
-            .triangles
-            .iter()
-            .map(|t| t.map(|i| mesh.points[i as usize]))
-            .collect();
-        let at: Vec<V3> = g.panels[q]
-            .mesh
-            .points
-            .iter()
-            .map(|&p| {
-                let f = flat.apply(p);
-                let (k, (_, share)) = tris
-                    .iter()
-                    .map(|&t| nearest_in(f, t))
-                    .enumerate()
-                    .min_by(|a, b| a.1.0.total_cmp(&b.1.0))
-                    .expect("a mesh has triangles");
-                let corners = mesh.triangles[k].map(|i| starts[base][i as usize]);
-                [0, 1, 2].map(|c| {
-                    share[0] * corners[0][c] + share[1] * corners[1][c] + share[2] * corners[2][c]
+    on.iter()
+        .enumerate()
+        .skip(placed)
+        .map(|(q, slot)| {
+            let (base, flat) = (*slot)?;
+            let mesh = &g.panels[base].mesh;
+            let tris: Vec<[P2; 3]> = mesh
+                .triangles
+                .iter()
+                .map(|t| t.map(|i| mesh.points[i as usize]))
+                .collect();
+            let at: Vec<V3> = g.panels[q]
+                .mesh
+                .points
+                .iter()
+                .map(|&p| {
+                    let f = flat.apply(p);
+                    let (k, (_, share)) = tris
+                        .iter()
+                        .map(|&t| nearest_in(f, t))
+                        .enumerate()
+                        .min_by(|a, b| a.1.0.total_cmp(&b.1.0))
+                        .expect("a mesh has triangles");
+                    let corners = mesh.triangles[k].map(|i| starts[base][i as usize]);
+                    [0, 1, 2].map(|c| {
+                        share[0] * corners[0][c]
+                            + share[1] * corners[1][c]
+                            + share[2] * corners[2][c]
+                    })
                 })
-            })
-            .collect();
-        out.push(at);
-    }
-    Some((out, over))
+                .collect();
+            Some((at, base))
+        })
+        .collect()
 }
 
-/// The garment `shell` (made of `sewn`, placed at `starts`) with its
-/// facings and linings `lined` inside it, all sewn by `seams`: the whole
-/// garment, its outside's panels first, and where each panel starts. None
-/// if there are none, or they can't be placed inside it (they are then
-/// left out).
+/// A garment with what goes inside it and what is sewn onto it, placed.
+#[derive(Clone, Debug)]
+pub struct Dressed {
+    /// Its outside's panels first, then its facings and linings, then the
+    /// pieces sewn onto it.
+    pub garment: Garment,
+    /// Where each panel starts, mm.
+    pub starts: Vec<Vec<V3>>,
+    /// Its facings and linings are in it: else (none placed) left out.
+    pub lined: bool,
+    /// The pieces sewn onto it that couldn't be laid on the panel they are
+    /// sewn onto (a pocket whose placement runs over the panel's edge, say):
+    /// left out.
+    pub unplaced: Vec<Id>,
+}
+
+/// The garment `shell` (`draped.sewn`, and the pieces sewn onto them, as
+/// `shell` makes it; placed at `starts`) with its facings and linings
+/// inside it and the pieces sewn onto it over it, all sewn by `seams`.
+/// Facings and linings go in all together or not at all; each piece sewn
+/// on that can't be placed is left out alone.
+pub fn dressed(
+    shell: &Garment,
+    starts: &[Vec<V3>],
+    draped: &Draped,
+    seams: &[Seam],
+    spacing: f64,
+) -> Dressed {
+    let ids = |pieces: &[Piece]| pieces.iter().map(|p| p.id.clone()).collect::<Vec<_>>();
+    let plain = Dressed {
+        garment: shell.clone(),
+        starts: starts.to_vec(),
+        lined: draped.lined.is_empty(),
+        unplaced: ids(&draped.on),
+    };
+    // With the facings and linings if there are any, else (or if they
+    // can't be placed) without.
+    let tries: &[bool] = match (draped.lined.is_empty(), draped.on.is_empty()) {
+        (true, true) => &[],
+        (true, false) => &[false],
+        (false, true) => &[true],
+        (false, false) => &[true, false],
+    };
+    for &with_lining in tries {
+        let lined: &[Piece] = if with_lining { &draped.lined } else { &[] };
+        let all: Vec<Piece> = draped
+            .sewn
+            .iter()
+            .chain(lined)
+            .chain(&draped.on)
+            .cloned()
+            .collect();
+        let Ok(whole) = assemble(&all, seams, spacing) else {
+            continue;
+        };
+        let same = whole.panels.len() >= shell.panels.len()
+            && whole.panels.iter().zip(&shell.panels).all(|(a, b)| {
+                a.piece == b.piece && a.copy == b.copy && a.mesh.points.len() == b.mesh.points.len()
+            });
+        if !same {
+            continue;
+        }
+        let placed = place_inside(&whole, starts);
+        let n = shell.panels.len();
+        let on: Vec<bool> = whole
+            .panels
+            .iter()
+            .map(|panel| draped.on.iter().any(|x| x.id == panel.piece))
+            .collect();
+        // Facings and linings all placed, or none.
+        if (n..whole.panels.len()).any(|p| !on[p] && placed[p - n].is_none()) {
+            continue;
+        }
+        let mut whole = whole;
+        let mut at: Vec<Option<Vec<V3>>> = starts.iter().cloned().map(Some).collect();
+        let mut unplaced: Vec<Id> = Vec::new();
+        for (k, slot) in placed.into_iter().enumerate() {
+            let p = n + k;
+            match slot {
+                Some((points, base)) => {
+                    whole.panels[p].over = Some(base);
+                    whole.panels[p].sewn_on = on[p];
+                    at.push(Some(points));
+                }
+                None => {
+                    at.push(None);
+                    if !unplaced.contains(&whole.panels[p].piece) {
+                        unplaced.push(whole.panels[p].piece.clone());
+                    }
+                }
+            }
+        }
+        // A piece is left out whole, not one of its copies.
+        let keep: Vec<bool> = whole
+            .panels
+            .iter()
+            .zip(&at)
+            .map(|(panel, a)| a.is_some() && !unplaced.contains(&panel.piece))
+            .collect();
+        let starts: Vec<Vec<V3>> = at
+            .into_iter()
+            .zip(&keep)
+            .filter_map(|(a, &k)| a.filter(|_| k))
+            .collect();
+        return Dressed {
+            garment: whole.keeping(&keep),
+            starts,
+            lined: with_lining || draped.lined.is_empty(),
+            unplaced,
+        };
+    }
+    plain
+}
+
+/// The garment `shell` (made of `draped.sewn`, placed at `starts`) with its
+/// facings and linings inside it and the pieces sewn onto it over it, as
+/// `dressed` makes it; none if nothing more could be placed.
 pub fn with_inside(
     shell: &Garment,
     starts: &[Vec<V3>],
-    (sewn, lined): (&[Piece], &[Piece]),
+    draped: &Draped,
     seams: &[Seam],
     spacing: f64,
 ) -> Option<(Garment, Vec<Vec<V3>>)> {
-    if lined.is_empty() {
-        return None;
-    }
-    let all: Vec<Piece> = sewn.iter().chain(lined).cloned().collect();
-    let whole = assemble(&all, seams, spacing).ok()?;
-    let same = whole.panels.len() > shell.panels.len()
-        && whole.panels.iter().zip(&shell.panels).all(|(a, b)| {
-            a.piece == b.piece && a.copy == b.copy && a.mesh.points.len() == b.mesh.points.len()
-        });
-    if !same {
-        return None;
-    }
-    let (starts, over) = place_inside(&whole, starts)?;
-    let mut whole = whole;
-    for (panel, base) in whole.panels[shell.panels.len()..].iter_mut().zip(over) {
-        panel.over = Some(base);
-    }
-    Some((whole, starts))
+    let d = dressed(shell, starts, draped, seams, spacing);
+    (d.garment.panels.len() > shell.panels.len()).then_some((d.garment, d.starts))
 }
 
 #[cfg(test)]

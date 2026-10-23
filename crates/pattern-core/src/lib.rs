@@ -16,6 +16,7 @@ pub mod notches;
 pub mod ops;
 mod point;
 pub mod stitching;
+pub mod upright;
 pub mod validate;
 
 #[cfg(any(test, feature = "testing"))]

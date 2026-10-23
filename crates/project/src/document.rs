@@ -16,7 +16,7 @@ use ts_rs::TS;
 pub const FORMAT: &str = "drapewright-project";
 
 /// The schema version this build reads and writes.
-pub const SCHEMA_VERSION: u32 = 7;
+pub const SCHEMA_VERSION: u32 = 8;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]

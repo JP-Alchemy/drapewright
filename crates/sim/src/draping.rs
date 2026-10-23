@@ -1,8 +1,9 @@
 //! A garment draped on the figure from start to finish: the pieces sewn by
 //! confirmed seams placed round the body, its facings and linings inside
-//! it, its buttons done up or not, let go, measured again as it settles,
-//! and moved into a pose. The app moves it on a frame at a time (on the
-//! graphics card where it can); the assistants' server until it is done.
+//! it, its pockets sewn on over it, its buttons done up or not, let go,
+//! measured again as it settles, and moved into a pose. The app moves it on
+//! a frame at a time (on the graphics card where it can); the assistants'
+//! server until it is done.
 
 use std::sync::Arc;
 
@@ -12,9 +13,9 @@ use drapewright_seams::Seam;
 
 use crate::drape::{Drape, Posable, Stepper};
 use crate::fabric::Fabric;
-use crate::garment::{Garment, GarmentError, assemble, draped_pieces};
+use crate::garment::{Garment, GarmentError, draped_pieces, shell};
 use crate::girth::girths;
-use crate::inside::with_inside;
+use crate::inside::dressed;
 use crate::place::{Figure, from_shoulders, half_round, place};
 
 /// A frame of the drape, s.
@@ -122,6 +123,13 @@ pub struct Draping {
     pub unplaced: Vec<String>,
     /// The facings and linings draped inside the rest, by id.
     pub lined: Vec<String>,
+    /// The pieces sewn onto others (patch pockets) left out, by id: sewn
+    /// onto a piece not draped, or onto a facing or a lining.
+    pub off: Vec<String>,
+    /// The pieces sewn onto others left out as they couldn't be laid on
+    /// the piece they are sewn onto (a pocket whose placement runs over
+    /// its edge), by id.
+    pub not_laid: Vec<String>,
     /// How many buttons it has, done up or not.
     pub buttons: usize,
     /// The garment's size round the body at its bust, waist and hip: as
@@ -170,8 +178,7 @@ impl Draping {
         pose: Pose,
     ) -> Result<Draping, DrapeError> {
         let draped = draped_pieces(request.pieces, request.seams);
-        let sewn = draped.sewn;
-        if sewn.is_empty() {
+        if draped.sewn.is_empty() {
             return Err(DrapeError::NothingSewn);
         }
         let seams: Vec<Seam> = request
@@ -180,7 +187,7 @@ impl Draping {
             .filter(|s| s.confirmed)
             .cloned()
             .collect();
-        let shell = assemble(&sewn, &seams, request.spacing).map_err(DrapeError::Garment)?;
+        let shell = shell(&draped, &seams, request.spacing).map_err(DrapeError::Garment)?;
         if half_round(&shell) {
             return Err(DrapeError::HalfRound);
         }
@@ -190,19 +197,17 @@ impl Draping {
         let girths = measure(&shell, &starts, &figure);
         let placed = starts.clone();
         let hung = from_shoulders(&shell);
-        // Its facings and linings inside it, or, if they can't be placed
-        // there, left out.
+        // Its facings and linings inside it and its pockets over it, or,
+        // where they can't be placed there, left out.
         let ids = |pieces: &[Piece]| pieces.iter().map(|p| p.id.clone()).collect::<Vec<_>>();
-        let (garment, starts, lined, unplaced) = match with_inside(
-            &shell,
-            &starts,
-            (&sewn, &draped.lined),
-            &seams,
-            request.spacing,
-        ) {
-            Some((whole, starts)) => (whole, starts, ids(&draped.lined), Vec::new()),
-            None => (shell.clone(), starts, Vec::new(), ids(&draped.lined)),
+        let made = dressed(&shell, &starts, &draped, &seams, request.spacing);
+        let (lined, unplaced) = if made.lined {
+            (ids(&draped.lined), Vec::new())
+        } else {
+            (Vec::new(), ids(&draped.lined))
         };
+        let (off, not_laid) = (draped.off.clone(), made.unplaced);
+        let (garment, starts) = (made.garment, made.starts);
         let buttons = garment.buttons;
         let garment = if request.open {
             garment.unbuttoned()
@@ -241,6 +246,8 @@ impl Draping {
             inside: draped.inside,
             unplaced,
             lined,
+            off,
+            not_laid,
             buttons,
             girths,
             shell,

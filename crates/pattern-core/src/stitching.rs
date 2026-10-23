@@ -5,8 +5,8 @@
 use kurbo::{Point, Vec2};
 
 use crate::allowance::MITRE_LIMIT;
-use crate::geom::outward_normal;
-use crate::model::{AllowanceMode, Piece};
+use crate::geom::{flatten_segs, outward_normal, segs_of};
+use crate::model::{AllowanceMode, InternalLine, Piece};
 
 /// How closely edges are followed, mm.
 const TOLERANCE: f64 = 0.01;
@@ -137,6 +137,21 @@ pub fn closed_polyline(points: &[Point], spans: &[(f64, f64)]) -> Vec<Point> {
             at(s) + back
         })
         .collect()
+}
+
+/// A line drawn inside a piece, as points along it from its start. Lines
+/// are where they are drawn whether the outline is the cutting line or the
+/// stitching line.
+pub fn line_points(line: &InternalLine) -> Vec<Point> {
+    flatten_segs(&segs_of(line.start, &line.segments), TOLERANCE)
+}
+
+/// Whether a line inside a piece is closed: it ends where it starts (a
+/// pocket's placement drawn all round).
+pub fn line_closed(line: &InternalLine) -> bool {
+    line.segments
+        .last()
+        .is_some_and(|s| Point::from(s.to()).distance(Point::from(line.start)) < 0.1)
 }
 
 /// The length of a polyline, mm.

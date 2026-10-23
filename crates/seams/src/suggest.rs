@@ -66,6 +66,9 @@ pub enum Reason {
     /// edges beside both are as long as each other (a cape's front edge
     /// into a princess seam, from the neck).
     SewnInto,
+    /// A pocket sewn onto a panel where its placement is drawn, the shape
+    /// it is.
+    OnPlacement,
 }
 
 /// A seam Drapewright thinks likely, not yet confirmed.
@@ -273,7 +276,7 @@ pub(crate) fn inside(piece: &Piece) -> bool {
 
 /// A strip made into something other than a seam: a rouleau (button
 /// loops), a tie, binding.
-fn strip(piece: &Piece) -> bool {
+pub(crate) fn strip(piece: &Piece) -> bool {
     let name = piece.name.to_lowercase();
     [
         "rouleau",
@@ -578,7 +581,7 @@ const HEM_DEEPER: f64 = 1.5;
 const HEM_ALLOWANCE: f64 = 15.0;
 
 /// Whether an edge marked as a seam has a hem's allowance.
-fn deeper(piece: &Piece, index: usize) -> bool {
+pub(crate) fn deeper(piece: &Piece, index: usize) -> bool {
     let allowance = piece.edge_allowance(index);
     allowance >= HEM_DEEPER * piece.allowance.seam.max(1.0) && allowance >= HEM_ALLOWANCE
 }
@@ -1123,6 +1126,9 @@ fn placer<'a, P: Borrow<Piece>>(
     pieces: &'a [P],
 ) -> impl Fn(&SeamSide) -> Option<(usize, usize)> + 'a {
     move |side: &SeamSide| {
+        if side.is_line() {
+            return None;
+        }
         let pi = pieces.iter().position(|p| p.borrow().id == side.piece)?;
         let ei = pieces[pi].borrow().outline.edge_index(&side.edge)?;
         Some((pi, ei))
@@ -1385,11 +1391,33 @@ fn alongside(accepted: &[Pair], cands: &[Candidate], already: &[Sewn]) -> Vec<(u
 
 /// Seams likely for these pieces, most likely first. Edges already in
 /// `existing` seams are left alone; each edge is in one suggestion at most.
+/// Pockets are fitted to their placements first (`pockets`), so that a
+/// pocket's edges are not sewn to anything else.
 pub fn suggest<P: Borrow<Piece>>(pieces: &[P], existing: &[Seam]) -> Vec<Suggestion> {
+    let pockets = crate::pockets::suggest(pieces, existing);
+    let placed: Vec<(Id, Id)> = pieces
+        .iter()
+        .map(Borrow::borrow)
+        .filter(|p| pockets.iter().any(|s| s.seam.a.piece == p.id))
+        .flat_map(|p| p.outline.edges.iter().map(|e| (p.id.clone(), e.id.clone())))
+        .collect();
+    let mut out = edges(pieces, existing, &placed);
+    out.extend(pockets);
+    out
+}
+
+/// Edges likely sewn to edges, those in `placed` (pockets' edges) aside.
+fn edges<P: Borrow<Piece>>(
+    pieces: &[P],
+    existing: &[Seam],
+    placed: &[(Id, Id)],
+) -> Vec<Suggestion> {
     let taken: Vec<(Id, Id)> = existing
         .iter()
         .flat_map(|s| [&s.a, &s.b])
+        .filter(|side| !side.is_line())
         .map(|side| (side.piece.clone(), side.edge.clone()))
+        .chain(placed.iter().cloned())
         .collect();
     let cands = candidates(pieces, &taken, false);
     let place = placer(pieces);
@@ -2483,6 +2511,7 @@ fn as_seams<P: Borrow<Piece>>(
         SeamSide {
             piece: piece.id.clone(),
             edge: piece.outline.edges[e.edge].id.clone(),
+            line: None,
             from: (!all).then_some(stretch.0),
             to: (!all).then_some(stretch.1),
             mirror: e.mirror,

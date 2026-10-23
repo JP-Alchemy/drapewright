@@ -689,6 +689,104 @@ pub fn cape_coat() -> Vec<Piece> {
     ]
 }
 
+/// A quarter circle's handles are this share of its radius from its ends.
+const ROUND: f64 = 0.5523;
+
+/// A patch pocket's outline as drawn (y down), `w` by `h` mm with its
+/// bottom corners rounded `r`, its top left corner at `at`: (start, top,
+/// right side, bottom, left side).
+fn pocket_outline(at: [f64; 2], w: f64, h: f64, r: f64) -> ([f64; 2], [Vec<Segment>; 4]) {
+    let [x, y] = at;
+    let k = ROUND * r;
+    (
+        at,
+        [
+            line([x + w, y]),
+            line([x + w, y + h - r]),
+            vec![
+                Segment::cubic(
+                    [x + w, y + h - r + k],
+                    [x + w - r + k, y + h],
+                    [x + w - r, y + h],
+                ),
+                Segment::line([x + r, y + h]),
+                Segment::cubic([x + r - k, y + h], [x, y + h - r + k], [x, y + h - r]),
+            ],
+            line([x, y]),
+        ],
+    )
+}
+
+/// The skirt the drape tests use (a front cut on the fold, a back cut as a
+/// pair with a centre back seam) with patch pockets on the front: a pocket
+/// 13 × 16 cm with rounded bottom corners, cut as a pair, its top a hem
+/// turned down 3 cm, and its placement drawn on the front's half all round,
+/// from its top left corner, as pattern CAD draws it (AAMA's layer 9).
+pub fn pocket_skirt() -> Vec<Piece> {
+    let mut front = piece(
+        "front",
+        "Skirt front",
+        [0.0, 0.0],
+        vec![
+            edge("fw", line([185.0, 8.0])),
+            edge("fs", cubic([215.0, 80.0], [255.0, 200.0], [290.0, 600.0])),
+            Edge {
+                kind: EdgeKind::Hem,
+                ..edge("fh", cubic([190.0, 608.0], [95.0, 612.0], [0.0, 612.0]))
+            },
+            Edge {
+                kind: EdgeKind::Fold,
+                ..edge("fcf", line([0.0, 0.0]))
+            },
+        ],
+        1,
+    );
+    grain(&mut front, [100.0, 100.0], [100.0, 400.0]);
+    let (start, [top, right, bottom, left]) = pocket_outline([60.0, 120.0], 130.0, 160.0, 20.0);
+    front.lines.push(InternalLine {
+        id: "fpocket".into(),
+        kind: LineKind::Placement,
+        start: Pt::new(start[0], start[1]),
+        segments: [top, right, bottom, left].concat(),
+        label: Some("Pocket placement".into()),
+    });
+    let mut back = piece(
+        "back",
+        "Skirt back",
+        [0.0, 0.0],
+        vec![
+            edge("bw", line([185.0, 12.0])),
+            edge("bs", cubic([215.0, 84.0], [255.0, 204.0], [290.0, 604.0])),
+            Edge {
+                kind: EdgeKind::Hem,
+                ..edge("bh", cubic([190.0, 612.0], [95.0, 616.0], [0.0, 616.0]))
+            },
+            edge("bcb", line([0.0, 0.0])),
+        ],
+        2,
+    );
+    grain(&mut back, [100.0, 100.0], [100.0, 400.0]);
+    let (start, [top, right, bottom, left]) = pocket_outline([0.0, 0.0], 130.0, 160.0, 20.0);
+    let mut pocket = piece(
+        "pocket",
+        "Patch pocket",
+        start,
+        vec![
+            Edge {
+                kind: EdgeKind::Hem,
+                ..edge("pt", top)
+            },
+            edge("pr", right),
+            edge("pb", bottom),
+            edge("pl", left),
+        ],
+        2,
+    );
+    pocket.allowance.hem = Some(30.0);
+    grain(&mut pocket, [65.0, 30.0], [65.0, 130.0]);
+    vec![front, back, pocket]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

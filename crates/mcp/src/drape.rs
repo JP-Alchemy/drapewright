@@ -424,6 +424,8 @@ pub fn drape(session: &mut Session, a: DrapeArgs) -> Result<Output, ToolError> {
         "leftOut": named(doc, &draping.left_out),
         "facingsSewnToNothing": named(doc, &draping.inside),
         "facingsWithNothingToLieOn": named(doc, &draping.unplaced),
+        "pocketsSewnOntoNothingDraped": named(doc, &draping.off),
+        "pocketsNotLaidOnTheirPiece": named(doc, &draping.not_laid),
         "picture": {
             "views": views.iter().map(|v| v.name()).collect::<Vec<_>>(),
             "shows": shows,

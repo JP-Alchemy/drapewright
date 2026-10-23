@@ -195,6 +195,8 @@ export interface UiState {
   suggestion: Seam | null
   /** An edge waiting for the edge it is to be sewn to: the next edge tapped. */
   sewing: { piece: string; edge: string } | null
+  /** A piece (a pocket) waiting to be sewn onto a line on another: the next tapped. */
+  sewingOnto: string | null
   /** The 3D view of the avatar is open beside the table. */
   avatar: boolean
   /** Projecting the pieces onto fabric, full screen. */
@@ -250,6 +252,7 @@ export class Session {
       seam: null,
       suggestion: null,
       sewing: null,
+      sewingOnto: null,
       avatar: false,
       projector: false,
       drafting: false,
@@ -310,13 +313,23 @@ export class Session {
     }
     const shown = ui.suggestion
     const edgeAlive = (side: SeamSide) =>
-      doc.pieces.some((p) => p.id === side.piece && p.outline.edges.some((e) => e.id === side.edge))
+      doc.pieces.some(
+        (p) =>
+          p.id === side.piece &&
+          (side.line
+            ? p.lines.some((l) => l.id === side.line)
+            : p.outline.edges.some((e) => e.id === side.edge)),
+      )
     if (shown && !(edgeAlive(shown.a) && edgeAlive(shown.b))) {
       this.ui.set((s) => ({ ...s, suggestion: null }))
     }
     const sewing = ui.sewing
     if (sewing && !doc.pieces.some((p) => p.id === sewing.piece)) {
       this.ui.set((s) => ({ ...s, sewing: null }))
+    }
+    const onto = ui.sewingOnto
+    if (onto && !doc.pieces.some((p) => p.id === onto)) {
+      this.ui.set((s) => ({ ...s, sewingOnto: null }))
     }
   }
 
@@ -502,7 +515,39 @@ export class Session {
   }
 
   cancelSewing(): void {
-    this.ui.set((s) => ({ ...s, sewing: null }))
+    this.ui.set((s) => ({ ...s, sewing: null, sewingOnto: null }))
+  }
+
+  /** Waits for the line on another piece to sew this one (a pocket) onto: the next tapped. */
+  startSewingOnto(piece: string): void {
+    this.ui.set((s) => ({ ...s, sewing: null, sewingOnto: piece }))
+  }
+
+  /**
+   * Sews the waiting piece onto the line nearest `world` (work-table mm)
+   * on `piece`, as it best fits there, all its seams one change, and picks
+   * the first to show it sewn. Tapping the waiting piece itself waits on.
+   * Whether a piece was waiting.
+   */
+  sewOntoAt(piece: string, world: { x: number; y: number }): boolean {
+    const pocket = this.ui.get().sewingOnto
+    if (!pocket) return false
+    if (piece === pocket) return true
+    this.cancelSewing()
+    const doc = this.engine.document()
+    const name = doc.pieces.find((p) => p.id === pocket)?.name ?? ''
+    const line = this.engine.nearestLine(piece, world.x, world.y)
+    const seams = line ? this.engine.pocketSeams(pocket, piece, line) : null
+    if (!line) {
+      this.toast(t.seams.noLine)
+    } else if (!seams || seams.length === 0) {
+      this.toast(t.seams.notItsShape(name))
+    } else if (this.dispatch({ type: 'addSeams', seams })) {
+      const first = this.engine.document().seams.at(-seams.length)
+      this.selectSeam(first?.id ?? null, pocket)
+      this.toast(t.seams.sewnOn(name))
+    }
+    return true
   }
 
   /**
@@ -520,8 +565,15 @@ export class Session {
       .find((p) => p.id === piece)
       ?.cut.some((c) => c.quantity >= 2 && c.mirrored !== false)
     if (same && !pair) return false
-    const a = { piece: from.piece, edge: from.edge, from: null, to: null, mirror: false }
-    const b = { piece, edge, from: null, to: null, mirror: same }
+    const a = {
+      piece: from.piece,
+      edge: from.edge,
+      line: null,
+      from: null,
+      to: null,
+      mirror: false,
+    }
+    const b = { piece, edge, line: null, from: null, to: null, mirror: same }
     const reversed = !same && this.engine.sewnReversed(a, b)
     const sewn = this.dispatch({
       type: 'addSeams',

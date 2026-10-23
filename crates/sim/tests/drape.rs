@@ -835,16 +835,11 @@ fn lined(
         draped.alone.is_empty() && draped.inside.is_empty(),
         "{draped:?}"
     );
-    let shell = assemble(&draped.sewn, seams, 20.0).unwrap();
+    let shell = drapewright_sim::garment::shell(&draped, seams, 20.0).unwrap();
     let starts = place(&shell, &figure);
-    let (whole, starts) = drapewright_sim::inside::with_inside(
-        &shell,
-        &starts,
-        (&draped.sewn, &draped.lined),
-        seams,
-        20.0,
-    )
-    .expect("placed inside");
+    let (whole, starts) =
+        drapewright_sim::inside::with_inside(&shell, &starts, &draped, seams, 20.0)
+            .expect("placed inside");
     let mut drape = Drape::new(
         &whole,
         &starts,

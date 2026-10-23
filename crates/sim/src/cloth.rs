@@ -95,6 +95,7 @@ pub struct ClothBuilder {
     bends: Vec<Bend>,
     stitches: Vec<[u32; 2]>,
     inside_from: Option<u32>,
+    on_from: Option<u32>,
     over: Vec<(std::ops::Range<u32>, std::ops::Range<u32>)>,
 }
 
@@ -120,6 +121,7 @@ impl ClothBuilder {
             bends: Vec::new(),
             stitches: Vec::new(),
             inside_from: None,
+            on_from: None,
             over: Vec::new(),
         }
     }
@@ -192,8 +194,16 @@ impl ClothBuilder {
         self.inside_from = Some(first);
     }
 
+    /// Of the points from `inside_from` on, those from `first` on are sewn
+    /// onto the cloth they lie on (patch pockets): they are kept outside
+    /// it, not behind it.
+    pub fn on_from(&mut self, first: u32) {
+        self.on_from = Some(first);
+    }
+
     /// The inside points `inside` lie on the points `over` (a lining on
-    /// the piece it was traced from), and are kept behind those only.
+    /// the piece it was traced from), and are kept behind those only (or,
+    /// sewn on, in front of them).
     pub fn lies_on(&mut self, inside: std::ops::Range<u32>, over: std::ops::Range<u32>) {
         self.over.push((inside, over));
     }
@@ -222,6 +232,7 @@ impl ClothBuilder {
             )
         });
         let inside_from = self.inside_from.map_or(n, |f| f as usize);
+        let on_from = self.on_from.map_or(n, |f| (f as usize).max(inside_from));
         // Where inside and outside are sewn together, they are one.
         let mut at_seam = vec![false; n];
         for &[i, j] in &self.stitches {
@@ -237,6 +248,7 @@ impl ClothBuilder {
             layers_found_at: Vec::new(),
             layer_finds: 0,
             inside_from,
+            on_from,
             at_seam,
             p: self.x.clone(),
             x: self.x,
@@ -293,8 +305,10 @@ pub struct Parts {
     /// Bends: their four points, weights and compliance.
     pub bends: Vec<([u32; 4], [f32; 4], f32)>,
     pub stitches: Vec<[u32; 2]>,
-    /// The points from this one on go inside the rest.
+    /// The points from this one on go inside the rest...
     pub inside_from: usize,
+    /// ...but those from this one on are sewn onto it, outside it.
+    pub on_from: usize,
     /// Kept this far off the body, m.
     pub gap: f32,
     pub friction: f32,
@@ -345,8 +359,11 @@ pub struct Cloth {
     contacts: Vec<(u32, V3)>,
     /// How fast the points moved over the last step, on average, m/s.
     stepped: f32,
-    /// The points from this one on go inside the rest (facings, linings).
+    /// The points from this one on go inside the rest (facings, linings)...
     inside_from: usize,
+    /// ...but those from this one on are sewn onto it, outside it (patch
+    /// pockets): kept in front of the cloth they lie on.
+    on_from: usize,
     /// Points sewn to the other layer.
     at_seam: Vec<bool>,
     /// Which way each triangle faces out (see `face_out`).
@@ -382,6 +399,7 @@ impl Cloth {
                 .collect(),
             stitches: self.stitches.clone(),
             inside_from: self.inside_from,
+            on_from: self.on_from,
             gap: self.fabric.thickness + AIR,
             friction: self.fabric.friction,
             apart: self.fabric.thickness + LAYER_AIR,
@@ -712,7 +730,12 @@ impl Cloth {
 
     /// Which points go inside the rest (facings, linings).
     pub fn inside(&self, k: usize) -> bool {
-        k >= self.inside_from
+        k >= self.inside_from && k < self.on_from
+    }
+
+    /// Which points are sewn onto the face of the rest (patch pockets).
+    pub fn sewn_on(&self, k: usize) -> bool {
+        k >= self.on_from
     }
 
     /// Which way each triangle faces out, away from the body: 1 the side
@@ -854,8 +877,9 @@ impl Cloth {
     /// it would rest against it: each inside point and each outside one
     /// near it (within `LAYER_REACH` across the outside cloth) pushed apart
     /// along the outside cloth's outward normal until the inside one is
-    /// behind it by its thickness and a little air. There is no cloth
-    /// resting on cloth otherwise.
+    /// behind it by its thickness and a little air. Cloth sewn onto the
+    /// outside (a patch pocket) is kept in front of it so, the other way.
+    /// There is no cloth resting on cloth otherwise.
     ///
     /// Not where the two face opposite ways: there one of them has folded
     /// over (a hem's corner flipping as it swings), and which is behind
@@ -894,9 +918,12 @@ impl Cloth {
             if dot(out[i], normal) < 0.0 {
                 continue;
             }
+            // Behind (1) or, sewn on, in front (-1).
+            let side = if i >= self.on_from { -1.0 } else { 1.0 };
             let off = sub(self.x[i], self.x[j]);
             let along = dot(off, normal);
-            if along < -apart || along > LAYER_REACH {
+            let ahead = side * along;
+            if ahead < -apart || ahead > LAYER_REACH {
                 continue;
             }
             let across = length(sub(off, normal.map(|v| v * along)));
@@ -904,9 +931,9 @@ impl Cloth {
                 continue;
             }
             let (wi, wj) = (self.w[i], self.w[j]);
-            let short = along + apart;
-            axpy(&mut self.x[i], -short * wi / (wi + wj), normal);
-            axpy(&mut self.x[j], short * wj / (wi + wj), normal);
+            let short = ahead + apart;
+            axpy(&mut self.x[i], -side * short * wi / (wi + wj), normal);
+            axpy(&mut self.x[j], side * short * wj / (wi + wj), normal);
             // With friction, as on the body: their slide past each other this
             // step cancelled if small for how hard they press, else cut down.
             let moved = sub(sub(self.x[i], self.p[i]), sub(self.x[j], self.p[j]));

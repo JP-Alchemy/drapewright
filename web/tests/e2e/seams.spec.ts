@@ -1,5 +1,5 @@
 import { expect, test, type Page } from './fixtures.ts'
-import { edgeMiddle, fixture, openWithFixture } from './helpers.ts'
+import { edgeMiddle, fixture, openBackup, openWithFixture, toPage } from './helpers.ts'
 
 /** Picks a piece's edge as a tap on it would (through the debug handle). */
 async function pickEdge(page: Page, piece: number, edge: number) {
@@ -190,4 +190,55 @@ test('panels drawn for one side are cut as pairs when seams are found, and it sa
   await page.getByRole('button', { name: /^Undo/ }).click()
   await expect(centre).toContainText('Cut 1')
   await expect(pieces.getByRole('row', { name: /Back Center/, level: 1 })).toContainText('Cut 1')
+})
+
+test('patch pockets are found onto their placement, or sewn on by hand', async ({ page }) => {
+  await page.goto('/app/?debug')
+  // The test skirt with a patch pocket, its placement drawn on the front.
+  await openBackup(page, 'pocket-skirt.drapewright', 3)
+  const sewnOnto = () =>
+    page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const doc = (window as any).drapewright.engine.document()
+      return doc.seams.filter((s: { b: { line: string | null } }) => s.b.line !== null).length
+    })
+
+  // Found: its sides and bottom onto the placement, said so.
+  await page.getByRole('button', { name: 'Find seams' }).click()
+  const found = page.getByRole('group', { name: 'Edges that look sewn together' })
+  const onPlacement = found
+    .getByRole('listitem')
+    .filter({ hasText: 'where its placement is drawn' })
+  await expect(onPlacement).toHaveCount(3)
+  await expect(onPlacement.first()).toContainText('Skirt front · part of Pocket placement')
+  await onPlacement.first().getByRole('button', { name: /↔/ }).click()
+  await page.getByRole('button', { name: /^Sew all/ }).click()
+  expect(await sewnOnto()).toBe(3)
+
+  // Unpicked, and sewn on by hand: the pocket chosen, then the line tapped.
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s = (window as any).drapewright
+    const doc = s.engine.document()
+    const ids = doc.seams
+      .filter((x: { b: { line: string | null } }) => x.b.line !== null)
+      .map((x: { id: string }) => x.id)
+    s.dispatch({ type: 'deleteSeams', ids })
+    s.select([doc.pieces[2].id])
+  })
+  expect(await sewnOnto()).toBe(0)
+  await page.getByRole('button', { name: 'Sew onto a placement…' }).click()
+  await expect(page.getByText('Tap the line on the panel where Patch pocket goes.')).toBeVisible()
+  // Its placement's bottom, on the front.
+  const front = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const p = (window as any).drapewright.engine.document().pieces[0].placement
+    return { x: p.x, y: p.y }
+  })
+  const at = await toPage(page, front.x + 125, front.y + 280)
+  await page.mouse.click(at.x, at.y)
+  await expect(page.getByText('Patch pocket sewn on.', { exact: false })).toBeVisible()
+  expect(await sewnOnto()).toBe(3)
+  // Its first seam picked, named for the pocket.
+  await expect(page.getByRole('heading', { name: /^\d+ · Patch pocket$/ })).toBeVisible()
 })

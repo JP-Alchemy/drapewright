@@ -12,6 +12,68 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 80 — Patch pockets, sewn onto their placement and draped
+
+Until now a pocket imported and printed like any piece, but it couldn't be
+sewn: a seam only joined an edge to an edge, so the drape left it off ("One
+piece isn't sewn to anything"). Now a piece can be sewn onto the face of
+another, where the pattern draws its placement, and the drape shows it
+there. The design, checked with JP first, is `docs/design-pockets.md`.
+
+* **Find seams** fits each piece not sewn yet to the lines drawn inside
+  the other pieces (AAMA placement lines from a DXF, or plain lines from an
+  SVG or a PDF). A pocket the shape of a placement is sewn onto it, one
+  seam for each of its edges sewn: its sides and bottom, its top left open.
+  The list says *where its placement is drawn*. A pocket whose top is
+  turned down (its sides on the piece longer than the placement's) is sewn
+  up to the turn. A pair of pockets goes on both sides of the body.
+* **By hand:** choose the pocket; its details say **Sew onto a
+  placement…**. Tap the line on the panel where it goes. It is sewn on as
+  it best fits there, all its seams one undo step.
+* **On the table**, a seam onto a placement draws its stretch of the line,
+  joined to the pocket's edge, as edges are: "Patch pocket · edge 2 ↔
+  Skirt front · part of Pocket placement".
+* **On the figure**, the pocket lies over the panel, in the garment's own
+  fabric, on the processor and on the graphics card alike. A pocket whose
+  placement runs over its piece's edge, or that is sewn onto a lining or
+  onto a piece not draped, is left off, and the status line says so.
+* **Print:** as before. The placement prints dash-dot, as it did.
+* **The file:** schema version 8. A seam's side can name a `line` inside a
+  piece instead of an edge; version 7 projects open unchanged.
+* **The assistant:** `get_seams` suggests pockets onto their placements;
+  `sew_edges` takes a `line` for either side; the drape tool lists pockets
+  left off.
+
+**Try it:** open `fixtures/drapewright/pocket-skirt.drapewright` (the test
+skirt with a 13 × 16 cm patch pocket cut as a pair, its placement drawn on
+the front). **Find seams**: five seams, three of them the pocket's onto
+*Pocket placement*. Tap one to see it joined on the table. **Sew all**,
+open the avatar and **Drape**: two pockets at the hips, over the front.
+Then unpick the pocket's seams, choose the pocket, **Sew onto a
+placement…**, and tap the front near its placement.
+
+**How it works:** the front's mesh is made with the placement in it, as
+many points along it as along the pocket's edges, so each of the pocket's
+sewn points is stitched to one of the front's, as seams are. Placed, the
+pocket starts laid on the front. Linings are kept behind the cloth they
+lie on; a pocket is kept in front of it, the same push the other way (on
+the graphics card, one more number in its parameters). The card's drape is
+the same every time, however long its cloth takes to come back.
+
+**Checked on real patterns:** over about 300 of the private test patterns,
+Find seams sews on a haori jacket's patch pockets and what looks like one
+on a museum nightgown, and nothing else but a few boxes in pattern legends
+that were imported as pieces. Pockets are at least 3.5 cm across,
+sewn by more than half their outline, and turn: a waistband the length of
+a hip line isn't one.
+
+**Limits:** pockets drafted into a panel (open question 36, Sasha's) still
+aren't sewn; placements marked only by dots aren't found (question 40);
+pockets on linings are left off. On the table a line can't be chosen by
+itself: the tap is taken as the nearest line on the piece tapped.
+
+---
+
 ## Step 79 — CI on your own computer, with the drape on the graphics card
 
 GitHub's CI for this repo has stopped (its Actions budget ran out on

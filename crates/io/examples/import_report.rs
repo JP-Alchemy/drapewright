@@ -168,9 +168,15 @@ fn main() {
                     summarise(&r),
                 );
                 if seams {
-                    let edge = |piece: &str, edge: &str| {
+                    let edge = |side: &drapewright_seams::SeamSide| {
+                        let (piece, edge) = (side.piece.as_str(), side.edge.as_str());
                         let p = r.pieces.iter().find(|p| p.id == piece);
                         let name = p.map_or("?", |p| p.name.as_str());
+                        if let Some(id) = &side.line {
+                            let line = p.and_then(|p| p.lines.iter().find(|l| l.id == *id));
+                            let label = line.and_then(|l| l.label.clone());
+                            return format!("{name} {}", label.unwrap_or_else(|| "line".into()));
+                        }
                         let index = p.and_then(|p| p.outline.edge_index(edge));
                         let label = p
                             .zip(index)
@@ -184,8 +190,8 @@ fn main() {
                         println!(
                             "         ~ {:.0}% {} ↔ {}{}{} ({:.0} / {:.0} mm) {:?}",
                             s.confidence * 100.0,
-                            edge(&s.seam.a.piece, &s.seam.a.edge),
-                            edge(&s.seam.b.piece, &s.seam.b.edge),
+                            edge(&s.seam.a),
+                            edge(&s.seam.b),
                             if s.seam.b.mirror { " (other half)" } else { "" },
                             if s.seam.reversed { ", reversed" } else { "" },
                             report.a_length,

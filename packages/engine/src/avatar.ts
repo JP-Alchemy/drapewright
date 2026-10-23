@@ -133,6 +133,16 @@ export class Draping {
     return drapings.get(this)!.lined
   }
 
+  /** The pieces sewn onto others (patch pockets) left out, by id: sewn onto a piece not draped, or onto a lining. */
+  get off(): string[] {
+    return drapings.get(this)!.off
+  }
+
+  /** The pieces sewn onto others left out as they couldn't be laid on the piece they are sewn onto, by id. */
+  get notLaid(): string[] {
+    return drapings.get(this)!.notLaid
+  }
+
   /** How many buttons the garment has, done up or not. */
   get buttons(): number {
     return drapings.get(this)!.buttons

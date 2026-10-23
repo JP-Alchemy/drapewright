@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Drapewright project (project.json)",
-  "description": "A Drapewright sewing pattern project, schema version 7. See docs/file-format.md.",
+  "description": "A Drapewright sewing pattern project, schema version 8. See docs/file-format.md.",
   "type": "object",
   "properties": {
     "extensions": {
@@ -1644,7 +1644,7 @@
       ]
     },
     "Seam": {
-      "description": "Two edges (or parts of edges) sewn together.",
+      "description": "Two edges (or parts of edges) sewn together, or an edge sewn onto a\nline inside another piece.",
       "type": "object",
       "properties": {
         "a": {
@@ -1683,19 +1683,29 @@
       ]
     },
     "SeamSide": {
-      "description": "One side of a seam: an edge of a piece, or part of it.",
+      "description": "One side of a seam: an edge of a piece, or part of it; or part of a line\ndrawn inside a piece, where another piece is sewn onto its face (a\npatch pocket onto its placement).",
       "type": "object",
       "properties": {
         "edge": {
-          "type": "string"
+          "description": "The edge sewn; empty where `line` is sewn instead.",
+          "type": "string",
+          "default": ""
         },
         "from": {
-          "description": "Sewn from this far along the edge's stitching line, mm; from its\nstart when absent.",
+          "description": "Sewn from this far along the edge's stitching line (or along the\nline, as drawn), mm; from its start when absent.",
           "type": [
             "number",
             "null"
           ],
           "format": "double",
+          "default": null
+        },
+        "line": {
+          "description": "A line inside the piece (one of its `lines`) sewn instead of an\nedge. Added in schema version 8.",
+          "type": [
+            "string",
+            "null"
+          ],
           "default": null
         },
         "mirror": {
@@ -1717,8 +1727,7 @@
         }
       },
       "required": [
-        "piece",
-        "edge"
+        "piece"
       ]
     },
     "Segment": {

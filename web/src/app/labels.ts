@@ -18,9 +18,17 @@ export function edgeLabel(piece: Piece, edgeId: string): string {
   return t.inspector.edgeNumber(i + 1)
 }
 
-/** "side seam", or "part of side seam" where a seam sews only part of it. */
+/** "Pocket placement" (its label), or "line drawn on it". */
+export function lineLabel(piece: Piece, lineId: string): string {
+  return piece.lines.find((l) => l.id === lineId)?.label || t.seams.lineInside
+}
+
+/**
+ * "side seam", or "part of side seam" where a seam sews only part of it;
+ * "part of Pocket placement" where it sews a line inside the piece.
+ */
 function sewnEdge(piece: Piece, side: SeamSide): string {
-  const edge = edgeLabel(piece, side.edge)
+  const edge = side.line ? lineLabel(piece, side.line) : edgeLabel(piece, side.edge)
   return side.from != null || side.to != null ? t.seams.partOf(edge) : edge
 }
 

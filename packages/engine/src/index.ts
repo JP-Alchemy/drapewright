@@ -41,6 +41,7 @@ import type {
   PieceView,
   PrintPlan,
   ScaleOption,
+  Seam,
   SeamReport,
   SeamSide,
   Suggestion,
@@ -186,6 +187,20 @@ export class Engine {
    */
   drawnForOneSide(): string[] {
     return this.#handle.drawnForOneSide()
+  }
+
+  /**
+   * The seams sewing a pocket onto a line inside a piece, as it best fits
+   * there (one for each of its edges sewn); null if it isn't about the
+   * line's shape.
+   */
+  pocketSeams(pocket: string, piece: string, line: string): Seam[] | null {
+    return (this.#handle.pocketSeams(pocket, piece, line) as Seam[] | null) ?? null
+  }
+
+  /** The line inside a piece nearest a work-table point, to sew a pocket onto. */
+  nearestLine(piece: string, x: number, y: number): string | null {
+    return this.#handle.nearestLine(piece, x, y) ?? null
   }
 
   /** Whether two edges chosen to be sewn together go the other way round. */

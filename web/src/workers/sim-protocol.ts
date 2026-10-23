@@ -28,6 +28,10 @@ export interface DrapeUpdate extends DrapeProgress {
   unplaced: string[]
   /** The facings and linings draped inside the rest, by id. */
   lined: string[]
+  /** The pieces sewn onto others (patch pockets) left out, by id: sewn onto a piece not draped, or onto a lining. */
+  off: string[]
+  /** The pieces sewn onto others left out as they couldn't be laid on the piece they are sewn onto, by id. */
+  notLaid: string[]
   /** How many buttons the garment has, done up or not. */
   buttons: number
   /** Whether the cloth is moved on on the graphics card. */

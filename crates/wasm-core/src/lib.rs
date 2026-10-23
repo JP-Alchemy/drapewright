@@ -181,6 +181,21 @@ impl EngineHandle {
         to_js(&self.engine.suggest_seams())
     }
 
+    /// The seams sewing a pocket onto a line inside a piece, as it best fits
+    /// there (one for each of its edges sewn); null if it isn't about the
+    /// line's shape.
+    #[wasm_bindgen(js_name = pocketSeams)]
+    pub fn pocket_seams(&self, pocket: &str, piece: &str, line: &str) -> Result<JsValue, JsError> {
+        to_js(&self.engine.pocket_seams(pocket, piece, line))
+    }
+
+    /// The line inside a piece nearest a work-table point, to sew a pocket
+    /// onto; none if it has none.
+    #[wasm_bindgen(js_name = nearestLine)]
+    pub fn nearest_line(&self, piece: &str, x: f64, y: f64) -> Option<String> {
+        self.engine.nearest_line(piece, Pt::new(x, y))
+    }
+
     /// The ids of pieces drawn for one side of the body and cut once.
     #[wasm_bindgen(js_name = drawnForOneSide)]
     pub fn drawn_for_one_side(&self) -> Vec<String> {

@@ -5,15 +5,23 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-/// One side of a seam: an edge of a piece, or part of it.
+/// One side of a seam: an edge of a piece, or part of it; or part of a line
+/// drawn inside a piece, where another piece is sewn onto its face (a
+/// patch pocket onto its placement).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct SeamSide {
     pub piece: Id,
+    /// The edge sewn; empty where `line` is sewn instead.
+    #[serde(default)]
     pub edge: Id,
-    /// Sewn from this far along the edge's stitching line, mm; from its
-    /// start when absent.
+    /// A line inside the piece (one of its `lines`) sewn instead of an
+    /// edge. Added in schema version 8.
+    #[serde(default)]
+    pub line: Option<Id>,
+    /// Sewn from this far along the edge's stitching line (or along the
+    /// line, as drawn), mm; from its start when absent.
     #[serde(default)]
     pub from: Option<f64>,
     /// Sewn up to this far along, mm; to its end when absent.
@@ -30,10 +38,33 @@ impl SeamSide {
         SeamSide {
             piece: piece.into(),
             edge: edge.into(),
+            line: None,
             from: None,
             to: None,
             mirror: false,
         }
+    }
+
+    /// Part of a line inside a piece, from and to mm along it.
+    pub fn on_line(piece: impl Into<Id>, line: impl Into<Id>, from: f64, to: f64) -> Self {
+        SeamSide {
+            piece: piece.into(),
+            edge: Id::new(),
+            line: Some(line.into()),
+            from: Some(from),
+            to: Some(to),
+            mirror: false,
+        }
+    }
+
+    /// Whether it sews a line inside its piece rather than an edge.
+    pub fn is_line(&self) -> bool {
+        self.line.is_some()
+    }
+
+    /// Whether it sews this edge of this piece.
+    pub fn sews_edge(&self, piece: &str, edge: &str) -> bool {
+        self.line.is_none() && self.piece == piece && self.edge == edge
     }
 }
 
@@ -51,7 +82,8 @@ fn yes() -> bool {
     true
 }
 
-/// Two edges (or parts of edges) sewn together.
+/// Two edges (or parts of edges) sewn together, or an edge sewn onto a
+/// line inside another piece.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]

@@ -70,6 +70,8 @@ interface Drape {
   inside: string[]
   unplaced: string[]
   lined: string[]
+  off: string[]
+  notLaid: string[]
   buttons: number
   finish: (last: DrapeUpdate | null) => void
   told: { stage: string; at: number }
@@ -117,6 +119,8 @@ function follow(id: number, draping: Draping, quietly: boolean): Promise<DrapeUp
       inside: draping.inside,
       unplaced: draping.unplaced,
       lined: draping.lined,
+      off: draping.off,
+      notLaid: draping.notLaid,
       buttons: draping.buttons,
       finish,
       told: { stage: '', at: 0 },
@@ -171,6 +175,8 @@ function moveDrape(d: Drape) {
     inside: d.inside,
     unplaced: d.unplaced,
     lined: d.lined,
+    off: d.off,
+    notLaid: d.notLaid,
     buttons: d.buttons,
     card: d.draping.onCard,
     // Measured as placed, then again as it settles.
