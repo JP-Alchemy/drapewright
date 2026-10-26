@@ -78,14 +78,20 @@ export async function tablePoint(
   )
 }
 
-/** A one-finger drag, as synthetic pointer events (fingers edit until a Pencil is seen). */
+/**
+ * A one-finger drag, as synthetic pointer events (fingers edit until a
+ * Pencil is seen). Sent in one go: a finger still within its slop when the
+ * long-press timer fires opens the context menu instead, and a busy page
+ * (the development build, a loaded machine) can delay a timer-paced move
+ * that long.
+ */
 export async function fingerDrag(
   page: Page,
   from: { x: number; y: number },
   to: { x: number; y: number },
 ) {
   await page.evaluate(
-    async ({ from, to }) => {
+    ({ from, to }) => {
       const canvas = document.querySelector('canvas')!
       const send = (type: string, at: { x: number; y: number }) =>
         canvas.dispatchEvent(
@@ -100,7 +106,6 @@ export async function fingerDrag(
         )
       send('pointerdown', from)
       for (let k = 1; k <= 8; k++) {
-        await new Promise((r) => setTimeout(r, 16))
         send('pointermove', {
           x: from.x + ((to.x - from.x) * k) / 8,
           y: from.y + ((to.y - from.y) * k) / 8,
