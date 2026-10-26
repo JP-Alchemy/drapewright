@@ -76,7 +76,7 @@ fn each_size_is_sewn_and_measured_round_the_body() {
         unreachable!()
     };
     assert_eq!((a.size.as_str(), b.size.as_str()), ("A", "B"));
-    assert_eq!(a.girths.len(), 3, "{a:?}");
+    assert_eq!(a.girths.len(), 4, "{a:?}");
     for (ga, gb) in a.girths.iter().zip(&b.girths) {
         assert_eq!(ga.level, gb.level);
         assert!((ga.body - gb.body).abs() < 1e-9, "the same body");
@@ -136,6 +136,7 @@ fn at(level: &str, size: &str) -> LevelSize {
     LevelSize {
         level: level.into(),
         size: size.into(),
+        between: 0.0,
     }
 }
 
@@ -199,6 +200,67 @@ fn a_skirt_is_cut_one_size_at_the_waist_and_another_at_the_hip() {
         "hip {hip} vs {}",
         girth(c, "hip")
     );
+}
+
+#[test]
+fn a_measurement_between_two_sizes_is_cut_between_their_lines() {
+    // Halfway from A to B at the waist, and three quarters of the way from
+    // B to C at the hip.
+    let sizes = graded("skirt");
+    let blended = blend_sizes(
+        &model(),
+        &BlendRequest {
+            sizes: sizes.clone(),
+            settings: Shape::default().into(),
+            at: vec![
+                LevelSize {
+                    between: 0.5,
+                    ..at("waist", "A")
+                },
+                LevelSize {
+                    between: 0.75,
+                    ..at("hip", "B")
+                },
+            ],
+        },
+    )
+    .unwrap();
+    assert_eq!(blended.notes, []);
+    let of = |k: usize, level: &str| girth(&sizes[k].pieces, level);
+    let waist = girth(&blended.pieces, "waist");
+    let hip = girth(&blended.pieces, "hip");
+    let (want_waist, want_hip) = (
+        (of(0, "waist") + of(1, "waist")) / 2.0,
+        of(1, "hip") + 0.75 * (of(2, "hip") - of(1, "hip")),
+    );
+    assert!(
+        (waist - want_waist).abs() < 3.0,
+        "waist {waist} vs {want_waist}"
+    );
+    assert!((hip - want_hip).abs() < 3.0, "hip {hip} vs {want_hip}");
+}
+
+#[test]
+fn a_corset_is_cut_in_another_size_at_the_underbust() {
+    let sizes = graded("corset");
+    let blended = blend_sizes(
+        &model(),
+        &BlendRequest {
+            sizes: sizes.clone(),
+            settings: Shape::default().into(),
+            at: vec![at("bust", "B"), at("underbust", "A"), at("waist", "B")],
+        },
+    )
+    .unwrap();
+    let of = |k: usize| girth(&sizes[k].pieces, "underbust");
+    let under = girth(&blended.pieces, "underbust");
+    assert!(
+        (under - of(0)).abs() < 3.0,
+        "underbust {under} vs {}",
+        of(0)
+    );
+    // Not size B's, which it is above and below.
+    assert!(of(1) - under > 10.0, "underbust {under} vs B's {}", of(1));
 }
 
 #[test]

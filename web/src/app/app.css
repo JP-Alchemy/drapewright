@@ -2650,3 +2650,10 @@ button.tree-chevron[data-hovered] {
   font: 16px var(--font);
   resize: vertical;
 }
+
+/* A pattern's sizes on the table, to blend between. */
+.table-sizes {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}

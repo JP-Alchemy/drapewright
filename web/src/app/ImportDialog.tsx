@@ -1,11 +1,4 @@
-import type {
-  AllowanceMode,
-  ImportSizes,
-  LevelSize,
-  PageUse,
-  Piece,
-  ScaleOption,
-} from '@drapewright/engine'
+import type { AllowanceMode, ImportSizes, PageUse, Piece, ScaleOption } from '@drapewright/engine'
 import { useId, useState } from 'react'
 import { Check } from 'lucide-react'
 import {
@@ -30,6 +23,7 @@ import { formatLength, t } from '../strings/en.ts'
 import { groupNotes } from './import-notes.ts'
 import { LengthField } from './LengthField.tsx'
 import { SizeFinder } from './SizeFinder.tsx'
+import { blendedPieces } from './sizes.ts'
 import { importReport, mailto } from './feedback.ts'
 import { fileName, saveFile } from '../platform/save-file.ts'
 
@@ -316,47 +310,34 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
               </ToggleButtonGroup>
               <SizeFinder
                 session={session}
-                result={result}
-                sizeOf={sizeOf}
-                scale={chosen}
-                allowance={mode && asked.length > 0 ? { mode, width } : null}
-                leftOut={leftOut}
+                sizePieces={async () => {
+                  // Every size's pieces, as they would be added (scale and
+                  // allowance answered, named as in the file).
+                  const finished = await session.io.call(
+                    'finishImport',
+                    result,
+                    sizes.names,
+                    chosen,
+                    mode && asked.length > 0 ? { mode, width } : null,
+                  )
+                  // A piece left out in the size shown is left out of every size.
+                  const named = new Map(result.pieces.map((p) => [p.id, p.name]))
+                  const unwanted = new Set([...leftOut].map((id) => named.get(id)))
+                  return sizes.names.map((size) => ({
+                    size,
+                    pieces: finished.pieces
+                      .map((p) => ({ ...p, name: named.get(p.id) ?? p.name }))
+                      .filter((p) => {
+                        const own = sizeOf.get(p.id)
+                        return !unwanted.has(p.name) && (own === undefined || own === size)
+                      }),
+                  }))
+                }}
                 ready={answered}
                 onChoose={(size) => setChosenSizes([size])}
                 onBlend={(blended, at) => {
-                  const parts = at.map((c) =>
-                    t.sizing.at(t.avatar.levels[c.level] ?? c.level, c.size),
-                  )
-                  // Blended: those of one size each, not cut in one size.
-                  const oneSize = new Set(blended.notes.map((n) => n.piece))
-                  const mixed = (p: Piece) => sizeOf.has(p.id) && !oneSize.has(p.name)
-                  // Its notes say how it's blended, not the size it was (a
-                  // CAD file's "Size 38").
-                  const notes = (p: Piece) => {
-                    const was = `Size ${sizeOf.get(p.id)}`
-                    const kept = p.notes
-                      .split('. ')
-                      .filter((part) => part && part !== was)
-                      .join('. ')
-                    const note = t.sizing.blendedNote(parts)
-                    return kept ? `${kept}\n${note}` : note
-                  }
-                  const added = session.addImported(
-                    blended.pieces.map((p) => (mixed(p) ? { ...p, notes: notes(p) } : p)),
-                  )
-                  if (!added) return
-                  const levelName = (c?: LevelSize) =>
-                    c ? (t.avatar.levels[c.level] ?? c.level) : ''
-                  const [top, bottom] = [levelName(at[0]), levelName(at[at.length - 1])]
-                  session.notify({
-                    kind: 'info',
-                    text: [
-                      t.sizing.blended(blended.pieces.filter(mixed).length, parts),
-                      ...blended.notes.map((n) =>
-                        t.sizing.oneSize(n.piece, n.size, n.why, top, bottom),
-                      ),
-                    ].join(' '),
-                  })
+                  const { pieces, said } = blendedPieces(blended, at, (id) => sizeOf.get(id))
+                  if (session.addImported(pieces)) session.notify({ kind: 'info', text: said })
                 }}
               />
             </div>

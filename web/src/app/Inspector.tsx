@@ -37,6 +37,7 @@ import {
   grainSummary,
 } from './PieceDetails.tsx'
 import { SeamSection } from './Seams.tsx'
+import { TableSizes } from './TableSizes.tsx'
 import { edgeLabel, sideLabel } from './labels.ts'
 import { cornerSteps } from '../tools/corner-move.ts'
 
@@ -233,6 +234,7 @@ function PieceSection({
           {t.seams.sewOnto}
         </Button>
       )}
+      <TableSizes session={session} chosen={[piece]} />
       <CutSection session={session} piece={piece} />
       <DetailsPart
         id="allowance"
@@ -282,6 +284,7 @@ function ManyPiecesSection({ session, pieces }: { session: Session; pieces: Piec
           {t.menu.deletePieces(pieces.length)}
         </Button>
       </div>
+      <TableSizes session={session} chosen={pieces} />
       <ManyCutSection session={session} pieces={pieces} />
       <DetailsPart
         id="allowance"

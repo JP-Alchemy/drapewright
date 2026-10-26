@@ -69,7 +69,7 @@ pub struct ClothEdge {
 /// measured flat as a sewist measures a finished garment.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Girth {
-    /// `bust`, `waist` or `hip`.
+    /// `bust`, `underbust`, `waist` or `hip`.
     pub level: &'static str,
     /// The garment round the body there, mm; none where it doesn't reach.
     pub garment: Option<f64>,

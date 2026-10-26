@@ -6,7 +6,7 @@
  */
 export type Girth = { 
 /**
- * `bust`, `waist` or `hip`.
+ * `bust`, `underbust`, `waist` or `hip`.
  */
 level: string, 
 /**

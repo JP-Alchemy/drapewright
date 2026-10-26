@@ -130,7 +130,7 @@ pub struct DrapeProgress {
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Girth {
-    /// `bust`, `waist` or `hip`.
+    /// `bust`, `underbust`, `waist` or `hip`.
     pub level: String,
     /// The garment round the body there, mm; none where it doesn't reach.
     pub garment: Option<f64>,

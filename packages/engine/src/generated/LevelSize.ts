@@ -5,6 +5,11 @@
  */
 export type LevelSize = { 
 /**
- * "bust", "waist" or "hip".
+ * "bust", "underbust", "waist" or "hip".
  */
-level: string, size: string, };
+level: string, size: string, 
+/**
+ * How far from `size` toward the next size up, 0 to 1: a measurement
+ * between two sizes is cut between their lines.
+ */
+between: number, };

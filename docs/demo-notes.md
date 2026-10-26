@@ -12,6 +12,59 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 81 — A pattern's sizes seen together, and blended between at the underbust or to a measurement
+
+Asked for by a tester: three sizes of a front brought in to compare lay on
+top of each other, and only the top one's lines showed. They wanted to see
+every size's line, as on the printed sheet, and to grade between sizes: one
+at the bust, another at the underbust, and the waist to their own
+measurement.
+
+* **Sizes laid over each other show all their lines.** The table lays
+  every piece's paper first and draws every piece's lines over it, so a
+  pattern's sizes nested as printed show each size's line, like tracing
+  paper. Pieces apart look as they did. The piece chosen is drawn last, in
+  blue, over the others. Names of stacked pieces are written one under
+  another, not over each other.
+* **The underbust.** The size finder measures each size round the
+  underbust as well as the bust, waist and hip, suggests a size there,
+  and blends a bodice or corset from one size at the bust to another under
+  it. (The fit report on the figure is unchanged: bust, waist and hip.)
+* **A measurement, between sizes.** Each level's size menu also has **A
+  measurement…**: type the body's girth there (it starts at the figure's)
+  and the level is cut to fit it as the chosen fit wants, between the two
+  sizes either side: "Cut to fit it as fitted should: 79.0 cm round,
+  between 38 and 42." The blended piece's notes say "a 75.0 cm waist
+  (between 38 and 42)".
+* **Sizes already on the table.** Brought in side by side ("Front (8)",
+  "Front (10)"), a pattern's sizes can be blended after the import: choose
+  one of them, and the details say **Blend between sizes…**. The same size
+  finder opens. The blend is added beside the sizes as a new set of pieces;
+  the sizes stay as they are.
+
+**Try it:** open `fixtures/pdf/sizes-layers.pdf`, choose sizes 8, 10 and
+12, **Already included**, **Add 6 pieces**: three fronts and three sleeves,
+each size's line showing. Then open `fixtures/dxf/aama-graded-skirt.dxf`
+with sizes 38 and 42, choose *Skirt front (38)*, **Blend between sizes…**,
+**Sew and measure**, set the hip to 42 and the waist to **A
+measurement…** of 75 cm, and **Blend between them**: a front and back
+whose waist is between the two sizes' and whose hem is size 42's.
+
+**How it works:** a level's size is now a size and how far it is on to
+the next (`between`, 0 to 1); the blend already cut fractional sizes
+between levels, so a level can be cut between two sizes too. A
+measurement is turned into one from each size's garment girth at that
+level, measured on the figure. Sizes on the table are found by their names
+(a piece's name, then its size in brackets, two sizes or more sharing a
+piece), smallest first by the area of the pieces they share.
+
+**Known:** on the test corset, a two-size jump between the bust and the
+underbust (C to A, about 8 cm apart up the body) blends, but Find seams
+then sews the result wrongly, so it can't be measured. One size apart
+(as a G bust and F underbust) is fine.
+
+---
+
 ## Step 80 — Patch pockets, sewn onto their placement and draped
 
 Until now a pocket imported and printed like any piece, but it couldn't be

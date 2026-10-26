@@ -79,6 +79,9 @@ export interface SeamMark extends EdgePart {
 }
 
 /** A seam's sides as drawn: one, where it sews an edge to its own other half. */
+/** A line of a piece's name and cutting, as written on it, px. */
+const LABEL_LINE = 19
+
 const sidesOf = (seam: Seam): SeamSide[] =>
   seam.a.piece === seam.b.piece && seam.a.edge === seam.b.edge ? [seam.a] : [seam.a, seam.b]
 
@@ -321,12 +324,23 @@ export function draw(
   ctx.setTransform(world)
   drawGrid(ctx, v, theme)
 
-  for (const sp of scene.pieces) {
-    const { piece, paths } = sp
-    const selected = scene.selection.has(piece.id)
+  // The paper of every piece first, then every piece's lines over it:
+  // pieces laid over each other (a pattern's sizes, nested as printed)
+  // show all their lines, as tracing paper would.
+  for (const { piece, paths } of scene.pieces) {
     ctx.setTransform(world.multiply(placement(piece, scene.preview)))
     ctx.fillStyle = theme.paper
     ctx.fill(paths.cut)
+  }
+  // The pieces chosen last, their lines over the others'.
+  const lined = [
+    ...scene.pieces.filter((sp) => !scene.selection.has(sp.piece.id)),
+    ...scene.pieces.filter((sp) => scene.selection.has(sp.piece.id)),
+  ]
+  for (const sp of lined) {
+    const { piece, paths } = sp
+    const selected = scene.selection.has(piece.id)
+    ctx.setTransform(world.multiply(placement(piece, scene.preview)))
     ctx.lineJoin = 'round'
     ctx.strokeStyle = selected ? theme.select : theme.ink
     ctx.lineWidth = (selected ? 2.5 : 1.25) / s
@@ -535,6 +549,9 @@ export function draw(
   ctx.font = '600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
+  // Where names are written so far: a piece laid over another (its other
+  // sizes) has its name written under theirs, not over them.
+  const written: { x0: number; x1: number; y0: number; y1: number }[] = []
   for (const { piece, view } of scene.pieces) {
     const [x0, y0, x1, y1] = view.bounds
     const m = placement(piece, scene.preview).transformPoint(
@@ -543,13 +560,23 @@ export function draw(
     const p = toScreen(v, { x: m.x, y: m.y })
     const widthPx = (x1 - x0) * s
     if (widthPx < 40) continue
+    const summary = cutSummary(piece)
+    const tall = summary && (y1 - y0) * s > 60 ? LABEL_LINE * 2 : LABEL_LINE
+    const half = Math.min(widthPx - 8, 13 * piece.name.length * 0.6) / 2
+    for (let k = 0; k < 8; k++) {
+      const over = written.find(
+        (w) => p.x - half < w.x1 && p.x + half > w.x0 && p.y - 9 < w.y1 && p.y - 9 + tall > w.y0,
+      )
+      if (!over) break
+      p.y = over.y1 + 9
+    }
+    written.push({ x0: p.x - half, x1: p.x + half, y0: p.y - 9, y1: p.y - 9 + tall })
     ctx.font = '600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     ctx.lineWidth = 4
     ctx.strokeStyle = theme.labelHalo
     ctx.strokeText(piece.name, p.x, p.y, widthPx - 8)
     ctx.fillStyle = theme.label
     ctx.fillText(piece.name, p.x, p.y, widthPx - 8)
-    const summary = cutSummary(piece)
     if (summary && (y1 - y0) * s > 60) {
       ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
       ctx.strokeText(summary, p.x, p.y + 17, widthPx - 8)

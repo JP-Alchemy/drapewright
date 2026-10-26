@@ -96,14 +96,32 @@ export const t = {
       `For ${name}: ${new Intl.ListFormat('en', { type: 'conjunction' }).format(parts)}.`,
     at: (level: string, size: string) => `${size} at the ${level}`,
     size: 'Size',
-    columns: { bust: 'Bust', waist: 'Waist', hip: 'Hip' } as Record<string, string>,
+    columns: { bust: 'Bust', underbust: 'Underbust', waist: 'Waist', hip: 'Hip' } as Record<
+      string,
+      string
+    >,
     chooseColumn: 'Choose',
     choose: (size: string) => `Choose ${size}`,
     notSewn: 'Couldn’t be sewn round the figure',
     suggestedHere: 'Suggested',
     ease: (sign: string, by: string) => `${sign}${by}`,
-    how: 'Each size is sewn as Find seams would sew it, and measured flat round the figure’s bust, waist and hip. The ease is how much bigger than the body it is there: the size suggested at each has the ease nearest to the fit chosen.',
+    how: 'Each size is sewn as Find seams would sew it, and measured flat round the figure’s bust, underbust, waist and hip. The ease is how much bigger than the body it is there: the size suggested at each has the ease nearest to the fit chosen.',
     cutAt: 'Size to cut at each',
+    /** The choice, beside the sizes, of cutting a level to a measurement. */
+    byMeasurement: 'A measurement…',
+    bodyRound: (level: string) => `Body round the ${level}`,
+    /** Where a measurement is cut: `between` the sizes either side, or in one. */
+    cutBetween: (fit: string, garment: string, a: string, b: string | null) =>
+      b
+        ? `Cut to fit it as ${fit} should: ${garment} round, between ${a} and ${b}.`
+        : `Cut to fit it as ${fit} should: ${garment} round, in ${a}.`,
+    /** A level cut to a measurement, in a blended piece's notes. */
+    measuredAt: (level: string, length: string, a: string, b: string | null) =>
+      `a ${length} ${level} (${b ? `between ${a} and ${b}` : a})`,
+    tableHeading: 'Blend between sizes',
+    tableHint: (sizes: string[]) =>
+      `This pattern is on the table in sizes ${new Intl.ListFormat('en', { type: 'conjunction' }).format(sizes)}. Cut a new set of pieces in a different size at the bust, underbust, waist and hip, blended between them; the sizes stay as they are.`,
+    tableOpen: 'Blend between sizes…',
     blend: 'Blend between them',
     blending: 'Blending the sizes…',
     blendFailed: (why: string) => `The sizes couldn’t be blended. ${why}`,
@@ -1257,7 +1275,10 @@ export const t = {
     easeMore: (by: string) => `${by} ease`,
     easeLess: (by: string) => `${by} smaller than the body`,
     noEase: 'no ease',
-    levels: { bust: 'bust', waist: 'waist', hip: 'hip' } as Record<string, string>,
+    levels: { bust: 'bust', underbust: 'underbust', waist: 'waist', hip: 'hip' } as Record<
+      string,
+      string
+    >,
     float: 'Float over the table, to move and resize it',
     dockBeside: 'Put back beside the table',
     dockBelow: 'Put back under the table',

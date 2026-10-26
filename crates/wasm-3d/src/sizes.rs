@@ -1,5 +1,5 @@
 //! Each size of a pattern sewn and measured on a person's figure: how big
-//! it is round the bust, waist and hip, and the ease there, to choose a size
+//! it is round the bust, underbust, waist and hip, and the ease there, to choose a size
 //! by; and the pattern cut in a different size at each, blended between
 //! them. Each size is sewn as Find seams would sew it: panels drawn for one
 //! side cut as pairs, and every seam suggested taken.
@@ -111,9 +111,13 @@ fn sewn(pieces: &[Piece], figure: &Figure) -> Option<(Vec<Piece>, Garment, Start
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct LevelSize {
-    /// "bust", "waist" or "hip".
+    /// "bust", "underbust", "waist" or "hip".
     pub level: String,
     pub size: String,
+    /// How far from `size` toward the next size up, 0 to 1: a measurement
+    /// between two sizes is cut between their lines.
+    #[serde(default)]
+    pub between: f64,
 }
 
 /// A pattern's sizes, to cut in the size chosen at each level and blend
@@ -172,39 +176,44 @@ pub fn blend_sizes(model: &BodyModel, request: &BlendRequest) -> Result<Blended,
     let body = model.shape(&Shape::from(request.settings.clone()));
     let figure = Figure::of(model, &body);
     let names: Vec<&str> = request.sizes.iter().map(|s| s.size.as_str()).collect();
-    // Each chosen level, top down: how high it is and which size.
-    let mut levels: Vec<(f64, usize)> = request
+    // Each chosen level, top down: how high it is and which size, counting
+    // along the sizes, fractional between two.
+    let last = names.len().saturating_sub(1) as f64;
+    let mut levels: Vec<(f64, f64)> = request
         .at
         .iter()
         .filter_map(|at| {
             let level = figure.levels.iter().find(|l| l.name == at.level)?;
-            let size = names.iter().position(|&n| n == at.size)?;
-            Some((level.y, size))
+            let size = names.iter().position(|&n| n == at.size)? as f64;
+            Some((level.y, (size + at.between.clamp(0.0, 1.0)).min(last)))
         })
         .collect();
     levels.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let nearest = |size: f64| size.round() as usize;
     let (Some(&(_, top)), Some(&(_, bottom)), Some(lo), Some(hi)) = (
         levels.first(),
         levels.last(),
-        levels.iter().map(|l| l.1).min(),
-        levels.iter().map(|l| l.1).max(),
+        levels.iter().map(|l| l.1).reduce(f64::min),
+        levels.iter().map(|l| l.1).reduce(f64::max),
     ) else {
         return Err("no size chosen at any level".into());
     };
-    let reference = levels[(levels.len() - 1) / 2].1;
+    let (top, bottom) = (nearest(top), nearest(bottom));
+    let (lo, hi) = (lo.floor() as usize, hi.ceil() as usize);
+    let reference = nearest(levels[(levels.len() - 1) / 2].1);
     let index = |h: f64| -> f64 {
         let first = levels[0];
         if h >= first.0 {
-            return first.1 as f64;
+            return first.1;
         }
         for w in levels.windows(2) {
             let ((ya, a), (yb, b)) = (w[0], w[1]);
             if h >= yb {
                 let s = ((ya - h) / (ya - yb)).clamp(0.0, 1.0);
-                return a as f64 + (b as f64 - a as f64) * s * s * (3.0 - 2.0 * s);
+                return a + (b - a) * s * s * (3.0 - 2.0 * s);
             }
         }
-        levels[levels.len() - 1].1 as f64
+        levels[levels.len() - 1].1
     };
     // Each size between, sewn: where each piece goes on the figure.
     let worn: Vec<Vec<(String, Worn)>> = (lo..=hi)

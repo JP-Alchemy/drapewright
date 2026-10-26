@@ -13,3 +13,4 @@ fixtures
 *.md
 crates/*/tests/gallery
 crates/*/tests/snapshots
+.claude/worktrees

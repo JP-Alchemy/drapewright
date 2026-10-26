@@ -31,15 +31,15 @@ pub struct Figure {
     pub legs: Vec<Arm>,
     /// How high the crotch is: where a bodysuit's crotch piece goes under.
     pub crotch: f64,
-    /// Where the body is measured round (bust, waist, hip), and how big it
-    /// is there.
+    /// Where the body is measured round (bust, underbust, waist, hip), top
+    /// down, and how big it is there.
     pub levels: Vec<Level>,
 }
 
 /// A height the body is measured round.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Level {
-    /// `bust`, `waist` or `hip`.
+    /// `bust`, `underbust`, `waist` or `hip`.
     pub name: &'static str,
     pub y: f64,
     /// The body's girth there, mm.
@@ -87,7 +87,7 @@ impl Figure {
             Arm::of(model, body, joints, [region, region], [0.0, 0.0, 1.0])
         })
         .collect();
-        let levels = ["bust", "waist", "hip"]
+        let levels = ["bust", "underbust", "waist", "hip"]
             .into_iter()
             .filter_map(|name| {
                 Some(Level {

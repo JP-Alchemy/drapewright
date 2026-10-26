@@ -901,6 +901,24 @@ export class Session {
     return true
   }
 
+  /**
+   * Adds pieces cut from those on the table (its sizes blended, say)
+   * beside them, and chooses them.
+   */
+  addBeside(pieces: Piece[]): boolean {
+    const outcome = this.engine.dispatch({
+      type: 'addPieces',
+      pieces: this.#besideExisting(pieces),
+    })
+    if (outcome.status === 'rejected') {
+      this.notify({ kind: 'error', text: outcome.error.message })
+      return false
+    }
+    this.select(outcome.changes.added)
+    this.fitAll()
+    return true
+  }
+
   #besideExisting(pieces: Piece[]): Piece[] {
     const existing = sceneBounds(this.scene())
     if (!existing || pieces.length === 0) return pieces
