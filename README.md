@@ -57,8 +57,10 @@ WebAssembly build and its size budget, types, lint, formatting, unit and
 end-to-end tests. It stops at the first step that fails, then lists each
 step's result and time.
 
-- **The drape on the graphics card:** then, if Chromium has WebGPU here, it
-  runs the drape tests again in full Chromium with WebGPU. CI can't: its
+- **The drape on the graphics card:** the Rust drape tests
+  (`crates/sim-gpu`) run on this computer's card; CI's runners have none,
+  so there they skip. Then, if Chromium has WebGPU here, it runs the drape
+  tests again in full Chromium with WebGPU. CI can't: its
   runners have no graphics card. A drape that quietly falls back to the
   processor fails them. To run them alone:
   `E2E_WEBGPU=1 pnpm e2e --project=chromium-webgpu`.

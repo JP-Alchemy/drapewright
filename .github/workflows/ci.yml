@@ -32,9 +32,9 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       # The 3D view and the drape on the graphics card, built for the browser.
       - run: cargo clippy -p drapewright-wasm-3d -p drapewright-wasm-core --target wasm32-unknown-unknown -- -D warnings
-      # A graphics card in software (Mesa's lavapipe), for the drape on the
-      # graphics card's tests.
-      - run: sudo apt-get update && sudo apt-get install -y mesa-vulkan-drivers
+      # No graphics card here, so the drape on the graphics card's tests
+      # skip themselves: `pnpm ci:local` runs them on a real card. (Mesa's
+      # software one cost minutes from a slow mirror, and drifted.)
       - run: cargo test --workspace
       - name: Generated files (TS types, schema, allowance gallery, test skirt) are committed and current
         run: git diff --exit-code -- packages/engine/src/generated docs/schema crates/pattern-core/tests/gallery fixtures/drapewright
@@ -73,7 +73,38 @@ jobs:
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm test
+      # The browsers' system libraries come from Ubuntu's mirror, which some
+      # evenings crawls (48 minutes once, for a step that takes one): the
+      # packages downloaded are kept, per Playwright version and runner
+      # image, so apt only fetches what is new.
+      - name: Which Playwright
+        id: playwright
+        run: |
+          echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+        working-directory: web
+      - name: Restore the browsers' system packages
+        id: apt-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/apt-archives
+          key: playwright-apt-${{ runner.os }}-${{ steps.playwright.outputs.image }}-${{ steps.playwright.outputs.version }}
+          restore-keys: playwright-apt-${{ runner.os }}-
+      - name: Keep apt's downloads there
+        run: |
+          mkdir -p ~/apt-archives/partial
+          printf 'Dir::Cache::Archives "%s/apt-archives";\nAPT::Keep-Downloaded-Packages "true";\n' "$HOME" \
+            | sudo tee /etc/apt/apt.conf.d/90-keep-archives
       - run: pnpm --filter @drapewright/web exec playwright install --with-deps chromium webkit
+      - name: Make the packages readable for the cache
+        if: steps.apt-cache.outputs.cache-hit != 'true'
+        run: sudo rm -f ~/apt-archives/lock && sudo chown -R "$USER" ~/apt-archives
+      - name: Save the browsers' system packages
+        if: steps.apt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/apt-archives
+          key: playwright-apt-${{ runner.os }}-${{ steps.playwright.outputs.image }}-${{ steps.playwright.outputs.version }}
       - run: pnpm e2e
       - uses: actions/upload-artifact@v4
         if: failure()
