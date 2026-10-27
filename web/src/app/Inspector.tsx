@@ -6,8 +6,17 @@ import type {
   Piece,
   PieceView,
 } from '@drapewright/engine'
-import { ChevronRight, RotateCcw, RotateCw, Trash2, X } from 'lucide-react'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import {
+  ChevronRight,
+  Minus,
+  MoveVertical,
+  Plus,
+  RotateCcw,
+  RotateCw,
+  Trash2,
+  X,
+} from 'lucide-react'
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import {
   Button,
   Disclosure,
@@ -25,6 +34,7 @@ import { useEngineState } from '../state/hooks.ts'
 import { edgeLine } from '../state/edge-line.ts'
 import type { EdgeRef, PartRef, Session } from '../state/session.ts'
 import { useStore } from '../state/store.ts'
+import { shownTurn } from '../state/straighten.ts'
 import { formatLength, t } from '../strings/en.ts'
 import { CornerChooser } from './CornerChooser.tsx'
 import { LengthField } from './LengthField.tsx'
@@ -191,6 +201,114 @@ function AllowanceFields({ session, pieces }: { session: Session; pieces: Piece[
 }
 
 /**
+ * A turn in degrees, typed to a tenth or stepped a degree at a time; mixed
+ * where pieces chosen together differ, and each stepped from its own.
+ */
+function AngleField({
+  label,
+  value,
+  onStep,
+  onSet,
+}: {
+  label: string
+  value: number | null
+  onStep(by: number): void
+  onSet(degrees: number): void
+}) {
+  const id = useId()
+  const hint = useId()
+  const shown = value === null ? '' : String(value)
+  const [draft, setDraft] = useState(shown)
+  const commit = () => {
+    const v = Number.parseFloat(draft.replace(',', '.').replace('°', ''))
+    if (Number.isFinite(v) && draft !== shown) onSet(v)
+    else setDraft(shown)
+  }
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <div className="number-group">
+        <Button
+          className="step-button"
+          aria-label={t.inspector.decrease(label)}
+          onPress={() => onStep(-1)}
+        >
+          <Minus size={16} aria-hidden="true" />
+        </Button>
+        <input
+          id={id}
+          className="number-input"
+          value={draft}
+          placeholder={value === null ? t.inspector.mixed : undefined}
+          inputMode="decimal"
+          aria-describedby={hint}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => e.key === 'Enter' && commit()}
+        />
+        <Button
+          className="step-button"
+          aria-label={t.inspector.increase(label)}
+          onPress={() => onStep(1)}
+        >
+          <Plus size={16} aria-hidden="true" />
+        </Button>
+      </div>
+      <p id={hint} className="muted small">
+        {t.inspector.turnAngleHint}
+      </p>
+    </div>
+  )
+}
+
+/** "As drawn", "3.5°", or "Mixed" where they differ. */
+function turnSummary(pieces: Piece[]): string {
+  const turns = pieces.map((p) => shownTurn(p.placement.rotation))
+  return turns.every((d) => d === turns[0])
+    ? t.inspector.turnSummary(turns[0] ?? 0)
+    : t.inspector.mixed
+}
+
+/**
+ * How pieces lie on the table: straightened to their grainline, turned a
+ * quarter at a time, or to any angle typed in. Never their shape.
+ */
+function TurnFields({ session, pieces }: { session: Session; pieces: Piece[] }) {
+  const ids = pieces.map((p) => p.id)
+  const turns = pieces.map((p) => shownTurn(p.placement.rotation))
+  const shared = turns.every((d) => d === turns[0]) ? (turns[0] ?? 0) : null
+  const label = t.inspector.turnAngle
+  return (
+    <>
+      <Button className="button" onPress={() => session.straightenPieces(ids)}>
+        <MoveVertical size={18} aria-hidden="true" />
+        {t.inspector.straighten}
+      </Button>
+      <p className="muted small">
+        {pieces.length > 1 ? t.inspector.straightenManyHint : t.inspector.straightenHint}
+      </p>
+      <div className="button-row">
+        <Button className="button" onPress={() => session.turnPieces(ids, 90)}>
+          <RotateCw size={18} aria-hidden="true" />
+          {t.inspector.turn}
+        </Button>
+        <Button className="button" onPress={() => session.turnPieces(ids, -90)}>
+          <RotateCcw size={18} aria-hidden="true" />
+          {t.inspector.turnBack}
+        </Button>
+      </div>
+      <AngleField
+        key={shared ?? 'mixed'}
+        label={label}
+        value={shared}
+        onStep={(by) => session.setTurn(ids, by, true)}
+        onSet={(degrees) => session.setTurn(ids, degrees)}
+      />
+    </>
+  )
+}
+
+/**
  * One piece: its name, how it is cut (first, as it is set for every piece
  * of a new pattern), then its allowance, grainline and alterations, each of
  * which folds away.
@@ -235,6 +353,9 @@ function PieceSection({
         </Button>
       )}
       <TableSizes session={session} chosen={[piece]} />
+      <DetailsPart id="turn" title={t.inspector.turnHeading} summary={turnSummary([piece])}>
+        <TurnFields session={session} pieces={[piece]} />
+      </DetailsPart>
       <CutSection session={session} piece={piece} />
       <DetailsPart
         id="allowance"
@@ -271,20 +392,15 @@ function ManyPiecesSection({ session, pieces }: { session: Session; pieces: Piec
       <h2 id="inspector-heading">{t.inspector.manyHeading(pieces.length)}</h2>
       <p className="muted small">{t.inspector.manyHint(pieces.map((p) => p.name))}</p>
       <div className="button-row">
-        <Button className="button" onPress={() => session.turnSelection(90)}>
-          <RotateCw size={18} aria-hidden="true" />
-          {t.inspector.turn}
-        </Button>
-        <Button className="button" onPress={() => session.turnSelection(-90)}>
-          <RotateCcw size={18} aria-hidden="true" />
-          {t.inspector.turnBack}
-        </Button>
         <Button className="button danger" onPress={() => session.deleteSelection()}>
           <Trash2 size={18} aria-hidden="true" />
           {t.menu.deletePieces(pieces.length)}
         </Button>
       </div>
       <TableSizes session={session} chosen={pieces} />
+      <DetailsPart id="turn" title={t.inspector.turnHeading} summary={turnSummary(pieces)}>
+        <TurnFields session={session} pieces={pieces} />
+      </DetailsPart>
       <ManyCutSection session={session} pieces={pieces} />
       <DetailsPart
         id="allowance"

@@ -1938,6 +1938,7 @@ fn rotate_piece(session: &mut Session, a: RotateArgs) -> Result<Output, ToolErro
     session.dispatch(vec![Command::RotatePiece {
         piece: a.piece.clone(),
         degrees: a.degrees,
+        about: None,
     }])?;
     Ok(Output::text(format!(
         "Turned {} by {}°.",

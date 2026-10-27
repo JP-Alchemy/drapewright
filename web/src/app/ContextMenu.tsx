@@ -8,6 +8,7 @@ import { t } from '../strings/en.ts'
 type Action =
   | 'turn'
   | 'turnBack'
+  | 'straighten'
   | 'delete'
   | 'open'
   | 'fit'
@@ -55,10 +56,14 @@ export function ContextMenu({ session, onOpen }: { session: Session; onOpen: () 
       if (action === 'turn' || action === 'turnBack') {
         session.turnSelection(action === 'turn' ? 90 : -90)
       }
+      if (action === 'straighten') session.straightenPieces(many)
       if (action === 'delete') session.deleteSelection()
       return
     }
     switch (action) {
+      case 'straighten':
+        session.straightenPieces([hit.piece])
+        break
       case 'turn':
       case 'turnBack':
         session.dispatch({
@@ -116,6 +121,9 @@ export function ContextMenu({ session, onOpen }: { session: Session; onOpen: () 
       </MenuItem>
       <MenuItem id="turnBack" className="menu-item">
         {t.menu.turnBack}
+      </MenuItem>
+      <MenuItem id="straighten" className="menu-item">
+        {t.inspector.straighten}
       </MenuItem>
       <MenuItem id="delete" className="menu-item danger">
         {many ? t.menu.deletePieces(many.length) : t.menu.deletePiece}

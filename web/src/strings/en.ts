@@ -307,6 +307,36 @@ export const t = {
     manyHeading: (n: number) => `${n} pieces`,
     turn: 'Turn clockwise',
     turnBack: 'Turn anticlockwise',
+    turnHeading: 'Turn',
+    straighten: 'Straighten to the grainline',
+    straightenHint: 'Turns it so its grainline runs straight up and down, the nearer way.',
+    straightenManyHint:
+      'Turns each so its grainline runs straight up and down, the nearer way. Sizes laid over each other turn together and stay nested.',
+    turnAngle: 'Turned (degrees clockwise)',
+    turnAngleHint: 'Any angle. Only where it lies on the table: its shape is unchanged.',
+    turnSummary: (degrees: number) => (degrees === 0 ? 'As drawn' : `${degrees}°`),
+    straightened: (turned: number, straight: number, noGrain: string[]) => {
+      const none =
+        noGrain.length > 0
+          ? `${namesList(noGrain)} ${noGrain.length === 1 ? 'has' : 'have'} no grainline to straighten to: add one under Grainline.`
+          : ''
+      if (turned > 0) {
+        const done = plural(
+          turned,
+          'Straightened: its grainline runs up and down.',
+          'Straightened # pieces: each grainline runs up and down.',
+        )
+        return none ? `${done} ${none}` : done
+      }
+      if (none) return none
+      return straight > 0
+        ? plural(
+            straight,
+            'Already straight along its grainline.',
+            'Already straight along their grainlines.',
+          )
+        : null
+    },
     manyHint: (names: string[]) =>
       `Changes here apply to all of them: ${namesList(names)}. Drag one on the table to move them together.`,
     mixed: 'Mixed',
@@ -785,6 +815,9 @@ export const t = {
     readAllPages: 'Read as at first',
     piecesToAdd: 'Pieces to add',
     untickHint: 'Untick anything that is not a pattern piece, such as a diagram or a title box.',
+    straighten: 'Straighten pieces to their grainline',
+    straightenHint: (names: string[], total: number) =>
+      `${piecesLabel(names, total)} ${names.length === 1 ? 'is' : 'are'} drawn a little askew on the sheet, the grainline a few degrees off up and down. Straightened, each is turned upright on the table (sizes laid over each other together); the shape is unchanged.`,
     sizeHint:
       'The file has several sizes of this pattern. Pick yours, or more than one to compare them.',
     sampleSize: 'sample',

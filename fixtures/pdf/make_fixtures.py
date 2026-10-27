@@ -13,7 +13,12 @@ sizes.
 - sizes-layers.pdf: each size on its own layer (optional content group),
   all in black, as layered indie patterns are.
 - sizes-colours.pdf: no layers; each size in its own colour, with a legend.
+- sizes-askew.pdf: sizes-layers.pdf with the pieces and their marks drawn
+  3° askew on the sheet (the test square and title upright), as a pattern
+  traced or scanned a little crooked comes: every grainline a few degrees
+  off up and down.
 """
+import math
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -95,24 +100,33 @@ def text(s, x, y, size, rotate=False):
     return f"BT /F1 {size} Tf {m} Tm ({s}) Tj ET"
 
 
+def marks():
+    """The pieces' own marks, shared by all sizes."""
+    return [
+        "0 0 0 RG 0 0 0 rg 0.6 w",
+        grainline(110.0, 140.0, 280.0),
+        grainline(340.0, 150.0, 300.0),
+        text("FRONT BODICE", 60.0, 200.0, 14),
+        text("Cut 1 on fold", 60.0, 210.0, 10),
+        text("SLEEVE", 312.0, 215.0, 14),
+        text("Cut 2", 318.0, 225.0, 10),
+        text("PLACE ON FOLD", 48.0, 250.0, 9, rotate=True),
+    ]
+
+
+def sheet():
+    """The test square, with its size inside, and the title."""
+    return [
+        "0 0 0 RG 0 0 0 rg 0.6 w",
+        f"{pt(470.0, 370.0)} {100 * PT:.3f} {-100 * PT:.3f} re S",
+        text("10 cm", 510.0, 422.0, 10),
+        text("Test pattern - sizes 8, 10, 12", 20.0, 480.0, 12),
+    ]
+
+
 def shared():
     """Everything all sizes share."""
-    return "\n".join(
-        [
-            "0 0 0 RG 0 0 0 rg 0.6 w",
-            grainline(110.0, 140.0, 280.0),
-            grainline(340.0, 150.0, 300.0),
-            text("FRONT BODICE", 60.0, 200.0, 14),
-            text("Cut 1 on fold", 60.0, 210.0, 10),
-            text("SLEEVE", 312.0, 215.0, 14),
-            text("Cut 2", 318.0, 225.0, 10),
-            text("PLACE ON FOLD", 48.0, 250.0, 9, rotate=True),
-            # The test square, with its size inside.
-            f"{pt(470.0, 370.0)} {100 * PT:.3f} {-100 * PT:.3f} re S",
-            text("10 cm", 510.0, 422.0, 10),
-            text("Test pattern - sizes 8, 10, 12", 20.0, 480.0, 12),
-        ]
-    )
+    return "\n".join(marks() + sheet()[1:])
 
 
 def pdf(objects):
@@ -141,12 +155,26 @@ def write(name, data):
     print("wrote", name, len(data), "bytes")
 
 
-def layered():
+def askew(content, degrees, about):
+    """Content turned `degrees` clockwise on the sheet about a point (mm)."""
+    a = math.radians(degrees)
+    c, s = math.cos(a), math.sin(a)
+    px, py = about[0] * PT, (H - about[1]) * PT
+    # Clockwise as seen, with PDF's y up.
+    e, f = px - (c * px + s * py), py - (-s * px + c * py)
+    return f"q {c:.6f} {-s:.6f} {s:.6f} {c:.6f} {e:.3f} {f:.3f} cm\n{content}\nQ"
+
+
+def layered(name="sizes-layers.pdf", tilt=0.0):
     # 1 catalog, 2 pages, 3 page, 4 font, 5–7 size layers, 8 content
     groups = []
     for label, k in SIZES:
         groups.append(f"/OC /S{label} BDC\n0 0 0 RG 0.8 w\n{outline(BODICE, k)}\n{outline(SLEEVE, k)}\nEMC")
-    content = "\n".join(groups + [shared()])
+    if tilt:
+        pieces = askew("\n".join(groups + marks()), tilt, (230.0, 190.0))
+        content = "\n".join([pieces] + sheet())
+    else:
+        content = "\n".join(groups + [shared()])
     ocgs = " ".join(f"{5 + i} 0 R" for i in range(len(SIZES)))
     props = " ".join(f"/S{label} {5 + i} 0 R" for i, (label, _) in enumerate(SIZES))
     objects = [
@@ -159,7 +187,7 @@ def layered():
     for label, _ in SIZES:
         objects.append(f"<< /Type /OCG /Name (Size {label}) >>".encode())
     objects.append(stream(content))
-    write("sizes-layers.pdf", pdf(objects))
+    write(name, pdf(objects))
 
 
 def coloured():
@@ -189,3 +217,4 @@ def coloured():
 if __name__ == "__main__":
     layered()
     coloured()
+    layered("sizes-askew.pdf", tilt=3.0)

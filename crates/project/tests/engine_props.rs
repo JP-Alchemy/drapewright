@@ -58,6 +58,7 @@ fn command(e: &Engine, step: &Step) -> Option<Command> {
         Step::Rotate(d) => Command::RotatePiece {
             piece: id,
             degrees: *d,
+            about: None,
         },
         Step::Allowance(a) => Command::SetAllowance {
             piece: id,

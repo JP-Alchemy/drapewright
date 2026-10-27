@@ -9,7 +9,7 @@ use drapewright_pattern_core::ops::{self, OpError};
 use drapewright_pattern_core::validate::{piece_ids, validate_piece};
 use drapewright_pattern_core::{
     Allowance, Alteration, Change, CornerStyle, CutInstruction, Drawn, EdgeKind, Grainline, Id,
-    Notch, NotchFrom, NotchKind, Piece, Severity, alter,
+    Notch, NotchFrom, NotchKind, Piece, Pt, Severity, alter,
 };
 use kurbo::{Affine, Point};
 use serde::{Deserialize, Serialize};
@@ -47,10 +47,15 @@ pub enum Command {
         dx: f64,
         dy: f64,
     },
-    /// Turns a piece on the work table about its centre, degrees.
+    /// Turns a piece on the work table about its centre, degrees, by any
+    /// angle; or about `about`, a point on the table (pieces turned
+    /// together, as a pattern's sizes laid over each other, stay as laid).
     RotatePiece {
         piece: Id,
         degrees: f64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        about: Option<Pt>,
     },
     SetAllowance {
         piece: Id,
@@ -564,18 +569,30 @@ fn apply_unaltered(
                 ..Default::default()
             })
         }
-        Command::RotatePiece { piece, degrees } => {
+        Command::RotatePiece {
+            piece,
+            degrees,
+            about,
+        } => {
+            if !degrees.is_finite() || about.is_some_and(|a| !a.is_finite()) {
+                return Err(CommandError::Rejected {
+                    message: "A turn is a number of degrees.".into(),
+                });
+            }
             let p = piece_mut(doc, &piece)?;
-            let c = p.outline.bounds().center();
-            let place = |rotation: f64, x: f64, y: f64| {
-                Affine::translate((x, y)) * Affine::rotate(rotation.to_radians())
+            let pl = p.placement;
+            let place = Affine::translate((pl.x, pl.y)) * Affine::rotate(pl.rotation.to_radians());
+            let about = match about {
+                Some(a) => Point::new(a.x, a.y),
+                None => place * p.outline.bounds().center(),
             };
-            let world_c = place(p.placement.rotation, p.placement.x, p.placement.y) * c;
-            let rotation = (p.placement.rotation + degrees).rem_euclid(360.0);
-            let turned: Point = Affine::rotate(rotation.to_radians()) * c;
-            p.placement.rotation = rotation;
-            p.placement.x = world_c.x - turned.x;
-            p.placement.y = world_c.y - turned.y;
+            // Turned about `about` on the table: the piece's origin goes
+            // round it, and the piece turns with it.
+            let turn = Affine::rotate_about(degrees.to_radians(), about);
+            let origin = turn * Point::new(pl.x, pl.y);
+            p.placement.rotation = (pl.rotation + degrees).rem_euclid(360.0);
+            p.placement.x = origin.x;
+            p.placement.y = origin.y;
             Ok(ChangeSet::changed(&piece))
         }
         Command::SetAllowance { piece, allowance } => {

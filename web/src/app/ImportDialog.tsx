@@ -12,6 +12,7 @@ import {
   ModalOverlay,
   Radio,
   RadioGroup,
+  Switch,
   TextArea,
   TextField,
   ToggleButton,
@@ -26,6 +27,11 @@ import { SizeFinder } from './SizeFinder.tsx'
 import { blendedPieces } from './sizes.ts'
 import { importReport, mailto } from './feedback.ts'
 import { fileName, saveFile } from '../platform/save-file.ts'
+import { remember, remembered } from '../platform/remember.ts'
+import { askew } from '../state/straighten.ts'
+
+/** Whether pieces drawn a little askew are straightened as they come in, as last chosen. */
+const UPRIGHT = 'drapewright.import.upright'
 
 /**
  * A pattern that didn't open right, reported: what's wrong, in the
@@ -207,6 +213,11 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
   const asked = toAdd.filter((p) => allowance.pieces.includes(p.id))
   const [width, setWidth] = useState(asked[0]?.allowance.seam ?? 0)
   const [adding, setAdding] = useState(false)
+  // Pieces drawn a few degrees off on the sheet: their grainlines not
+  // quite up and down.
+  const tilted = toAdd.filter(askew)
+  const [upright, setUpright] = useState(() => remembered<boolean>(UPRIGHT, true))
+  const straighten = upright && tilted.length > 0
 
   const options = [scale.chosen, ...scale.alternatives]
   const chosen = options.find((o) => o.basis === choice) ?? scale.chosen
@@ -240,6 +251,7 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
         mode && asked.length > 0 ? { mode, width } : null,
         graded ? chosenSizes : null,
         leftOut.size > 0 ? toAdd.map((p) => p.id) : null,
+        straighten,
       )
     } finally {
       setAdding(false)
@@ -337,7 +349,8 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
                 onChoose={(size) => setChosenSizes([size])}
                 onBlend={(blended, at) => {
                   const { pieces, said } = blendedPieces(blended, at, (id) => sizeOf.get(id))
-                  if (session.addImported(pieces)) session.notify({ kind: 'info', text: said })
+                  if (session.addImported(pieces, straighten))
+                    session.notify({ kind: 'info', text: said })
                 }}
               />
             </div>
@@ -422,6 +435,25 @@ function ImportForm({ session, pending }: { session: Session; pending: PendingIm
                 units={units}
                 onChange={setWidth}
               />
+            </>
+          )}
+
+          {tilted.length > 0 && (
+            <>
+              <Switch
+                className="switch"
+                isSelected={upright}
+                onChange={(on) => {
+                  setUpright(on)
+                  remember(UPRIGHT, on)
+                }}
+              >
+                <span className="switch-track" aria-hidden="true" />
+                {t.importing.straighten}
+              </Switch>
+              <p className="muted small">
+                {t.importing.straightenHint(tilted.map(shownName), toAdd.length)}
+              </p>
             </>
           )}
 

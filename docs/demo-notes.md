@@ -12,6 +12,55 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 82 — Pieces straightened to their grainline, and turned to any angle
+
+Asked for by a tester: their corset, imported from a PDF in three sizes laid
+over each other, came in with every piece a few degrees askew, its
+grainline not quite up and down, and the only way to turn a piece was a
+quarter turn at a time.
+
+* **Straighten to the grainline.** A piece's details now have a **Turn**
+  part. **Straighten to the grainline** turns the piece so its grainline
+  runs straight up and down the table, whichever way up is nearer. Choose
+  several pieces and it straightens them all, as one undo step: a pattern's
+  sizes laid over each other turn together about their shared middle, so
+  they stay nested. A piece with no grainline is left as it is, and says
+  so: "“Waistband” has no grainline to straighten to". It is on the
+  right-click (long-press) menu too.
+* **On import.** When pieces in a file are drawn a little askew (up to 10°
+  off; a bias piece is left alone), the import says so and offers
+  **Straighten pieces to their grainline**, on by default and remembered.
+* **Any angle.** **Turned (degrees clockwise)** shows how far a piece is
+  turned from as drawn, either way (a piece straightened 3° back reads
+  −3). Type any angle, to a tenth of a degree, or step a degree at a time
+  with − and +. Chosen together, pieces that differ show *Mixed*: the
+  steppers turn each from where it is, and a number typed sets them all.
+  The quarter turns are there as before.
+
+Turning only changes where a piece lies on the table; its shape is never
+changed. Printing, the projector, the cutting layout, choosing on the table
+and dragging corners all follow a piece at any angle.
+
+**Try it:** open `fixtures/pdf/sizes-askew.pdf` (the sizes PDF drawn 3°
+askew), choose sizes 8, 10 and 12 and **Already included**: the dialog
+says all 6 pieces are drawn a little askew. Untick **Straighten pieces to
+their grainline** and **Add 6 pieces**: the fronts and sleeves lie tilted.
+Choose them all (Ctrl/⌘-A on the table), open **Turn** and press
+**Straighten to the grainline**: "Straightened 6 pieces", each grainline
+upright, each size's line still nested inside the next, and one Undo puts
+them back. Then choose one sleeve and type 20 in **Turned**.
+
+**How it works:** the table already kept any angle (`placement.rotation`,
+degrees), and the print plan, hit-testing and drawing all use the full
+turn, so nothing in the file format changed. The turn command can now turn
+a piece about a given point on the table (`about`), which is how stacked
+sizes turn together. The straightening is worked out in the app
+(`web/src/state/straighten.ts`): each grain's angle on the table, the
+nearer upright, and pieces laid over each other (one's middle inside the
+other's box) grouped.
+
+---
+
 ## Step 81 — A pattern's sizes seen together, and blended between at the underbust or to a measurement
 
 Asked for by a tester: three sizes of a front brought in to compare lay on

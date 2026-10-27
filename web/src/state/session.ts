@@ -33,6 +33,7 @@ import { saveScreenScale } from '../platform/screen.ts'
 import type { Projects } from '../storage/projects.ts'
 import type { IoClient } from '../workers/io-client.ts'
 import { type EdgeRef, edgeLine } from './edge-line.ts'
+import { straighten, straightenedPieces } from './straighten.ts'
 import { type Store, createStore } from './store.ts'
 
 export type { EdgeRef } from './edge-line.ts'
@@ -747,9 +748,45 @@ export class Session {
 
   /** Turns each chosen piece about its own middle, together as one undo step. */
   turnSelection(degrees: number): void {
-    const ids = [...this.ui.get().selection].sort()
+    this.turnPieces([...this.ui.get().selection], degrees)
+  }
+
+  /** Turns pieces each about its own middle, together as one undo step. */
+  turnPieces(pieces: readonly string[], degrees: number): void {
+    const ids = [...pieces].sort()
     if (ids.length > 0) {
       this.dispatchAll(ids.map((piece) => ({ type: 'rotatePiece', piece, degrees })))
+    }
+  }
+
+  /**
+   * Turns each of these pieces so its grainline runs straight up and down
+   * the table, together as one undo step; says which have no grainline.
+   */
+  straightenPieces(ids: readonly string[]): void {
+    const pieces = this.scene().filter((sp) => ids.includes(sp.piece.id))
+    if (pieces.length === 0) return
+    const { commands, noGrain, straight } = straighten(pieces)
+    if (commands.length > 0 && !this.dispatchAll(commands)) return
+    const text = t.inspector.straightened(commands.length, straight, noGrain)
+    if (text) this.toast(text)
+  }
+
+  /**
+   * Sets pieces' turn on the table to `degrees` (clockwise from as drawn),
+   * each about its own middle; or, with `by`, turns each by that from where
+   * it is. A run of changes is one undo step.
+   */
+  setTurn(pieces: readonly string[], degrees: number, by = false): void {
+    const ids = [...pieces].sort()
+    const step = { coalesce: `turn:${ids.join(',')}` }
+    for (const id of ids) {
+      const piece = this.engine.document().pieces.find((p) => p.id === id)
+      if (!piece) continue
+      // To an angle the shorter way round.
+      const turn = by ? degrees : ((((degrees - piece.placement.rotation) % 360) + 540) % 360) - 180
+      if (Math.abs(turn) < 1e-9) continue
+      if (!this.dispatch({ type: 'rotatePiece', piece: id, degrees: turn }, step)) return
     }
   }
 
@@ -858,6 +895,7 @@ export class Session {
     allowance: AllowanceAnswer | null,
     sizes: string[] | null = null,
     keep: string[] | null = null,
+    upright = false,
   ): Promise<void> {
     const pending = this.ui.get().pendingImport
     if (!pending) return
@@ -873,17 +911,20 @@ export class Session {
     }
     // Pieces she left out (by id, which the answers don't change) stay out.
     const chosen = keep ? result.pieces.filter((p) => keep.includes(p.id)) : result.pieces
-    this.addImported(chosen)
+    this.addImported(chosen, upright)
   }
 
   /**
    * Adds pieces made from the file being imported (its sizes blended, say)
-   * as its pieces, and closes the import.
+   * as its pieces, and closes the import; `upright`, those drawn a little
+   * askew turned straight to their grainline.
    */
-  addImported(chosen: Piece[]): boolean {
+  addImported(chosen: Piece[], upright = false): boolean {
     const pending = this.ui.get().pendingImport
     if (!pending) return false
-    const pieces = this.#besideExisting(chosen)
+    const pieces = this.#besideExisting(
+      upright ? straightenedPieces(chosen, (p) => outlinePoints(p).flat()) : chosen,
+    )
     const outcome = this.engine.dispatch({ type: 'addPieces', pieces })
     this.ui.set((s) => ({ ...s, pendingImport: null }))
     if (outcome.status === 'rejected') {
@@ -922,8 +963,10 @@ export class Session {
   #besideExisting(pieces: Piece[]): Piece[] {
     const existing = sceneBounds(this.scene())
     if (!existing || pieces.length === 0) return pieces
-    const minX = Math.min(...pieces.flatMap((p) => outlineXs(p)))
-    const minY = Math.min(...pieces.flatMap((p) => outlineYs(p)))
+    // Where they lie, turned as they are (straightened, say).
+    const lying = pieces.flatMap(onTable)
+    const minX = Math.min(...lying.map(([x]) => x))
+    const minY = Math.min(...lying.map(([, y]) => y))
     const dx = existing.x1 + IMPORT_GAP - minX
     const dy = existing.y0 - minY
     return pieces.map((p) => ({
@@ -943,6 +986,15 @@ function outlinePoints(p: Piece): [number, number][] {
       e.segments.flatMap((s) => ('c1' in s ? [s.c1, s.c2, s.to] : [s.to])),
     ),
   ]
+}
+
+/** A piece's outline points where it lies on the table. */
+function onTable(p: Piece): [number, number][] {
+  const { x, y, rotation } = p.placement
+  const a = (rotation * Math.PI) / 180
+  const cos = Math.cos(a)
+  const sin = Math.sin(a)
+  return outlinePoints(p).map(([px, py]) => [x + px * cos - py * sin, y + px * sin + py * cos])
 }
 
 const outlineXs = (p: Piece) => outlinePoints(p).map(([x]) => x)

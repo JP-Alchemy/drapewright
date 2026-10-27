@@ -297,6 +297,28 @@ fn layout_covers_every_piece_and_skips_nothing_needed() {
 }
 
 #[test]
+fn pieces_turned_by_odd_angles_print_whole_and_true_to_size() {
+    let mut skirt = panel();
+    skirt.placement.rotation = 3.7;
+    let mut pocket = rectangle("r", "Pocket", 200.0, 300.0);
+    pocket.placement.rotation = 352.0;
+    let doc = document(vec![pocket, skirt]);
+    let plan = plan_print(&doc).unwrap();
+    // Each piece printed at its turn on the table, every part of it on a page.
+    let turn = |id: &str| {
+        plan.placements
+            .iter()
+            .find(|p| p.piece == id)
+            .unwrap()
+            .rotation
+    };
+    assert!((turn("skirt") - 3.7).abs() < 1e-9);
+    assert!((turn("r").rem_euclid(360.0) - 352.0).abs() < 1e-9);
+    assert_covered(&doc, &plan);
+    export_pdf(&doc, &texts()).unwrap();
+}
+
+#[test]
 fn empty_pages_are_skipped() {
     let mut doc = document(vec![
         rectangle("a", "A", 50.0, 50.0),

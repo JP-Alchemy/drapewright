@@ -425,6 +425,69 @@ mod tests {
     }
 
     #[test]
+    fn a_piece_turns_by_any_angle_about_its_middle_or_a_point() {
+        let mut e = engine();
+        let ids = e
+            .dispatch(
+                Command::AddPieces {
+                    pieces: vec![square("A"), square("B")],
+                },
+                Default::default(),
+            )
+            .unwrap()
+            .added;
+        let outline = e.document().pieces[0].outline.clone();
+        let middle = |e: &Engine, i: usize| {
+            let p = &e.document().pieces[i];
+            crate::hit::placement_affine(p) * p.outline.bounds().center()
+        };
+        let before = middle(&e, 0);
+        e.dispatch(
+            Command::RotatePiece {
+                piece: ids[0].clone(),
+                degrees: -3.5,
+                about: None,
+            },
+            Default::default(),
+        )
+        .unwrap();
+        let p = &e.document().pieces[0];
+        assert!((p.placement.rotation - 356.5).abs() < 1e-9);
+        assert!(middle(&e, 0).distance(before) < 1e-9);
+        // Placement only: the shape is as it was.
+        assert_eq!(p.outline, outline);
+
+        // Two pieces turned about one point keep their places to each other.
+        let gap = middle(&e, 1) - middle(&e, 0);
+        let about = Pt::new(30.0, -20.0);
+        for id in &ids {
+            e.dispatch(
+                Command::RotatePiece {
+                    piece: id.clone(),
+                    degrees: 7.25,
+                    about: Some(about),
+                },
+                Default::default(),
+            )
+            .unwrap();
+        }
+        let turned = kurbo::Affine::rotate(7.25_f64.to_radians()) * gap.to_point();
+        assert!(((middle(&e, 1) - middle(&e, 0)).to_point() - turned).hypot() < 1e-9);
+
+        for degrees in [f64::NAN, f64::INFINITY] {
+            let err = e.dispatch(
+                Command::RotatePiece {
+                    piece: ids[0].clone(),
+                    degrees,
+                    about: None,
+                },
+                Default::default(),
+            );
+            assert!(err.is_err());
+        }
+    }
+
+    #[test]
     fn add_undo_redo() {
         let mut e = engine();
         let set = e
@@ -594,6 +657,44 @@ mod tests {
             Some(Hit::Piece { .. })
         ));
         assert_eq!(e.hit_test(Pt::new(50.0, 50.0), 2.0), None);
+    }
+
+    #[test]
+    fn a_piece_turned_by_an_odd_angle_is_found_where_it_lies() {
+        let mut e = engine();
+        e.dispatch(
+            Command::AddPieces {
+                pieces: vec![square("A")],
+            },
+            Default::default(),
+        )
+        .unwrap();
+        let id = e.document().pieces[0].id.clone();
+        e.dispatch(
+            Command::RotatePiece {
+                piece: id,
+                degrees: 30.0,
+                about: None,
+            },
+            Default::default(),
+        )
+        .unwrap();
+        let place = crate::hit::placement_affine(&e.document().pieces[0]);
+        let corner = place * Point::new(100.0, 0.0);
+        assert!(matches!(
+            e.hit_test(Pt::new(corner.x, corner.y), 2.0),
+            Some(Hit::Corner { .. })
+        ));
+        // Where the corner was before the turn is off the piece now.
+        assert!(!matches!(
+            e.hit_test(Pt::new(100.0, 0.0), 2.0),
+            Some(Hit::Corner { .. })
+        ));
+        let mid_edge = place * Point::new(50.0, 100.0);
+        assert!(matches!(
+            e.hit_test(Pt::new(mid_edge.x, mid_edge.y), 2.0),
+            Some(Hit::Edge { .. })
+        ));
     }
 
     #[test]
