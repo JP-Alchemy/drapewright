@@ -659,6 +659,10 @@ fn grow(edges: &[EdgeInfo], outline: Vec<Point>) -> AllowanceLines {
     let mut shapes = adds.simplify_shape(FillRule::NonZero);
     if !cuts.is_empty() {
         shapes = shapes.overlay(&cuts, OverlayRule::Difference, FillRule::NonZero);
+        // Trims shape the allowance only: at a sharp corner a folded-back
+        // end can reach over the piece itself (a hem curving back beside a
+        // fold), which is never cut away.
+        shapes = shapes.overlay(&to_contour(&outline), OverlayRule::Union, FillRule::NonZero);
     }
     let Some((cutting, holes)) = outer_contour(shapes) else {
         return AllowanceLines {
