@@ -79,6 +79,9 @@ export interface SeamMark extends EdgePart {
 }
 
 /** A seam's sides as drawn: one, where it sews an edge to its own other half. */
+/** A bone's channel is drawn this wide on the table, mm. */
+const BONE_WIDTH = 7
+
 /** A line of a piece's name and cutting, as written on it, px. */
 const LABEL_LINE = 19
 
@@ -355,6 +358,15 @@ export function draw(
     ctx.setLineDash([])
     ctx.stroke(paths.lines)
     ctx.stroke(paths.marks)
+    // Boning: a channel the width of a bone, its line down the middle.
+    ctx.save()
+    ctx.globalAlpha = 0.18
+    ctx.lineWidth = BONE_WIDTH
+    ctx.lineCap = 'round'
+    ctx.stroke(paths.bones)
+    ctx.restore()
+    ctx.lineWidth = 1.25 / s
+    ctx.stroke(paths.bones)
     ctx.fillStyle = theme.ink
     ctx.fill(paths.dots)
     drawNotches(ctx, sp.view, s, theme)

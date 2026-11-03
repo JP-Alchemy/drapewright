@@ -9,7 +9,8 @@ use drapewright_pattern_core::ops::{self, OpError};
 use drapewright_pattern_core::validate::{piece_ids, validate_piece};
 use drapewright_pattern_core::{
     Allowance, Alteration, Change, CornerStyle, CutInstruction, Drawn, EdgeKind, Grainline, Id,
-    Notch, NotchFrom, NotchKind, Piece, Pt, Severity, alter,
+    LineKind, Notch, NotchFrom, NotchKind, Piece, Pt, Severity, alter,
+    stitching::{bone_along, bone_id},
 };
 use kurbo::{Affine, Point};
 use serde::{Deserialize, Serialize};
@@ -97,6 +98,19 @@ pub enum Command {
     SetGrainline {
         piece: Id,
         grainline: Option<Grainline>,
+    },
+    /// What a line inside the piece is: a boning channel, say.
+    SetLineKind {
+        piece: Id,
+        line: Id,
+        kind: LineKind,
+    },
+    /// A bone sewn along `edge`, in a channel beside its stitching line
+    /// (a corset's seam boned), or (`boned` false) taken out.
+    BoneEdge {
+        piece: Id,
+        edge: Id,
+        boned: bool,
     },
     AddNotch {
         piece: Id,
@@ -204,6 +218,9 @@ impl Command {
             Command::SplitEdge { .. } => "add corner",
             Command::JoinEdges { .. } => "remove corner",
             Command::SetGrainline { .. } => "grainline",
+            Command::SetLineKind { .. } => "line type",
+            Command::BoneEdge { boned: true, .. } => "bone edge",
+            Command::BoneEdge { boned: false, .. } => "take bone out",
             Command::AddNotch { .. } => "add notch",
             Command::SetNotch { .. } => "change notch",
             Command::DeleteNotch { .. } => "delete notch",
@@ -235,6 +252,8 @@ impl Command {
             | Command::SetEdgeKind { piece, .. }
             | Command::SetCornerStyle { piece, .. }
             | Command::RenameEdge { piece, .. }
+            | Command::SetLineKind { piece, .. }
+            | Command::BoneEdge { piece, .. }
             | Command::JoinEdges { piece, .. }
             | Command::DeleteNotch { piece, .. } => Some((piece, false)),
             Command::SplitEdge { piece, .. }
@@ -631,6 +650,29 @@ fn apply_unaltered(
             p.outline.edges[i].end_corner = style;
             Ok(ChangeSet::changed(&piece))
         }
+        Command::SetLineKind { piece, line, kind } => {
+            let p = piece_mut(doc, &piece)?;
+            let l = p.lines.iter_mut().find(|l| l.id == line).ok_or_else(|| {
+                CommandError::Rejected {
+                    message: "The line is no longer on the piece.".into(),
+                }
+            })?;
+            l.kind = kind;
+            Ok(ChangeSet::changed(&piece))
+        }
+        Command::BoneEdge { piece, edge, boned } => {
+            let p = piece_mut(doc, &piece)?;
+            let i = edge_index(p, &edge)?;
+            let id = bone_id(&edge);
+            p.lines.retain(|l| l.id != id);
+            if boned {
+                let bone = bone_along(p, i, None, None).ok_or_else(|| CommandError::Rejected {
+                    message: "That edge is too short to bone.".into(),
+                })?;
+                p.lines.push(bone);
+            }
+            Ok(ChangeSet::changed(&piece))
+        }
         Command::RenameEdge { piece, edge, name } => {
             let p = piece_mut(doc, &piece)?;
             let i = edge_index(p, &edge)?;
@@ -863,10 +905,25 @@ fn unsewn(doc: &Document, piece: &Id, edges: &[&Id]) -> Result<(), CommandError>
 
 /// A seam that can be kept: both sides measurable, and not one side sewn to
 /// itself.
+/// The most a laced seam is left open, mm.
+const MOST_LACED: f64 = 300.0;
+
 fn checked_seam(doc: &Document, seam: &Seam) -> Result<(), CommandError> {
     if seam.a == seam.b {
         return Err(CommandError::Rejected {
             message: "An edge can't be sewn to itself; choose its partner.".into(),
+        });
+    }
+    if let Some(gap) = seam.lacing
+        && !(gap.is_finite() && (0.0..=MOST_LACED).contains(&gap))
+    {
+        return Err(CommandError::Rejected {
+            message: "A laced seam can be left open by up to 30 cm.".into(),
+        });
+    }
+    if seam.lacing.is_some() && (seam.a.is_line() || seam.b.is_line()) {
+        return Err(CommandError::Rejected {
+            message: "Only edges can be laced together, not a line inside a piece.".into(),
         });
     }
     match drapewright_seams::measure(seam, &doc.pieces).problem {

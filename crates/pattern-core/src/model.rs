@@ -345,6 +345,9 @@ pub enum LineKind {
     Stitch,
     Cut,
     LengthenShorten,
+    /// A boning channel: a bone (steel or plastic) sewn in along it, as in
+    /// a corset, keeps the cloth from creasing across it.
+    Boning,
 }
 
 /// A line drawn inside a piece (fold line, placement line, lengthen/shorten…).

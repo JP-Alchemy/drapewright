@@ -297,10 +297,10 @@ impl View {
     /// The cloth, shown as it is to be shown.
     fn colour_cloth(&mut self) {
         if let Some(cloth) = &self.cloth {
-            let mesh = Mesh::new(cloth.points.clone(), &cloth.triangles);
-            let colours = cloth.colours(self.shows, self.fabric);
+            let drawn = cloth.drawn(self.shows, self.fabric);
+            let mesh = Mesh::new(drawn.points, &drawn.triangles);
             self.renderer
-                .set_cloth(&self.device, &self.queue, &mesh, &colours);
+                .set_cloth(&self.device, &self.queue, &mesh, &drawn.colours);
         }
     }
 

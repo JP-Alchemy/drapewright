@@ -9,6 +9,8 @@ export interface PiecePaths {
   /** Lines inside the piece: plain, and dashed (fold, placement and stitching lines). */
   lines: Path2D
   dashedLines: Path2D
+  /** Boning channels: a bone sewn along each. */
+  bones: Path2D
   /** Marks: outlined (drill holes, circles, crosses, buttonholes) and filled (dots). */
   marks: Path2D
   dots: Path2D
@@ -161,13 +163,14 @@ export function buildPaths(piece: Piece, view: PieceView): PiecePaths {
   const exact = outlinePath(piece.outline)
   const lines = new Path2D()
   const dashedLines = new Path2D()
+  const bones = new Path2D()
   for (const l of piece.lines) {
-    const path = DASHED_LINES.has(l.kind) ? dashedLines : lines
+    const path = l.kind === 'boning' ? bones : DASHED_LINES.has(l.kind) ? dashedLines : lines
     path.moveTo(l.start[0], l.start[1])
     for (const seg of l.segments) addSegment(path, seg)
   }
   const outlines = view.outlineIsCutting
     ? { cut: exact, stitch: polyline(view.stitching) }
     : { cut: polyline(view.cutting), stitch: exact }
-  return { ...outlines, lines, dashedLines, ...markPaths(piece), ...alteredPaths(piece) }
+  return { ...outlines, lines, dashedLines, bones, ...markPaths(piece), ...alteredPaths(piece) }
 }

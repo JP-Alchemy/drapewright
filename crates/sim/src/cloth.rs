@@ -188,6 +188,34 @@ impl ClothBuilder {
         self.stitches.push([i, j]);
     }
 
+    /// A bone through `points` (in order along it): each held as far from
+    /// the next few along it as it is flat, so the cloth along it can't
+    /// bend or crease, only turn.
+    pub fn bone(&mut self, points: &[u32]) {
+        for reach in 1..=BONE_REACH {
+            for w in points.windows(reach + 1) {
+                let (i, j) = (w[0], w[reach]);
+                let (pi, pj) = (self.rest[i as usize], self.rest[j as usize]);
+                self.edges.push(Edge {
+                    i,
+                    j,
+                    rest: (pj[0] - pi[0]).hypot(pj[1] - pi[1]),
+                    compliance: BONE_COMPLIANCE,
+                });
+            }
+        }
+    }
+
+    /// Laces point `i` to point `j`, `gap` (m) apart.
+    pub fn lace(&mut self, i: u32, j: u32, gap: f32) {
+        self.edges.push(Edge {
+            i,
+            j,
+            rest: gap,
+            compliance: LACE_COMPLIANCE,
+        });
+    }
+
     /// The points from `first` on go inside the rest (facings, linings):
     /// they are kept nearer the body than the cloth over them.
     pub fn inside_from(&mut self, first: u32) {
@@ -273,6 +301,15 @@ impl ClothBuilder {
         }
     }
 }
+
+/// A bone holds each of its points as far as flat from each of this many
+/// points on along it (about 120 mm of it, its points about 20 mm apart):
+/// with fewer, it bends near half as much as the cloth without it.
+const BONE_REACH: usize = 6;
+/// How a bone gives, m/N: steel, near enough not at all.
+const BONE_COMPLIANCE: f32 = 1e-8;
+/// How a lace gives, m/N: a cord pulled tight.
+const LACE_COMPLIANCE: f32 = 1e-6;
 
 /// The height of the bands constraints are solved in, m.
 const BAND: f32 = 0.01;

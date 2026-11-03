@@ -72,7 +72,7 @@ single exception of sidecars it references explicitly.
 | Field | Type | Notes |
 |---|---|---|
 | `format` | `"drapewright-project"` | Identifies the file type. |
-| `schemaVersion` | integer | `8` for this document. See §8. |
+| `schemaVersion` | integer | `9` for this document. See §8. |
 | `generator` | string | Free text naming the program that wrote the file. |
 | `meta.id` | string | Stable project identifier. |
 | `meta.name` | string | Shown to the user. |
@@ -273,8 +273,15 @@ Optional: `size` (diameter, mm), `length` (buttonholes, mm), `angle`
 ```
 
 `kind` is one of `line`, `fold` (pleat or tuck fold), `placement` (pocket or
-trim position), `stitch` (topstitching guide), `cut` (slit), and
-`lengthenShorten`. Optional `label`.
+trim position), `stitch` (topstitching guide), `cut` (slit),
+`lengthenShorten`, and `boning` (version 9: a boning channel, a bone sewn
+along it, as in a corset; draped, the cloth along it is kept from bending).
+Optional `label`.
+
+A bone sewn along a seam is a `boning` line in a channel beside the edge's
+stitching line: the reference implementation puts it 6 mm inside it,
+stopping 8 mm short of the edges across its ends, its `id` `bone-` and
+the edge's id, and reads one from a PDF pattern's "Stop boning here" mark.
 
 ### 4.10 Labels
 
@@ -572,6 +579,7 @@ Non-semantic: readers may ignore it.
 | 6 | `fabrics` (§10.5): fabrics of one's own. Earlier files have none. |
 | 7 | A piece source's `words` (§4.12): the text printed on it in its file. Earlier pieces keep none. |
 | 8 | A seam side's `line` (§10.4): a line inside a piece sewn instead of an edge, where a patch pocket goes. Earlier seams sew edges only. |
+| 9 | `boning` lines inside pieces (§4.9), and a seam's `lacing` (§10.4). Earlier files have neither: every seam sewn. |
 
 ## 9. Validation
 
@@ -700,7 +708,8 @@ No longer a draft: written since schema version 3.
   "b": { "piece": "p2", "edge": "e6", "from": null, "to": null, "mirror": false },
   "reversed": false,
   "ease": "even",
-  "confirmed": true
+  "confirmed": true,
+  "lacing": null
 }, {
   "id": "s13", "name": "Patch pocket",
   "a": { "piece": "p3", "edge": "e10", "line": null, "from": null, "to": null, "mirror": false },
@@ -723,6 +732,7 @@ No longer a draft: written since schema version 3.
 | `reversed` | boolean | `a`'s start is sewn to `b`'s end, not its start. Default `false`. |
 | `ease` | `"even"` | How a difference in length is spread: evenly. Default `"even"`. |
 | `confirmed` | boolean | Confirmed by the user. Default `true`. |
+| `lacing` | number \| null | Laced, not sewn: the two sides held this far apart (mm, 0 to 300) by a lace through eyelets along them, as a corset's back is. Only edges are laced, never a `line`. Default `null`: sewn. Version 9. |
 
 Lengths, the difference between the sides and how their notches meet are
 always derived, on the stitching line with darts closed (§4.14): where an

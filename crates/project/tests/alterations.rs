@@ -270,6 +270,7 @@ fn seams_are_measured_on_the_altered_piece() {
                 reversed: false,
                 ease: Default::default(),
                 confirmed: true,
+                lacing: None,
             }],
         },
         Default::default(),

@@ -243,6 +243,23 @@ impl Drape {
         for [(pa, a), (pb, b)] in &garment.stitches {
             builder.stitch(firsts[*pa] + a, firsts[*pb] + b);
         }
+        for bone in &garment.bones {
+            let points: Vec<u32> = bone
+                .points
+                .iter()
+                .map(|&k| firsts[bone.panel] + k)
+                .collect();
+            builder.bone(&points);
+        }
+        for lacing in &garment.lacings {
+            for [(pa, a), (pb, b)] in &lacing.pairs {
+                builder.lace(
+                    firsts[*pa] + a,
+                    firsts[*pb] + b,
+                    (lacing.gap / 1000.0) as f32,
+                );
+            }
+        }
         // Facings and linings, then the pieces sewn onto the garment, are
         // the last panels: the first go inside the rest, each behind the
         // panel it lies on; the others over the panel they are sewn onto.

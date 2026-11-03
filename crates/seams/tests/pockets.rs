@@ -363,6 +363,7 @@ fn a_line_side_names_a_line_that_must_be_there() {
         reversed: false,
         ease: Default::default(),
         confirmed: true,
+        lacing: None,
     };
     let report = measure(&seam, &pieces);
     assert!(report.problem.is_none());

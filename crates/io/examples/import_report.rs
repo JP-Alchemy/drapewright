@@ -261,6 +261,19 @@ fn main() {
                         if !tiny.is_empty() {
                             println!("             short lines: {}", tiny.join("; "));
                         }
+                        // Lines named, or of a kind other than a plain line.
+                        let named: Vec<String> = p
+                            .lines
+                            .iter()
+                            .filter(|l| {
+                                l.label.is_some()
+                                    || l.kind != drapewright_pattern_core::LineKind::Line
+                            })
+                            .map(|l| format!("{:?} {}", l.kind, l.label.as_deref().unwrap_or("-")))
+                            .collect();
+                        if !named.is_empty() {
+                            println!("             lines: {}", named.join("; "));
+                        }
                         if !p.marks.is_empty() {
                             let marks: Vec<String> = p
                                 .marks

@@ -477,6 +477,7 @@ fn seams_of(
             reversed: fit.backwards,
             ease: Ease::Even,
             confirmed,
+            lacing: None,
         });
     };
     for (edge, start, end) in spans {

@@ -516,16 +516,26 @@ fn picture(
         skin.extend(corners.iter().map(|p| p.map(|c| c * 1000.0)));
         skin_triangles.extend(faces.iter().map(|f| f.map(|i| i + first)));
     }
-    let cloth: Vec<[f32; 3]> = drape
+    let mut cloth: Vec<[f32; 3]> = drape
         .cloth
         .x
         .iter()
         .map(|p| p.map(|c| c * 1000.0))
         .collect();
+    // Its bones and lacing on it.
+    let mut triangles = drape.cloth.triangles.clone();
+    let mut colours = colours;
+    let shapes = draping
+        .trims
+        .shapes(&cloth, &triangles, drape.cloth.facing(), 1.0);
+    let first = cloth.len() as u32;
+    cloth.extend(&shapes.points);
+    triangles.extend(shapes.triangles.iter().map(|t| t.map(|i| i + first)));
+    colours.extend(shapes.kinds.iter().map(|k| k.colour(FABRIC)));
     worn::draw(
         &Scene {
             skin: (&skin, &skin_triangles),
-            cloth: (&cloth, &drape.cloth.triangles),
+            cloth: (&cloth, &triangles),
             colours: &colours,
         },
         views,

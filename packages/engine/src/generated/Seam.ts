@@ -18,4 +18,10 @@ reversed: boolean, ease: Ease,
 /**
  * Confirmed by hand. Suggestions are not, until then.
  */
-confirmed: boolean, };
+confirmed: boolean, 
+/**
+ * Laced, not sewn: its sides held this far apart (mm) by a lace
+ * through eyelets along them, as a corset's back is. None: sewn.
+ * Added in schema version 9.
+ */
+lacing: number | null, };

@@ -36,6 +36,7 @@ const onto: Seam = {
   reversed: false,
   ease: 'even',
   confirmed: true,
+  lacing: null,
 }
 
 describe('a pocket sewn onto its placement', () => {

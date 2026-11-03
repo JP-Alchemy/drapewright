@@ -84,6 +84,7 @@ fn a_side_with_a_dart_is_measured_with_the_dart_closed() {
         reversed: false,
         ease: Default::default(),
         confirmed: true,
+        lacing: None,
     };
     let report = measure(&seam, &[front(), back()]);
     // 180 above the dart and 180 below it: 360, as long as the back.

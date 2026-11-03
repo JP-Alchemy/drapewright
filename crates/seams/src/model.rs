@@ -102,6 +102,11 @@ pub struct Seam {
     /// Confirmed by hand. Suggestions are not, until then.
     #[serde(default = "yes")]
     pub confirmed: bool,
+    /// Laced, not sewn: its sides held this far apart (mm) by a lace
+    /// through eyelets along them, as a corset's back is. None: sewn.
+    /// Added in schema version 9.
+    #[serde(default)]
+    pub lacing: Option<f64>,
 }
 
 impl Seam {

@@ -578,7 +578,7 @@ export class Session {
     const reversed = !same && this.engine.sewnReversed(a, b)
     const sewn = this.dispatch({
       type: 'addSeams',
-      seams: [{ id: '', name: '', a, b, reversed, ease: 'even', confirmed: true }],
+      seams: [{ id: '', name: '', a, b, reversed, ease: 'even', confirmed: true, lacing: null }],
     })
     if (sewn) {
       this.selectSeam(this.engine.document().seams.at(-1)?.id ?? null, piece)

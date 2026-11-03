@@ -640,6 +640,8 @@ export const t = {
 
   edges: {
     heading: (n: number) => `${n} edges`,
+    boned: 'Boned: a bone sewn along it',
+    bonedAll: (n: number) => `Boned: a bone sewn along each of the ${n}`,
     hint: 'Moved together: drag the handles beside any of them, on the table or on the figure, or set how far here.',
     by: 'Moved out by',
     byHint: 'Less than 0 moves them in. Each is a step on its own piece.',
@@ -1145,6 +1147,7 @@ export const t = {
       fitsAlong: 'fits along the opening',
       sewnInto: 'sewn into the seam',
       onPlacement: 'where its placement is drawn',
+      eyelets: 'eyelets along it',
     } satisfies Record<Reason, string>,
     sewTo: 'Sew to another edge…',
     sewingHint: (edge: string) =>
@@ -1158,6 +1161,11 @@ export const t = {
     notItsShape: (piece: string) => `${piece} isn’t the shape of that line.`,
     sewnOn: (piece: string) => `${piece} sewn on. Its seams are numbered on both pieces.`,
     lineInside: 'line drawn on it',
+    lace: 'Lace',
+    laced: 'Laced, not sewn',
+    lacingGap: 'Left open by',
+    lacingHint:
+      'How far apart the lace holds its two sides: a corset’s back is laced about 5 cm open, to pull in or let out as it is worn.',
   },
 
   measure: {

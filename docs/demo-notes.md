@@ -12,6 +12,72 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 83 — Corsets: boning and lacing, read from the pattern and draped
+
+JP asked for a corset's boning and its lacing to be in. Until now a corset
+draped as soft cloth, its back sewn shut. Now its bones keep the cloth from
+creasing, and its back is laced, held open by the lace.
+
+* **Boning lines.** A line inside a piece can be a boning channel: a bone
+  sewn along it. On the table it is drawn as a channel, a grey band the
+  width of a bone with its line down the middle. Printed, it is dashed.
+* **Read from a PDF pattern.** A pair of lines with "Boning" (or "Back
+  Lacing Bone") printed between them becomes a boning channel, named as
+  printed. A short line marked "Stop / Boning / Here" (often each word on
+  a line of its own) means a bone runs along the seam beside it, from
+  there up to the top. That bone is added as a boning line 6 mm inside the
+  seam, ending 8 mm short of the top edge, and the mark is named "Stop
+  boning here".
+* **Bones by hand.** Choose an edge: its details have **Boned: a bone sewn
+  along it**. With a whole line of edges chosen, **Boned** bones them all
+  at once, as one undo step.
+* **Laced seams.** Find seams suggests a centre edge with eyelets marked
+  along it (circles, holes or dots in a row beside it) laced to its other
+  half, 5 cm open. The suggestion says *eyelets along it* and its button
+  says **Lace**. Any seam's details have **Laced, not sewn** and **Left
+  open by** (up to 30 cm).
+* **On the figure.** Each bone keeps the cloth along it from bending: it
+  holds each of its points as far as they are flat from the next six
+  along it. In a test, the cloth along a bone bends about half as much as
+  without it. A laced seam is held its gap apart instead of being sewn
+  shut. Its sides cross with a dark lace, eyelet to eyelet (about every
+  25 mm), tied straight across at both ends. Bones show as raised
+  channels a shade darker than the fabric. The garment's size round the
+  body counts the lacing's gap. All of this works the same with the
+  drape on the processor and on the graphics card, and in the assistant's
+  drape pictures.
+* **The file:** schema version 9. A line's `kind` can be `boning`, and a
+  seam has `lacing` (mm, or null where sewn). Version 8 projects open
+  unchanged, every seam sewn.
+* **The assistant:** `sew_edges` takes `lacing_mm`, and `get_seams` shows
+  `lacingMm` on seams and suggestions. `update_edge` takes `boned`, and
+  `update_piece` takes `line_kinds` (a line marked as boning).
+
+**Try it:** open `fixtures/pdf/corset-boning.pdf` (a test corset drawn for
+one side, each panel cut 2), choose **Not included**, and **Add 3 pieces**.
+The front has a boning channel down its middle, the side panel a bone up
+its right seam to the stop mark, and the back two lacing bones either
+side of its eyelets. **Find seams**: the back's centre comes up *eyelets
+along it* with a **Lace** button. **Sew all**, then tap the back's
+centre seam to see **Laced, not sewn**, 5 cm open. Choose any seam's edge
+and switch **Boned** on.
+
+**How it works:** a bone is the cloth's points along its line, held apart
+by stiff ties (the same distance constraints as the cloth's own, solved
+the same way on the graphics card). It is drawn along its true line,
+through points placed inside the cloth's triangles. A lacing is the seam's
+point pairs tied at the gap instead of stitched. Its cords and eyelets
+are drawn as small tubes and discs off the cloth.
+
+**Known:** a pattern that marks where its bones go only in words that
+aren't next to a line inside the piece is not read. On the corset tested,
+one panel's "Stop boning here" line lies outside the smallest sizes'
+outline. Bone those seams with **Boned**. Find seams doesn't suggest
+FreeSewing's Cathrin corset's centre back or its first seam, and it drapes
+too low; that's being looked at separately.
+
+---
+
 ## Step 82 — Pieces straightened to their grainline, and turned to any angle
 
 Asked for by a tester: their corset, imported from a PDF in three sizes laid

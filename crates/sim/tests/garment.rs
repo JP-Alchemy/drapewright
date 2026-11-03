@@ -426,6 +426,7 @@ fn a_piece_sewn_into_a_seam_is_sewn_to_the_same_points() {
         reversed: true,
         ease: Default::default(),
         confirmed: true,
+        lacing: None,
     });
     let g = assemble(&pieces, &seams, 20.0).unwrap();
     let flaps: HashSet<usize> = (0..g.panels.len())

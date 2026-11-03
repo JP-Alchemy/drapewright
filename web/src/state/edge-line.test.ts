@@ -20,6 +20,7 @@ const seam = (
   reversed,
   ease: 'even',
   confirmed: true,
+  lacing: null,
 })
 
 // A skirt: its front cut on the fold (waist, side, hem, fold), its back cut

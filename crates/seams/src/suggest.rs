@@ -69,6 +69,8 @@ pub enum Reason {
     /// A pocket sewn onto a panel where its placement is drawn, the shape
     /// it is.
     OnPlacement,
+    /// Eyelets are marked along it: laced, not sewn (a corset's back).
+    Eyelets,
 }
 
 /// A seam Drapewright thinks likely, not yet confirmed.
@@ -1039,6 +1041,7 @@ fn seam(a: SeamSide, b: SeamSide, reversed: bool) -> Seam {
         reversed,
         ease: Ease::Even,
         confirmed: false,
+        lacing: None,
     }
 }
 
@@ -1676,13 +1679,26 @@ fn edges<P: Borrow<Piece>>(
         }
         used[k] = true;
         centred[c.piece] = true;
+        // Eyelets along it: laced shut, not sewn.
+        let laced = eyeleted(pieces[c.piece].borrow(), &c.points);
+        let mut reasons = vec![Reason::CentreOfPair];
+        if laced {
+            reasons.push(Reason::Eyelets);
+        }
         out.push(Suggestion {
             seam: Seam {
                 name: sentence(&c.name),
+                lacing: laced.then_some(LACING_GAP),
                 ..centre
             },
-            confidence: if named { 0.6 } else { 0.4 },
-            reasons: vec![Reason::CentreOfPair],
+            confidence: if laced {
+                0.9
+            } else if named {
+                0.6
+            } else {
+                0.4
+            },
+            reasons,
         });
     }
     // Trousers: a front and a back sewn to each other twice, at the
@@ -1788,6 +1804,36 @@ fn edges<P: Borrow<Piece>>(
     let into = sewn_into(&cands, pieces, &out, existing);
     out.extend(into);
     out
+}
+
+/// A laced seam is left this far open, to begin with, mm: a corset's back
+/// is laced about 5 cm open, to be pulled in or let out as it is worn.
+pub const LACING_GAP: f64 = 50.0;
+/// Eyelets are marked this near the edge they lace, at most, mm ...
+const EYELET_REACH: f64 = 40.0;
+/// ... at least this many of them ...
+const EYELETS: usize = 4;
+/// ... along at least this share of its length.
+const EYELETS_ALONG: f64 = 0.5;
+
+/// Whether eyelets are marked along an edge (its stitching line `points`):
+/// circles, holes or dots in a row beside it, along most of it.
+fn eyeleted(piece: &Piece, points: &[Point]) -> bool {
+    use drapewright_pattern_core::MarkKind;
+    use drapewright_pattern_core::geom::distance_to_polyline;
+    use drapewright_pattern_core::stitching::{along_polyline, polyline_length};
+    let along: Vec<f64> = piece
+        .marks
+        .iter()
+        .filter(|m| matches!(m.kind, MarkKind::Circle | MarkKind::Drill | MarkKind::Dot))
+        .map(|m| Point::from(m.at))
+        .filter(|&p| distance_to_polyline(p, points, false) <= EYELET_REACH)
+        .map(|p| along_polyline(points, p))
+        .collect();
+    let (low, high) = along
+        .iter()
+        .fold((f64::MAX, f64::MIN), |(l, h), &a| (l.min(a), h.max(a)));
+    along.len() >= EYELETS && high - low >= EYELETS_ALONG * polyline_length(points)
 }
 
 /// An edge sewn into a seam this much shorter than the edge it goes along,
@@ -1940,6 +1986,7 @@ fn sewn_into<P: Borrow<Piece>>(
                 reversed,
                 ease: Ease::default(),
                 confirmed: false,
+                lacing: None,
             },
             confidence: 0.5,
             reasons: vec![Reason::SewnInto],

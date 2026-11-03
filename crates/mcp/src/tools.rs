@@ -13,8 +13,8 @@ use drapewright_io::{AllowanceAnswer, ImportResult, PageLeftOut};
 use drapewright_pattern_core::build::{DEFAULT_CORNER_ANGLE, counter, outline_from_path};
 use drapewright_pattern_core::ops::normalize_orientation;
 use drapewright_pattern_core::{
-    Allowance, AllowanceMode, CornerStyle, CutInstruction, EdgeKind, Grainline, Id, NotchFrom,
-    NotchKind, Piece, Pt, ScaleBasis, Source, SourceFormat,
+    Allowance, AllowanceMode, CornerStyle, CutInstruction, EdgeKind, Grainline, Id, LineKind,
+    NotchFrom, NotchKind, Piece, Pt, ScaleBasis, Source, SourceFormat,
 };
 use drapewright_project::document::{Assembly, Document, Orientation, Paper, PaperName};
 use drapewright_project::hit::placement_affine;
@@ -221,14 +221,14 @@ pub fn all() -> Vec<Tool> {
             "update_piece",
             "Update piece",
             Edits,
-            "Renames a piece, changes its seam allowance, or sets how to cut it. Give only what changes.",
+            "Renames a piece, changes its seam allowance, sets how to cut it, or says what lines inside it are (boning channels). Give only what changes.",
             update_piece,
         ),
         tool(
             "update_edge",
             "Update edge",
             Edits,
-            "Changes one edge of a piece: its kind (seam, hem or fold), its name (e.g. \"centre front\"), its own seam allowance, or the corner shape where it ends. Give only what changes.",
+            "Changes one edge of a piece: its kind (seam, hem or fold), its name (e.g. \"centre front\"), its own seam allowance, the corner shape where it ends, or whether a bone is sewn along it (a corset). Give only what changes.",
             update_edge,
         ),
         tool(
@@ -326,7 +326,7 @@ pub fn all() -> Vec<Tool> {
             "drape",
             "Drape on the avatar",
             Reads,
-            "Drapes the project's garment on the avatar, as the app's Drape does, and shows it: a picture of the figure wearing it from the front, side and back, and how it fits standing. At the bust, waist and hip: the garment's size round the body, the body's, the ease, how hard the cloth pulls there (N/m, typically and in its hardest-pulled tenth: the app's heatmap runs from pale at 0 to red at 100) and the room it leaves (typically, and the least: 0 is touching); and the band of heights where it pulls hardest (always somewhat where it hangs from: the shoulders, or a skirt's waist). The avatar is fitted to a person's measurements (as fit_avatar) or is the standard figure. Only pieces sewn by seams are draped (sew_edges); facings and linings go inside. With pose, it then moves into that pose; with shows \"pull\" or \"room\" the picture is a heatmap. It takes from a few seconds to a minute.",
+            "Drapes the project's garment on the avatar, as the app's Drape does, and shows it: a picture of the figure wearing it from the front, side and back, and how it fits standing. At the bust, waist and hip: the garment's size round the body, the body's, the ease, how hard the cloth pulls there (N/m, typically and in its hardest-pulled tenth: the app's heatmap runs from pale at 0 to red at 100) and the room it leaves (typically, and the least: 0 is touching); and the band of heights where it pulls hardest (always somewhat where it hangs from: the shoulders, or a skirt's waist). The avatar is fitted to a person's measurements (as fit_avatar) or is the standard figure. Only pieces sewn by seams are draped (sew_edges); facings and linings go inside; boning keeps the cloth along it from bending, and a laced seam is held open by its lacing, the lace drawn across. With pose, it then moves into that pose; with shows \"pull\" or \"room\" the picture is a heatmap. It takes from a few seconds to a minute.",
             crate::drape::drape,
         ),
         tool(
@@ -340,7 +340,7 @@ pub fn all() -> Vec<Tool> {
             "sew_edges",
             "Sew edges",
             Edits,
-            "Sews pairs of edges together (adds seams). Each side is a piece id and edge id, optionally a part of the edge (from_mm, to_mm along its stitching line) or the piece's mirror copy (mirror: true, for a piece cut as a pair sewn to itself at the centre back). reversed: true when one side's start meets the other's end. A side can instead be part of a line drawn inside a piece (line, from_mm, to_mm), where a patch pocket is sewn onto its placement: one seam for each of the pocket's sewn edges. get_seams suggests pockets onto their placements itself.",
+            "Sews pairs of edges together (adds seams). Each side is a piece id and edge id, optionally a part of the edge (from_mm, to_mm along its stitching line) or the piece's mirror copy (mirror: true, for a piece cut as a pair sewn to itself at the centre back). reversed: true when one side's start meets the other's end. A side can instead be part of a line drawn inside a piece (line, from_mm, to_mm), where a patch pocket is sewn onto its placement: one seam for each of the pocket's sewn edges. get_seams suggests pockets onto their placements itself. lacing_mm laces the edges instead of sewing them, held that far apart (a corset's back, where eyelets are marked; get_seams suggests it with lacingMm).",
             sew_edges,
         ),
         tool(
@@ -1439,6 +1439,10 @@ struct UpdatePiece {
     seam_allowance: Option<PieceAllowanceArg>,
     /// How to cut it, one entry per fabric. Replaces what is there.
     cut: Option<Vec<CutArg>>,
+    /// What lines inside it are, by id (from get_piece): "boning" for a
+    /// boning channel (a corset's bone sewn along it, kept from bending
+    /// when draped), or back to "line".
+    line_kinds: Option<std::collections::BTreeMap<String, LineKind>>,
 }
 
 fn update_piece(session: &mut Session, a: UpdatePiece) -> Result<Output, ToolError> {
@@ -1491,9 +1495,16 @@ fn update_piece(session: &mut Session, a: UpdatePiece) -> Result<Output, ToolErr
             cut: cut.into_iter().map(Into::into).collect(),
         });
     }
+    for (line, kind) in a.line_kinds.unwrap_or_default() {
+        commands.push(Command::SetLineKind {
+            piece: a.piece.clone(),
+            line,
+            kind,
+        });
+    }
     if commands.is_empty() {
         return Err(ToolError::new(
-            "Nothing to change: give name, seam_allowance or cut.",
+            "Nothing to change: give name, seam_allowance, cut or line_kinds.",
         ));
     }
     session.dispatch(commands)?;
@@ -1520,6 +1531,10 @@ struct UpdateEdge {
     /// Shape of the allowance at the corner where this edge ends and the next
     /// begins.
     corner: Option<CornerStyle>,
+    /// true: a bone sewn along it, in a channel beside its stitching line
+    /// (a corset's seam boned), kept from bending when draped; false: taken
+    /// out.
+    boned: Option<bool>,
 }
 
 fn update_edge(session: &mut Session, a: UpdateEdge) -> Result<Output, ToolError> {
@@ -1560,9 +1575,16 @@ fn update_edge(session: &mut Session, a: UpdateEdge) -> Result<Output, ToolError
             style,
         });
     }
+    if let Some(boned) = a.boned {
+        commands.push(Command::BoneEdge {
+            piece: piece.clone(),
+            edge: edge.clone(),
+            boned,
+        });
+    }
     if commands.is_empty() {
         return Err(ToolError::new(
-            "Nothing to change: give kind, name, allowance_mm, use_piece_allowance or corner.",
+            "Nothing to change: give kind, name, allowance_mm, use_piece_allowance, corner or boned.",
         ));
     }
     session.dispatch(commands)?;
@@ -2075,6 +2097,7 @@ fn get_seams(session: &mut Session, _: NoArgs) -> Result<Output, ToolError> {
                 "b": side_json(doc, &s.b),
                 "reversed": s.reversed,
                 "confirmed": s.confirmed,
+                "lacingMm": s.lacing,
                 "aLengthMm": r1(r.a_length),
                 "bLengthMm": r1(r.b_length),
                 "differenceMm": r1(r.difference),
@@ -2091,6 +2114,7 @@ fn get_seams(session: &mut Session, _: NoArgs) -> Result<Output, ToolError> {
                 "a": side_json(doc, &s.seam.a),
                 "b": side_json(doc, &s.seam.b),
                 "reversed": s.seam.reversed,
+                "lacingMm": s.seam.lacing,
                 "name": s.seam.name,
                 "confidence": (s.confidence * 100.0).round() / 100.0,
                 "reasons": s.reasons,
@@ -2145,6 +2169,9 @@ struct SeamArgs {
     reversed: bool,
     /// "Side seam".
     name: Option<String>,
+    /// Laced, not sewn (a corset's back, eyelets marked along it): the two
+    /// sides held this far apart by the lace, mm (50 is usual).
+    lacing_mm: Option<f64>,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -2176,6 +2203,7 @@ fn sew_edges(session: &mut Session, a: SewArgs) -> Result<Output, ToolError> {
             reversed: s.reversed,
             ease: Default::default(),
             confirmed: true,
+            lacing: s.lacing_mm,
         })
         .collect();
     let count = seams.len();

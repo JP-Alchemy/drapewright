@@ -540,6 +540,7 @@ fn tube() -> (
         reversed: true,
         ease: Default::default(),
         confirmed: true,
+        lacing: None,
     };
     (
         vec![
@@ -618,6 +619,7 @@ fn panels_are_placed_where_their_seams_meet_not_by_their_tops() {
         reversed: true,
         ease: Default::default(),
         confirmed: true,
+        lacing: None,
     };
     let seams = vec![
         side("s1", ("front", "fright"), ("back", "bleft")),

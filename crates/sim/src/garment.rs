@@ -90,6 +90,28 @@ pub struct Link {
     pub name: String,
 }
 
+/// A bone sewn into a panel (a corset's boning): the panel's points along
+/// it, in order, kept from bending.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Bone {
+    pub panel: usize,
+    /// Indices into the panel's mesh.
+    pub points: Vec<u32>,
+    /// Where it runs, point by point: each a triangle of the mesh and the
+    /// weights of its corners (to draw it along its line, not zigzagging
+    /// from point to point of the mesh).
+    pub path: Vec<([u32; 3], [f32; 3])>,
+}
+
+/// A laced seam: pairs of (panel, point) across it, in order along it,
+/// held `gap` apart by the lace.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Lacing {
+    pub pairs: Vec<[(usize, u32); 2]>,
+    /// mm.
+    pub gap: f64,
+}
+
 /// A garment's panels and the points sewn together.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Garment {
@@ -99,6 +121,8 @@ pub struct Garment {
     pub links: Vec<Link>,
     /// How many of the stitches are buttons done up.
     pub buttons: usize,
+    pub bones: Vec<Bone>,
+    pub lacings: Vec<Lacing>,
 }
 
 impl Garment {
@@ -140,11 +164,33 @@ impl Garment {
                 })
             })
             .collect();
+        let bones = self
+            .bones
+            .iter()
+            .filter_map(|b| {
+                Some(Bone {
+                    panel: index[b.panel]?,
+                    points: b.points.clone(),
+                    path: b.path.clone(),
+                })
+            })
+            .collect();
+        let lacings = self
+            .lacings
+            .iter()
+            .map(|l| Lacing {
+                pairs: l.pairs.iter().filter_map(stitch).collect(),
+                gap: l.gap,
+            })
+            .filter(|l| !l.pairs.is_empty())
+            .collect();
         Garment {
             panels,
             stitches,
             links,
             buttons: count,
+            bones,
+            lacings,
         }
     }
 
@@ -232,6 +278,8 @@ struct Layout {
     /// The lines drawn inside it that a piece may be sewn onto (a pocket's
     /// placement), each from its start, as `edges` are.
     lines: Vec<(Id, Half, Vec<P2>)>,
+    /// Its boning lines, where they are on the panel.
+    bones: Vec<Vec<P2>>,
 }
 
 fn reflect(p: P2, a: P2, b: P2) -> P2 {
@@ -370,6 +418,18 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                 (l.id.clone(), points)
             })
             .collect();
+        // Its boning, stood upright as the edges are.
+        let bones: Vec<Vec<P2>> = piece
+            .lines
+            .iter()
+            .filter(|l| l.kind == LineKind::Boning)
+            .map(|l| {
+                line_points(l)
+                    .iter()
+                    .map(|p| quarter_turned([p.x, -p.y], quarters))
+                    .collect()
+            })
+            .collect();
         let fold = kinds.iter().position(|(_, kind)| *kind == EdgeKind::Fold);
         let on_fold = cut.on_fold.unwrap_or(fold.is_some()) && fold.is_some();
         let pair = cut.quantity >= 2 && cut.mirrored.unwrap_or(true);
@@ -416,6 +476,15 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                         (id.clone(), Half::B, mirrored)
                     }))
                     .collect(),
+                bones: bones
+                    .iter()
+                    .cloned()
+                    .chain(
+                        bones
+                            .iter()
+                            .map(|l| l.iter().map(|&p| reflect(p, a, b)).collect()),
+                    )
+                    .collect(),
             });
             continue;
         }
@@ -457,6 +526,10 @@ fn layouts(pieces: &[Piece]) -> Vec<Layout> {
                         let points = l.iter().map(|p| [flip * p[0], p[1]]).collect();
                         (id.clone(), half, points)
                     })
+                    .collect(),
+                bones: bones
+                    .iter()
+                    .map(|l| l.iter().map(|p| [flip * p[0], p[1]]).collect())
                     .collect(),
             });
         }
@@ -1130,6 +1203,8 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
     // The seams on panels: each seam on both sides of the body where its
     // pieces are in pairs, once where it names a mirror copy itself.
     let mut sewn: Vec<(Side, Side, bool, String)> = Vec::new();
+    // Seams laced, not sewn: sampled as seams are, but held apart.
+    let mut laced: Vec<(Side, Side, bool, String, f64)> = Vec::new();
     // Edges sewn onto lines inside panels (a pocket onto its placement):
     // the edge's side, the line's (its `edge` the line's index), and
     // whether sewn the other way round.
@@ -1159,7 +1234,10 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
                 })
             };
             if let (Some(a), Some(b)) = (side(&seam.a, ha), side(&seam.b, hb)) {
-                sewn.push((a, b, seam.reversed, seam.name.clone()));
+                match seam.lacing {
+                    Some(gap) => laced.push((a, b, seam.reversed, seam.name.clone(), gap)),
+                    None => sewn.push((a, b, seam.reversed, seam.name.clone())),
+                }
             }
             let on_line = |s: &drapewright_seams::SeamSide, half: Half| -> Option<Side> {
                 let half = if explicit {
@@ -1231,6 +1309,10 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             }
         }
     }
+    // Then the laced seams.
+    let laced_from = sewn.len();
+    let gaps: Vec<f64> = laced.iter().map(|l| l.4).collect();
+    sewn.extend(laced.into_iter().map(|(a, b, r, name, _)| (a, b, r, name)));
     // Each seam's steps, as many on both sides; layers sewn as one, as
     // many as each other.
     let mut steps_of: Vec<usize> = sewn
@@ -1422,9 +1504,17 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
             sewn_on: false,
         });
     }
-    // Stitches: the two runs of each seam, point for point.
+    // Stitches: the two runs of each seam, point for point; a laced
+    // seam's, its lacing.
     let mut stitches = Vec::new();
     let mut links = Vec::new();
+    let mut lacings: Vec<Lacing> = gaps
+        .iter()
+        .map(|&gap| Lacing {
+            pairs: Vec::new(),
+            gap,
+        })
+        .collect();
     for (k, (a, b, reversed, name)) in sewn.iter().enumerate() {
         let (Some(&ra), Some(&rb)) = (runs.get(&(k, false)), runs.get(&(k, true))) else {
             continue;
@@ -1443,11 +1533,17 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
         if *reversed {
             va.reverse();
         }
-        // A dart's legs meet at its tip: the same point.
-        for (x, y) in va.into_iter().zip(vb).filter(|(x, y)| x != y) {
-            stitches.push([x, y]);
+        let pairs = va.into_iter().zip(vb).filter(|(x, y)| x != y);
+        if k >= laced_from {
+            lacings[k - laced_from]
+                .pairs
+                .extend(pairs.map(|(x, y)| [x, y]));
+        } else {
+            // A dart's legs meet at its tip: the same point.
+            stitches.extend(pairs.map(|(x, y)| [x, y]));
         }
-        if k >= seams_sewn {
+        // Darts join no panels.
+        if (seams_sewn..laced_from).contains(&k) {
             continue;
         }
         let half = |s: &Side| layouts[s.panel].edges[s.edge].1;
@@ -1491,12 +1587,84 @@ pub fn assemble(pieces: &[Piece], seams: &[Seam], spacing: f64) -> Result<Garmen
     let buttons = buttons(&layouts, pieces, &panels, &sewn[..seams_sewn]);
     let done_up = buttons.len();
     stitches.extend(buttons);
+    // The bones, along the mesh.
+    let bones = layouts
+        .iter()
+        .enumerate()
+        .flat_map(|(p, layout)| {
+            let mesh = &panels[p].mesh;
+            layout.bones.iter().filter_map(move |line| {
+                let points = along_mesh(&mesh.points, line, spacing);
+                let path = in_mesh(mesh, line, spacing);
+                (points.len() >= 3 && path.len() >= 2).then_some(Bone {
+                    panel: p,
+                    points,
+                    path,
+                })
+            })
+        })
+        .collect();
+    lacings.retain(|l| !l.pairs.is_empty());
     Ok(Garment {
         panels,
         stitches,
         links,
         buttons: done_up,
+        bones,
+        lacings,
     })
+}
+
+/// Points along a line, each as the triangle of the mesh it is in and the
+/// weights of its corners: those off the mesh left out.
+fn in_mesh(mesh: &PanelMesh, line: &[P2], spacing: f64) -> Vec<([u32; 3], [f32; 3])> {
+    let total = length(line);
+    let n = (2.0 * total / spacing).ceil().max(1.0) as usize;
+    steps(line, 0.0, total, n)
+        .into_iter()
+        .filter_map(|q| {
+            mesh.triangles.iter().find_map(|t| {
+                let [a, b, c] = t.map(|i| mesh.points[i as usize]);
+                let det = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+                if det.abs() < 1e-12 {
+                    return None;
+                }
+                let wa = ((b[1] - c[1]) * (q[0] - c[0]) + (c[0] - b[0]) * (q[1] - c[1])) / det;
+                let wb = ((c[1] - a[1]) * (q[0] - c[0]) + (a[0] - c[0]) * (q[1] - c[1])) / det;
+                let wc = 1.0 - wa - wb;
+                const SLACK: f64 = -1e-6;
+                (wa >= SLACK && wb >= SLACK && wc >= SLACK)
+                    .then_some((*t, [wa as f32, wb as f32, wc as f32]))
+            })
+        })
+        .collect()
+}
+
+/// The mesh's points along a line, in order: the nearest to each of many
+/// points along it, those further than half a step off left out (a bone
+/// that runs past the panel's edge).
+fn along_mesh(points: &[P2], line: &[P2], spacing: f64) -> Vec<u32> {
+    let total = length(line);
+    if total < spacing {
+        return Vec::new();
+    }
+    let n = (3.0 * total / spacing).ceil() as usize;
+    let mut out: Vec<u32> = Vec::new();
+    for q in steps(line, 0.0, total, n) {
+        let Some((k, d)) = points
+            .iter()
+            .enumerate()
+            .map(|(k, p)| (k, (p[0] - q[0]).hypot(p[1] - q[1])))
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+        else {
+            continue;
+        };
+        let k = k as u32;
+        if d <= spacing / 2.0 && !out.contains(&k) {
+            out.push(k);
+        }
+    }
+    out
 }
 
 /// Buttons are marked this near the edge they button over, mm.

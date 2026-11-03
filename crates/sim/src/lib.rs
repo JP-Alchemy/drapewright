@@ -13,6 +13,7 @@ pub mod heights;
 pub mod inside;
 pub mod mesh;
 pub mod place;
+pub mod trims;
 
 pub use cloth::{Cloth, ClothBuilder, Collider};
 pub use fabric::Fabric;

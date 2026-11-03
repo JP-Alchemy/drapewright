@@ -10,6 +10,7 @@ use drapewright_seams::Seam;
 use drapewright_sim::draping::{self, ClothEdge, Stage};
 use drapewright_sim::garment::GarmentError;
 use drapewright_sim::heatmap;
+use drapewright_sim::trims::Trims;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -386,6 +387,14 @@ pub struct ClothReading {
     pub room: f64,
 }
 
+/// The cloth as drawn, with what is sewn into it.
+#[derive(Clone, Debug)]
+pub struct Drawn {
+    pub points: Vec<[f32; 3]>,
+    pub triangles: Vec<[u32; 3]>,
+    pub colours: Vec<[f32; 3]>,
+}
+
 /// The cloth as last seen: where its points are (mm), its triangles, and
 /// how it is at each point.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -404,6 +413,8 @@ pub struct ClothState {
     /// Which way each triangle faces out of the garment: 1 its corners'
     /// way round, −1 the other.
     facing: Vec<f32>,
+    /// Its bones and lacing.
+    trims: Arc<Trims>,
 }
 
 /// One of the pieces' edges as seen in the view: where its points are, which
@@ -456,11 +467,32 @@ impl Draping {
             },
             edges: self.0.edges.clone(),
             facing: drape.cloth.facing().to_vec(),
+            trims: self.0.trims.clone(),
         }
     }
 }
 
 impl ClothState {
+    /// The cloth to draw, coloured as `shows` (the fabric `fabric`), its
+    /// bones and lacing on it.
+    pub fn drawn(&self, shows: ClothShows, fabric: [f32; 3]) -> Drawn {
+        let mut points = self.points.clone();
+        let mut triangles = self.triangles.clone();
+        let mut colours = self.colours(shows, fabric);
+        let shapes = self
+            .trims
+            .shapes(&self.points, &self.triangles, &self.facing, 1.0);
+        let first = points.len() as u32;
+        points.extend(&shapes.points);
+        triangles.extend(shapes.triangles.iter().map(|t| t.map(|i| i + first)));
+        colours.extend(shapes.kinds.iter().map(|k| k.colour(fabric)));
+        Drawn {
+            points,
+            triangles,
+            colours,
+        }
+    }
+
     /// Each point's colour, shown as `shows`, the fabric being `fabric`
     /// (sRGB, 0 to 1).
     pub fn colours(&self, shows: ClothShows, fabric: [f32; 3]) -> Vec<[f32; 3]> {

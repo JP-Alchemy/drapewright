@@ -1,11 +1,15 @@
 import type { DisplayUnits, Seam, SeamReport, SeamSide, Suggestion } from '@drapewright/engine'
 import { useState } from 'react'
-import { Button } from 'react-aria-components'
+import { Button, Switch } from 'react-aria-components'
 import { useEngineState } from '../state/hooks.ts'
 import type { Session } from '../state/session.ts'
 import { useStore } from '../state/store.ts'
 import { formatLength, t } from '../strings/en.ts'
 import { sideLabel } from './labels.ts'
+import { LengthField } from './LengthField.tsx'
+
+/** A seam laced shut is left this far open, to begin with, mm (as Find seams suggests). */
+const LACING_GAP = 50
 
 /** How a seam measures, in a line: its lengths and how its notches meet. */
 export function seamSummary(report: SeamReport, units: DisplayUnits): string {
@@ -127,7 +131,7 @@ export function FindSeams({ session }: { session: Session }) {
                       </Button>
                       <div className="seam-actions">
                         <Button className="button primary" onPress={() => sew([s])}>
-                          {t.seams.sew}
+                          {s.seam.lacing === null ? t.seams.sew : t.seams.lace}
                         </Button>
                         <Button
                           className="button"
@@ -169,6 +173,33 @@ export function SeamSection({ session, seam }: { session: Session; seam: Seam })
         {t.seams.between(sideLabel(doc, seam.a), sideLabel(doc, seam.b))}
       </p>
       {report && <p className="muted small">{seamSummary(report, doc.settings.displayUnits)}</p>}
+      <Switch
+        className="switch"
+        isSelected={seam.lacing !== null}
+        onChange={(laced) =>
+          session.dispatch({
+            type: 'setSeam',
+            seam: { ...seam, lacing: laced ? LACING_GAP : null },
+          })
+        }
+      >
+        <span className="switch-track" aria-hidden="true" />
+        {t.seams.laced}
+      </Switch>
+      {seam.lacing !== null && (
+        <LengthField
+          label={t.seams.lacingGap}
+          description={t.seams.lacingHint}
+          value={seam.lacing}
+          units={doc.settings.displayUnits}
+          onChange={(gap) =>
+            session.dispatch(
+              { type: 'setSeam', seam: { ...seam, lacing: Math.min(gap, 300) } },
+              { coalesce: `lacing:${seam.id}` },
+            )
+          }
+        />
+      )}
       <div className="button-row">
         <Button
           className="button"

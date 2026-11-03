@@ -492,6 +492,7 @@ function EdgeSection({
         </div>
         <p className="muted small">{t.inspector.kindHints[edge.kind]}</p>
       </RadioGroup>
+      {edge.kind !== 'fold' && <BoneSwitch session={session} edges={[ref]} />}
       {edge.kind === 'fold' ? (
         <p className="muted small">{t.inspector.foldNoAllowance}</p>
       ) : (
@@ -613,7 +614,39 @@ function EdgesSection({ session, edges }: { session: Session; edges: EdgeRef[] }
         onChange={(mm) => move(() => mm)}
         onStep={(mm) => move((was) => was + mm)}
       />
+      <BoneSwitch session={session} edges={edges} />
     </section>
+  )
+}
+
+/**
+ * Whether a bone is sewn along the edges (a corset's seams boned): on
+ * when every one has its own, turned on or off for all at once.
+ */
+function BoneSwitch({ session, edges }: { session: Session; edges: EdgeRef[] }) {
+  const doc = session.engine.document()
+  const boned = (e: EdgeRef) =>
+    doc.pieces
+      .find((p) => p.id === e.piece)
+      ?.lines.some((l) => l.kind === 'boning' && l.id === `bone-${e.edge}`) ?? false
+  return (
+    <Switch
+      className="switch"
+      isSelected={edges.length > 0 && edges.every(boned)}
+      onChange={(on) =>
+        session.dispatchAll(
+          edges.map((e): Command => ({
+            type: 'boneEdge',
+            piece: e.piece,
+            edge: e.edge,
+            boned: on,
+          })),
+        )
+      }
+    >
+      <span className="switch-track" aria-hidden="true" />
+      {edges.length === 1 ? t.edges.boned : t.edges.bonedAll(edges.length)}
+    </Switch>
   )
 }
 

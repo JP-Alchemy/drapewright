@@ -73,12 +73,30 @@ const OPEN_ENDS: usize = 2;
 const MOSTLY: f64 = 0.75;
 
 /// The garment's girth at a level: each triangle of a trunk panel that
-/// crosses its height, measured flat between where its edges cross; none
-/// where the cloth doesn't go round the body there.
+/// crosses its height, measured flat between where its edges cross, and
+/// the gap a lacing leaves there; none where the cloth doesn't go round
+/// the body there.
 fn girth_at(g: &Garment, points: &[Vec<[f64; 3]>], trunk: &[bool], level: &Level) -> Option<f64> {
     let y = level.y;
-    let sewn: HashSet<(usize, u32)> = g.stitches.iter().flatten().copied().collect();
-    let mut total = 0.0;
+    // Laced points are joined too, the lace's gap between them.
+    let sewn: HashSet<(usize, u32)> = g
+        .stitches
+        .iter()
+        .chain(g.lacings.iter().flat_map(|l| &l.pairs))
+        .flatten()
+        .copied()
+        .collect();
+    let mut total: f64 = g
+        .lacings
+        .iter()
+        .filter(|l| {
+            let heights = l.pairs.iter().map(|[(p, i), _]| points[*p][*i as usize][1]);
+            let (low, high) =
+                heights.fold((f64::MAX, f64::MIN), |(lo, hi), h| (lo.min(h), hi.max(h)));
+            low <= y && y <= high
+        })
+        .map(|l| l.gap)
+        .sum();
     let mut crossed = false;
     let mut open = 0;
     for (p, panel) in g.panels.iter().enumerate() {

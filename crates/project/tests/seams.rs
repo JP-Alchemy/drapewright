@@ -49,6 +49,7 @@ fn seam(a: &(String, String), b: &(String, String)) -> Seam {
         reversed: false,
         ease: Default::default(),
         confirmed: true,
+        lacing: None,
     }
 }
 

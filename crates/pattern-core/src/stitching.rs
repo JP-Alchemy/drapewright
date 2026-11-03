@@ -6,7 +6,7 @@ use kurbo::{Point, Vec2};
 
 use crate::allowance::MITRE_LIMIT;
 use crate::geom::{flatten_segs, outward_normal, segs_of};
-use crate::model::{AllowanceMode, InternalLine, Piece};
+use crate::model::{AllowanceMode, InternalLine, LineKind, LineSeg, Piece, Segment};
 
 /// How closely edges are followed, mm.
 const TOLERANCE: f64 = 0.01;
@@ -287,6 +287,71 @@ fn crossing(p0: Point, p1: Point, q0: Point, q1: Point) -> Option<Point> {
     let t = (q0 - p0).cross(s) / denom;
     let u = (q0 - p0).cross(r) / denom;
     ((0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u)).then(|| p0 + r * t)
+}
+
+/// A bone sewn along a seam lies this far inside its stitching line, in a
+/// channel beside it, mm ...
+pub const BONE_INSET: f64 = 6.0;
+/// ... and stops this short of the edges across its ends, mm.
+pub const BONE_SHORT: f64 = 8.0;
+
+/// The id of the bone sewn along an edge.
+pub fn bone_id(edge: &str) -> String {
+    format!("bone-{edge}")
+}
+
+/// A bone sewn along edge `edge` of `piece` (a corset's seam boned): in a
+/// channel `BONE_INSET` inside its stitching line, from `from` to `to` mm
+/// along it (from its start to its end where absent), `BONE_SHORT` short of
+/// its ends. None where that leaves less than 30 mm.
+pub fn bone_along(
+    piece: &Piece,
+    edge: usize,
+    from: Option<f64>,
+    to: Option<f64>,
+) -> Option<InternalLine> {
+    let edges = stitching_edges(piece);
+    let points = edges.get(edge)?;
+    let total = polyline_length(points);
+    let from = from.unwrap_or(0.0).max(BONE_SHORT);
+    let to = to.unwrap_or(total).min(total - BONE_SHORT);
+    if to - from < 30.0 {
+        return None;
+    }
+    let along = offset_inward(&part_of(points, from, to), BONE_INSET);
+    let (first, rest) = along.split_first()?;
+    Some(InternalLine {
+        id: bone_id(&piece.outline.edges[edge].id),
+        kind: LineKind::Boning,
+        start: (*first).into(),
+        segments: rest
+            .iter()
+            .map(|&p| Segment::Line(LineSeg { to: p.into() }))
+            .collect(),
+        label: Some("Boning".into()),
+    })
+}
+
+/// The stretch of `points` from `from` to `to` mm along it.
+fn part_of(points: &[Point], from: f64, to: f64) -> Vec<Point> {
+    let mut out = Vec::new();
+    let mut walked = 0.0;
+    for w in points.windows(2) {
+        let len = w[0].distance(w[1]);
+        let at = |t: f64| w[0] + (w[1] - w[0]) * ((t - walked) / len.max(1e-12));
+        if out.is_empty() && walked + len >= from {
+            out.push(at(from.max(walked)));
+        }
+        if !out.is_empty() {
+            if walked + len >= to {
+                out.push(at(to));
+                break;
+            }
+            out.push(w[1]);
+        }
+        walked += len;
+    }
+    out
 }
 
 #[cfg(test)]

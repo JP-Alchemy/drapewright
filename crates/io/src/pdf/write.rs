@@ -327,7 +327,7 @@ fn draw_piece(c: &mut Canvas, p: &Prepared, tf: Affine, doc: &Document, texts: &
         c.path(&segs, closed);
         let dash: &[f64] = match line.kind {
             LineKind::Fold | LineKind::Placement => &[4.0, 1.5, 0.8, 1.5],
-            LineKind::Stitch => &[2.0, 1.5],
+            LineKind::Stitch | LineKind::Boning => &[2.0, 1.5],
             LineKind::Line | LineKind::Cut | LineKind::LengthenShorten => &[],
         };
         c.stroke(0.5, dash, 0.0);

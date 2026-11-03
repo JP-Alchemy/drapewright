@@ -262,6 +262,7 @@ fn seams_already_made_are_left_alone() {
         reversed: false,
         ease: Default::default(),
         confirmed: true,
+        lacing: None,
     };
     assert_eq!(
         suggest(&pieces, std::slice::from_ref(&made))
@@ -283,6 +284,7 @@ fn a_seam_measures_both_sides_and_their_notches() {
         reversed: false,
         ease: Default::default(),
         confirmed: true,
+        lacing: None,
     };
     let report = measure(&seam, &pieces);
     assert_eq!(report.problem, None);
@@ -340,6 +342,7 @@ fn allowance_included_is_measured_inside_it() {
         reversed: false,
         ease: Default::default(),
         confirmed: true,
+        lacing: None,
     };
     let added = measure(&seam, &skirt()).a_length;
     let included = measure(&seam, &pieces).a_length;
@@ -579,6 +582,49 @@ fn a_corsets_panels_are_sewn_where_the_lines_across_them_meet() {
             "fc.fcl-fc.fcl*",
         ]
     );
+}
+
+#[test]
+fn a_centre_back_with_eyelets_along_it_is_laced() {
+    use drapewright_pattern_core::testing::garments::corset;
+    use drapewright_pattern_core::{Mark, MarkKind};
+    // Eyelets every 25 mm down the back, 15 mm in from its centre.
+    let mut pieces = corset(true);
+    let back = pieces.iter_mut().find(|p| p.id == "bk").unwrap();
+    for k in 0..16 {
+        back.marks.push(Mark {
+            id: format!("m{k}"),
+            kind: MarkKind::Circle,
+            at: Pt::new(455.0, 20.0 + 25.0 * f64::from(k)),
+            size: Some(5.0),
+            length: None,
+            angle: 0.0,
+            label: None,
+        });
+    }
+    let (suggested, _) = listed(&pieces, &[]);
+    let centre = |edge: &str| {
+        suggested
+            .iter()
+            .find(|s| s.seam.a.edge == edge && s.seam.b.edge == edge)
+            .unwrap()
+    };
+    let back = centre("bkr");
+    assert_eq!(back.seam.lacing, Some(50.0));
+    assert_eq!(back.reasons, [Reason::CentreOfPair, Reason::Eyelets]);
+    assert!(back.confidence >= 0.9, "{back:?}");
+    // The front, with none, sewn.
+    assert_eq!(centre("fcl").seam.lacing, None);
+    // Eyelets marked as dots, as a drafting diagram marks them: laced too.
+    for mark in &mut pieces.iter_mut().find(|p| p.id == "bk").unwrap().marks {
+        mark.kind = MarkKind::Dot;
+    }
+    let (suggested, _) = listed(&pieces, &[]);
+    let back = suggested
+        .iter()
+        .find(|s| s.seam.a.edge == "bkr" && s.seam.b.edge == "bkr")
+        .unwrap();
+    assert_eq!(back.seam.lacing, Some(50.0));
 }
 
 #[test]

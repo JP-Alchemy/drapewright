@@ -84,6 +84,7 @@ pub fn skirt() -> (Vec<Piece>, Vec<Seam>) {
         reversed: false,
         ease: Default::default(),
         confirmed: true,
+        lacing: None,
     };
     let seams = vec![
         seam(
@@ -147,6 +148,7 @@ pub fn lined_skirt() -> (Vec<Piece>, Vec<Seam>) {
         reversed: false,
         ease: Default::default(),
         confirmed: true,
+        lacing: None,
     };
     seams.push(seam(
         "l1",
@@ -264,6 +266,7 @@ pub fn blouse() -> (Vec<Piece>, Vec<Seam>) {
         reversed,
         ease: Default::default(),
         confirmed: true,
+        lacing: None,
     };
     let part = |from: f64, to: f64| SeamSide {
         from: Some(from),

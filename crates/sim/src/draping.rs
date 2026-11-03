@@ -17,6 +17,7 @@ use crate::garment::{Garment, GarmentError, draped_pieces, shell};
 use crate::girth::girths;
 use crate::inside::dressed;
 use crate::place::{Figure, from_shoulders, half_round, place};
+use crate::trims::Trims;
 
 /// A frame of the drape, s.
 pub const FRAME: f32 = 1.0 / 60.0;
@@ -115,6 +116,8 @@ pub struct Draping {
     pub left_out: Vec<String>,
     /// The pieces' edges in the cloth (shared with each look at it).
     pub edges: Arc<[ClothEdge]>,
+    /// Its bones and lacing in the cloth.
+    pub trims: Arc<Trims>,
     /// The facings and linings sewn to nothing, by id: left out, as they
     /// go inside.
     pub inside: Vec<String>,
@@ -238,11 +241,36 @@ impl Draping {
             })
             .collect::<Vec<_>>()
             .into();
+        let firsts = &drape.firsts;
+        let trims = Arc::new(Trims {
+            bones: garment
+                .bones
+                .iter()
+                .map(|b| {
+                    let first = firsts[b.panel];
+                    b.path
+                        .iter()
+                        .map(|(t, w)| (t.map(|k| first + k), *w))
+                        .collect()
+                })
+                .collect(),
+            laces: garment
+                .lacings
+                .iter()
+                .map(|l| {
+                    l.pairs
+                        .iter()
+                        .map(|[(pa, a), (pb, b)]| [firsts[*pa] + a, firsts[*pb] + b])
+                        .collect()
+                })
+                .collect(),
+        });
         Ok(Draping {
             drape,
             body,
             left_out: draped.alone,
             edges,
+            trims,
             inside: draped.inside,
             unplaced,
             lined,

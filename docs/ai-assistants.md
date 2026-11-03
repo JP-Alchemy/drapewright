@@ -92,8 +92,8 @@ assistant that file.
 | `get_piece` | One piece in full: edges, notches, grainline, marks, lines, position |
 | `piece_labels` | The words printed on each piece in the PDF it came from, biggest first, each marked as the piece's number, its cutting, an instruction, a size or the pattern's own words (title, designer), and which words named it: to name pieces the import named poorly |
 | `render_preview` | A picture of the pieces (PNG) with a legend |
-| `update_piece` | Name, seam allowance, cutting instructions |
-| `update_edge` | An edge's kind (seam, hem, fold), name, allowance and corner shape |
+| `update_piece` | Name, seam allowance, cutting instructions, and what its inside lines are (boning channels) |
+| `update_edge` | An edge's kind (seam, hem, fold), name, allowance and corner shape, and a bone sewn along it (a corset) |
 | `split_edge`, `join_edges` | Add or remove a corner on the outline |
 | `set_grainline` | Along the length or width, between two points, or removed |
 | `add_notch`, `delete_notch` | Single, double or triple notches |
@@ -103,7 +103,7 @@ assistant that file.
 | `get_measurements`, `set_measurements` | People's body measurements kept in the project; values outside the usual range are pointed out |
 | `fit_avatar` | Fits the avatar to a person's measurements and says how close it comes to each |
 | `drape` | Drapes the garment on the avatar (fitted to a person, or the standard figure) in a fabric, done up or open, and in a pose if asked: a picture of it worn (or a heatmap of where it pulls, or of the room it leaves), and at the bust, waist and hip its size, the ease, how hard it pulls and how much room it leaves |
-| `get_seams`, `sew_edges`, `unpick_seams` | Which edges are sewn together, each side's length and how the notches meet; seams Drapewright suggests (to confirm with the user), patch pockets onto their placements among them. A side can be part of a line drawn inside a piece (a pocket's placement) instead of an edge |
+| `get_seams`, `sew_edges`, `unpick_seams` | Which edges are sewn together, each side's length and how the notches meet; seams Drapewright suggests (to confirm with the user), patch pockets onto their placements among them. A side can be part of a line drawn inside a piece (a pocket's placement) instead of an edge. A seam can be laced instead of sewn (`lacing_mm`, a corset's back): suggested where eyelets are marked along it |
 | `undo`, `redo` | One tool call is one step |
 | `print_settings` | How the project prints, and its print settings |
 | `export_pdf`, `export_svg` | The tiled true-size PDF, or a true-size SVG |

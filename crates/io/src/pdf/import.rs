@@ -10,8 +10,12 @@ use drapewright_pattern_core::geom::{
     distance_to_polyline, flatten_segs, label_point, point_in_polygon, polygon_area, segs_of,
     unit_tangent,
 };
+use drapewright_pattern_core::stitching::{
+    along_polyline, bone_along, bone_id, line_points, polyline_length, stitching_edges,
+};
 use drapewright_pattern_core::{
-    CutInstruction, Grainline, Mark, MarkKind, Piece, PrintedText, Pt, ScaleBasis, SourceFormat,
+    CutInstruction, Grainline, InternalLine, LineKind, Mark, MarkKind, Piece, PrintedText, Pt,
+    ScaleBasis, SourceFormat,
 };
 use drapewright_pdf_import::{Document, Page, Shape, TextRun};
 use kurbo::{
@@ -1752,6 +1756,7 @@ pub fn import_pdf_pages(
         );
         read_labels(&mut found, &labels);
         name_lines(&mut found, &labels);
+        boning_lines(&mut found, &labels);
         grain_from_labels(&mut found, &labels);
         add_crosses(&mut found, &crosses);
         // Lines drawn once for all the sizes reach the largest size's
@@ -2390,6 +2395,184 @@ fn name_lines(pieces: &mut [Piece], labels: &[Label]) {
             }
         }
     }
+}
+
+/// Whether a label says a bone goes along the line it is printed by:
+/// "Boning", "Back Lacing Bone", "Bone casing".
+fn names_boning(text: &str) -> bool {
+    has_word(text, &["boning", "bone", "bones"])
+}
+
+fn has_word(text: &str, words: &[&str]) -> bool {
+    text.split(|c: char| !c.is_alphabetic())
+        .any(|w| words.contains(&w.to_lowercase().as_str()))
+}
+
+/// A boning channel's lines lie this far either side of the word printed
+/// between them, at most (a channel is about 6 to 15 mm wide), mm.
+const BONING_REACH: f64 = 9.0;
+/// A "stop boning here" mark ends this near the edge it marks, at most:
+/// drawn across every size's lines, it may stop short of a small size's,
+/// mm.
+const STOP_REACH: f64 = 15.0;
+
+/// The words printed by a mark telling the bones to stop there ("Stop /
+/// Boning / Here", often each word its own line of print): groups of a
+/// label naming boning and the "stop" printed next to it.
+fn stop_marks(labels: &[Label]) -> Vec<Vec<&Label>> {
+    let near = |a: &Label, b: &Label| a.at.distance(b.at) <= 3.0 * a.size.max(b.size);
+    labels
+        .iter()
+        .filter(|l| names_boning(&l.text))
+        .filter_map(|bone| {
+            if has_word(&bone.text, &["stop", "end"]) {
+                return Some(vec![bone]);
+            }
+            let stop = labels
+                .iter()
+                .find(|l| has_word(&l.text, &["stop", "end"]) && near(l, bone))?;
+            let mut group = vec![stop, bone];
+            group.extend(
+                labels
+                    .iter()
+                    .filter(|l| has_word(&l.text, &["here"]) && near(l, bone)),
+            );
+            Some(group)
+        })
+        .collect()
+}
+
+/// Lines with "Boning" printed along them (a channel's two stitching lines,
+/// the word between them) are boning channels, named as printed. A line
+/// marked "Stop boning here" across a seam's edge is where a bone sewn
+/// along that seam stops: the bone, from there along the edge to its top
+/// (the end the waist is towards), is added as a boning line beside it.
+fn boning_lines(pieces: &mut [Piece], labels: &[Label]) {
+    let stops = stop_marks(labels);
+    let stop_words: Vec<&Label> = stops.iter().flatten().copied().collect();
+    let boning: Vec<&Label> = labels
+        .iter()
+        .filter(|l| names_boning(&l.text) && !stop_words.iter().any(|s| std::ptr::eq(*s, *l)))
+        .collect();
+    if boning.is_empty() && stops.is_empty() {
+        return;
+    }
+    for piece in pieces {
+        for line in &mut piece.lines {
+            let pts = flatten_segs(&segs_of(line.start, &line.segments), 0.5);
+            let (Some(&a), Some(&b)) = (pts.first(), pts.last()) else {
+                continue;
+            };
+            let along = b - a;
+            if along.hypot() < 20.0 {
+                continue;
+            }
+            let unit = along / along.hypot();
+            let nearest = boning
+                .iter()
+                .filter(|l| l.dir.dot(unit).abs() >= 0.95)
+                .filter(|l| (0.0..=along.hypot()).contains(&(l.at - a).dot(unit)))
+                .map(|l| (l, distance_to_polyline(l.at, &pts, false)))
+                .filter(|(l, d)| *d <= BONING_REACH.max(2.5 * l.size))
+                .min_by(|x, y| x.1.total_cmp(&y.1));
+            if let Some((l, _)) = nearest {
+                line.kind = LineKind::Boning;
+                line.label = Some(sentence_case(l.text.trim()));
+            }
+        }
+        for group in &stops {
+            if let Some(bones) = bone_to_stop(piece, group) {
+                piece.lines.extend(bones);
+            }
+        }
+    }
+}
+
+/// The bones stopping at the mark `words` names on `piece`: its line
+/// marked (named "Stop boning here"), and a bone along each edge it
+/// crosses, from there to the edge's top. None where no line is by the
+/// words.
+fn bone_to_stop(piece: &mut Piece, words: &[&Label]) -> Option<Vec<InternalLine>> {
+    let size = words.iter().map(|l| l.size).fold(0.0, f64::max);
+    let dir = words[0].dir;
+    // The line marked: the nearest to the words, across the piece as they
+    // are printed.
+    let (k, _) = piece
+        .lines
+        .iter()
+        .enumerate()
+        .filter(|(_, l)| l.kind == LineKind::Line && l.label.is_none())
+        .filter_map(|(k, l)| {
+            let pts = line_points(l);
+            let (a, b) = (*pts.first()?, *pts.last()?);
+            let len = a.distance(b);
+            if !(10.0..=150.0).contains(&len) || ((b - a) / len).dot(dir).abs() < 0.9 {
+                return None;
+            }
+            let d = words
+                .iter()
+                .map(|w| distance_to_polyline(w.at, &pts, false))
+                .fold(f64::MAX, f64::min);
+            (d <= (4.0 * size).max(12.0)).then_some((k, d))
+        })
+        .min_by(|x, y| x.1.total_cmp(&y.1))?;
+    piece.lines[k].label = Some("Stop boning here".into());
+    let mark = line_points(&piece.lines[k]);
+    let edges = stitching_edges(piece);
+    // Where the body's waist is on the piece: the bones run up from the
+    // mark towards it.
+    let waist: Option<Vec<Point>> = piece
+        .lines
+        .iter()
+        .find(|l| {
+            l.label
+                .as_deref()
+                .is_some_and(|t| t.to_lowercase().contains("waist"))
+        })
+        .map(line_points);
+    let mut bones = Vec::new();
+    // Each end of the mark at the edge it is nearest (it may stop short of
+    // a small size's edge, drawn across every size's).
+    let mut met: Vec<(usize, Point)> = Vec::new();
+    for end in [mark.first(), mark.last()].into_iter().flatten() {
+        let nearest = edges
+            .iter()
+            .enumerate()
+            .map(|(e, edge)| (e, distance_to_polyline(*end, edge, false)))
+            .min_by(|x, y| x.1.total_cmp(&y.1));
+        if let Some((e, d)) = nearest
+            && d <= STOP_REACH
+            && !met.iter().any(|(m, _)| *m == e)
+        {
+            met.push((e, *end));
+        }
+    }
+    for (e, at) in met {
+        let edge = &edges[e];
+        // Already boned along there (the mark printed twice over).
+        let id = bone_id(&piece.outline.edges[e].id);
+        if piece.lines.iter().any(|l| l.id == id) {
+            continue;
+        }
+        let total = polyline_length(edge);
+        let s = along_polyline(edge, at);
+        let up = match &waist {
+            Some(w) => {
+                let nearest = w
+                    .iter()
+                    .min_by(|x, y| {
+                        distance_to_polyline(**x, edge, false)
+                            .total_cmp(&distance_to_polyline(**y, edge, false))
+                    })
+                    .copied()?;
+                along_polyline(edge, nearest) > s
+            }
+            None => total - s > s,
+        };
+        let (from, to) = if up { (Some(s), None) } else { (None, Some(s)) };
+        bones.extend(bone_along(piece, e, from, to));
+    }
+    Some(bones)
 }
 
 /// A piece with no grainline found by its arrows: the straight line inside
