@@ -22,6 +22,8 @@ drapewright-project.workspace = true
 tiny-skia.workspace = true
 # The made-up garments shared by tests.
 drapewright-pattern-core = { workspace = true, features = ["testing"] }
+# FreeSewing's patterns as the app drafts them, read from their SVG.
+drapewright-io.workspace = true
 
 [lints]
 workspace = true

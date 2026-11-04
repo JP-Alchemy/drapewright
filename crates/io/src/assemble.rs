@@ -57,6 +57,9 @@ pub(crate) struct RawPath {
     pub reference: Option<String>,
     /// How many to cut, when the file says for the piece this path belongs to.
     pub cut: Option<CutInstruction>,
+    /// What the file names the line, when it is a line inside a piece (a
+    /// waist line written along it).
+    pub label: Option<String>,
 }
 
 /// A notch drawn as a symbol, at its centre, in millimetres.
@@ -1698,7 +1701,7 @@ pub(crate) fn assemble(
                 kind: LineKind::Line,
                 start: Pt::from(r.segs[0].start()),
                 segments: to_segments(&r.segs),
-                label: None,
+                label: r.label.clone(),
             });
         }
     }
@@ -1849,6 +1852,7 @@ mod tests {
             name: None,
             reference: None,
             cut: None,
+            label: None,
         }
     }
 

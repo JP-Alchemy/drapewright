@@ -64,8 +64,11 @@ pub(crate) fn round_an_arm(points: &[[f64; 3]], figure: &Figure) -> bool {
 }
 
 /// Cloth across a height that ends at more edges not sewn to anything than
-/// this (a front buttoned shut, or a slit, is one opening: two ends) ...
+/// this (a front buttoned shut, or a slit, is one opening: two ends), or
+/// at as few but less than a `QUARTER` of the body round there (a corset's
+/// centre front dipping below its other panels, alone at the hip) ...
 const OPEN_ENDS: usize = 2;
+const QUARTER: f64 = 0.25;
 /// ... and is less than this much of the body round there doesn't go
 /// round the body: a bunnysuit cut up for the legs, at the hips. (An
 /// armhole dipping below the bust is an opening too, but the cloth there
@@ -137,7 +140,8 @@ fn girth_at(g: &Garment, points: &[Vec<[f64; 3]>], trunk: &[bool], level: &Level
             }
         }
     }
-    let round = open <= OPEN_ENDS || total >= MOSTLY * level.girth;
+    let round =
+        (open <= OPEN_ENDS && total >= QUARTER * level.girth) || total >= MOSTLY * level.girth;
     (crossed && round).then_some(total)
 }
 

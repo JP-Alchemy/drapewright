@@ -420,6 +420,7 @@ mod tests {
             name: None,
             reference: None,
             cut: None,
+            label: None,
         }
     }
 

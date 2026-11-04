@@ -260,6 +260,10 @@ fn collect(
                 .join(" ")
                 .to_ascii_lowercase();
                 let cut = info.and_then(|i| i.cut.clone());
+                // The name FreeSewing writes along a line (a waist line).
+                let line_label = info
+                    .and_then(|i| i.text.as_deref())
+                    .and_then(freesewing::line_name);
                 let reference = (!p.id().is_empty()).then(|| p.id().to_string());
                 let filled = p.fill().is_some();
 
@@ -292,6 +296,7 @@ fn collect(
                         name: name.clone(),
                         reference: reference.clone(),
                         cut: cut.clone(),
+                        label: line_label.clone(),
                     });
                 };
                 for seg in p.data().segments() {

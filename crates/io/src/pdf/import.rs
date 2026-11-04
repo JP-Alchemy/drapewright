@@ -312,6 +312,7 @@ fn page_paths(
                     name: None,
                     reference: None,
                     cut: None,
+                    label: None,
                 },
                 style.clone(),
                 seen,
@@ -1598,6 +1599,7 @@ pub fn import_pdf_pages(
                     name: None,
                     reference: None,
                     cut: None,
+                    label: None,
                 },
                 style.clone(),
             ));

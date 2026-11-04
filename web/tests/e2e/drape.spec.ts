@@ -142,6 +142,57 @@ test('the sample dress is sewn from its PDF by Find seams, and drapes', async ({
   expect(ease('waist')).toBeLessThan(10)
 })
 
+test('FreeSewing’s Cathrin corset is sewn whole by Find seams and goes on at the waist', async ({
+  page,
+  webgpu,
+}) => {
+  test.setTimeout(240_000)
+  await page.goto('/app/?debug')
+  await page.getByRole('button', { name: /^A FreeSewing design, made to measure/ }).click()
+  const dialog = page.getByRole('dialog', { name: 'Draft a FreeSewing design' })
+  await dialog.getByText('Cathrin corset', { exact: true }).click()
+  await expect(dialog.getByRole('status')).toHaveText(/^Drafted to Example’s/)
+  await dialog.getByRole('button', { name: 'Draft Cathrin corset' }).click()
+  // Its centre front and the panel beside it, drawn side by side by
+  // FreeSewing as one part, are two pieces: seven in all.
+  await page.getByRole('button', { name: 'Add 7 pieces' }).click()
+  await page.getByRole('button', { name: 'Find seams' }).click()
+  const found = page.getByRole('group', { name: 'Edges that look sewn together' })
+  await found.getByRole('button', { name: 'Sew all 7' }).click()
+  await expect(found.getByText(/No more likely seams found/)).toBeVisible()
+  const seams = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const doc = (window as any).drapewright.engine.document()
+    const name = (id: string) => doc.pieces.find((p: { id: string }) => p.id === id).name
+    return doc.seams.map((s: { a: { piece: string }; b: { piece: string } }) =>
+      [name(s.a.piece), name(s.b.piece)].sort().join(' + '),
+    )
+  })
+  expect(seams.sort()).toEqual([
+    'Panel1a + Panel1b',
+    'Panel1b + Panel2',
+    'Panel2 + Panel3',
+    'Panel3 + Panel4',
+    'Panel4 + Panel5',
+    'Panel5 + Panel6',
+    'Panel6 + Panel6',
+  ])
+  test.skip(!(await openTheAvatar(page, webgpu)), 'Draping is seen in the 3D view')
+  const pane = page.getByRole('region', { name: 'Avatar' })
+  await pane
+    .getByRole('group', { name: 'Drape the garment' })
+    .getByRole('button', { name: 'Drape', exact: true })
+    .click()
+  await settles(pane, 'Draped in poplin.', webgpu)
+  // Put on by its waist line: a corset's waist, taken in from the
+  // figure's 70.8 cm, and nothing at the hip, which it ends above.
+  const garment = (await pane.getByText(/^Garment: /).textContent()) ?? ''
+  const waist = Number(garment.match(/waist ([\d.]+) cm \([\d.]+ cm smaller than the body\)/)?.[1])
+  expect(waist, garment).toBeGreaterThan(55)
+  expect(waist, garment).toBeLessThan(68)
+  expect(garment).not.toContain('hip')
+})
+
 test('nothing is draped until something is sewn', async ({ page, webgpu }) => {
   await openWithFixture(page, 'flared-skirt.svg', 'Add the piece')
   test.skip(!(await openTheAvatar(page, webgpu)), 'Draping is seen in the 3D view')

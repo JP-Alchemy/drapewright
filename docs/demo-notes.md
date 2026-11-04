@@ -12,6 +12,58 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 84 — FreeSewing's Cathrin corset: all its panels, sewn whole, worn at the waist
+
+Asked for by JP. Cathrin drafted for the example figure draped at the hips,
+and the drape bar read "Garment: hip 3.8 cm (94.7 cm smaller than the
+body)". Find seams also left out its first seam and its centre back. Each
+had its own cause, and none was the corset's boning or lacing:
+
+* **A panel was missing.** Cathrin's first panel is drawn in two by
+  default (13 panels, not 11): a centre front (1a) cut once on the fold,
+  and beside it a panel (1b) cut as a pair. FreeSewing draws both as one
+  part. The app's drafting kept only the first, and gave it the second's
+  cut count ("Cut 2 mirrored on fold"). The 220 mm side that Find seams
+  couldn't match to panel 2's 207 mm was really 1a's seam to 1b. Now
+  each outline a part draws is a piece of its own, with its own
+  grainline, fold, lines and cut count: **Add 7 pieces**.
+* **Its waist lines were dropped.** Each panel has a dashed waist line,
+  and the drape puts a corset on by its waist line. The drafting didn't
+  write those lines, so the drape hung the corset from just above the
+  waist, and it fell to the hips. Now they are written, and any SVG line
+  FreeSewing writes a name along is read with that name ("Waist line").
+* **The size round only a tip.** Low on the body, only the centre front's
+  point crossed the hip, and that tip counted as the corset's girth there.
+  Cloth with two loose ends now counts only when it is at least a quarter
+  of the body's size round there.
+* **The first seam.** Panels 1a and 1b meet along a straight edge, as long
+  as each other, with nothing else to tell them apart. The one waist line
+  across each piece, meeting at that edge, now counts towards the seam:
+  half as much as several lines meeting, as on a printed corset.
+* **The centre back.** The pieces are called "Panel1a" to "Panel6", so
+  none of them says front or back. Now a panel cut as a pair at the far
+  end of a band of panels that starts at a piece cut on the fold is taken
+  to hold the other centre. It is sewn to its other half.
+
+**Try it:** Projects → New project → **A FreeSewing design, made to
+measure** → **Cathrin corset**, for the Example figure. **Draft Cathrin
+corset**, then **Add 7 pieces**. Panel1a says *Cut 1 on the fold*, the rest
+*Cut 2*, and each has a waist line. **Find seams** suggests 7 seams: 1a to
+1b, each panel to the next, and Panel6's centre back to its other half.
+**Sew all 7**, then Avatar → **Drape**. The corset goes on with its waist
+line at the waist, from just under the bust to the high hip. The bar
+reads about "Garment: waist 61 cm (10 cm smaller than the body)", the
+waist Cathrin takes in plus the gap it leaves at the back for lacing.
+
+**Known:** Cathrin is drafted to a waist-to-underbust length that Drapewright
+doesn't measure. For the Example it is estimated from FreeSewing's
+standard sizes as 8.1 cm, where the figure's own is about 10.5 cm, so the
+corset's top sits about 2 cm under the underbust. Cathrin draws no
+eyelets, so its centre back comes up sewn. To lace it, choose that seam
+and switch on **Laced, not sewn**.
+
+---
+
 ## Step 83 — Corsets: boning and lacing, read from the pattern and draped
 
 JP asked for a corset's boning and its lacing to be in. Until now a corset
@@ -72,9 +124,9 @@ are drawn as small tubes and discs off the cloth.
 **Known:** a pattern that marks where its bones go only in words that
 aren't next to a line inside the piece is not read. On the corset tested,
 one panel's "Stop boning here" line lies outside the smallest sizes'
-outline. Bone those seams with **Boned**. Find seams doesn't suggest
-FreeSewing's Cathrin corset's centre back or its first seam, and it drapes
-too low; that's being looked at separately.
+outline. Bone those seams with **Boned**. (FreeSewing's Cathrin corset
+draping too low, and its centre back and first seam not suggested, are
+fixed in Step 84.)
 
 ---
 

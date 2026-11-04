@@ -67,6 +67,20 @@ const CORRECTIONS: Partial<Record<DesignName, (pattern: FsPattern) => void>> = {
   },
 }
 
+/**
+ * How many to cut of each piece, where one of a design's parts draws
+ * several and FreeSewing's cut list keeps only the last one's. Cathrin's
+ * first panel, in its 13-panel default, is a centre front (1a) cut once
+ * on the fold beside a panel (1b) cut as a pair (panel1ab.mjs sets each
+ * in turn).
+ */
+const PIECE_CUTS: Partial<Record<DesignName, Record<string, { cut: number; onFold: boolean }>>> = {
+  cathrin: {
+    panel1a: { cut: 1, onFold: true },
+    panel1b: { cut: 2, onFold: false },
+  },
+}
+
 // What is used of FreeSewing's objects.
 interface FsPoint {
   x: number
@@ -310,75 +324,113 @@ export async function draftSvg(
     const classOf = (p: FsPath) => String(p.attributes.get('class') || '')
     // Its stitching line: FreeSewing's `seam`, or else a closed line in
     // the fabric's style that isn't the allowance (a hem drawn on its own
-    // is in the fabric's style too).
+    // is in the fabric's style too). A part without a `seam` can draw
+    // several pieces side by side (Cathrin's first panel, in two): each
+    // is a piece of its own.
     const fabric = (p: FsPath) => classOf(p).split(' ').includes('fabric')
-    const seam =
-      shown.find(([k]) => k === 'seam') ??
-      shown.find(
-        ([, p]) =>
-          fabric(p) && !classOf(p).split(' ').includes('sa') && p.asPathstring().endsWith('z'),
-      )
-    if (!seam) continue
-    const grain = shown.find(([k]) => k.includes('grainline'))
-    const fold = shown.find(([k]) => k.includes('cutonfold'))
-    const outline = [seam[1]]
-    // FreeSewing's allowance, in one line or several.
-    const allowanceLines = shown
-      .filter(([k, p]) => k === 'sa' || classOf(p).split(' ').includes('sa'))
-      .map(([, p]) => p)
-    const { hems, hemAllowance } = safely(hemsOf)(
-      seam[1],
-      allowanceLines,
-      sa,
-      cutlist[id]?.cutOnFold ?? [],
+    const closed = shown.filter(
+      ([, p]) =>
+        fabric(p) && !classOf(p).split(' ').includes('sa') && p.asPathstring().endsWith('z'),
     )
-    const boxes = outline.map((p) => p.bbox())
-    const x0 = Math.min(...boxes.map((b) => b.topLeft.x))
-    const y0 = Math.min(...boxes.map((b) => b.topLeft.y))
-    const x1 = Math.max(...boxes.map((b) => b.bottomRight.x))
-    const y1 = Math.max(...boxes.map((b) => b.bottomRight.y))
+    const seamPath = shown.find(([k]) => k === 'seam')
+    const seams = seamPath ? [seamPath] : closed
+    if (seams.length === 0) continue
     const cut = cutlist[id]
-    // The main fabric's, where it is cut from several.
-    const materials = Object.entries(cut?.materials ?? {})
-    const [material, how] = materials.find(([m]) => m === 'fabric') ??
-      materials[0] ?? ['fabric', []]
-    const first = how[0] ?? { cut: 1, identical: false, onFold: false }
-    const onFold = first.onFold || (cut?.cutOnFold?.length ?? 0) > 0
-    const said = `Cut ${first.cut}${!first.identical && first.cut >= 2 ? ' mirrored' : ''}${onFold ? ' on fold' : ''} from ${material}`
-    const line = (d: string, attrs: string) =>
-      `<path d="${d}" fill="none" stroke="#000000" stroke-width="0.5" ${attrs}/>`
-    // Ids as FreeSewing numbers them, which say nothing: the piece is
-    // named by its group.
-    const next = () => `fs-${++count}`
-    const body = [
-      // The stitching line, saying how much allowance to add: Drapewright
-      // draws the cutting line itself (FreeSewing's loops at some inner
-      // corners).
-      line(
-        seam[1].asPathstring(),
-        `id="${next()}" class="fabric" data-allowance="${sa}"${hemAllowance === null ? '' : ` data-hem-allowance="${hemAllowance}"`}`,
-      ),
-      // Its hems, where FreeSewing's allowance is deeper, so that they are
-      // known for hems.
-      ...hems.map((h) => line(h.asPathstring(), `id="${next()}" data-text="hem"`)),
-      grain ? line(grain[1].asPathstring(), `id="${next()}" data-text="grainline"`) : '',
-      // A fold's bracket is its grainline too, when it says so.
-      fold
-        ? line(
-            fold[1].asPathstring(),
-            `id="${next()}" data-text="cutonfold${cut?.grainOrigin === 'cutonfold' || !grain ? ' grainline' : ''}"`,
-          )
-        : '',
-      ...Object.values(part.snippets)
-        .filter((s) => s.def === 'notch' || s.def === 'bnotch')
-        .map((s) => `<use href="#${s.def}" x="${s.anchor.x}" y="${s.anchor.y}"/>`),
-      `<text x="${(x0 + x1) / 2}" y="${(y0 + y1) / 2}" font-size="8">${escape(said)}</text>`,
-    ]
-    groups.push(
-      `<g id="fs-stack-${escape(id)}-part-${escape(id)}" transform="translate(${x - x0} ${-y0})">${body.join('')}</g>`,
-    )
-    x += x1 - x0 + 50
-    height = Math.max(height, y1 - y0)
+    for (const seam of seams) {
+      const box = seam[1].bbox()
+      const [x0, y0] = [box.topLeft.x, box.topLeft.y]
+      const [x1, y1] = [box.bottomRight.x, box.bottomRight.y]
+      // What is drawn on this piece, where the part draws several: what
+      // lies inside its outline's box.
+      const inside = (q: FsPoint) =>
+        seams.length === 1 || (q.x >= x0 - 1 && q.x <= x1 + 1 && q.y >= y0 - 1 && q.y <= y1 + 1)
+      const on = (p: FsPath) => {
+        const b = p.bbox()
+        return inside({
+          x: (b.topLeft.x + b.bottomRight.x) / 2,
+          y: (b.topLeft.y + b.bottomRight.y) / 2,
+        } as FsPoint)
+      }
+      const mine = shown.filter(([, p]) => on(p))
+      const grain = mine.find(([k]) => k.includes('grainline'))
+      const fold = mine.find(([k]) => k.includes('cutonfold'))
+      // FreeSewing's allowance, in one line or several.
+      const allowanceLines = mine
+        .filter(([k, p]) => k === 'sa' || classOf(p).split(' ').includes('sa'))
+        .map(([, p]) => p)
+      const { hems, hemAllowance } = safely(hemsOf)(
+        seam[1],
+        allowanceLines,
+        sa,
+        fold || seams.length === 1 ? (cut?.cutOnFold ?? []) : [],
+      )
+      // The main fabric's, where it is cut from several.
+      const materials = Object.entries(cut?.materials ?? {})
+      const [material, how] = materials.find(([m]) => m === 'fabric') ??
+        materials[0] ?? ['fabric', []]
+      const given = how[0] ?? { cut: 1, identical: false, onFold: false }
+      const own = seams.length > 1 ? PIECE_CUTS[name]?.[seam[0]] : undefined
+      const first = own ? { ...given, cut: own.cut } : given
+      const onFold = own ? own.onFold : first.onFold || (cut?.cutOnFold?.length ?? 0) > 0
+      const said = `Cut ${first.cut}${!first.identical && first.cut >= 2 ? ' mirrored' : ''}${onFold ? ' on fold' : ''} from ${material}`
+      const line = (d: string, attrs: string) =>
+        `<path d="${d}" fill="none" stroke="#000000" stroke-width="0.5" ${attrs}/>`
+      // Ids as FreeSewing numbers them, which say nothing: the piece is
+      // named by its group.
+      const next = () => `fs-${++count}`
+      const body = [
+        // The stitching line, saying how much allowance to add: Drapewright
+        // draws the cutting line itself (FreeSewing's loops at some inner
+        // corners).
+        line(
+          seam[1].asPathstring(),
+          `id="${next()}" class="fabric" data-allowance="${sa}"${hemAllowance === null ? '' : ` data-hem-allowance="${hemAllowance}"`}`,
+        ),
+        // Its hems, where FreeSewing's allowance is deeper, so that they are
+        // known for hems.
+        ...hems.map((h) => line(h.asPathstring(), `id="${next()}" data-text="hem"`)),
+        grain ? line(grain[1].asPathstring(), `id="${next()}" data-text="grainline"`) : '',
+        // A fold's bracket is its grainline too, when it says so.
+        fold && (seams.length === 1 || onFold)
+          ? line(
+              fold[1].asPathstring(),
+              `id="${next()}" data-text="cutonfold${cut?.grainOrigin === 'cutonfold' || !grain ? ' grainline' : ''}"`,
+            )
+          : '',
+        // Lines marked across it with their name written along them, such
+        // as Cathrin's waist line: where a corset goes on the body.
+        ...mine
+          .filter(([k, p]) => {
+            const text = p.attributes.get('data-text')
+            return (
+              k !== seam[0] &&
+              !k.includes('grainline') &&
+              !k.includes('cutonfold') &&
+              !classOf(p).split(' ').includes('sa') &&
+              typeof text === 'string' &&
+              /waist|hips?\b|bust|chest|seat/i.test(text)
+            )
+          })
+          .map(([, p]) =>
+            line(
+              p.asPathstring(),
+              `id="${next()}" data-text="${escape(String(p.attributes.get('data-text')))}"`,
+            ),
+          ),
+        ...Object.values(part.snippets)
+          .filter((s) => (s.def === 'notch' || s.def === 'bnotch') && inside(s.anchor))
+          .map((s) => `<use href="#${s.def}" x="${s.anchor.x}" y="${s.anchor.y}"/>`),
+        `<text x="${(x0 + x1) / 2}" y="${(y0 + y1) / 2}" font-size="8">${escape(said)}</text>`,
+      ]
+      // A piece of several drawn by one part is named for its own line
+      // (`cathrin.panel1a`).
+      const piece = seams.length > 1 ? `${id.split('.')[0]}.${seam[0]}` : id
+      groups.push(
+        `<g id="fs-stack-${escape(piece)}-part-${escape(piece)}" transform="translate(${x - x0} ${-y0})">${body.join('')}</g>`,
+      )
+      x += x1 - x0 + 50
+      height = Math.max(height, y1 - y0)
+    }
   }
   if (groups.length === 0) throw new Error('FreeSewing drafted no pieces.')
   const width = Math.max(x - 50, 1)

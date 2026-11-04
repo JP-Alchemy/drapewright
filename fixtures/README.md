@@ -22,6 +22,7 @@ cargo run --release -p drapewright-io --example import_report -- ~/Source/drapew
 | `svg/flared-skirt.svg` | A panel flaring 20° with a straight hem, where the corner shapes differ visibly |
 | `svg/freesewing-sasha-sa10.svg` | **Generated with FreeSewing** (MIT; see below): the Sasha princess-seam skater dress at FreeSewing's standard size 36 (`cisFemaleAdult36`), with 10 mm seam allowance. Piece groups named `fs-stack-…`; open cutting lines along the fold (front) and at a corner (the others); `#notch`/`#bnotch` symbols; a cut-on-fold-and-grainline bracket; cutting texts |
 | `svg/freesewing-sasha-no-allowance.svg` | The same without seam allowance: the fold comes from the cut-on-fold bracket alone |
+| `svg/freesewing-cathrin-example.svg` | **Generated with FreeSewing** (MIT): the Cathrin underbust corset (13 panels, its default) drafted by Drapewright (**A FreeSewing design, made to measure**) to the example figure, as the app writes it: seven pieces, the centre front (1a, cut once on the fold) and the panel beside it (1b) split from FreeSewing's one part, a waist line named along each panel (`data-text="cathrin:waistLine"`). Find seams and the drape's placing are tested on it (`crates/sim/tests/freesewing_corset.rs`) |
 | `dxf/aama-skirt.dxf` | AAMA/ASTM-style garment CAD file, `UNITS: METRIC`: a skirt front in a block with cutting line (layer 1), stitching line (14) with a 40 mm hem and 15 mm seams, turn points, a notch, grainline, fold (mirror) line, drill hole and piece texts; and a waistband with only its cutting line, so allowance is included |
 | `dxf/generic-mm.dxf` | Ordinary CAD drawing in millimetres (`$INSUNITS` 4): a pocket with rounded corners from polyline bulges, a flap drawn as four separate lines (one reversed) named by a text inside it, a grainline layer, a drill circle and an unsupported hatch |
 | `dxf/inches.dxf` | `$INSUNITS` 1 (inches): a 4″ × 2″ cuff |
@@ -48,7 +49,7 @@ changing them; poppler's `pdfinfo` and `pdftotext` confirm the encrypted
 files are valid).
 
 The `freesewing-*` files were made with FreeSewing 4.10.2
-(`@freesewing/sasha`, `sa: 10` and `sa: 0`); the PDFs are Drapewright's
+(`@freesewing/sasha`, `sa: 10` and `sa: 0`; `@freesewing/cathrin`, `sa: 10`); the PDFs are Drapewright's
 prints of the SVG with 10 mm allowance (the protected one by `gs -sDEVICE=pdfwrite
 -dCompatibilityLevel=1.7 -sOwnerPassword=… -sUserPassword= -dEncryptionR=3
 -dKeyLength=128 -dPermissions=-3900`). FreeSewing is MIT licensed,

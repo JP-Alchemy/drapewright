@@ -118,6 +118,9 @@ const MARK_APART: f64 = 6.0;
 /// Lines across two pieces meet at a seam when they reach it this near
 /// each other, mm.
 const MARKS_MEET: f64 = 3.0;
+/// How much more likely a seam is for the one line across each piece
+/// meeting there (several meeting: 0.9).
+const ONE_LINE_MEETS: f64 = 0.5;
 /// A pair going on from a seam suggested needs only this.
 const CONTINUING: f64 = 0.8;
 /// An edge gathered is at least this much longer than what it is gathered
@@ -164,6 +167,10 @@ struct Candidate {
     /// Where lines across the piece (a waist, a bust line) end on the
     /// edge, along its stitching line from the start.
     marks: Vec<f64>,
+    /// The name of the one line across the piece that ends on the edge
+    /// ("waist line"), lower-cased: none where it has no name, or where
+    /// more than one line ends there.
+    mark_name: Option<String>,
     /// The first piece shaped as this one is (as many edges, as long, in
     /// either order): its copies (a lining, the other sleeve) have its
     /// lines in the same places, sewn to it or not.
@@ -413,6 +420,30 @@ fn line_marks(piece: &Piece, edge: &[Point], scale: f64, darts: &[(f64, f64)]) -
     marks
 }
 
+/// The name of the one line across `piece` with an end on `edge` (and not
+/// the other), if it is the only one and is named for a level of the body
+/// (a waist line; not a centre front, which runs down the piece):
+/// lower-cased.
+fn line_name_on(piece: &Piece, edge: &[Point]) -> Option<String> {
+    let on = |p: Pt| nearest_on(edge, p.into()).0 <= MARK_NEAR;
+    let mut ending = piece.lines.iter().filter(|line| {
+        let last = line.segments.last().map_or(line.start, |s| s.to());
+        on(line.start) != on(last)
+    });
+    let line = ending.next()?;
+    if ending.next().is_some() {
+        return None;
+    }
+    let name = line.label.as_deref()?.trim().to_lowercase();
+    let levels = ["waist", "bust", "hip", "chest", "seat"];
+    let level = name.split(|c: char| !c.is_alphabetic()).any(|w| {
+        levels
+            .iter()
+            .any(|l| w == *l || w == format!("{l}s") || w == format!("under{l}"))
+    });
+    (level && !name.contains("centre") && !name.contains("center")).then_some(name)
+}
+
 /// Whether the lines across `a`'s and `b`'s pieces meet at the seam
 /// between them, sewn the given way round, at the same places: most of the
 /// marks on the edge with fewer, and two at least, have one on the other
@@ -446,6 +477,26 @@ fn lines_meet(a: &Candidate, b: &Candidate, reversed: bool) -> Option<f64> {
         .filter(|&(m, _)| m >= 2 && 4 * m >= 3 * fewer)
         .max_by_key(|&(m, _)| m)
         .map(|(_, shift)| shift)
+}
+
+/// Whether the one line across each of `a`'s and `b`'s pieces, named
+/// alike (a waist line, as FreeSewing's Cathrin corset marks its panels),
+/// meets the other's at the seam between them, edges as long as each
+/// other: less said than by several lines meeting, but more than by the
+/// lengths alone. A line without a name says too little alone (a grading
+/// line, a pattern's lines in another size).
+fn one_line_meets(a: &Candidate, b: &Candidate, reversed: bool) -> bool {
+    let ([m], [n]) = (&a.marks[..], &b.marks[..]) else {
+        return false;
+    };
+    let at = if reversed { b.length - n } else { *n };
+    a.mark_name.is_some()
+        && a.mark_name == b.mark_name
+        && a.shape != b.shape
+        && !a.inside
+        && !b.inside
+        && (a.length - b.length).abs() <= SAME_LENGTH
+        && (m - at).abs() <= MARKS_MEET
 }
 
 /// The two sides of a seam between `a` and `b` (which copy of each), sewn
@@ -682,6 +733,9 @@ fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -
                 points: points.clone(),
                 length,
                 notches,
+                mark_name: (marks.len() == 1)
+                    .then(|| line_name_on(piece, &piece.outline.edge_geom(ei).flatten(0.1)))
+                    .flatten(),
                 marks,
                 shape: shapes[pi],
                 ends: (end_of(piece, (ei + n - 1) % n), end_of(piece, (ei + 1) % n)),
@@ -847,6 +901,9 @@ fn score(a: &Candidate, b: &Candidate, reversed: bool) -> (f64, Vec<Reason>) {
     }
     if meet.is_some() {
         score += 0.9;
+        reasons.push(Reason::LinesMeet);
+    } else if one_line_meets(a, b, reversed) {
+        score += ONE_LINE_MEETS;
         reasons.push(Reason::LinesMeet);
     }
     // A facing is shaped as the edge it faces: not a curve to a straight
@@ -1649,12 +1706,53 @@ fn edges<P: Borrow<Piece>>(
             name.contains(word) && (name.contains("centre") || name.contains("center"))
         })
     };
+    // A band of panels named for neither front nor back (a corset's
+    // "Panel 1" to "Panel 6"), running from a piece cut on the fold at
+    // one centre: the panel at its other end, sewn to one panel only, has
+    // the other centre.
+    let band_end: Vec<bool> = {
+        let mut joined: Vec<(usize, usize)> = accepted
+            .iter()
+            .map(|t| (cands[t.pair.1].piece, cands[t.pair.2].piece))
+            .chain(already.iter().map(|&((pa, _), (pb, _))| (pa, pb)))
+            .filter(|(a, b)| a != b)
+            .collect();
+        joined.sort_unstable();
+        joined.dedup();
+        let mut group: Vec<usize> = (0..pieces.len()).collect();
+        let root = |group: &[usize], mut i: usize| {
+            while group[i] != i {
+                i = group[i];
+            }
+            i
+        };
+        for &(a, b) in &joined {
+            let (ra, rb) = (root(&group, a), root(&group, b));
+            group[ra.max(rb)] = ra.min(rb);
+        }
+        let folded: Vec<bool> = (0..pieces.len())
+            .map(|p| {
+                (0..pieces.len())
+                    .any(|q| root(&group, q) == root(&group, p) && pieces[q].borrow().has_fold())
+            })
+            .collect();
+        (0..pieces.len())
+            .map(|p| {
+                let piece = pieces[p].borrow();
+                let neighbours = joined.iter().filter(|(a, b)| *a == p || *b == p).count();
+                neighbours == 1
+                    && folded[p]
+                    && !piece.has_fold()
+                    && side_of(&piece.name) == Side::Neither
+            })
+            .collect()
+    };
     for (k, c) in cands.iter().enumerate() {
         let named = named_centre(c);
         if used[k]
             || centred[c.piece]
             || !c.pair
-            || !(named || c.with_grain && c.side != Side::Neither)
+            || !(named || c.with_grain && (c.side != Side::Neither || band_end[c.piece]))
             || (!named && centre_piece(c.side).is_some_and(|p| p != c.piece))
             || past_centre(pieces[c.piece].borrow(), c)
         {

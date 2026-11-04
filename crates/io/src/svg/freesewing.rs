@@ -22,6 +22,24 @@ pub fn is_generated_id(id: &str) -> bool {
         .is_some_and(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
 }
 
+/// The name of a line FreeSewing writes text along (its `data-text`):
+/// `cathrin:waistLine` gives "Waist line", a plain "pocket opening" stays
+/// as it is. None for the marks the import reads otherwise (grainline,
+/// fold, hem) and for a text without words.
+pub fn line_name(text: &str) -> Option<String> {
+    let text = text.trim();
+    let key = text.rsplit(':').next().unwrap_or(text).trim();
+    let lower = key.to_lowercase();
+    let marks = ["grainline", "cutonfold", "hem"];
+    if key.is_empty()
+        || lower.split_whitespace().any(|w| marks.contains(&w))
+        || !key.chars().any(char::is_alphabetic)
+    {
+        return None;
+    }
+    Some(humanise(key))
+}
+
 /// "frontOutsideAbove" → "Front outside above".
 fn humanise(camel: &str) -> String {
     let mut out = String::new();
@@ -93,6 +111,22 @@ mod tests {
         assert_eq!(part_name("front"), None);
         assert!(is_generated_id("fs-12"));
         assert!(!is_generated_id("fs-stack-sasha.pocket"));
+    }
+
+    #[test]
+    fn lines_named_by_their_text() {
+        assert_eq!(
+            line_name("cathrin:waistLine").as_deref(),
+            Some("Waist line")
+        );
+        assert_eq!(
+            line_name("pocket opening (do not cut)").as_deref(),
+            Some("Pocket opening (do not cut)")
+        );
+        assert_eq!(line_name("grainline"), None);
+        assert_eq!(line_name("cutonfold grainline"), None);
+        assert_eq!(line_name("hem"), None);
+        assert_eq!(line_name(" 12 "), None);
     }
 
     #[test]

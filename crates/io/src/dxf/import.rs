@@ -551,6 +551,7 @@ fn generic_pieces(
                 name: name.clone(),
                 reference: Some(layer.clone()),
                 cut: None,
+                label: None,
             });
         }
         for (segs, closed) in chain(open_paths, CLOSE_TOLERANCE) {
@@ -562,6 +563,7 @@ fn generic_pieces(
                 name: name.clone(),
                 reference: Some(layer.clone()),
                 cut: None,
+                label: None,
             });
         }
     }
