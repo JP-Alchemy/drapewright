@@ -78,3 +78,45 @@ test('the pieces are projected true size once the projector is calibrated', asyn
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog', { name: 'Projector' })).toHaveCount(0)
 })
+
+test('leaving full screen while measuring leaves the projector open', async ({ page }) => {
+  await page.goto('/app/')
+  await openBackup(page, 'skirt.drapewright', 2)
+  await page.getByRole('button', { name: 'Projector', exact: true }).click()
+  const projector = page.getByRole('dialog', { name: 'Projector' })
+  await expect(projector.getByText('Calibrate the projector')).toBeVisible()
+  // Into full screen, by its button where the browser didn't start there.
+  const fullScreen = projector.getByRole('button', { name: 'Full screen' })
+  const inFullScreen = () => page.evaluate(() => document.fullscreenElement !== null)
+  // (The projector may go full screen itself meanwhile, the button gone.)
+  if (!(await inFullScreen())) await fullScreen.click({ timeout: 2000 }).catch(() => {})
+  await page.waitForTimeout(300)
+  const across = projector.getByRole('textbox', { name: 'Rectangle across' })
+  if (!(await inFullScreen())) {
+    // A browser that won't go full screen here (WebKit under test):
+    // typing keeps the projector open, full screen still offered.
+    await across.fill('50')
+    await across.press('Tab')
+    await expect(projector.getByText('Calibrate the projector')).toBeVisible()
+    await expect(across).toHaveValue('50')
+    await expect(fullScreen).toBeVisible()
+    return
+  }
+  await expect(fullScreen).toBeHidden()
+  // A measurement typed, and full screen left as Safari leaves it then.
+  await across.fill('50')
+  await page.evaluate(() => document.exitFullscreen())
+  await expect.poll(inFullScreen).toBe(false)
+  await across.press('Tab')
+  // Still open, the measurement kept, and back into full screen at a tap.
+  await expect(projector.getByText('Calibrate the projector')).toBeVisible()
+  await expect(across).toHaveValue('50')
+  await fullScreen.click()
+  await expect.poll(inFullScreen).toBe(true)
+  // Escape while typing doesn't close it; after, it does.
+  await across.focus()
+  await across.press('Escape')
+  await expect(projector).toBeVisible()
+  await projector.getByRole('button', { name: 'Close' }).click()
+  await expect(projector).toHaveCount(0)
+})

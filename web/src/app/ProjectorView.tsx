@@ -33,6 +33,7 @@ import { useEngineState } from '../state/hooks.ts'
 import type { Session } from '../state/session.ts'
 import { t } from '../strings/en.ts'
 import { keptChoice, mainMaterial, widthName } from './LayoutDialog.tsx'
+import { isTyping } from './shortcuts.ts'
 
 /** A rectangle on the mat (mm), and where its corners show on the screen. */
 interface Calibration {
@@ -155,17 +156,21 @@ export function ProjectorView({ session }: { session: Session }) {
   const drag = useRef<Drag | null>(null)
   const map = mapOf(cal)
 
-  // Full screen, as a projector shows it; leaving full screen closes it.
-  useEffect(() => {
-    const el = host.current
-    let entered = false
-    el?.requestFullscreen?.().then(
-      () => (entered = true),
+  // Full screen, as a projector shows it. Leaving full screen leaves the
+  // projector open, to go back into it: Safari leaves it as soon as a
+  // measurement is typed, and an iPad as its keyboard comes up.
+  const [full, setFull] = useState(false)
+  const fullScreen = () =>
+    host.current?.requestFullscreen?.().then(
+      () => setFull(true),
       () => {},
     )
-    const onChange = () => {
-      if (entered && !document.fullscreenElement) session.showProjector(false)
-    }
+  useEffect(() => {
+    host.current?.requestFullscreen?.().then(
+      () => setFull(true),
+      () => {},
+    )
+    const onChange = () => setFull(document.fullscreenElement !== null)
     // A screen of another size: its own calibration, or calibrated again.
     const onResize = () => {
       const now = screen()
@@ -178,7 +183,9 @@ export function ProjectorView({ session }: { session: Session }) {
       )
       if (!kept) setCalibrating(true)
     }
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && session.showProjector(false)
+    // Escape closes it, but not while a measurement is being typed.
+    const onKey = (e: KeyboardEvent) =>
+      e.key === 'Escape' && !isTyping(e.target) && session.showProjector(false)
     document.addEventListener('fullscreenchange', onChange)
     window.addEventListener('resize', onResize)
     window.addEventListener('keydown', onKey)
@@ -338,6 +345,11 @@ export function ProjectorView({ session }: { session: Session }) {
               <Button className="button" onPress={() => session.showProjector(false)}>
                 {text.close}
               </Button>
+              {!full && (
+                <Button className="button" onPress={() => void fullScreen()}>
+                  {text.fullScreen}
+                </Button>
+              )}
               <Button
                 className="button primary"
                 onPress={() => {
@@ -415,6 +427,11 @@ export function ProjectorView({ session }: { session: Session }) {
               <Button className="button" onPress={() => setCalibrating(true)}>
                 {text.recalibrate}
               </Button>
+              {!full && (
+                <Button className="button" onPress={() => void fullScreen()}>
+                  {text.fullScreen}
+                </Button>
+              )}
               <Button className="button" onPress={() => session.showProjector(false)}>
                 {text.close}
               </Button>

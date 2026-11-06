@@ -12,6 +12,24 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 85 — The projector stays open out of full screen
+
+Reported by a tester: typing or changing the calibration rectangle's size
+closed the whole projector. The projector closed whenever it left full
+screen, and Safari leaves full screen as soon as a key is typed into it
+(as an iPad does when its keyboard comes up).
+
+* Leaving full screen now leaves the projector open, as it was, with a
+  **Full screen** button to go back in (while calibrating and while
+  projecting). **Close** closes it, and so does Escape, but not while a
+  measurement is being typed.
+
+**Try it:** open `fixtures/drapewright/skirt.drapewright`, **Projector**,
+and type a new **Rectangle across** in Safari: the projector stays, out of
+full screen; **Full screen** puts it back.
+
+---
+
 ## Step 84 — FreeSewing's Cathrin corset: all its panels, sewn whole, worn at the waist
 
 Asked for by JP. Cathrin drafted for the example figure draped at the hips,

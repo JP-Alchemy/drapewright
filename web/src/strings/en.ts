@@ -471,6 +471,7 @@ export const t = {
     height: 'Rectangle down',
     done: 'Done',
     close: 'Close',
+    fullScreen: 'Full screen',
     recalibrate: 'Calibrate',
     slide: 'Drag to slide the pattern across the fabric.',
     stitching: 'Stitching lines',
