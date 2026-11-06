@@ -214,6 +214,8 @@ export function drawCalibration(
   map: Homography,
   rectangle: { width: number; height: number },
   corners: readonly Pt[],
+  /** The corner the step buttons move, picked out. */
+  chosen?: number,
 ) {
   ctx.setTransform(size.dpr, 0, 0, size.dpr, 0, 0)
   ctx.fillStyle = '#000000'
@@ -235,11 +237,17 @@ export function drawCalibration(
   ctx.strokeStyle = COLOURS.rectangle
   ctx.lineWidth = 3
   ctx.stroke()
-  for (const [x, y] of corners) {
+  corners.forEach(([x, y], k) => {
     ctx.beginPath()
     ctx.arc(x, y, 14, 0, Math.PI * 2)
     ctx.strokeStyle = COLOURS.handle
     ctx.lineWidth = 3
+    if (k === chosen) {
+      ctx.fillStyle = COLOURS.handle
+      ctx.globalAlpha = 0.45
+      ctx.fill()
+      ctx.globalAlpha = 1
+    }
     ctx.stroke()
     ctx.beginPath()
     ctx.moveTo(x - 22, y)
@@ -248,5 +256,5 @@ export function drawCalibration(
     ctx.lineTo(x, y + 22)
     ctx.lineWidth = 1.5
     ctx.stroke()
-  }
+  })
 }

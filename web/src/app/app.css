@@ -2657,3 +2657,17 @@ button.tree-chevron[data-hovered] {
   gap: 6px;
   justify-items: start;
 }
+
+/* Stepping a calibration corner or the projected pattern. */
+.projector-steps {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.step-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 40px);
+  grid-template-rows: repeat(3, 40px);
+  gap: 2px;
+}

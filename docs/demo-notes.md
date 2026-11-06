@@ -12,6 +12,33 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 87 — The projector remembers its calibration, and moves in steps
+
+Asked for by a tester: the calibration shouldn't have to be set up every
+time, and a projector shows an iPad's screen a moment late, so dragging a
+corner (or the pattern) onto a mark overshoots.
+
+* **Kept for each screen.** A calibration is saved on the device for the
+  screen it was made on, beside those of other screens (another
+  projector, or an iPad turned the other way), not in place of them.
+  Opened again on a screen it knows, the projector goes straight to
+  projecting, and says the calibration is saved there. **Done** says
+  "Calibration saved for this screen."
+* **Steps.** While calibrating, choose a **Corner** (top left, top right,
+  bottom right, bottom left; dragging one chooses it, and it is filled on
+  the projection), then move it with the arrow buttons. Projecting, the
+  same buttons **Move the pattern** across the fabric. Each step is
+  **1 mm**, **5 mm** or **1 cm** on the mat (remembered). The keyboard's
+  arrow keys step too, and Shift with them takes ten steps, unless a
+  control has the keys (a corner choice).
+
+**Try it:** open `fixtures/drapewright/skirt.drapewright`, **Projector**:
+choose **1 cm**, then **Right** and **Down**: the top left corner moves a
+centimetre each way on the mat. **Done**, **Close**, and **Projector**
+again: it opens ready to cut. **Move the pattern** steps it across.
+
+---
+
 ## Step 86 — The projector's calibration holds in full screen and out of it
 
 Still reported after Step 85: the projector only worked in full screen.

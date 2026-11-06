@@ -3,11 +3,13 @@
 // as the cutting layout lays them on the fabric, all of them or one at a
 // time. The projector is calibrated first: four corners dragged onto a
 // rectangle marked on the mat, which gives the scale and straightens a
-// projector that is not square on. Kept for this device and this screen
-// size.
+// projector that is not square on. Kept on this device for each screen it
+// is made on, and used again whenever the projector opens there. Corners
+// and the pattern can be moved a step at a time, from buttons or the arrow
+// keys, where a projector shows a finger's drag late.
 
 import type { Layout } from '@drapewright/engine'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   Button,
@@ -48,7 +50,13 @@ interface Calibration {
   screen: [number, number]
 }
 
+/** The calibration last made (before each screen kept its own). */
 const STORAGE = 'drapewright.projector'
+/** Each screen's calibration, by its size ("1920x1080"). */
+const CALIBRATIONS = 'drapewright.projector.calibrations'
+/** How far a step moves a corner or the pattern, mm. */
+const STEP = 'drapewright.projector.step'
+const STEPS = [1, 5, 10] as const
 /** What is projected, and how. */
 const SHOWS = 'drapewright.projector.shows'
 const THICK = 'drapewright.projector.thick'
@@ -102,7 +110,23 @@ function onPage(c: Calibration, origin: Pt): Calibration {
   return { ...c, corners: c.corners.map(at) as Calibration['corners'] }
 }
 
+const screenKey = (width: number, height: number) => `${width}x${height}`
+
+function savedCalibrations(): Record<string, Calibration> {
+  try {
+    return (JSON.parse(localStorage.getItem(CALIBRATIONS) ?? 'null') ?? {}) as Record<
+      string,
+      Calibration
+    >
+  } catch {
+    return {}
+  }
+}
+
+/** The calibration kept for a screen of this size, if any. */
 function loadCalibration(width: number, height: number): Calibration | null {
+  const kept = savedCalibrations()[screenKey(width, height)]
+  if (kept) return kept
   try {
     const c = JSON.parse(localStorage.getItem(STORAGE) ?? 'null') as Calibration | null
     return c && c.screen[0] === width && c.screen[1] === height ? c : null
@@ -111,9 +135,12 @@ function loadCalibration(width: number, height: number): Calibration | null {
   }
 }
 
+/** Keeps a calibration for its screen, beside those of other screens. */
 function saveCalibration(c: Calibration) {
   try {
-    localStorage.setItem(STORAGE, JSON.stringify(c))
+    const all = savedCalibrations()
+    all[screenKey(...c.screen)] = c
+    localStorage.setItem(CALIBRATIONS, JSON.stringify(all))
   } catch {
     // Not kept (private browsing): calibrated again next time.
   }
@@ -189,6 +216,39 @@ export function ProjectorView({ session }: { session: Session }) {
   const [focus, setFocus] = useState<number | null>(null)
   const drag = useRef<Drag | null>(null)
   const map = mapOf(shown)
+  // The corner the step buttons move: the last dragged or chosen.
+  const [chosen, setChosen] = useState(0)
+  const [stepMm, setStepMm] = useState<number>(() => {
+    const kept = remembered<number>(STEP, 1)
+    return (STEPS as readonly number[]).includes(kept) ? kept : 1
+  })
+  /**
+   * Steps (`dx`, `dy`: how many, each way) of the chosen corner, while
+   * calibrating, or of the pattern on the fabric.
+   */
+  const nudge = (dx: number, dy: number) => {
+    if (calibrating) {
+      // The rectangle's scale on the screen, px a mm, along its top and side.
+      const [a, b, , d] = cal.corners
+      const across = Math.hypot(b[0] - a[0], b[1] - a[1]) / cal.width
+      const down = Math.hypot(d[0] - a[0], d[1] - a[1]) / cal.height
+      const px = (stepMm * (across + down)) / 2
+      const corners = [...cal.corners] as Calibration['corners']
+      const [x, y] = corners[chosen]!
+      corners[chosen] = [x + dx * px, y + dy * px]
+      const next = { ...cal, corners }
+      if (!mapOf(next)) return
+      setCal(next)
+      saveCalibration(next)
+    } else {
+      setOffset(([x, y]) => [x - dx * stepMm, y - dy * stepMm])
+    }
+  }
+  // The arrow keys step it too, from the newest `nudge`.
+  const nudgeRef = useRef(nudge)
+  useEffect(() => {
+    nudgeRef.current = nudge
+  })
 
   // Full screen, as a projector shows it. Leaving full screen leaves the
   // projector open, to go back into it: Safari leaves it as soon as a
@@ -227,9 +287,23 @@ export function ProjectorView({ session }: { session: Session }) {
       const o = pageOrigin()
       setOrigin((was) => (was[0] === o[0] && was[1] === o[1] ? was : o))
     }, 500)
-    // Escape closes it, but not while a measurement is being typed.
-    const onKey = (e: KeyboardEvent) =>
-      e.key === 'Escape' && !isTyping(e.target) && session.showProjector(false)
+    // Escape closes it, but not while a measurement is being typed; the
+    // arrow keys step the corner or the pattern (with Shift, ten steps).
+    const arrows: Record<string, Pt> = {
+      ArrowLeft: [-1, 0],
+      ArrowRight: [1, 0],
+      ArrowUp: [0, -1],
+      ArrowDown: [0, 1],
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (isTyping(e.target)) return
+      if (e.key === 'Escape') session.showProjector(false)
+      const by = arrows[e.key]
+      if (!by) return
+      e.preventDefault()
+      const times = e.shiftKey ? 10 : 1
+      nudgeRef.current(by[0] * times, by[1] * times)
+    }
     document.addEventListener('fullscreenchange', onChange)
     window.addEventListener('resize', onResize)
     window.addEventListener('keydown', onKey)
@@ -251,7 +325,7 @@ export function ProjectorView({ session }: { session: Session }) {
     c.height = Math.round(size[1] * dpr)
     const box = { width: size[0], height: size[1], dpr }
     const look = { stitching, thick, focus }
-    if (calibrating) drawCalibration(ctx, box, map, shown, shown.corners)
+    if (calibrating) drawCalibration(ctx, box, map, shown, shown.corners, chosen)
     else if (shows === 'layout' && layout)
       drawLayout(ctx, box, layout, { map, offset }, look, t.layout.faceDown)
     else drawProjection(ctx, box, session.scene(), { map, offset }, look)
@@ -260,6 +334,7 @@ export function ProjectorView({ session }: { session: Session }) {
     shown,
     map,
     calibrating,
+    chosen,
     offset,
     stitching,
     thick,
@@ -324,6 +399,7 @@ export function ProjectorView({ session }: { session: Session }) {
         .sort((a, b) => a.d - b.d)[0]!
       if (nearest.d > GRAB) return
       drag.current = { kind: 'corner', index: nearest.index }
+      setChosen(nearest.index)
     } else {
       const back = map && invert(map)
       if (!back) return
@@ -387,6 +463,31 @@ export function ProjectorView({ session }: { session: Session }) {
                 onChange={(cm) => resize(cal.width, cm * 10)}
               />
             </div>
+            <RadioGroup
+              className="segmented"
+              orientation="horizontal"
+              aria-label={text.corner}
+              value={String(chosen)}
+              onChange={(v) => setChosen(Number(v))}
+            >
+              <Label className="group-label">{text.corner}</Label>
+              <div className="segments">
+                {text.corners.map((name, k) => (
+                  <Radio key={name} value={String(k)} className="segment">
+                    {name}
+                  </Radio>
+                ))}
+              </div>
+            </RadioGroup>
+            <StepPad
+              label={text.moveCorner(text.corners[chosen]!)}
+              step={stepMm}
+              onStep={(mm) => {
+                setStepMm(mm)
+                remember(STEP, mm)
+              }}
+              onNudge={nudge}
+            />
             <div className="projector-actions">
               <Button className="button" onPress={() => session.showProjector(false)}>
                 {text.close}
@@ -401,6 +502,7 @@ export function ProjectorView({ session }: { session: Session }) {
                 onPress={() => {
                   saveCalibration(cal)
                   setCalibrating(false)
+                  session.toast(text.savedNow)
                 }}
               >
                 {text.done}
@@ -452,6 +554,16 @@ export function ProjectorView({ session }: { session: Session }) {
                 </Button>
               )}
             </div>
+            <StepPad
+              label={text.movePattern}
+              step={stepMm}
+              onStep={(mm) => {
+                setStepMm(mm)
+                remember(STEP, mm)
+              }}
+              onNudge={nudge}
+            />
+            <p className="small">{text.saved}</p>
             {shows === 'table' && (
               <Switch className="switch" isSelected={stitching} onChange={setStitching}>
                 <span className="switch-track" aria-hidden="true" />
@@ -485,6 +597,60 @@ export function ProjectorView({ session }: { session: Session }) {
           </>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Buttons that move something a step at a time (the arrow keys do too),
+ * and how big a step is: for a projector that shows a drag late.
+ */
+function StepPad({
+  label,
+  step,
+  onStep,
+  onNudge,
+}: {
+  label: string
+  step: number
+  onStep(mm: number): void
+  onNudge(dx: number, dy: number): void
+}) {
+  const text = t.projector
+  const arrow = (name: string, dx: number, dy: number, icon: React.ReactNode) => (
+    <Button
+      className="icon-button"
+      aria-label={name}
+      onPress={() => onNudge(dx, dy)}
+      style={{ gridColumn: 2 + dx, gridRow: 2 + dy }}
+    >
+      {icon}
+    </Button>
+  )
+  return (
+    <div className="projector-steps" role="group" aria-label={label}>
+      <span className="group-label">{label}</span>
+      <div className="step-pad">
+        {arrow(text.up, 0, -1, <ArrowUp size={20} aria-hidden="true" />)}
+        {arrow(text.left, -1, 0, <ArrowLeft size={20} aria-hidden="true" />)}
+        {arrow(text.right, 1, 0, <ArrowRight size={20} aria-hidden="true" />)}
+        {arrow(text.down, 0, 1, <ArrowDown size={20} aria-hidden="true" />)}
+      </div>
+      <RadioGroup
+        className="segmented"
+        orientation="horizontal"
+        aria-label={text.stepSize}
+        value={String(step)}
+        onChange={(v) => onStep(Number(v))}
+      >
+        <div className="segments">
+          {STEPS.map((mm) => (
+            <Radio key={mm} value={String(mm)} className="segment">
+              {text.stepOf(mm)}
+            </Radio>
+          ))}
+        </div>
+      </RadioGroup>
     </div>
   )
 }

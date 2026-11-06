@@ -158,3 +158,58 @@ test.describe('on one screen', () => {
     await expect(projector).toHaveCount(0)
   })
 })
+
+test('the calibration is kept, and corners and the pattern step a little at a time', async ({
+  page,
+}) => {
+  await page.goto('/app/')
+  await openBackup(page, 'skirt.drapewright', 2)
+  await page.getByRole('button', { name: 'Projector', exact: true }).click()
+  const projector = page.getByRole('dialog', { name: 'Projector' })
+  await expect(projector.getByText('Calibrate the projector')).toBeVisible()
+  const saved = () =>
+    page.evaluate(() =>
+      Object.values(
+        JSON.parse(localStorage.getItem('drapewright.projector.calibrations') ?? '{}'),
+      ).map((c) => (c as { corners: [number, number][] }).corners),
+    )
+  // The top left corner, a centimetre right and one down: 40 cm across
+  // the rectangle's width on the page, each step its 400th.
+  await projector.getByText('1 cm', { exact: true }).click()
+  const corner = projector.getByRole('group', { name: 'Move the top left corner' })
+  await corner.getByRole('button', { name: 'Right' }).click()
+  await corner.getByRole('button', { name: 'Down' }).click()
+  const [once] = await saved()
+  expect(once).toBeDefined()
+  // The bottom right corner, by the arrow keys: Shift for ten steps.
+  await projector.getByText('Bottom right', { exact: true }).click()
+  await expect(projector.getByRole('group', { name: 'Move the bottom right corner' })).toBeVisible()
+  // (Off the controls: there, the arrow keys move between their choices.)
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+  await page.keyboard.press('Shift+ArrowLeft')
+  const [twice] = await saved()
+  const [a, b] = [once!, twice!]
+  // A step is 10 mm at the rectangle's scale, the same either way.
+  const step = Math.hypot(a[1]![0] - a[0]![0], a[1]![1] - a[0]![1]) / 40
+  // (Near enough: the scale is taken along its top and side, both.)
+  expect(Math.abs(a[0]![0] - a[3]![0] - step)).toBeLessThan(2)
+  expect(Math.abs(b[2]![0] - (a[2]![0] - 10 * step))).toBeLessThan(2)
+  await projector.getByRole('button', { name: 'Done' }).click()
+  await expect(page.getByText('Calibration saved for this screen.')).toBeVisible()
+
+  // Closed and opened again: ready to cut, calibrated as it was.
+  await projector.getByRole('button', { name: 'Close' }).click()
+  await page.getByRole('button', { name: 'Projector', exact: true }).click()
+  await expect(projector.getByText('Calibrate the projector')).toHaveCount(0)
+  await expect(page.getByRole('img', { name: 'The pieces, true size.' })).toBeVisible()
+  await expect(projector.getByText(/The calibration is saved on this device/)).toBeVisible()
+  expect(await saved()).toEqual([b])
+  // The pattern stepped across the fabric.
+  const picture = () => page.getByRole('img', { name: 'The pieces, true size.' }).screenshot()
+  const before = await picture()
+  await projector
+    .getByRole('group', { name: 'Move the pattern' })
+    .getByRole('button', { name: 'Right' })
+    .click()
+  await expect.poll(async () => (await picture()).equals(before)).toBe(false)
+})
