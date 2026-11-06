@@ -12,6 +12,31 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 86 — The projector's calibration holds in full screen and out of it
+
+Still reported after Step 85: the projector only worked in full screen.
+Its calibration was kept for the window's size, and leaving full screen
+changes that size. Out of full screen it found none, started the
+rectangle again, its corners dragged so far lost. Back in full screen the
+old one came back. Even kept, a calibration made in full screen would
+have been off in a window by the browser's bar along the top.
+
+* The calibration's corners are now kept where they are on the screen,
+  not the page: the projector works out where the page is on the screen
+  (its top left corner in full screen; past the browser's frame and bar
+  in a window, looked at again as the window is resized or moved). The
+  same calibration holds in full screen, in a window and after switching,
+  and the pattern stays where it was on the fabric. Only on another
+  screen (a projector of another size) is it calibrated again.
+* Calibrations already made in full screen keep working; one made in a
+  window is asked for again once.
+
+**Try it:** **Projector**, drag a corner, type a size (in Safari this
+leaves full screen): the corner stays on its mark. **Full screen**, then
+**Done**: still there.
+
+---
+
 ## Step 85 — The projector stays open out of full screen
 
 Reported by a tester: typing or changing the calibration rectangle's size

@@ -79,44 +79,82 @@ test('the pieces are projected true size once the projector is calibrated', asyn
   await expect(page.getByRole('dialog', { name: 'Projector' })).toHaveCount(0)
 })
 
-test('leaving full screen while measuring leaves the projector open', async ({ page }) => {
-  await page.goto('/app/')
-  await openBackup(page, 'skirt.drapewright', 2)
-  await page.getByRole('button', { name: 'Projector', exact: true }).click()
-  const projector = page.getByRole('dialog', { name: 'Projector' })
-  await expect(projector.getByText('Calibrate the projector')).toBeVisible()
-  // Into full screen, by its button where the browser didn't start there.
-  const fullScreen = projector.getByRole('button', { name: 'Full screen' })
-  const inFullScreen = () => page.evaluate(() => document.fullscreenElement !== null)
-  // (The projector may go full screen itself meanwhile, the button gone.)
-  if (!(await inFullScreen())) await fullScreen.click({ timeout: 2000 }).catch(() => {})
-  await page.waitForTimeout(300)
-  const across = projector.getByRole('textbox', { name: 'Rectangle across' })
-  if (!(await inFullScreen())) {
-    // A browser that won't go full screen here (WebKit under test):
-    // typing keeps the projector open, full screen still offered.
+test.describe('on one screen', () => {
+  // The screen stays its size when the page changes size, as a real one
+  // does.
+  test.use({ screen: { width: 1920, height: 1080 } })
+
+  test('leaving full screen while measuring leaves the projector open', async ({ page }) => {
+    await page.goto('/app/')
+    await openBackup(page, 'skirt.drapewright', 2)
+    await page.getByRole('button', { name: 'Projector', exact: true }).click()
+    const projector = page.getByRole('dialog', { name: 'Projector' })
+    await expect(projector.getByText('Calibrate the projector')).toBeVisible()
+    // Into full screen, by its button where the browser didn't start there.
+    const fullScreen = projector.getByRole('button', { name: 'Full screen' })
+    const inFullScreen = () => page.evaluate(() => document.fullscreenElement !== null)
+    // (The projector may go full screen itself meanwhile, the button gone.)
+    if (!(await inFullScreen())) await fullScreen.click({ timeout: 2000 }).catch(() => {})
+    await page.waitForTimeout(300)
+    const across = projector.getByRole('textbox', { name: 'Rectangle across' })
+    if (!(await inFullScreen())) {
+      // A browser that won't go full screen here (WebKit under test):
+      // typing keeps the projector open, full screen still offered.
+      await across.fill('50')
+      await across.press('Tab')
+      await expect(projector.getByText('Calibrate the projector')).toBeVisible()
+      await expect(across).toHaveValue('50')
+      await expect(fullScreen).toBeVisible()
+      return
+    }
+    await expect(fullScreen).toBeHidden()
+    // A corner dragged onto the mat's mark.
+    const corners = () =>
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem('drapewright.projector') ?? 'null')?.corners,
+      )
+    const box = (await page.getByRole('img', { name: /calibrate by/ }).boundingBox())!
+    const s = Math.min((box.width * 0.7) / 400, (box.height * 0.7) / 300)
+    const corner = { x: box.x + (box.width - 400 * s) / 2, y: box.y + (box.height - 300 * s) / 2 }
+    await page.mouse.move(corner.x, corner.y)
+    await page.mouse.down()
+    await page.mouse.move(corner.x + 30, corner.y + 20, { steps: 4 })
+    await page.mouse.up()
+    const dragged = await corners()
+    expect(dragged).not.toBeNull()
+    // A measurement typed, and full screen left as Safari leaves it then.
     await across.fill('50')
+    await page.evaluate(() => document.exitFullscreen())
+    await expect.poll(inFullScreen).toBe(false)
+    // Out of full screen, the page is smaller (the browser's bar is back),
+    // on the same screen.
+    const viewport = page.viewportSize()!
+    const cdp = await page.context().newCDPSession(page)
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: viewport.width,
+      height: viewport.height - 80,
+      deviceScaleFactor: 1,
+      mobile: false,
+      screenWidth: 1920,
+      screenHeight: 1080,
+    })
     await across.press('Tab')
+    // Still open, still calibrating, the corner where it was dragged and the
+    // measurement kept; back into full screen at a tap, the same.
     await expect(projector.getByText('Calibrate the projector')).toBeVisible()
     await expect(across).toHaveValue('50')
-    await expect(fullScreen).toBeVisible()
-    return
-  }
-  await expect(fullScreen).toBeHidden()
-  // A measurement typed, and full screen left as Safari leaves it then.
-  await across.fill('50')
-  await page.evaluate(() => document.exitFullscreen())
-  await expect.poll(inFullScreen).toBe(false)
-  await across.press('Tab')
-  // Still open, the measurement kept, and back into full screen at a tap.
-  await expect(projector.getByText('Calibrate the projector')).toBeVisible()
-  await expect(across).toHaveValue('50')
-  await fullScreen.click()
-  await expect.poll(inFullScreen).toBe(true)
-  // Escape while typing doesn't close it; after, it does.
-  await across.focus()
-  await across.press('Escape')
-  await expect(projector).toBeVisible()
-  await projector.getByRole('button', { name: 'Close' }).click()
-  await expect(projector).toHaveCount(0)
+    expect(await corners()).toEqual(dragged)
+    await fullScreen.click()
+    await expect.poll(inFullScreen).toBe(true)
+    expect(await corners()).toEqual(dragged)
+    // Escape while typing doesn't close it; after, it does.
+    await across.focus()
+    await across.press('Escape')
+    await expect(projector).toBeVisible()
+    // Done: the calibration kept is the one made, the corner as dragged.
+    await projector.getByRole('button', { name: 'Done' }).click()
+    expect(await corners()).toEqual(dragged)
+    await projector.getByRole('button', { name: 'Close' }).click()
+    await expect(projector).toHaveCount(0)
+  })
 })

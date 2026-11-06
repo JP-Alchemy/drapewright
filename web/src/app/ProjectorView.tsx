@@ -39,7 +39,10 @@ import { isTyping } from './shortcuts.ts'
 interface Calibration {
   width: number
   height: number
-  /** Top left, top right, bottom right, bottom left: CSS px. */
+  /**
+   * Top left, top right, bottom right, bottom left: CSS px on the screen
+   * (not the window), so that it holds in full screen or not.
+   */
   corners: [Pt, Pt, Pt, Pt]
   /** The screen it was made on, CSS px: another must be calibrated again. */
   screen: [number, number]
@@ -78,6 +81,27 @@ function onFabric(layout: Layout, k: number): [number, number, number, number] {
 /** A corner within this of a press is the one dragged, CSS px. */
 const GRAB = 48
 
+/** The screen's size, CSS px. */
+const display = (): [number, number] => [window.screen.width, window.screen.height]
+
+/**
+ * Where the page's top left corner is on the screen, CSS px: nowhere but
+ * the corner in full screen; in a window, past the browser's frame and its
+ * bar along the top (outer less inner size: the frame as wide all round).
+ */
+function pageOrigin(): Pt {
+  if (document.fullscreenElement) return [0, 0]
+  const side = Math.max(0, (window.outerWidth - window.innerWidth) / 2)
+  const top = Math.max(0, window.outerHeight - window.innerHeight - side)
+  return [window.screenX + side, window.screenY + top]
+}
+
+/** The calibration's corners where they are on the page, its top left at `origin`. */
+function onPage(c: Calibration, origin: Pt): Calibration {
+  const at = ([x, y]: Pt): Pt => [x - origin[0], y - origin[1]]
+  return { ...c, corners: c.corners.map(at) as Calibration['corners'] }
+}
+
 function loadCalibration(width: number, height: number): Calibration | null {
   try {
     const c = JSON.parse(localStorage.getItem(STORAGE) ?? 'null') as Calibration | null
@@ -113,6 +137,13 @@ function startingCalibration(screen: [number, number], width = 400, height = 300
   }
 }
 
+/** A rectangle in the middle of the page to start from, its corners on the screen. */
+function startingOnScreen(width?: number, height?: number): Calibration {
+  const o = pageOrigin()
+  const c = startingCalibration([window.innerWidth, window.innerHeight], width, height)
+  return { ...onPage(c, [-o[0], -o[1]]), screen: display() }
+}
+
 /** Mat mm to the screen, by the calibration. */
 function mapOf(c: Calibration): Homography | null {
   return solveHomography(
@@ -134,12 +165,15 @@ export function ProjectorView({ session }: { session: Session }) {
   const { revision } = useEngineState(session)
   const host = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
-  const screen = (): [number, number] => [window.innerWidth, window.innerHeight]
-  const [size, setSize] = useState(screen)
+  const page = (): [number, number] => [window.innerWidth, window.innerHeight]
+  const [size, setSize] = useState(page)
+  const [origin, setOrigin] = useState(pageOrigin)
   const [cal, setCal] = useState<Calibration>(
-    () => loadCalibration(...screen()) ?? startingCalibration(screen()),
+    () => loadCalibration(...display()) ?? startingOnScreen(),
   )
-  const [calibrating, setCalibrating] = useState(() => loadCalibration(...screen()) === null)
+  const [calibrating, setCalibrating] = useState(() => loadCalibration(...display()) === null)
+  // The calibration as it is on this page, wherever the window is.
+  const shown = onPage(cal, origin)
   // The table point at the rectangle's top left corner: the pieces' top left.
   const [offset, setOffset] = useState<Pt>(() => {
     const b = sceneBounds(session.scene())
@@ -154,7 +188,7 @@ export function ProjectorView({ session }: { session: Session }) {
   // The piece being cut, picked out of the rest; none: all of them.
   const [focus, setFocus] = useState<number | null>(null)
   const drag = useRef<Drag | null>(null)
-  const map = mapOf(cal)
+  const map = mapOf(shown)
 
   // Full screen, as a projector shows it. Leaving full screen leaves the
   // projector open, to go back into it: Safari leaves it as soon as a
@@ -170,19 +204,29 @@ export function ProjectorView({ session }: { session: Session }) {
       () => setFull(true),
       () => {},
     )
-    const onChange = () => setFull(document.fullscreenElement !== null)
-    // A screen of another size: its own calibration, or calibrated again.
-    const onResize = () => {
-      const now = screen()
-      setSize(now)
-      const kept = loadCalibration(...now)
-      setCal((c) =>
-        c.screen[0] === now[0] && c.screen[1] === now[1]
-          ? c
-          : (kept ?? startingCalibration(now, c.width, c.height)),
-      )
-      if (!kept) setCalibrating(true)
+    const onChange = () => {
+      setFull(document.fullscreenElement !== null)
+      setOrigin(pageOrigin())
     }
+    // The window resized (in or out of full screen) or moved: the
+    // calibration holds, on the screen. Another screen: its own
+    // calibration, or calibrated again.
+    const onResize = () => {
+      setSize([window.innerWidth, window.innerHeight])
+      setOrigin(pageOrigin())
+      const now = display()
+      setCal((c) => {
+        if (c.screen[0] === now[0] && c.screen[1] === now[1]) return c
+        const kept = loadCalibration(...now)
+        if (!kept) setCalibrating(true)
+        return kept ?? startingOnScreen(c.width, c.height)
+      })
+    }
+    // A window moved fires nothing: looked for now and then.
+    const moved = window.setInterval(() => {
+      const o = pageOrigin()
+      setOrigin((was) => (was[0] === o[0] && was[1] === o[1] ? was : o))
+    }, 500)
     // Escape closes it, but not while a measurement is being typed.
     const onKey = (e: KeyboardEvent) =>
       e.key === 'Escape' && !isTyping(e.target) && session.showProjector(false)
@@ -192,6 +236,7 @@ export function ProjectorView({ session }: { session: Session }) {
     return () => {
       document.removeEventListener('fullscreenchange', onChange)
       window.removeEventListener('resize', onResize)
+      window.clearInterval(moved)
       window.removeEventListener('keydown', onKey)
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
     }
@@ -206,13 +251,13 @@ export function ProjectorView({ session }: { session: Session }) {
     c.height = Math.round(size[1] * dpr)
     const box = { width: size[0], height: size[1], dpr }
     const look = { stitching, thick, focus }
-    if (calibrating) drawCalibration(ctx, box, map, cal, cal.corners)
+    if (calibrating) drawCalibration(ctx, box, map, shown, shown.corners)
     else if (shows === 'layout' && layout)
       drawLayout(ctx, box, layout, { map, offset }, look, t.layout.faceDown)
     else drawProjection(ctx, box, session.scene(), { map, offset }, look)
   }, [
     size,
-    cal,
+    shown,
     map,
     calibrating,
     offset,
@@ -274,7 +319,7 @@ export function ProjectorView({ session }: { session: Session }) {
   const down = (e: React.PointerEvent) => {
     const p = point(e)
     if (calibrating) {
-      const nearest = cal.corners
+      const nearest = shown.corners
         .map((c, index) => ({ index, d: Math.hypot(c[0] - p[0], c[1] - p[1]) }))
         .sort((a, b) => a.d - b.d)[0]!
       if (nearest.d > GRAB) return
@@ -291,8 +336,9 @@ export function ProjectorView({ session }: { session: Session }) {
     if (!d) return
     const p = point(e)
     if (d.kind === 'corner') {
+      // Kept on the screen: where it is on the page, plus where the page is.
       const corners = [...cal.corners] as Calibration['corners']
-      corners[d.index] = p
+      corners[d.index] = [p[0] + origin[0], p[1] + origin[1]]
       if (mapOf({ ...cal, corners })) setCal({ ...cal, corners })
     } else {
       // The table point first pressed stays under the finger.
