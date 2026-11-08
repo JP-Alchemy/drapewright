@@ -23,6 +23,40 @@ export function suggest(measured: SizeMeasures[], fit: Fit): Partial<Record<Size
   return out
 }
 
+/**
+ * The levels the garment reaches in some size, top down, and whether it goes
+ * round the body there in some size: a skirt has no bust, and a bunnysuit
+ * cut up for the legs reaches the hip without going round it, a level to
+ * choose a size at all the same.
+ */
+export function levelsReached(measured: SizeMeasures[]): { level: SizeLevel; round: boolean }[] {
+  const girths = measured.flatMap((m) => m.girths)
+  return SIZE_LEVELS.flatMap((level) => {
+    const at = girths.filter((g) => g.level === level)
+    const round = at.some((g) => g.garment !== null)
+    return round || at.some((g) => g.across != null) ? [{ level, round }] : []
+  })
+}
+
+/**
+ * The size to start a level with where none is suggested there (it doesn't
+ * go round the body there): the size suggested at the nearest level, the
+ * one above where two are as near.
+ */
+export function nearestSuggested(
+  level: SizeLevel,
+  suggested: Partial<Record<SizeLevel, string>>,
+): string | undefined {
+  const at = SIZE_LEVELS.indexOf(level)
+  for (let d = 1; d < SIZE_LEVELS.length; d++) {
+    for (const k of [at - d, at + d]) {
+      const size = suggested[SIZE_LEVELS[k] as SizeLevel]
+      if (size !== undefined) return size
+    }
+  }
+  return undefined
+}
+
 /** Where a level is cut: in `size`, or `between` (0 to 1) of the way on to `next`. */
 export interface Cut {
   size: string

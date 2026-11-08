@@ -787,6 +787,57 @@ pub fn pocket_skirt() -> Vec<Piece> {
     vec![front, back, pocket]
 }
 
+/// A bunnysuit cut up high for the legs, drawn about x = 0: a front and a
+/// back, each cut once, 340 mm wide across the top and 355 at the waist
+/// line drawn across them, sewn at the sides for 260 mm down from the top.
+/// Below that each is cut away for the legs to a crotch, the back's fuller
+/// (its leg openings longer than the front's, as they are drawn), so round
+/// the hip there is only the front and back's cloth, not the sides'.
+pub fn bunnysuit() -> Vec<Piece> {
+    let mut front = piece(
+        "bf",
+        "Front",
+        [-170.0, 0.0],
+        vec![
+            edge("bft", line([170.0, 0.0])),
+            edge("bfr", line([185.0, 260.0])),
+            edge("bflr", line([20.0, 420.0])),
+            edge("bfc", line([-20.0, 420.0])),
+            edge("bfll", line([-185.0, 260.0])),
+            edge("bfl", line([-170.0, 0.0])),
+        ],
+        1,
+    );
+    let mut back = piece(
+        "bb",
+        "Back",
+        [-170.0, 0.0],
+        vec![
+            edge("bbt", line([170.0, 0.0])),
+            edge("bbr", line([185.0, 260.0])),
+            edge(
+                "bblr",
+                vec![Segment::line([145.0, 420.0]), Segment::line([60.0, 470.0])],
+            ),
+            edge("bbc", line([-60.0, 470.0])),
+            edge(
+                "bbll",
+                vec![
+                    Segment::line([-145.0, 420.0]),
+                    Segment::line([-185.0, 260.0]),
+                ],
+            ),
+            edge("bbl", line([-170.0, 0.0])),
+        ],
+        1,
+    );
+    for p in [&mut front, &mut back] {
+        grain(p, [0.0, 20.0], [0.0, 300.0]);
+        level(p, "Waist", [-177.5, 130.0], [177.5, 130.0]);
+    }
+    vec![front, back]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -491,6 +491,14 @@ fn cloth_only_part_of_the_way_round_is_not_measured() {
         "{measured:?}"
     );
     assert_eq!(at("hip"), None, "{measured:?}");
+    // But it reaches the hip, across it: a level to choose a size at.
+    use drapewright_sim::girth::{Reach, reaches};
+    let reach = reaches(&g, &starts, &figure);
+    let hip = reach.iter().find(|r| r.0 == "hip").unwrap().1;
+    assert!(
+        matches!(hip, Reach::Across(cloth) if (cloth - 600.0).abs() < 1.0),
+        "{reach:?}"
+    );
 }
 
 /// A tube of two rectangles, each 300 mm wide and 400 mm long, sewn at both

@@ -33,6 +33,8 @@ web-sys = { workspace = true, features = ["OffscreenCanvas"] }
 wasm-bindgen-futures.workspace = true
 
 [dev-dependencies]
+# The made-up garments to test with.
+drapewright-pattern-core = { workspace = true, features = ["testing"] }
 # The vocabulary of measurements the avatar should take.
 drapewright-project.workspace = true
 serde_json.workspace = true

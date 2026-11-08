@@ -12,6 +12,38 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 88 — A bunnysuit's hip blended again, though it doesn't go round
+
+A tester's corset bunnysuit in many sizes: the size finder's **Size to cut
+at each** gave only the bust, underbust and waist, not the hip as it had.
+A bunnysuit is cut up for the legs, so its cloth doesn't go round the hip.
+Before, the finder only showed the hip because some sizes were sewn wrongly
+and left a small strip of cloth there that counted as going round. Step 84
+stopped that strip counting (it is less than a quarter of the body round),
+and so the hip went from the finder.
+
+* **Across, not round.** Where a size reaches a level with a good part of
+  the body's width (a quarter round there at least) but doesn't go round
+  it, the finder now shows the cloth across there ("36.0 cm across"), with
+  no ease. The level is offered under **Size to cut at each**, starting in
+  the size suggested at the level nearest it (the waist's, for the hip).
+  Choose any size there; it can't be cut to a measurement, since there's
+  no girth to match. The blend cuts the legs' part of each piece in that
+  size.
+* The drape's own girths (the drape bar) are unchanged: a bunnysuit
+  still shows no hip there.
+* Known, not changed here: in some multi-size corset bunnysuits, Find
+  seams sews the centre front to the centre back in every other size, so
+  those sizes measure about half as big as they should.
+
+**Try it:** a corset bunnysuit PDF in several sizes (or a bunnysuit's
+sizes on the table as "Front (A)", "Front (B)" …): **Blend between
+sizes…**, **Sew and measure every size**. The **Hip** column says how
+much cloth is across it, and **Size to cut at each** has a **Hip** to
+choose, beside the bust, underbust and waist.
+
+---
+
 ## Step 87 — The projector remembers its calibration, and moves in steps
 
 Asked for by a tester: the calibration shouldn't have to be set up every

@@ -135,6 +135,12 @@ pub struct Girth {
     pub level: String,
     /// The garment round the body there, mm; none where it doesn't reach.
     pub garment: Option<f64>,
+    /// Where it reaches but doesn't go round (a bunnysuit cut up for the
+    /// legs, at the hip): the cloth across there, mm. Measured for a
+    /// pattern's sizes, a level to choose a size at all the same.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub across: Option<f64>,
     /// The body round there, mm.
     pub body: f64,
 }
@@ -284,6 +290,7 @@ impl Draping {
             .map(|g| Girth {
                 level: g.level.into(),
                 garment: g.garment,
+                across: None,
                 body: g.body,
             })
             .collect()

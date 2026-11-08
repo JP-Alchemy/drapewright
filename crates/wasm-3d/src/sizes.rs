@@ -1,8 +1,10 @@
 //! Each size of a pattern sewn and measured on a person's figure: how big
-//! it is round the bust, underbust, waist and hip, and the ease there, to choose a size
-//! by; and the pattern cut in a different size at each, blended between
-//! them. Each size is sewn as Find seams would sew it: panels drawn for one
-//! side cut as pairs, and every seam suggested taken.
+//! it is round the bust, underbust, waist and hip, and the ease there, to
+//! choose a size by (or the cloth across a level it reaches but doesn't go
+//! round, a bunnysuit's hip); and the pattern cut in a different size at
+//! each, blended between them. Each size is sewn as Find seams would sew
+//! it: panels drawn for one side cut as pairs, and every seam suggested
+//! taken.
 
 use drapewright_body::{BodyModel, Shape};
 use drapewright_pattern_core::blend::{Sized, blend};
@@ -10,7 +12,7 @@ use drapewright_pattern_core::geom::flatten_segs;
 use drapewright_pattern_core::{CutInstruction, Piece};
 use drapewright_seams::{Seam, drawn_for_one_side, suggest};
 use drapewright_sim::garment::{Garment, assemble, between_legs, draped_pieces};
-use drapewright_sim::girth::girths;
+use drapewright_sim::girth::{Reach, reaches};
 use drapewright_sim::heights::{Worn, worn};
 use drapewright_sim::place::{Figure, half_round, place};
 use serde::{Deserialize, Serialize};
@@ -64,12 +66,19 @@ fn measure(pieces: &[Piece], figure: &Figure) -> Vec<Girth> {
     let Some((_, garment, starts)) = sewn(pieces, figure) else {
         return Vec::new();
     };
-    girths(&garment, &starts, figure)
+    reaches(&garment, &starts, figure)
         .into_iter()
         .zip(&figure.levels)
-        .map(|((level, garment), at)| Girth {
+        .map(|((level, reach), at)| Girth {
             level: level.into(),
-            garment,
+            garment: match reach {
+                Reach::Round(girth) => Some(girth),
+                _ => None,
+            },
+            across: match reach {
+                Reach::Across(cloth) => Some(cloth),
+                _ => None,
+            },
             body: at.girth,
         })
         .collect()

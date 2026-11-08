@@ -1,6 +1,8 @@
 // Which size of a pattern in many sizes fits someone: each size sewn and
 // measured on their figure, round the bust, underbust, waist and hip, and
-// the size whose ease comes nearest to how it should fit suggested at each.
+// the size whose ease comes nearest to how it should fit suggested at each
+// (where it reaches a level without going round, a bunnysuit's hip, the
+// cloth across there, its size chosen by hand).
 // Where they differ, the pattern can be cut in each level's size (or to a
 // measurement there, between two sizes), blended between them.
 
@@ -25,7 +27,7 @@ import { avatarRequest } from './avatar.ts'
 import { withExample } from './example.ts'
 import { FITS, type Fit, SIZE_LEVELS, type SizeLevel } from './fit.ts'
 import { LengthField } from './LengthField.tsx'
-import { type Cut, type CutAt, cutFor, suggest } from './sizes.ts'
+import { type Cut, type CutAt, cutFor, levelsReached, nearestSuggested, suggest } from './sizes.ts'
 
 const text = t.sizing
 /** The choice, among a level's sizes, of cutting it to a measurement. */
@@ -94,10 +96,11 @@ export function SizeFinder({
   }
 
   const suggested = measured ? suggest(measured, fit) : {}
-  // Only the levels the garment reaches in some size (a skirt has no bust).
-  const levels = SIZE_LEVELS.filter((level) =>
-    (measured ?? []).some((m) => m.girths.some((g) => g.level === level && g.garment !== null)),
-  )
+  // Only the levels the garment reaches in some size (a skirt has no bust),
+  // and of those, the ones it goes round.
+  const reached = levelsReached(measured ?? [])
+  const levels = reached.map((r) => r.level)
+  const goesRound = (level: SizeLevel) => reached.some((r) => r.level === level && r.round)
   const levelName = (level: SizeLevel) => t.avatar.levels[level] ?? level
   const named = SIZE_LEVELS.flatMap((level) =>
     suggested[level] ? [text.at(levelName(level), suggested[level])] : [],
@@ -108,7 +111,7 @@ export function SizeFinder({
   // How each level the garment reaches is cut: in a size, or to the
   // measurement asked for, between two.
   const cut = levels.flatMap((level): LevelCut[] => {
-    const choice = picked[level] ?? suggested[level]
+    const choice = picked[level] ?? suggested[level] ?? nearestSuggested(level, suggested)
     if (choice === undefined) return []
     if (typeof choice === 'string') {
       return [{ level, choice, at: { size: choice, between: 0, next: null }, body: null }]
@@ -235,6 +238,12 @@ export function SizeFinder({
                     ) : (
                       levels.map((level) => {
                         const g = m.girths.find((x) => x.level === level)
+                        if (g?.garment == null && g?.across != null && !goesRound(level))
+                          return (
+                            <td key={level} className="muted">
+                              {text.across(formatLength(g.across, units))}
+                            </td>
+                          )
                         if (!g || g.garment === null) return <td key={level}>–</td>
                         const ease = g.garment - g.body
                         const mine = suggested[level] === m.size
@@ -296,14 +305,16 @@ export function SizeFinder({
                             {n}
                           </ListBoxItem>
                         ))}
-                        <ListBoxItem
-                          key={MEASUREMENT}
-                          id={MEASUREMENT}
-                          textValue={text.byMeasurement}
-                          className="menu-item"
-                        >
-                          {text.byMeasurement}
-                        </ListBoxItem>
+                        {goesRound(level) && (
+                          <ListBoxItem
+                            key={MEASUREMENT}
+                            id={MEASUREMENT}
+                            textValue={text.byMeasurement}
+                            className="menu-item"
+                          >
+                            {text.byMeasurement}
+                          </ListBoxItem>
+                        )}
                       </ListBox>
                     </Popover>
                   </Select>

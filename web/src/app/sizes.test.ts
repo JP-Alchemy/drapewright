@@ -1,6 +1,6 @@
 import type { Piece, SizeMeasures } from '@drapewright/engine'
 import { describe, expect, it } from 'vitest'
-import { cutFor, sizesOnTable, suggest } from './sizes.ts'
+import { cutFor, levelsReached, nearestSuggested, sizesOnTable, suggest } from './sizes.ts'
 
 /** A size measured round the figure: `round` the garment at each level, mm. */
 const size = (name: string, round: Record<string, number | null>): SizeMeasures => ({
@@ -47,6 +47,27 @@ describe('the size to cut at each level', () => {
 
   it('cuts nowhere the garment doesn’t reach', () => {
     expect(cutFor(measured, 'hip', 960, 'close')).toBeNull()
+  })
+
+  it('offers a level the garment reaches without going round it', () => {
+    // A corset bunnysuit cut up for the legs: across the hip, not round it.
+    const across = (m: SizeMeasures, cloth: number): SizeMeasures => ({
+      ...m,
+      girths: m.girths.map((g) => (g.level === 'hip' ? { ...g, across: cloth } : g)),
+    })
+    const bunnysuit = measured.map((m, k) => across(m, 360 + 20 * k))
+    expect(levelsReached(bunnysuit)).toEqual([
+      { level: 'bust', round: true },
+      { level: 'underbust', round: true },
+      { level: 'waist', round: true },
+      { level: 'hip', round: false },
+    ])
+    expect(levelsReached(measured).map((l) => l.level)).toEqual(['bust', 'underbust', 'waist'])
+    // No ease there to suggest a size by: it starts as the waist's.
+    const suggested = suggest(bunnysuit, 'fitted')
+    expect(suggested.hip).toBeUndefined()
+    expect(nearestSuggested('hip', suggested)).toBe('G')
+    expect(nearestSuggested('underbust', { bust: 'F', waist: 'G' })).toBe('F')
   })
 })
 

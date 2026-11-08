@@ -17,13 +17,43 @@ pub fn girths(
     points: &[Vec<[f64; 3]>],
     figure: &Figure,
 ) -> Vec<(&'static str, Option<f64>)> {
+    reaches(g, points, figure)
+        .into_iter()
+        .map(|(name, reach)| match reach {
+            Reach::Round(girth) => (name, Some(girth)),
+            _ => (name, None),
+        })
+        .collect()
+}
+
+/// How a garment meets one of the figure's levels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Reach {
+    /// Round the body: its girth there, mm.
+    Round(f64),
+    /// Across a good part of the body but not round it, the cloth across
+    /// there, mm: a bunnysuit cut up for the legs, at the hip. Still a
+    /// level to choose a size at.
+    Across(f64),
+    /// Not there, or too little of it to count (a corset's centre front
+    /// dipping alone to the hip).
+    Short,
+}
+
+/// How the garment meets each of the figure's levels: round the body,
+/// across it, or not.
+pub fn reaches(
+    g: &Garment,
+    points: &[Vec<[f64; 3]>],
+    figure: &Figure,
+) -> Vec<(&'static str, Reach)> {
     let trunk: Vec<bool> = (0..g.panels.len())
         .map(|p| !round_an_arm(&points[p], figure))
         .collect();
     figure
         .levels
         .iter()
-        .map(|level| (level.name, girth_at(g, points, &trunk, level)))
+        .map(|level| (level.name, reach_at(g, points, &trunk, level)))
         .collect()
 }
 
@@ -75,11 +105,12 @@ const QUARTER: f64 = 0.25;
 /// is about as big as the body.)
 const MOSTLY: f64 = 0.75;
 
-/// The garment's girth at a level: each triangle of a trunk panel that
-/// crosses its height, measured flat between where its edges cross, and
-/// the gap a lacing leaves there; none where the cloth doesn't go round
-/// the body there.
-fn girth_at(g: &Garment, points: &[Vec<[f64; 3]>], trunk: &[bool], level: &Level) -> Option<f64> {
+/// How the garment meets a level: its cloth there is each triangle of a
+/// trunk panel that crosses its height, measured flat between where its
+/// edges cross, and the gap a lacing leaves there; round the body, or
+/// across it where it doesn't go round (but is a `QUARTER` of the body
+/// round there at least).
+fn reach_at(g: &Garment, points: &[Vec<[f64; 3]>], trunk: &[bool], level: &Level) -> Reach {
     let y = level.y;
     // Laced points are joined too, the lace's gap between them.
     let sewn: HashSet<(usize, u32)> = g
@@ -140,9 +171,14 @@ fn girth_at(g: &Garment, points: &[Vec<[f64; 3]>], trunk: &[bool], level: &Level
             }
         }
     }
-    let round =
-        (open <= OPEN_ENDS && total >= QUARTER * level.girth) || total >= MOSTLY * level.girth;
-    (crossed && round).then_some(total)
+    let enough = total >= QUARTER * level.girth;
+    if !crossed || !enough {
+        Reach::Short
+    } else if open <= OPEN_ENDS || total >= MOSTLY * level.girth {
+        Reach::Round(total)
+    } else {
+        Reach::Across(total)
+    }
 }
 
 #[cfg(test)]

@@ -14,6 +14,12 @@ level: string,
  */
 garment: number | null, 
 /**
+ * Where it reaches but doesn't go round (a bunnysuit cut up for the
+ * legs, at the hip): the cloth across there, mm. Measured for a
+ * pattern's sizes, a level to choose a size at all the same.
+ */
+across?: number, 
+/**
  * The body round there, mm.
  */
 body: number, };

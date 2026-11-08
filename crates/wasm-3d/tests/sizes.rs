@@ -1,8 +1,10 @@
 //! A pattern's sizes sewn and measured on the avatar, to choose one by.
 
 use drapewright_body::{BodyModel, Shape};
+use drapewright_pattern_core::testing::garments::bunnysuit;
 use drapewright_pattern_core::{Piece, Pt};
 use drapewright_project::{Engine, container};
+use drapewright_wasm_3d::drape::Girth;
 use drapewright_wasm_3d::sizes::{
     BlendRequest, LevelSize, OneSize, SizePieces, SizesRequest, blend_sizes, measure_sizes,
 };
@@ -116,7 +118,11 @@ fn panels_drawn_for_one_side_are_measured_as_pairs() {
 /// A garment in three sizes, each 5% wider than the last, each size's
 /// pieces their own.
 fn graded(name: &str) -> Vec<SizePieces> {
-    let pieces = pieces(name);
+    graded_from(&pieces(name))
+}
+
+/// `pieces` in three sizes, as `graded`.
+fn graded_from(pieces: &[Piece]) -> Vec<SizePieces> {
     [("A", 1.0), ("B", 1.05), ("C", 1.1)]
         .into_iter()
         .map(|(size, by)| SizePieces {
@@ -142,6 +148,13 @@ fn at(level: &str, size: &str) -> LevelSize {
 
 /// The garment's girth at `level`, sewn from `pieces`.
 fn girth(pieces: &[Piece], level: &str) -> f64 {
+    measured_at(pieces, level)
+        .garment
+        .unwrap_or_else(|| panic!("{level}: not round the body"))
+}
+
+/// The garment at `level`, sewn from `pieces`.
+fn measured_at(pieces: &[Piece], level: &str) -> Girth {
     let measured = measure_sizes(
         &model(),
         &SizesRequest {
@@ -156,8 +169,60 @@ fn girth(pieces: &[Piece], level: &str) -> f64 {
         .girths
         .iter()
         .find(|g| g.level == level)
-        .and_then(|g| g.garment)
+        .cloned()
         .unwrap_or_else(|| panic!("{level}: {measured:?}"))
+}
+
+#[test]
+fn a_bunnysuit_is_cut_in_another_size_at_the_hip_it_doesnt_go_round() {
+    // Cut up for the legs, it reaches the hip but doesn't go round it: the
+    // hip is still a level to choose a size at (a tester's corset
+    // bunnysuit lost its hip from the size finder once a scrap of cloth
+    // alone there stopped counting as round the body).
+    let sizes = graded_from(&bunnysuit());
+    let measured = measure_sizes(
+        &model(),
+        &SizesRequest {
+            sizes: sizes.clone(),
+            settings: Shape::default().into(),
+        },
+    );
+    let across: Vec<f64> = measured
+        .iter()
+        .map(|m| {
+            let levels: Vec<&str> = m.girths.iter().map(|g| g.level.as_str()).collect();
+            assert_eq!(levels, ["bust", "underbust", "waist", "hip"], "{m:?}");
+            let at = |level: &str| m.girths.iter().find(|g| g.level == level).unwrap();
+            assert!(
+                at("waist").garment.is_some() && at("waist").across.is_none(),
+                "{m:?}"
+            );
+            let hip = at("hip");
+            assert_eq!(hip.garment, None, "not round the hip: {m:?}");
+            hip.across
+                .unwrap_or_else(|| panic!("across the hip: {m:?}"))
+        })
+        .collect();
+    // The front and back across it, each size 5% bigger.
+    assert!((400.0..600.0).contains(&across[0]), "{across:?}");
+    assert!((across[2] / across[0] - 1.1).abs() < 0.01, "{across:?}");
+    // Size A at the waist, C at the hip: as big round the waist as A, as
+    // much cloth across the hip as C.
+    let blended = blend_sizes(
+        &model(),
+        &BlendRequest {
+            sizes: sizes.clone(),
+            settings: Shape::default().into(),
+            at: vec![at("waist", "A"), at("hip", "C")],
+        },
+    )
+    .unwrap();
+    assert_eq!(blended.notes, []);
+    let waist = girth(&blended.pieces, "waist");
+    let a = girth(&sizes[0].pieces, "waist");
+    assert!((waist - a).abs() < 3.0, "waist {waist} vs {a}");
+    let hip = measured_at(&blended.pieces, "hip").across.unwrap();
+    assert!((hip - across[2]).abs() < 3.0, "hip {hip} vs {}", across[2]);
 }
 
 #[test]

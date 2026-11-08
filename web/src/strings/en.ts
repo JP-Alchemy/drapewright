@@ -105,7 +105,9 @@ export const t = {
     notSewn: 'Couldn’t be sewn round the figure',
     suggestedHere: 'Suggested',
     ease: (sign: string, by: string) => `${sign}${by}`,
-    how: 'Each size is sewn as Find seams would sew it, and measured flat round the figure’s bust, underbust, waist and hip. The ease is how much bigger than the body it is there: the size suggested at each has the ease nearest to the fit chosen.',
+    /** The cloth across a level the garment doesn't go round. */
+    across: (length: string) => `${length} across`,
+    how: 'Each size is sewn as Find seams would sew it, and measured flat round the figure’s bust, underbust, waist and hip. The ease is how much bigger than the body it is there: the size suggested at each has the ease nearest to the fit chosen. Where it doesn’t go round (a bunnysuit cut up for the legs, at the hip) the cloth across is shown: choose the size there yourself.',
     cutAt: 'Size to cut at each',
     /** The choice, beside the sizes, of cutting a level to a measurement. */
     byMeasurement: 'A measurement…',
