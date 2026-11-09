@@ -12,6 +12,37 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 89 — Every size of a corset bunnysuit sewn as a whole
+
+Following Step 88: in the tester's kind of corset bunnysuit (13 sizes, its
+panels drawn for one side), the size finder measured every other size about
+half as big as it should, so it suggested the wrong sizes there.
+
+* **The centre front panel.** In those sizes the "Front Center" piece's
+  centre happens to be as long as the "Back Center" piece's, and Find seams
+  sewed one to the other. That joined the two halves as if they were the
+  whole corset, so they were never cut as pairs. Find seams knew not to do
+  this for a panel with one straight side, but a centre front panel is
+  straight on both sides (its seam to the next panel too). A side running
+  with the grain on a piece named for the centre front or back now counts
+  as its centre. Those sizes are cut as pairs, each centre sewn to its other
+  half (the back laced), and the crotch pieces go along the bottoms.
+* **The modesty panel.** In the largest size, the modesty panel's end was
+  as long as the back's bottom edges either side of the lacing, and it was
+  sewn along them like a band. A piece named "Modesty panel" is now left
+  for you to place, as a binding strip or a rouleau is.
+* Measured on the standard figure, the sizes now go up evenly, 5 cm a size
+  round the bust, underbust and waist (66.4 cm to 126.3 cm at the bust).
+  Find seams is unchanged on the other private test patterns, every size.
+
+**Try it:** the same corset bunnysuit as in Step 88, **Blend between
+sizes…**, **Sew and measure every size**: each size is about 5 cm bigger
+than the one before at the bust, underbust and waist, A as well as B. Or
+pick size A alone, **Find seams**: the centre front and back panels are cut
+as pairs, the front sewn to its other half, the back laced.
+
+---
+
 ## Step 88 — A bunnysuit's hip blended again, though it doesn't go round
 
 A tester's corset bunnysuit in many sizes: the size finder's **Size to cut
@@ -32,9 +63,9 @@ and so the hip went from the finder.
   size.
 * The drape's own girths (the drape bar) are unchanged: a bunnysuit
   still shows no hip there.
-* Known, not changed here: in some multi-size corset bunnysuits, Find
-  seams sews the centre front to the centre back in every other size, so
-  those sizes measure about half as big as they should.
+* In some multi-size corset bunnysuits, Find seams sewed the centre
+  front to the centre back in every other size, so those sizes measured
+  about half as big as they should: fixed in Step 89.
 
 **Try it:** a corset bunnysuit PDF in several sizes (or a bunnysuit's
 sizes on the table as "Front (A)", "Front (B)" …): **Blend between

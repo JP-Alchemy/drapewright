@@ -628,6 +628,82 @@ fn a_centre_back_with_eyelets_along_it_is_laced() {
 }
 
 #[test]
+fn a_centre_front_panel_straight_both_sides_is_not_sewn_to_the_centre_back() {
+    use drapewright_pattern_core::testing::garments::corset;
+    use drapewright_seams::drawn_for_one_side;
+    // The corset's centre front panel straight down both sides (its seam
+    // to the side panel as straight as its centre), and its centre as long
+    // as the centre back: as a corset bunnysuit in many sizes has it in
+    // every other size. Its centre is still its centre: not sewn to the
+    // back's, as if the two halves were the whole corset.
+    let mut pieces = corset(false);
+    let front = &mut pieces[0];
+    assert_eq!(front.name, "Front Center");
+    // Its centre 455 mm long, from 465 up to 10, as the back's runs from
+    // -25 down to 430; its seam to the side panel, and the side panel's
+    // to it, straight, the lines across them meeting there still.
+    front.outline.edges[1].segments = vec![Segment::line([70.0, 500.0])];
+    front.outline.edges[2].segments = vec![Segment::line([0.0, 465.0])];
+    for line in &mut front.lines {
+        line.segments = vec![Segment::line([70.0, line.start.y])];
+    }
+    let side = &mut pieces[1];
+    side.outline.edges[3].segments = vec![Segment::line([200.0, 0.0])];
+    for line in &mut side.lines {
+        line.start.x = 200.0;
+    }
+    assert_eq!(drawn_for_one_side(&pieces, &[]), ["fc", "fs", "bk"]);
+    // Cut as pairs: each centre sewn to its other half.
+    for p in &mut pieces[..3] {
+        p.cut[0].quantity = 2;
+    }
+    let sewn = pairs(&pieces);
+    assert!(sewn.contains(&"fc.fcl-fc.fcl*".to_string()), "{sewn:?}");
+    assert!(sewn.contains(&"bk.bkr-bk.bkr*".to_string()), "{sewn:?}");
+    assert!(
+        !sewn
+            .iter()
+            .any(|s| s.contains("fc.fcl-bk") || s.contains("bk.bkr-fc")),
+        "{sewn:?}"
+    );
+}
+
+#[test]
+fn a_modesty_panel_is_not_sewn_on() {
+    use drapewright_pattern_core::testing::garments::corset;
+    // A corset's modesty panel, laid under the lacing: its end as long as
+    // the back's lower edges either side of the centre back (the back run
+    // 40 mm lower there, each 76 mm), as a corset bunnysuit's is in one of
+    // its sizes, but not sewn along them, as a band would be.
+    let mut pieces = corset(true);
+    pieces[2].outline.edges[1].segments = vec![Segment::line([470.0, 470.0])];
+    let panel = |name: &str| {
+        piece(
+            "mp",
+            name,
+            [800.0, 0.0],
+            vec![
+                edge("mpt", EdgeKind::Seam, Segment::line([952.3, 0.0])),
+                edge("mpr", EdgeKind::Seam, Segment::line([952.3, 455.0])),
+                edge("mpb", EdgeKind::Seam, Segment::line([800.0, 455.0])),
+                edge("mpl", EdgeKind::Seam, Segment::line([800.0, 0.0])),
+            ],
+            1,
+        )
+    };
+    // Any other panel so long is sewn along them ...
+    pieces.push(panel("Panel"));
+    let sewn = pairs(&pieces);
+    assert!(sewn.contains(&"bk.bkb-mp.mpt".to_string()), "{sewn:?}");
+    // ... not a modesty panel.
+    pieces.pop();
+    pieces.push(panel("Modesty Panel"));
+    let sewn = pairs(&pieces);
+    assert!(sewn.contains(&"bk.bkr-bk.bkr*".to_string()), "{sewn:?}");
+    assert!(!sewn.iter().any(|s| s.contains("mp.")), "{sewn:?}");
+}
+
+#[test]
 fn pieces_drawn_for_one_side_are_found_to_be_cut_as_pairs() {
     use drapewright_pattern_core::testing::garments::{corset, yoked_blouse};
     use drapewright_seams::drawn_for_one_side;

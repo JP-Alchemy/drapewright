@@ -193,6 +193,8 @@ struct Candidate {
     /// The piece's one edge with the grain, and it has no fold: a front's
     /// or a back's, its centre.
     only_straight: bool,
+    /// The piece is named for the centre front or back ("Front Center").
+    centre_piece: bool,
     /// Next to the centre of a piece cut as a pair (which is sewn to its
     /// other half), as a waist or a neckline is.
     at_centre: bool,
@@ -217,6 +219,15 @@ struct Candidate {
     /// The piece drawn as this one's mirror image, edge for edge, if any:
     /// the other side's, though not named so (by index).
     twin: Option<usize>,
+}
+
+impl Candidate {
+    /// A front's or a back's centre: its piece's one edge with the grain,
+    /// or one with the grain on a piece named for the centre (a centre
+    /// front panel's other side, sewn to the next panel, is as straight).
+    fn centre(&self) -> bool {
+        self.only_straight || (self.with_grain && self.centre_piece)
+    }
 }
 
 /// For each piece, the first piece shaped as it is: as many edges, each as
@@ -284,10 +295,12 @@ pub(crate) fn inside(piece: &Piece) -> bool {
 }
 
 /// A strip made into something other than a seam: a rouleau (button
-/// loops), a tie, binding.
+/// loops), a tie, binding; or a corset's modesty panel, laid under the
+/// lacing (sewn behind one side by hand, if at all).
 pub(crate) fn strip(piece: &Piece) -> bool {
     let name = piece.name.to_lowercase();
     [
+        "modesty",
         "rouleau",
         "loop",
         "tie",
@@ -760,6 +773,10 @@ fn candidates<P: Borrow<Piece>>(pieces: &[P], taken: &[(Id, Id)], every: bool) -
                 mirror_of: None,
                 twin: twins[pi],
                 only_straight: false,
+                centre_piece: side_of(&piece.name) != Side::Neither && {
+                    let name = piece.name.to_lowercase();
+                    name.contains("centre") || name.contains("center")
+                },
                 at_centre: false,
             });
         }
@@ -1001,7 +1018,7 @@ fn score(a: &Candidate, b: &Candidate, reversed: bool) -> (f64, Vec<Reason>) {
     );
     // A front's centre and a back's, cut as pairs: each is sewn to its own
     // other half.
-    if front_and_back && a.pair && b.pair && a.only_straight && b.only_straight {
+    if front_and_back && a.pair && b.pair && a.centre() && b.centre() {
         score -= 1.0;
     }
     match (a.side, b.side) {
@@ -2754,8 +2771,8 @@ pub fn drawn_for_one_side<P: Borrow<Piece>>(pieces: &[P], seams: &[Seam]) -> Vec
     for s in suggest(pieces, seams) {
         let centres = match (find(&s.seam.a), find(&s.seam.b)) {
             (Some(a), Some(b)) => {
-                a.only_straight
-                    && b.only_straight
+                a.centre()
+                    && b.centre()
                     && a.side != b.side
                     && a.side != Side::Neither
                     && b.side != Side::Neither
