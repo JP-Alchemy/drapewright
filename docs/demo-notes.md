@@ -12,6 +12,29 @@ pnpm dev        # then open http://localhost:5173/app/ (the site is at the root)
 
 ---
 
+## Step 90 — A corset bunnysuit's crotch pieces sewn on in every size
+
+Following Step 89: in one size of the tester's kind of corset bunnysuit,
+Find seams sewed the crotch front's narrow end to the bottom of one half of
+the back (the two happen to be about as long, 5.4 and 5.6 cm). That left
+both crotch pieces off the garment in that size.
+
+* A crotch piece cut once goes across the centre, along both halves of the
+  panels beside it (the crotch front along both centre fronts' bottoms, the
+  crotch back along the back panels'). It is no longer sewn by one edge to
+  an edge beside the centre of a piece cut as a pair, which would join it
+  to one half only.
+* In that pattern, size B now has both crotch pieces sewn on as every
+  other size does. Find seams is unchanged on the other private test
+  patterns, every size.
+
+**Try it:** the corset bunnysuit, size B alone, **Find seams**: the crotch
+front goes along the bottoms of both centre front panels, and the crotch
+back along the back panels' bottoms. Neither is sewn to the back centre
+panel alone.
+
+---
+
 ## Step 89 — Every size of a corset bunnysuit sewn as a whole
 
 Following Step 88: in the tester's kind of corset bunnysuit (13 sizes, its

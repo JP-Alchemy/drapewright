@@ -669,6 +669,23 @@ fn a_centre_front_panel_straight_both_sides_is_not_sewn_to_the_centre_back() {
 }
 
 #[test]
+fn a_crotch_piece_is_not_sewn_to_one_half_of_the_back() {
+    use drapewright_pattern_core::testing::garments::corset;
+    // The corset's crotch piece, its lower edge as long as the back's lower
+    // edge beside the centre back (70.7 mm), as a corset bunnysuit's is in
+    // some of its sizes. It still goes along both centre fronts, and is not
+    // sewn by that edge to one half of the back.
+    let mut pieces = corset(true);
+    let crotch = &mut pieces[3];
+    assert_eq!(crotch.name, "Crotch Front");
+    crotch.outline.edges[2].segments = vec![Segment::line([639.3, 100.0])];
+    let sewn = pairs(&pieces);
+    assert!(sewn.contains(&"cr.crt-fc.fcb".to_string()), "{sewn:?}");
+    assert!(sewn.contains(&"cr.crt-fc.fcb*".to_string()), "{sewn:?}");
+    assert!(!sewn.iter().any(|s| s.contains("bk.bkb")), "{sewn:?}");
+}
+
+#[test]
 fn a_modesty_panel_is_not_sewn_on() {
     use drapewright_pattern_core::testing::garments::corset;
     // A corset's modesty panel, laid under the lacing: its end as long as

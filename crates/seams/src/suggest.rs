@@ -1530,6 +1530,15 @@ fn edges<P: Borrow<Piece>>(
             if a.strip || b.strip {
                 continue;
             }
+            // A crotch piece cut once goes across the centre, along both
+            // halves of a pair (`along_openings`): not by an edge to one
+            // half's edge beside the centre, as long as it by chance.
+            let one_half = |x: &Candidate, y: &Candidate| {
+                x.role == Role::Crotch && !x.pair && y.role != Role::Crotch && y.at_centre
+            };
+            if one_half(a, b) || one_half(b, a) {
+                continue;
+            }
             if (a.length - b.length).abs() / a.length.max(b.length) <= MOST_APART {
                 let ((s1, r1), (s2, r2)) = (score(a, b, false), score(a, b, true));
                 let (s, reversed, reasons) = if s2 > s1 {
